@@ -42,6 +42,17 @@ export const donates = (root: Element) =>
     (a) => a.textContent === "Donate"
   );
 
+/** the give card's blocks, top to bottom: "banner" for its image, "donate"
+ * for a block holding Donate and nothing else, else that block's text */
+export const panel_parts = (panel: Element) =>
+  Array.from(panel.children).map((el) => {
+    if (el instanceof HTMLImageElement) return "banner";
+    const only_donate =
+      el.textContent === "Donate" &&
+      (el.matches("a") || donates(el).length === 1);
+    return only_donate ? "donate" : (el.textContent ?? "");
+  });
+
 /** elements under `root` pinned to the viewport's bottom edge: fixed or
  * sticky, with a bottom inset */
 export const pinned_to_bottom = (root: Element) =>

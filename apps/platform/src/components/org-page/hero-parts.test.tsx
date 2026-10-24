@@ -7,7 +7,6 @@ import { OrgBanner } from "./org-banner";
 import { OrgMark } from "./org-mark";
 import { OrgMeta } from "./org-meta";
 import { OrgName } from "./org-name";
-import { RaisedStats } from "./raised-stats";
 
 // a real 1x1 pixel, so the img stays mounted rather than falling back
 const PIXEL =
@@ -203,77 +202,5 @@ describe("org hero", () => {
     expect(glyph.bottom).toBeLessThanOrEqual(
       text.getBoundingClientRect().top + line
     );
-  });
-});
-
-describe("raised stats", () => {
-  test("$0 raised asks for the first gift instead of showing the figures", async () => {
-    const screen = await render(
-      <RaisedStats raised={0} donors={0} target={undefined} variant="inline" />
-    );
-    await expect
-      .element(screen.getByText("Be the first to give"))
-      .toBeVisible();
-    expect(screen.container).not.toMatchTextContent("$0");
-    expect(screen.getByRole("progressbar").query()).toBeNull();
-  });
-
-  test("figures are pairs, a figure over its label, the donors only when the count is known; a goal adds the bar and the goal in dollars", async () => {
-    const screen = await render(
-      <>
-        <RaisedStats
-          raised={3322}
-          donors={49}
-          target={undefined}
-          variant="inline"
-        />
-        <RaisedStats
-          raised={3322}
-          donors={null}
-          target="8000"
-          variant="card-lg"
-        />
-      </>
-    );
-    const [inline, panel] = Array.from(screen.container.children);
-    const pairs = Array.from(inline.querySelectorAll("p"));
-    expect(pairs.map((p) => p.textContent)).toEqual([
-      "$3,322 raised",
-      "49 donors",
-    ]);
-    for (const p of pairs) {
-      const [figure, label] = Array.from(p.children);
-      expect(figure.tagName).toBe("STRONG");
-      // the figure over its label
-      expect(figure.getBoundingClientRect().bottom).toBeLessThanOrEqual(
-        label.getBoundingClientRect().top
-      );
-    }
-    expect(inline.textContent).not.toContain("·");
-    expect(inline.querySelector("[role=progressbar]")).toBeNull();
-
-    expect(panel).not.toMatchTextContent("donor");
-    expect(panel.querySelector("strong")).toHaveTextContent("$3,322");
-    const bar = screen.getByRole("progressbar");
-    await expect.element(bar).toHaveAttribute("aria-valuenow", "3322");
-    await expect.element(bar).toHaveAttribute("aria-valuemax", "8000");
-    expect(panel.textContent).toContain("$3,322 of $8,000 goal");
-    expect(panel.textContent).not.toContain("%");
-  });
-
-  test("a supporter count in the thousands is written with its separator", async () => {
-    const screen = await render(
-      <RaisedStats
-        raised={3322}
-        donors={12_345}
-        target={undefined}
-        variant="inline"
-      />
-    );
-    const pairs = Array.from(screen.container.querySelectorAll("p"));
-    expect(pairs.map((p) => p.textContent)).toEqual([
-      "$3,322 raised",
-      "12,345 donors",
-    ]);
   });
 });

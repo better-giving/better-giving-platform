@@ -9,6 +9,7 @@ import {
   header_donate,
   imgs_outside_panel,
   panel_banner,
+  panel_parts,
   pinned_to_bottom,
   scroll_past_hero_donate,
 } from "#/__tests__/fixtures/layout-dom";
@@ -23,6 +24,7 @@ import {
   many,
   message,
   npo,
+  org_figures,
   org_layout,
   program,
   prose,
@@ -82,6 +84,18 @@ const tab_names = () =>
   [...document.querySelectorAll('[role="tab"]')].map((t) => t.textContent);
 
 describe("Hub", () => {
+  test.each([3322, 0])(
+    "shows none of the org's figures, with %i raised and a goal stored",
+    async (raised) => {
+      const org = npo({ contributions_total: raised, target: "8000" });
+      const screen = await mount(org_layout({ npo: org }));
+      await expect
+        .element(screen.getByRole("heading", { level: 1 }))
+        .toBeVisible();
+      expect(org_figures(screen.container, org)).toEqual([]);
+    }
+  );
+
   test("no middle dot anywhere in the rendered page", async () => {
     await page.viewport(1440, 900);
     const screen = await mount(
@@ -248,6 +262,7 @@ describe("Hub", () => {
     const panel = give_panel(screen.container);
     await expect.poll(() => panel_banner(panel)?.ratio ?? 0).toBeCloseTo(4, 1);
     expect(panel_banner(panel)?.flush).toBe(true);
+    expect(panel_parts(panel)).toEqual(["banner", "donate"]);
     expect(imgs_outside_panel(screen.container)).toEqual([]);
     // the mark sits inside the band
     const mark = band.querySelector("[data-monogram]") as HTMLElement;
@@ -256,7 +271,7 @@ describe("Hub", () => {
     );
   });
 
-  test("with no banner the band stays the tint and the give card starts at the figures", async () => {
+  test("with no banner the band stays the tint and the give card is Donate alone", async () => {
     const screen = await mount(
       org_layout({ give: many(give, 4), npo: npo({ image: null }) })
     );
@@ -267,10 +282,7 @@ describe("Hub", () => {
     expect(main.firstElementChild).toHaveClass("bg-band");
     expect(main.querySelector("img")).toBeNull();
     const panel = give_panel(screen.container);
-    expect(panel_banner(panel)).toBeNull();
-    expect(panel.firstElementChild?.querySelector("strong")).toHaveTextContent(
-      "$3,322"
-    );
+    expect(panel_parts(panel)).toEqual(["donate"]);
     const [donate] = donates(panel);
     expect(donate).toHaveClass("btn-primary");
   });

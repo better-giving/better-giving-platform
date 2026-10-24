@@ -78,7 +78,6 @@ function OrgPage({ d }: IOrgPage) {
     <Layout
       npo={npo}
       shape={d.shape}
-      donors={d.donors}
       donate_to={href("/donate/:id", { id: String(npo.id) })}
       share={{ recipientName: npo.name, url: d.url }}
       now={d.now}

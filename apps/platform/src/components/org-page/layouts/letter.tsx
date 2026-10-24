@@ -6,7 +6,6 @@ import { OrgBanner } from "../org-banner";
 import { OrgMeta } from "../org-meta";
 import { OrgName } from "../org-name";
 import { QuoteStrip } from "../quote-strip";
-import { RaisedStats } from "../raised-stats";
 import { OrgPageFrame } from "./org-page-frame";
 import type { IOrgLayout } from "./types";
 import { WaysToHelp } from "./ways-to-help";
@@ -15,9 +14,8 @@ const LEAD =
   "[&>p:first-child]:text-lg [&>p:first-child]:font-bold md:[&>p:first-child]:text-xl";
 
 /** a long story, and 0-3 items: an editorial reading column on the page's
- * left edge. the name and its deck, the figures and Donate under them, the
- * banner across the page, the story, the donors' words, then whatever there
- * is to give to */
+ * left edge. the name and its deck, Donate under them, the banner across the
+ * page, the story, the donors' words, then whatever there is to give to */
 export function Letter(props: IOrgLayout) {
   const { npo } = props;
   const [hero_donate, set_hero_donate] = useState<HTMLElement | null>(null);
@@ -43,13 +41,6 @@ export function Letter(props: IOrgLayout) {
                 {deck}
               </p>
             )}
-            <RaisedStats
-              raised={npo.contributions_total}
-              donors={props.donors}
-              target={npo.target}
-              variant="stacked"
-              classes="mt-1"
-            />
             <DonateButton
               ref={set_hero_donate}
               to={props.donate_to}

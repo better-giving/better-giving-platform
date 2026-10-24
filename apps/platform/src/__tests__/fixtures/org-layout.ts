@@ -1,3 +1,4 @@
+import { to_usd } from "@better-giving/ui/helpers";
 import type {
   IDonorMessage,
   IGiveItem,
@@ -165,6 +166,28 @@ export const npo = (o: Partial<INpoPublic> = {}): INpoPublic => ({
   ...o,
 });
 
+/** the org-wide figures a page shows, each as the text or role that gave it
+ * away: the raised total, a donor count, a goal bar or goal line, the
+ * first-gift ask. `toEqual([])` prints whichever is back */
+export function org_figures(root: Element, org: INpoPublic): string[] {
+  const text = root.textContent ?? "";
+  const found = Array.from(root.querySelectorAll("[role=progressbar]")).map(
+    (bar) => `progressbar ${bar.getAttribute("aria-label") ?? ""}`.trim()
+  );
+  const raised = to_usd(org.contributions_total);
+  if (text.includes(raised)) found.push(raised);
+  for (const re of [
+    /\braised\b/i,
+    /[\d,]+ donors?\b/i,
+    /\bgoal\b/i,
+    /be the first to give/i,
+  ]) {
+    const m = text.match(re);
+    if (m) found.push(m[0]);
+  }
+  return found;
+}
+
 /** a page's props. the shape is measured from the npo and the lists given,
  * as the loader measures it, unless `shape` says otherwise */
 export function org_layout(o: Partial<IOrgLayout> = {}): IOrgLayout {
@@ -181,7 +204,6 @@ export function org_layout(o: Partial<IOrgLayout> = {}): IOrgLayout {
       programs: 0,
       videos: 0,
     },
-    donors: 49,
     donate_to: "/donate/7",
     share: { recipientName: "Riverside Literacy", url: "https://x/org/7" },
     now: NOW,

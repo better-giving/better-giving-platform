@@ -168,11 +168,7 @@ function HubHero({ page, donate_ref }: IHubHero) {
         <GivePanel
           name={npo.name}
           banner={npo.image}
-          raised={npo.contributions_total}
-          donors={page.donors}
-          target={npo.target}
           donate_to={page.donate_to}
-          figures="md"
           donate_ref={donate_ref}
           classes="col-span-2 md:col-span-1 md:col-start-3 md:row-span-full md:row-start-1"
         />

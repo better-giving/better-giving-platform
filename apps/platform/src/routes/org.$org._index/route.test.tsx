@@ -112,8 +112,8 @@ describe("public org page", () => {
     const screen = await mount("hub");
     await expect.element(screen.getByText("hub layout")).toBeInTheDocument();
 
+    expect(rendered.props).not.toHaveProperty("donors");
     expect(rendered.props).toMatchObject({
-      donors: 3,
       now: NOW,
       give: [give],
       programs: [],

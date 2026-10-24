@@ -1,5 +1,4 @@
 import * as v from "valibot";
-import { target } from "#/components/goal-selector";
 import { donate_method } from "#/types/components";
 import { $, MAX_RECEIPT_MSG_CHAR } from "@/npo/schema";
 import { increment, MAX_NUM_INCREMENTS } from "@/schemas";
@@ -27,7 +26,6 @@ export const schema = v.object({
     v.filterItems((m) => !m.disabled),
     v.minLength(1, "at least one payment option should be active")
   ),
-  target,
 });
 
 export type FV = v.InferInput<typeof schema>;

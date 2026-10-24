@@ -48,8 +48,6 @@ function Page({ loaderData }: Route.ComponentProps) {
             tagline={endow.tagline ?? undefined}
             logo={endow.logo || flying_character}
             classes=""
-            target={endow.target}
-            contributions_total={endow.contributions_total}
             program={program}
           />
         </div>

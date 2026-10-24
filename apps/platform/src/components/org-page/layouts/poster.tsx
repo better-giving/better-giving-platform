@@ -47,11 +47,7 @@ export function Poster(props: IOrgLayout) {
             <GivePanel
               name={npo.name}
               banner={npo.image}
-              raised={npo.contributions_total}
-              donors={props.donors}
-              target={npo.target}
               donate_to={props.donate_to}
-              figures="lg"
               donate_ref={set_hero_donate}
               classes="mt-1 md:col-start-2 md:row-span-full md:mt-0 md:self-center"
             />

@@ -65,7 +65,6 @@ function Page({ loaderData: endow }: Route.ComponentProps) {
                 endow.donate_methods ?? (["stripe"] as DonateMethodId[])
               }
               increments={endow.increments ?? []}
-              target={endow.target}
               freqs={endow.donate_frequencies ?? undefined}
             />
           </TabPanel>

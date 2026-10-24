@@ -9,6 +9,7 @@ import {
   header_donate,
   imgs_outside_panel,
   panel_banner,
+  panel_parts,
   pinned_to_bottom,
   scroll_past_hero_donate,
 } from "#/__tests__/fixtures/layout-dom";
@@ -22,6 +23,7 @@ import {
   LONG_NAME,
   many,
   npo,
+  org_figures,
   org_layout,
   program,
   story,
@@ -86,6 +88,22 @@ function mount(o: Partial<IOrgLayout> = {}) {
 }
 
 describe("Feature", () => {
+  test.each([3322, 0])(
+    "shows none of the org's figures, with %i raised and a goal stored",
+    async (raised) => {
+      const org = npo({
+        overview_pt: story_of(STORY_CLAMP + 400),
+        contributions_total: raised,
+        target: "8000",
+      });
+      const screen = await mount({ npo: org, give: [], programs: [] });
+      await expect
+        .element(screen.getByRole("heading", { level: 1 }))
+        .toBeVisible();
+      expect(org_figures(screen.container, org)).toEqual([]);
+    }
+  );
+
   test("no middle dot anywhere in the rendered page", async () => {
     await page.viewport(1440, 900);
     const screen = await mount();
@@ -234,22 +252,20 @@ describe("Feature", () => {
     const panel = give_panel(screen.container);
     await expect.poll(() => panel_banner(panel)?.ratio ?? 0).toBeCloseTo(4, 1);
     expect(panel_banner(panel)?.flush).toBe(true);
+    expect(panel_parts(panel)).toEqual(["banner", "donate"]);
     // one Donate in main: the card's
     expect(
       donates(screen.container.querySelector("main") as HTMLElement)
     ).toHaveLength(1);
   });
 
-  test("with no banner the give card starts at the figures", async () => {
+  test("with no banner the give card is Donate alone", async () => {
     const screen = await mount({
       npo: npo({ image: null, overview_pt: story_of(STORY_CLAMP + 400) }),
     });
     const panel = give_panel(screen.container);
     await expect.poll(() => panel.checkVisibility()).toBe(true);
-    expect(panel_banner(panel)).toBeNull();
-    expect(panel.firstElementChild?.querySelector("strong")).toHaveTextContent(
-      "$3,322"
-    );
+    expect(panel_parts(panel)).toEqual(["donate"]);
   });
 
   test("the give card rises into the hero from its top, beside the story, and sticks while the story scrolls", async () => {

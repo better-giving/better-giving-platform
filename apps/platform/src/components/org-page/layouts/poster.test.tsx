@@ -9,6 +9,7 @@ import {
   header_donate,
   imgs_outside_panel,
   panel_banner,
+  panel_parts,
   pinned_to_bottom,
   scroll_past_hero_donate,
 } from "#/__tests__/fixtures/layout-dom";
@@ -22,6 +23,7 @@ import {
   many,
   message,
   npo,
+  org_figures,
   org_layout,
   program,
   story,
@@ -59,6 +61,18 @@ function mount(o: Partial<IOrgLayout> = {}, n: Partial<INpoPublic> = {}) {
 }
 
 describe("Poster", () => {
+  test.each([3322, 0])(
+    "shows none of the org's figures, with %i raised and a goal stored",
+    async (raised) => {
+      const org = { contributions_total: raised, target: "8000" };
+      const screen = await mount({}, org);
+      await expect
+        .element(screen.getByRole("heading", { level: 1 }))
+        .toBeVisible();
+      expect(org_figures(screen.container, npo(org))).toEqual([]);
+    }
+  );
+
   test("no middle dot anywhere in the rendered page", async () => {
     await page.viewport(1440, 900);
     const screen = await mount({
@@ -137,7 +151,7 @@ describe("Poster", () => {
     [375, 812],
     [1440, 900],
   ])(
-    "the give card: the banner on top at 4:1, the figures, then Donate across it, at %i",
+    "the give card: the banner on top at 4:1, then Donate across it, at %i",
     async (w, h) => {
       await page.viewport(w, h);
       const screen = await mount();
@@ -148,11 +162,7 @@ describe("Poster", () => {
         .poll(() => panel_banner(panel)?.ratio ?? 0)
         .toBeCloseTo(4, 1);
       expect(panel_banner(panel)?.flush).toBe(true);
-      const figure = panel.querySelector("strong") as HTMLElement;
-      expect(figure).toHaveTextContent("$3,322");
-      expect(figure.getBoundingClientRect().bottom).toBeLessThanOrEqual(
-        donate.getBoundingClientRect().top
-      );
+      expect(panel_parts(panel)).toEqual(["banner", "donate"]);
       const body = donate.parentElement as HTMLElement;
       const inset = Number.parseFloat(getComputedStyle(body).paddingLeft);
       expect(donate.getBoundingClientRect().width).toBeCloseTo(
@@ -162,15 +172,13 @@ describe("Poster", () => {
     }
   );
 
-  test("on the deep band the card is a light surface: Donate is the primary button and the figures' labels take muted page ink", async () => {
+  test("on the deep band the card is a light surface and Donate is the primary button", async () => {
     const screen = await mount();
     const panel = give_panel(screen.container);
     const [donate] = donates(panel);
     await expect.poll(() => donate.checkVisibility()).toBe(true);
     expect(panel.closest(".bg-primary-deep")).not.toBeNull();
     expect(donate).toHaveClass("btn-primary");
-    const label = screen.getByText("raised", { exact: true }).element();
-    expect(label).toHaveClass("text-gray-11");
   });
 
   test("the card's Donate takes the page's focus ring, not the deep band's white one", async () => {
@@ -260,16 +268,13 @@ describe("Poster", () => {
       .toBeVisible();
   });
 
-  test("with no banner there is no img, the deep band leads the page, and the card starts at the figures", async () => {
+  test("with no banner there is no img, the deep band leads the page, and the card is Donate alone", async () => {
     const screen = await mount({}, { image: null });
     const h1 = screen.getByRole("heading", { level: 1 });
     await expect.element(h1).toBeVisible();
     expect(screen.container.querySelector("img")).toBeNull();
     const panel = give_panel(screen.container);
-    expect(panel_banner(panel)).toBeNull();
-    expect(panel.firstElementChild?.querySelector("strong")).toHaveTextContent(
-      "$3,322"
-    );
+    expect(panel_parts(panel)).toEqual(["donate"]);
     const main = screen.container.querySelector("main") as HTMLElement;
     expect(main.firstElementChild).toHaveClass("bg-primary-deep");
     expect(main.firstElementChild).toContainElement(

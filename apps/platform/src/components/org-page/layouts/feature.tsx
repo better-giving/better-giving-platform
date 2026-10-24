@@ -93,11 +93,7 @@ export function Feature(props: IOrgLayout) {
           <GivePanel
             name={npo.name}
             banner={npo.image}
-            raised={npo.contributions_total}
-            donors={props.donors}
-            target={npo.target}
             donate_to={props.donate_to}
-            figures="lg"
             donate_ref={set_hero_donate}
             classes="md:pointer-events-auto md:sticky md:top-20 md:col-start-2 md:self-start"
           />
