@@ -1,4 +1,4 @@
-import { Image, Target, to_target } from "@better-giving/ui";
+import { Image } from "@better-giving/ui";
 import { href, NavLink } from "react-router";
 import flying_character from "#/assets/images/flying-character.webp";
 import { BookmarkBtn } from "#/components/bookmark-btn";
@@ -8,14 +8,7 @@ import type { EndowmentCard } from "#/types/npo";
 
 const PLACEHOLDER_TAGLINE = " ";
 
-export function Card({
-  name,
-  card_img,
-  id,
-  tagline,
-  contributions_total,
-  target,
-}: EndowmentCard) {
+export function Card({ name, card_img, id, tagline }: EndowmentCard) {
   return (
     <div className="relative bg-panel border rounded has-[.pending]:grayscale has-[.pending]:pointer-events-none  grid grid-rows-subgrid row-span-4 gap-y-0">
       <NavLink
@@ -39,10 +32,6 @@ export function Card({
             <p className="peer text-gray-11 text-sm -mt-2 mb-4">{tagline}</p>
           ) : (
             <div />
-          )}
-
-          {target && (
-            <Target progress={contributions_total} target={to_target(target)} />
           )}
         </div>
       </NavLink>
