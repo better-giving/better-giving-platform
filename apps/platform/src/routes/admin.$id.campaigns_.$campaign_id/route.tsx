@@ -73,6 +73,7 @@ export default function Page({ loaderData }: Route.ComponentProps) {
         locked={!!campaign.published_at}
         status={campaign.status}
         gift_count={gift_count}
+        folded={!!campaign.legacy_fund_id}
         fallback_methods={endow.donate_methods}
         fallback_frequencies={endow.donate_frequencies}
         settings_donation_to={`${href("/admin/:id/settings", { id })}?tab=donation`}

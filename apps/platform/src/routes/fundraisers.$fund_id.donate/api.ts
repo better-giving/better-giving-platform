@@ -2,7 +2,10 @@ import { safeParse, union } from "valibot";
 import { get_session } from "#/.server/auth";
 import { get_fund } from "#/.server/fund";
 import { segment } from "#/api/schema/segment";
-import { campaign_moved } from "#/routes/_app.fundraisers.$fund_id/api";
+import {
+  campaign_moved,
+  folded_campaign_public,
+} from "#/routes/_app.fundraisers.$fund_id/api";
 import type { AuthUser } from "#/types/auth";
 import type { IFund } from "#/types/fund";
 import { fund_id } from "@/fundraiser/schema";
@@ -27,11 +30,11 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
   const id = p.output;
   const fund = await get_fund(id);
   if (!fund) throw new Response(null, { status: 404 });
-  // the campaign page carries the donation form; a folded fund donates there. a
-  // draft campaign is absent from the public page, so keep serving the fund's
-  // own donate page until its campaign goes live rather than 301ing to a 404
+  // the campaign page carries the donation form; a folded fund donates there.
+  // redirect only when `folded_campaign_public` allows it, else keep serving the
+  // fund's own donate page
   const campaign = await campaign_by_legacy_fund(fund.id);
-  if (campaign && campaign.status !== "draft") {
+  if (folded_campaign_public(campaign, fund.members.length)) {
     throw campaign_moved(campaign, new URL(request.url).search);
   }
 

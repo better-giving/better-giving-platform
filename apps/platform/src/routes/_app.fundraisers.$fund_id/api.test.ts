@@ -152,6 +152,99 @@ describe("folded fund redirects", () => {
     expect((data as { id: string }).id).toBe(fund.id);
   });
 
+  it("keeps serving a multi-beneficiary folded fund (the campaign pays the owner alone)", async () => {
+    const other = await seed_npo(db(), {
+      registration_number: "EIN-OTHER",
+      slug: "other-org",
+      published: true,
+    });
+    const fund = await seed_fund(db(), {
+      id: crypto.randomUUID(),
+      slug: "shared-drive",
+      npo_owner: npo_id,
+      creator_id,
+      members: [npo_id, other.id],
+    });
+    await db()
+      .insert(campaigns)
+      .values({
+        id: `camp-${fund.id}`,
+        owner_npo_id: npo_id,
+        creator_id,
+        name: "Winter",
+        slug: "winter",
+        status: "live",
+        legacy_fund_id: fund.id,
+      });
+
+    const data = await load(fund.id);
+    expect(data).not.toBeInstanceOf(Response);
+    expect((data as { id: string }).id).toBe(fund.id);
+  });
+
+  it("keeps serving a folded fund when the owner npo is unpublished (campaign page would 404)", async () => {
+    const hidden = await seed_npo(db(), {
+      registration_number: "EIN-HIDDEN",
+      slug: "hidden-org",
+      published: false,
+    });
+    const creator = await seed_user(db(), `hidden-${hidden.id}@test.com`);
+    const fund = await seed_fund(db(), {
+      id: crypto.randomUUID(),
+      slug: "hidden-drive",
+      npo_owner: hidden.id,
+      creator_id: creator.id,
+      members: [hidden.id],
+    });
+    await db()
+      .insert(campaigns)
+      .values({
+        id: `camp-${fund.id}`,
+        owner_npo_id: hidden.id,
+        creator_id: creator.id,
+        name: "Winter",
+        slug: "winter",
+        status: "live",
+        legacy_fund_id: fund.id,
+      });
+
+    const data = await load(fund.id);
+    expect(data).not.toBeInstanceOf(Response);
+    expect((data as { id: string }).id).toBe(fund.id);
+  });
+
+  it("keeps serving a folded fund when the owner npo is inactive (campaign page would 404)", async () => {
+    const dormant = await seed_npo(db(), {
+      registration_number: "EIN-DORMANT",
+      slug: "dormant-org",
+      published: true,
+      active: false,
+    });
+    const creator = await seed_user(db(), `dormant-${dormant.id}@test.com`);
+    const fund = await seed_fund(db(), {
+      id: crypto.randomUUID(),
+      slug: "dormant-drive",
+      npo_owner: dormant.id,
+      creator_id: creator.id,
+      members: [dormant.id],
+    });
+    await db()
+      .insert(campaigns)
+      .values({
+        id: `camp-${fund.id}`,
+        owner_npo_id: dormant.id,
+        creator_id: creator.id,
+        name: "Winter",
+        slug: "winter",
+        status: "live",
+        legacy_fund_id: fund.id,
+      });
+
+    const data = await load(fund.id);
+    expect(data).not.toBeInstanceOf(Response);
+    expect((data as { id: string }).id).toBe(fund.id);
+  });
+
   it("redirects to the owner's numeric id when the org has no slug", async () => {
     const slugless = await seed_npo(db(), {
       registration_number: "EIN-NOSLUG",

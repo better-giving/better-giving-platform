@@ -133,6 +133,9 @@ interface Props {
   locked: boolean;
   status: "draft" | "live" | "ended" | null;
   gift_count: number;
+  /** true when this campaign was folded from a legacy fund; it carries historic
+   * legacy revenue and so cannot be deleted */
+  folded?: boolean;
   fallback_methods: DonateMethodId[] | null | undefined;
   fallback_frequencies: TFrequency[] | null | undefined;
   settings_donation_to: string;
@@ -146,6 +149,7 @@ export function CampaignForm({
   locked,
   status,
   gift_count,
+  folded = false,
   fallback_methods,
   fallback_frequencies,
   settings_donation_to,
@@ -583,7 +587,7 @@ export function CampaignForm({
         error={errors.program_id?.message || server_error("program_id")}
       />
       <div className="flex flex-wrap gap-3 justify-end">
-        {gift_count === 0 && status && (
+        {gift_count === 0 && !folded && status && (
           <button
             type="button"
             className="text-sm font-medium text-destructive-subtle-fg"

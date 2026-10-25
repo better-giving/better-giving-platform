@@ -320,17 +320,23 @@ export async function campaign_by_id(
 }
 
 /** the campaign an org fund was folded into, if any, with its owner's slug for
- * the public url; the 301s off `/fundraisers/*` read this */
-export async function campaign_by_legacy_fund(fund_id: string): Promise<
-  | {
-      id: string;
-      slug: string;
-      status: TCampaignStatus;
-      owner_npo_id: number | null;
-      owner_slug: string | null;
-    }
-  | undefined
-> {
+ * the public url and the owner's publication state; the 301s off `/fundraisers/*`
+ * read this */
+export interface IFoldedCampaign {
+  id: string;
+  slug: string;
+  status: TCampaignStatus;
+  owner_npo_id: number | null;
+  owner_slug: string | null;
+  /** owner npo publication state; the public campaign page 404s when the owner
+   * is unpublished or inactive, so a 301 must check these first */
+  owner_published: boolean | null;
+  owner_active: boolean | null;
+}
+
+export async function campaign_by_legacy_fund(
+  fund_id: string
+): Promise<IFoldedCampaign | undefined> {
   const [row] = await db
     .select({
       id: campaigns.id,
@@ -338,6 +344,8 @@ export async function campaign_by_legacy_fund(fund_id: string): Promise<
       status: campaigns.status,
       owner_npo_id: campaigns.owner_npo_id,
       owner_slug: npos.slug,
+      owner_published: npos.published,
+      owner_active: npos.active,
     })
     .from(campaigns)
     .leftJoin(npos, eq(npos.id, campaigns.owner_npo_id))
@@ -555,7 +563,8 @@ export async function campaign_gift_count(
   return row?.n ?? 0;
 }
 
-/** false when another nonprofit owns it, it has gifts, or it is missing */
+/** false when another nonprofit owns it, it has gifts, it was folded from a
+ * fund, or it is missing */
 export async function campaign_delete(
   npo_id: number,
   id: string
@@ -563,6 +572,10 @@ export async function campaign_delete(
   const current = await campaign_get(npo_id, id);
   if (!current) return false;
   if ((await campaign_gift_count(id)) > 0) return false;
+  // a folded campaign carries historic legacy gifts (settled dists keyed on its
+  // legacy_fund_id) that campaign_gift_count never sees; deleting it would
+  // orphan that revenue, so it is undeletable like one with its own gifts
+  if (current.legacy_fund_id) return false;
   await db
     .delete(campaigns)
     .where(and(eq(campaigns.id, id), eq(campaigns.owner_npo_id, npo_id)));

@@ -11,6 +11,7 @@ import {
 } from "vitest";
 import { cleanup, render } from "vitest-browser-react";
 import { user } from "$/pg/schema/auth";
+import { campaigns as campaign_table } from "$/pg/schema/campaign";
 import { funds as fund_table } from "$/pg/schema/fund";
 import { npos } from "$/pg/schema/npo";
 import type { TestDb } from "$/pg/test-utils/pglite";
@@ -90,6 +91,8 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await cleanup();
+  // campaigns reference funds (legacy_fund_id) and npos, so drop them first
+  await test_db.current!.db.delete(campaign_table);
   await test_db.current!.db.delete(fund_table);
   await test_db.current!.db.delete(npos);
   await test_db.current!.db.delete(user);
@@ -767,26 +770,39 @@ describe("funds — published visibility on npo profile", () => {
       .not.toBeInTheDocument();
   });
 
-  it("org funds no longer list on Your campaigns — they're campaigns now (BG-1943)", async () => {
+  it("lists an unfolded org fund on Your campaigns and drops a folded one (BG-1943)", async () => {
     const npo = await seed_npo();
     const creator = await seed_user("admin-vis@test.com", "Admin", "Vis");
 
+    // an org fund not yet folded (the backfill is gated) still lists here, so it
+    // never vanishes from the admin's view
     await seed_fund({
       id: "eeeeeeee-0001-0001-0001-000000000001",
-      name: "Published Admin Fund",
+      name: "Standalone Org Fund",
       npo_owner: npo.id,
       creator_id: creator.id,
       members: [npo.id],
       published: true,
     });
 
+    // an org fund already folded lives on as its campaign, so the fund row is
+    // dropped and only the campaign shows
     await seed_fund({
       id: "eeeeeeee-0002-0002-0002-000000000002",
-      name: "Draft Admin Fund",
+      name: "Merged Legacy Fund",
       npo_owner: npo.id,
       creator_id: creator.id,
       members: [npo.id],
-      published: false,
+      published: true,
+    });
+    await db().insert(campaign_table).values({
+      id: "camp-folded-fund",
+      owner_npo_id: npo.id,
+      creator_id: creator.id,
+      name: "Merged Campaign",
+      slug: "merged-campaign",
+      status: "live",
+      legacy_fund_id: "eeeeeeee-0002-0002-0002-000000000002",
     });
 
     const screen = await render_funds(npo.id, {
@@ -797,11 +813,20 @@ describe("funds — published visibility on npo profile", () => {
       .getByRole("tab", { name: "Your campaigns", exact: true })
       .click();
 
-    // Your campaigns lists real campaigns; none seeded, so the empty state shows
-    await expect.element(screen.getByText("No campaigns yet")).toBeVisible();
-    // the org's own funds are not listed here anymore
-    expect(screen.getByText("Published Admin Fund").query()).toBeNull();
-    expect(screen.getByText("Draft Admin Fund").query()).toBeNull();
+    // the unfolded org fund still lists as its own row
+    await expect
+      .element(screen.getByText("Standalone Org Fund", { exact: true }))
+      .toBeVisible();
+    // the folded fund shows only as its campaign, not as a fund row
+    await expect
+      .element(screen.getByText("Merged Campaign", { exact: true }))
+      .toBeVisible();
+    expect(
+      screen.getByText("Merged Legacy Fund", { exact: true }).query()
+    ).toBeNull();
+    expect(
+      screen.getByText("No campaigns yet", { exact: true }).query()
+    ).toBeNull();
   });
 });
 

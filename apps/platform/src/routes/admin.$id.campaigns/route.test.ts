@@ -409,7 +409,7 @@ describe("campaign slug", () => {
 });
 
 describe("campaign list loader", () => {
-  it("lists real campaigns on Your campaigns and supporter funds on the other tab", async () => {
+  it("lists real campaigns and unfolded org funds on Your campaigns, supporter funds on the other tab", async () => {
     const org = await npo("EIN-LIST", "list-org");
     await db().insert(campaigns).values({
       id: "camp-real",
@@ -422,13 +422,30 @@ describe("campaign list loader", () => {
     await db()
       .insert(campaign_members)
       .values({ campaign_id: "camp-real", npo_id: org.id });
-    // an org fund is folded into a campaign now (BG-1943), so it is not
-    // surfaced on the campaigns tab as its own row
+    // an org fund not yet folded still lists on the campaigns tab as its own row
+    // (the backfill is gated), so it never vanishes
     await seed_fund(db(), {
       id: "fund-owned",
       name: "Owned drive",
       npo_owner: org.id,
       creator_id: USER,
+    });
+    // an org fund already folded into a campaign lives on as that campaign, so
+    // it is dropped from the fund list and not shown twice
+    await seed_fund(db(), {
+      id: "fund-folded",
+      name: "Folded drive",
+      npo_owner: org.id,
+      creator_id: USER,
+    });
+    await db().insert(campaigns).values({
+      id: "camp-folded",
+      owner_npo_id: org.id,
+      creator_id: USER,
+      name: "Folded drive",
+      slug: "folded-drive",
+      status: "live",
+      legacy_fund_id: "fund-folded",
     });
     await seed_fund(db(), {
       id: "fund-supporter",
@@ -447,8 +464,12 @@ describe("campaign list loader", () => {
     } as any);
     if (data.view !== "campaigns")
       throw new Error("expected the campaigns tab");
-    expect(data.campaigns.map((c) => c.id)).toEqual(["camp-real"]);
-    expect(data).not.toHaveProperty("org_funds");
+    expect(data.campaigns.map((c) => c.id).sort()).toEqual([
+      "camp-folded",
+      "camp-real",
+    ]);
+    // the unfolded org fund lists; the folded one is excluded (it is a campaign)
+    expect(data.org_funds.map((f) => f.id)).toEqual(["fund-owned"]);
 
     const tab = await list_loader({
       request: new Request("https://x/admin/list/campaigns?tab=fundraisers"),

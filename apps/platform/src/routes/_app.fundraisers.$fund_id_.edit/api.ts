@@ -71,9 +71,11 @@ export const loader = async ({ request, params }: Route.LoaderArgs) => {
   const fund = await get_fund(id);
   if (!fund) throw resp.status(404);
 
-  // a folded fund is edited as its campaign; the campaign editor gates access
+  // a folded fund is edited as its campaign; the campaign editor gates access.
+  // a multi-beneficiary fund keeps its own editor, because the campaign it was
+  // folded into pays the owner npo alone (see `folded_campaign_public`)
   const campaign = await campaign_by_legacy_fund(fund.id);
-  if (campaign?.owner_npo_id != null) {
+  if (campaign?.owner_npo_id != null && fund.members.length <= 1) {
     throw moved(
       `${href("/admin/:id/campaigns/:campaign_id", {
         id: String(campaign.owner_npo_id),

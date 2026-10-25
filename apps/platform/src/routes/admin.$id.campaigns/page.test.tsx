@@ -42,7 +42,7 @@ const init: ICampaignFormInit = {
 
 function form_page(
   status: "draft" | "live" | "ended" | null,
-  extra?: { gift_count?: number; locked?: boolean }
+  extra?: { gift_count?: number; locked?: boolean; folded?: boolean }
 ) {
   let entered = false;
   let posted: unknown;
@@ -58,6 +58,7 @@ function form_page(
           locked={extra?.locked ?? false}
           status={status}
           gift_count={extra?.gift_count ?? 0}
+          folded={extra?.folded ?? false}
           fallback_methods={["stripe"]}
           fallback_frequencies={["one-time"]}
           settings_donation_to="/admin/7/settings?tab=donation"
@@ -96,7 +97,7 @@ function form_page(
 
 async function render_form(
   status: "draft" | "live" | "ended" | null,
-  extra?: { gift_count?: number; locked?: boolean }
+  extra?: { gift_count?: number; locked?: boolean; folded?: boolean }
 ) {
   const built = form_page(status, extra);
   const screen = await render(
@@ -131,7 +132,11 @@ describe("campaign list", () => {
     );
   }
 
-  async function render_list(campaigns: unknown[], search = "") {
+  async function render_list(
+    campaigns: unknown[],
+    search = "",
+    org_funds: unknown[] = []
+  ) {
     const Stub = createRoutesStub([
       {
         path: "/admin/:id/campaigns",
@@ -156,6 +161,7 @@ describe("campaign list", () => {
             view: "campaigns" as const,
             endow,
             campaigns,
+            org_funds,
           };
         },
       },
@@ -409,6 +415,54 @@ describe("campaign list", () => {
       "Spring",
     ]);
   });
+
+  it("lists an unfolded org fund as its own row on Your campaigns", async () => {
+    const screen = await render_list(
+      [
+        {
+          id: "c-live",
+          name: "Winter",
+          slug: "winter",
+          status: "live",
+          status_label: "live",
+          raised: 12,
+          ends_at: null,
+        },
+      ],
+      "",
+      [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          name: "Legacy drive",
+          active: true,
+          published: true,
+          donation_total_usd: 55,
+          expiration: 0,
+          banner: undefined,
+          target: undefined,
+        },
+      ]
+    );
+
+    expect(screen.getByText("No campaigns yet").query()).toBeNull();
+    const items = screen.getByRole("listitem").elements();
+    expect(items.map((el) => el.querySelector("p")?.textContent)).toEqual([
+      "Winter",
+      "Legacy drive",
+    ]);
+    const fund_row = (
+      screen.getByText("Legacy drive", { exact: true }).element() as HTMLElement
+    ).closest("li");
+    // an active published fund keeps its own fundraiser editor + public view
+    expect(
+      (
+        page
+          .elementLocator(fund_row as HTMLElement)
+          .getByRole("link", { name: "Edit Legacy drive", exact: true })
+          .element() as HTMLAnchorElement
+      ).getAttribute("href")
+    ).toBe("/fundraisers/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/edit");
+  });
 });
 
 describe("campaign form", () => {
@@ -543,6 +597,13 @@ describe("campaign form", () => {
     await expect
       .element(screen.getByRole("button", { name: "Delete" }))
       .toBeVisible();
+  });
+
+  it("hides Delete for a campaign folded from a legacy fund", async () => {
+    const { screen } = await render_form("draft", { folded: true });
+    expect(
+      screen.getByRole("button", { name: "Delete", exact: true }).query()
+    ).toBeNull();
   });
 
   it("shows a server refusal on the address and moves focus there", async () => {

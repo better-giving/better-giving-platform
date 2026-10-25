@@ -26,6 +26,7 @@ import type {
 import type { IPageKeyed } from "@/types/api";
 import { db } from "../db";
 import { user } from "../schema/auth";
+import { campaigns } from "../schema/campaign";
 import { fund_members, funds } from "../schema/fund";
 import { v_donation_total_usd } from "../schema/views";
 import { from_target, to_target } from "./fmt";
@@ -328,6 +329,14 @@ export async function fund_npo_memberof(
       eq(funds.published, true),
       eq(funds.active, true),
       fund_is_open_sql
+    );
+  }
+
+  if (params.exclude_folded) {
+    // a fund already folded into a campaign lives on as that campaign; drop it
+    // here so it is not listed twice. an unfolded org fund still shows
+    conditions.push(
+      sql`NOT EXISTS (SELECT 1 FROM ${campaigns} WHERE ${campaigns.legacy_fund_id} = ${funds.id})`
     );
   }
 
