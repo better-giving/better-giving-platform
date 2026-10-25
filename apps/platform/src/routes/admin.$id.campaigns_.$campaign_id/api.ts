@@ -82,7 +82,7 @@ export const action = async ({
     const ok = await campaign_delete(id, campaign_id);
     if (!ok) {
       const note = current.legacy_fund_id
-        ? "A campaign created from a fundraiser cannot be deleted."
+        ? "A campaign with past gifts cannot be deleted."
         : "A campaign with gifts cannot be deleted.";
       return data(refusal(note), { status: 400 });
     }
