@@ -1,0 +1,44 @@
+{
+  "$comment": "Pass as outputSchema on POST /eve/v1/session. The run's result.completed event carries an object of this shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "prUrl",
+    "gatedAreas",
+    "openFindings",
+    "doneCheck",
+    "questions",
+    "summary"
+  ],
+  "properties": {
+    "status": { "type": "string", "enum": ["PASS", "BLOCKED"] },
+    "prUrl": {
+      "type": ["string", "null"],
+      "description": "Draft PR URL. null when BLOCKED."
+    },
+    "gatedAreas": {
+      "type": "string",
+      "description": "The reviewer's Gated areas line, or none."
+    },
+    "openFindings": { "type": "array", "items": { "type": "string" } },
+    "doneCheck": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["item", "command", "result"],
+        "properties": {
+          "item": { "type": "string" },
+          "command": { "type": "string" },
+          "result": { "type": "string" }
+        }
+      }
+    },
+    "questions": { "type": "array", "items": { "type": "string" } },
+    "summary": {
+      "type": "string",
+      "description": "What changes for users, in plain words."
+    }
+  }
+}
