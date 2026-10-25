@@ -497,6 +497,51 @@ describe("ItemsByCount", () => {
     expect(hit?.closest("a")?.textContent).toBe("School meals 1");
   });
 
+  test.each([
+    { layout: "a lone feature card at 1440", width: 1440, n: 1 },
+    { layout: "halves at 1440", width: 1440, n: 2 },
+    { layout: "thirds at 1440", width: 1440, n: 3 },
+    { layout: "a phone's stack at 375", width: 375, n: 2 },
+  ])(
+    "without a goal, a program's title and clamped summary stay clear of its chevron: $layout",
+    async ({ width, n }) => {
+      await page.viewport(width, 900);
+      const goalless = (i: number): IProgramItem => ({
+        ...program(i),
+        title: `School meals and a weekly take-home ration for every pupil in the district ${i}`,
+        summary:
+          "Breakfast and a hot lunch for every pupil in four district schools, every school day of the year, cooked by parents on site from local produce bought at the weekly market, with a take-home ration on Fridays for the pupils whose families need it most. In the holidays the kitchens stay open three mornings a week, and the parents who cook are paid a stipend that the programme reviews each term with the school boards and the district health office. Every kitchen keeps a log of what it served and to how many pupils, and the logs are published at the end of each term so that donors, parents and teachers can see where each shilling went.",
+      });
+      const screen = await mount(
+        <ItemsByCount
+          items={Array.from({ length: n }, (_, i) => goalless(i + 1))}
+          now={NOW}
+        />
+      );
+      for (const card of screen.getByRole("article").elements()) {
+        const chevron = (
+          card.querySelector("svg.lucide-chevron-right") as Element
+        ).getBoundingClientRect();
+        const summary = card.querySelector("h3 + p") as HTMLElement;
+        // it clamps: the summary's text runs past the lines it shows
+        expect(summary.scrollHeight).toBeGreaterThan(summary.clientHeight);
+        const title = card.querySelector("h3 a") as Element;
+        // the text's own ranges, not their blocks, which span the column
+        for (const el of [title, summary]) {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const text = range.getBoundingClientRect();
+          const overlaps =
+            text.left < chevron.right &&
+            chevron.left < text.right &&
+            text.top < chevron.bottom &&
+            chevron.top < text.bottom;
+          expect(overlaps, el.textContent ?? "").toBe(false);
+        }
+      }
+    }
+  );
+
   test("videos: one full, two halves, three as one large over two", async () => {
     await page.viewport(1440, 900);
 

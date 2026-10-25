@@ -13,13 +13,18 @@ export interface IProgramCard {
 
 /** a program, laid out as a campaign's card: the 4:1 image across the top,
  * the text column the card's full width, a goal's bar and figures on the
- * card's bottom edge. the chevron sits over the bottom-right corner. the
- * title is the card's one link, stretched over it */
+ * card's bottom edge. the chevron sits over the bottom-right corner, and a
+ * goal-less card's title and summary stop short of it. the title is the
+ * card's one link, stretched over it */
 export function ProgramCard({
   item,
   feature = false,
   show_kind,
 }: IProgramCard) {
+  // without a goal the title or summary is the column's last line and runs
+  // its full width: the chevron's 16px plus the column's gap keeps it clear.
+  // a goal's figures are short, and its bar spans the column
+  const clear_chevron = item.goal == null ? "pr-6" : "";
   return (
     <article
       className={`${CARD_LINK} relative grid h-full grid-rows-[auto_1fr] overflow-hidden rounded border bg-panel text-gray-12 has-[h3_a:focus-visible]:outline-2 has-[h3_a:focus-visible]:outline-ring has-[h3_a:focus-visible]:-outline-offset-2`}
@@ -27,7 +32,9 @@ export function ProgramCard({
       <ImageFrame src={item.image} />
       <div className="flex min-w-0 flex-col gap-2 p-4">
         {show_kind && <p className="eyebrow text-primary">Program</p>}
-        <h3 className={`font-bold ${feature ? "md:text-xl" : ""}`}>
+        <h3
+          className={`font-bold ${clear_chevron} ${feature ? "md:text-xl" : ""}`}
+        >
           <Link
             to={item.to}
             className="outline-0 after:absolute after:inset-0 after:content-['']"
@@ -36,7 +43,9 @@ export function ProgramCard({
           </Link>
         </h3>
         {item.summary && (
-          <p className="line-clamp-2 text-sm text-gray-11">{item.summary}</p>
+          <p className={`line-clamp-2 text-sm text-gray-11 ${clear_chevron}`}>
+            {item.summary}
+          </p>
         )}
         {item.goal != null && (
           <Progress title={item.title} raised={item.raised} goal={item.goal} />
