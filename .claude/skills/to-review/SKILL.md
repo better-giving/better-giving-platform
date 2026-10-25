@@ -20,11 +20,11 @@ Run `kru:text-fix` on the branch. Commit what it changes.
 
 ## 3. Open the PR
 
-Push the branch, then open the PR against `main` with the GitHub MCP tools. The body says what changes for someone using the product, with the design artifact link when there is one; the record (seats, findings, test counts) stays out. Subscribe to its activity (`subscribe_pr_activity`).
+Push the branch, then open the PR against `main`. The body says what changes for someone using the product, with the design artifact link when there is one; the record (seats, findings, test counts) stays out. Subscribe to its activity (`subscribe_pr_activity`).
 
 ## 4. Wait for the review
 
-Greptile reviews a new PR on its own; don't comment to start it. Events wake the session — don't poll. Greptile posts a summary comment whose heading reads `Confidence Score: N/5` (also `<!-- greptile_confidence_score:N -->`), plus inline threads. CI is `checks`, `test`, and `gate` (`.github/workflows/ci.yml`).
+Greptile reviews a new PR on its own, so the wait starts the moment the PR is open, and the subscription's events wake the session. Greptile posts a summary comment whose heading reads `Confidence Score: N/5` (also `<!-- greptile_confidence_score:N -->`), plus inline threads. CI is `checks`, `test`, and `gate` (`.github/workflows/ci.yml`).
 
 ## 5. Merge, or fix and ask again
 
@@ -37,6 +37,6 @@ Read the score on the **current head** — the summary's "Last reviewed commit" 
   - Reply on each thread naming the commit, and resolve it.
   - Post a standalone PR comment `@greptileai`, which is what re-runs a review after the first, then back to step 4.
 
-  CI stops at the first failing test file, so after a red `test` run the whole platform suite locally before pushing — a second failure may be hiding behind the first.
+  CI stops at the first failing test file, so after a red `test`, run the whole platform suite locally before pushing — a second failure may be hiding behind the first.
 
-A push refused with 403 is a GitHub access problem, not a retry: say so once, with the reconnect link from the error, and wait.
+A push refused with 403 means GitHub access is missing: say so once, with the reconnect link from the error, and wait.
