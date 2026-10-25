@@ -4,25 +4,14 @@ import { href, Link, useSearchParams } from "react-router";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
 import { FundsList } from "#/routes/admin.$id.funds/list";
 import type { Route } from "./+types/route";
-import { fund_row_status, STATUS_WORD } from "./copy";
-import { fund_end, Row, when } from "./row";
+import { STATUS_WORD } from "./copy";
+import { Row, when } from "./row";
 
 export { ErrorBoundary } from "#/components/error";
 export { loader } from "./api";
 
 export const meta: Route.MetaFunction = ({ matches }) =>
   admin_page_meta("Campaigns", matches);
-
-interface IListedFund {
-  id: string;
-  name: string;
-  active: boolean;
-  published: boolean;
-  donation_total_usd: number;
-  expiration: number;
-  banner?: string;
-  target?: string;
-}
 
 interface IRowLinks {
   edit_to?: string;
@@ -63,16 +52,6 @@ function RowLinks({ edit_to, view_to, name_id }: IRowLinksProps) {
   );
 }
 
-/** a closed fund has no editor; the public page is the view link */
-function fund_links(f: IListedFund): IRowLinks {
-  const public_to = href("/fundraisers/:fund_id", { fund_id: f.id });
-  if (!f.active) return { view_to: f.published ? public_to : undefined };
-  return {
-    edit_to: href("/fundraisers/:fund_id/edit", { fund_id: f.id }),
-    view_to: f.published ? public_to : undefined,
-  };
-}
-
 export default function Page({ loaderData }: Route.ComponentProps) {
   const [params, setParams] = useSearchParams();
   const tab = loaderData.view;
@@ -105,8 +84,7 @@ export default function Page({ loaderData }: Route.ComponentProps) {
       >
         {loaderData.view === "campaigns" ? (
           <TabPanel value="campaigns" className="grid gap-6">
-            {loaderData.campaigns.length === 0 &&
-            loaderData.org_funds.length === 0 ? (
+            {loaderData.campaigns.length === 0 ? (
               <EmptyState
                 action={
                   <Link to={new_to} className="btn btn-primary">
@@ -145,23 +123,6 @@ export default function Page({ loaderData }: Route.ComponentProps) {
                           view_to={public_to}
                           name_id={name_id}
                         />
-                      )}
-                    />
-                  );
-                })}
-                {loaderData.org_funds.map((f) => {
-                  const status = fund_row_status(f);
-                  return (
-                    <Row
-                      key={f.id}
-                      name={f.name}
-                      status={status}
-                      thumb={f.banner || endow.image || null}
-                      raised={f.donation_total_usd}
-                      target={f.target}
-                      ends={fund_end(f.expiration, status)}
-                      actions={(name_id) => (
-                        <RowLinks {...fund_links(f)} name_id={name_id} />
                       )}
                     />
                   );

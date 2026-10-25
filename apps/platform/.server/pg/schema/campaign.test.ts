@@ -162,7 +162,7 @@ describe("campaigns constraints", () => {
     );
   });
 
-  it("stores exactly the owning nonprofit as the member", async () => {
+  it("seeds the owner as the member and accepts further beneficiaries", async () => {
     const org = await npo("EIN-MEM");
     const other = await npo("EIN-MEM-2");
     await campaign_create({
@@ -191,27 +191,26 @@ describe("campaigns constraints", () => {
       .where(eq(campaign_members.campaign_id, "c-own"));
     expect(members.map((m) => m.npo_id)).toEqual([org.id]);
 
+    // BG-1943 decision 6: a campaign folded from an org fund keeps the fund's
+    // several beneficiaries, so 0070 dropped 0067's one-member/owner-only guard
+    await db()
+      .insert(campaign_members)
+      .values({ campaign_id: "c-own", npo_id: other.id });
+    const after = await db()
+      .select()
+      .from(campaign_members)
+      .where(eq(campaign_members.campaign_id, "c-own"));
+    expect(after.map((m) => m.npo_id).sort((a, b) => a - b)).toEqual(
+      [org.id, other.id].sort((a, b) => a - b)
+    );
+
+    // the same nonprofit twice on one campaign is still the primary key's job
     await rejects(
       db().insert(campaign_members).values({
         campaign_id: "c-own",
         npo_id: org.id,
       }),
-      "a campaign has one member, its owner"
-    );
-
-    await db().insert(campaigns).values({
-      id: "c-raw",
-      owner_npo_id: org.id,
-      creator_id: USER,
-      name: "Raw",
-      slug: "raw",
-    });
-    await rejects(
-      db().insert(campaign_members).values({
-        campaign_id: "c-raw",
-        npo_id: other.id,
-      }),
-      "campaign member must be the owning nonprofit"
+      "campaign_members_campaign_id_npo_id_pk"
     );
   });
 });

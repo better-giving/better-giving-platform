@@ -1,13 +1,16 @@
 import { and, eq } from "drizzle-orm";
+import { href } from "react-router";
 import { safeParse } from "valibot";
 import { type AuthUser, get_session, to_auth } from "#/.server/auth";
 import { get_fund } from "#/.server/fund";
 import { dataWithError, dataWithSuccess } from "#/.server/toast";
+import { moved } from "#/helpers/moved";
 import { slug_taken_message } from "#/routes/admin.$id.campaigns/copy";
 import type { IFund } from "#/types/fund";
 import { fund_id, fund_update } from "@/fundraiser/schema";
 import { resp } from "@/helpers/https";
 import { db } from "$/pg/db";
+import { campaign_by_legacy_fund } from "$/pg/queries/campaign";
 import {
   fund_by_slug,
   fund_close,
@@ -67,6 +70,17 @@ export const loader = async ({ request, params }: Route.LoaderArgs) => {
 
   const fund = await get_fund(id);
   if (!fund) throw resp.status(404);
+
+  // a folded fund is edited as its campaign; the campaign editor gates access
+  const campaign = await campaign_by_legacy_fund(fund.id);
+  if (campaign?.owner_npo_id != null) {
+    throw moved(
+      `${href("/admin/:id/campaigns/:campaign_id", {
+        id: String(campaign.owner_npo_id),
+        campaign_id: campaign.id,
+      })}${new URL(request.url).search}`
+    );
+  }
 
   await assert_fund_editor(user, fund);
 

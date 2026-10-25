@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { TestDb } from "../test-utils/pglite";
 
@@ -114,19 +115,23 @@ describe("campaign_public", () => {
   });
 });
 
-// campaign_live_for_npo lists owned campaigns only; this holds while no other org can be a member
+// BG-1943 decision 6: 0070 dropped the one-member/owner-only guard, so a
+// campaign folded from an org fund carries its several beneficiaries
 describe("campaign_members", () => {
-  it("takes the owner and refuses another org", async () => {
+  it("accepts the owner and another org as beneficiaries", async () => {
     const { db } = test_db.current!;
     await db
       .insert(campaign_members)
-      .values({ campaign_id: "bare-winter", npo_id: bare });
-    await expect(
-      db
-        .insert(campaign_members)
-        .values({ campaign_id: "acme-spring", npo_id: bare })
-    ).rejects.toMatchObject({
-      cause: { message: "campaign member must be the owning nonprofit" },
-    });
+      .values({ campaign_id: "acme-spring", npo_id: acme });
+    await db
+      .insert(campaign_members)
+      .values({ campaign_id: "acme-spring", npo_id: bare });
+    const rows = await db
+      .select()
+      .from(campaign_members)
+      .where(eq(campaign_members.campaign_id, "acme-spring"));
+    expect(rows.map((r) => r.npo_id).sort((a, b) => a - b)).toEqual(
+      [acme, bare].sort((a, b) => a - b)
+    );
   });
 });

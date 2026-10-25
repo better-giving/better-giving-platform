@@ -409,8 +409,21 @@ describe("campaign slug", () => {
 });
 
 describe("campaign list loader", () => {
-  it("puts an org-owned fund with campaigns and a member fund with supporters", async () => {
+  it("lists real campaigns on Your campaigns and supporter funds on the other tab", async () => {
     const org = await npo("EIN-LIST", "list-org");
+    await db().insert(campaigns).values({
+      id: "camp-real",
+      owner_npo_id: org.id,
+      creator_id: USER,
+      name: "Real drive",
+      slug: "real-drive",
+      status: "live",
+    });
+    await db()
+      .insert(campaign_members)
+      .values({ campaign_id: "camp-real", npo_id: org.id });
+    // an org fund is folded into a campaign now (BG-1943), so it is not
+    // surfaced on the campaigns tab as its own row
     await seed_fund(db(), {
       id: "fund-owned",
       name: "Owned drive",
@@ -434,7 +447,8 @@ describe("campaign list loader", () => {
     } as any);
     if (data.view !== "campaigns")
       throw new Error("expected the campaigns tab");
-    expect(data.org_funds.map((f) => f.id)).toEqual(["fund-owned"]);
+    expect(data.campaigns.map((c) => c.id)).toEqual(["camp-real"]);
+    expect(data).not.toHaveProperty("org_funds");
 
     const tab = await list_loader({
       request: new Request("https://x/admin/list/campaigns?tab=fundraisers"),

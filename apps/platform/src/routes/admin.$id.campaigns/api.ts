@@ -22,10 +22,9 @@ export const loader = async ({ context, request }: Route.LoaderArgs) => {
     };
   }
 
-  const [campaigns, org_funds] = await Promise.all([
-    campaign_list(id),
-    get_funds_npo_memberof(id, { creator: "ours" }),
-  ]);
+  // org funds are campaigns now (BG-1943); only supporter funds remain on the
+  // other tab. the list shows real campaigns alone
+  const campaigns = await campaign_list(id);
   return {
     view: "campaigns" as const,
     endow,
@@ -33,6 +32,5 @@ export const loader = async ({ context, request }: Route.LoaderArgs) => {
       ...c,
       status_label: campaign_shown_status(c),
     })),
-    org_funds,
   };
 };

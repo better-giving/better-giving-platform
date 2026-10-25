@@ -319,6 +319,31 @@ export async function campaign_by_id(
   return row && present(row);
 }
 
+/** the campaign an org fund was folded into, if any, with its owner's slug for
+ * the public url; the 301s off `/fundraisers/*` read this */
+export async function campaign_by_legacy_fund(fund_id: string): Promise<
+  | {
+      id: string;
+      slug: string;
+      owner_npo_id: number | null;
+      owner_slug: string | null;
+    }
+  | undefined
+> {
+  const [row] = await db
+    .select({
+      id: campaigns.id,
+      slug: campaigns.slug,
+      owner_npo_id: campaigns.owner_npo_id,
+      owner_slug: npos.slug,
+    })
+    .from(campaigns)
+    .leftJoin(npos, eq(npos.id, campaigns.owner_npo_id))
+    .where(eq(campaigns.legacy_fund_id, fund_id))
+    .limit(1);
+  return row;
+}
+
 /** stored `live` reads as ended once `ends_at` has passed. the row stays live. */
 export function campaign_shown_status(
   row: { status: TCampaignStatus; ends_at: string | null },
