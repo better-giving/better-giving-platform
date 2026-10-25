@@ -243,15 +243,17 @@ describe("marketplace — card rows", () => {
 describe("marketplace — card figures", () => {
   it("shows an org's name and tagline but not its stored goal or raised total", async () => {
     const org = await seed_npo({
-      name: "Goal Org",
-      tagline: "Has a goal",
+      name: "Target Org",
+      tagline: "Has a stored target",
       target_number: 8000,
     });
     await seed_contribution(test_db.current!.db, org.id, 3322);
     const screen = await render_marketplace();
 
-    await expect.element(screen.getByText("Goal Org")).toBeInTheDocument();
-    await expect.element(screen.getByText("Has a goal")).toBeInTheDocument();
+    await expect.element(screen.getByText("Target Org")).toBeInTheDocument();
+    await expect
+      .element(screen.getByText("Has a stored target"))
+      .toBeInTheDocument();
     expect(
       org_figures(
         screen.container,
