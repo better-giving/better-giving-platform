@@ -378,6 +378,100 @@ describe("ItemsByCount", () => {
       .toBeVisible();
   });
 
+  test("programs in halves anchor their progress to the card's bottom, whatever the summary", async () => {
+    await page.viewport(1440, 900);
+    const screen = await mount(
+      <ItemsByCount
+        items={[
+          { ...program(1), goal: 5000, raised: 1200, summary: "" },
+          {
+            ...program(2),
+            goal: 900,
+            raised: 300,
+            summary:
+              "Breakfast and a hot lunch for every pupil in four district schools, every school day of the year, cooked by parents on site from local produce bought at the weekly market.",
+          },
+        ]}
+        now={NOW}
+      />
+    );
+    const bars = screen.getByRole("progressbar").elements();
+    expect(bars).toHaveLength(2);
+    const [a, b] = bars.map((x) => x.getBoundingClientRect());
+    expect(a.top).toBeCloseTo(b.top, 0);
+    const bottoms = screen
+      .getByRole("article")
+      .elements()
+      .map((x) => x.getBoundingClientRect().bottom);
+    expect(bottoms[0]).toBeCloseTo(bottoms[1], 0);
+  });
+
+  test("a lone program is a feature card: its title is larger than a program's in a pair", async () => {
+    await page.viewport(1440, 900);
+    const size = (container: HTMLElement) =>
+      Number.parseFloat(
+        getComputedStyle(container.querySelector("h3") as HTMLElement).fontSize
+      );
+    const one = await mount(<ItemsByCount items={[program(1)]} now={NOW} />);
+    const lone = size(one.container);
+    await cleanup();
+    const two = await mount(
+      <ItemsByCount items={[program(1), program(2)]} now={NOW} />
+    );
+    expect(lone).toBeGreaterThan(size(two.container));
+  });
+
+  test("a program's chevron sits in the card's bottom-right corner, clear of its figures", async () => {
+    await page.viewport(1440, 900);
+    const screen = await mount(
+      <ItemsByCount
+        items={[
+          { ...program(1), goal: 5000, raised: 1200 },
+          { ...program(2), goal: 900, raised: 300 },
+        ]}
+        now={NOW}
+      />
+    );
+    const card = screen
+      .getByRole("article")
+      .filter({ hasText: "School meals 1" })
+      .element();
+    const box = card.getBoundingClientRect();
+    const chevron = (
+      card.querySelector("svg.lucide-chevron-right") as Element
+    ).getBoundingClientRect();
+    expect(chevron.right).toBeLessThanOrEqual(box.right);
+    expect(chevron.bottom).toBeLessThanOrEqual(box.bottom);
+    expect(chevron.left).toBeGreaterThan(box.left + box.width / 2);
+    expect(chevron.top).toBeGreaterThan(box.top + box.height / 2);
+    // the figures' own text, not their block, which spans the column
+    const figures = page
+      .elementLocator(card)
+      .getByText("$1,200 of $5,000")
+      .element();
+    const range = document.createRange();
+    range.selectNodeContents(figures);
+    const text = range.getBoundingClientRect();
+    const overlaps =
+      text.left < chevron.right &&
+      chevron.left < text.right &&
+      text.top < chevron.bottom &&
+      chevron.top < text.bottom;
+    expect(overlaps).toBe(false);
+    // the text column spans the card, as a campaign's does
+    const bar = card.querySelector('[role="progressbar"]') as Element;
+    expect(bar.getBoundingClientRect().width).toBeCloseTo(
+      card.clientWidth - 32,
+      0
+    ); // p-4 either side, inside the border
+    // the title's stretched link still covers the card, chevron included
+    const hit = document.elementFromPoint(
+      (chevron.left + chevron.right) / 2,
+      (chevron.top + chevron.bottom) / 2
+    );
+    expect(hit?.closest("a")?.textContent).toBe("School meals 1");
+  });
+
   test("videos: one full, two halves, three as one large over two", async () => {
     await page.viewport(1440, 900);
 

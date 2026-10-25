@@ -63,11 +63,7 @@ export function GiveCard({ item, feature = false, now, show_kind }: IGiveCard) {
             {ends}
           </p>
         )}
-        <div
-          className={`flex flex-col gap-2 ${item.goal == null ? "" : "mt-auto pt-1"}`}
-        >
-          <Progress title={item.title} raised={item.raised} goal={item.goal} />
-        </div>
+        <Progress title={item.title} raised={item.raised} goal={item.goal} />
       </div>
     </article>
   );
@@ -75,15 +71,14 @@ export function GiveCard({ item, feature = false, now, show_kind }: IGiveCard) {
 
 interface IImageFrame {
   src: string | null;
-  classes?: string;
 }
 
 /** the 4:1 slot, the image as uploaded filling it exactly, so nothing is
  * re-cropped; with no image the fill is the frame. its width is the caller's:
  * a grid cell stretches it to the column. zooms on a `CARD_LINK` hover */
-export function ImageFrame({ src, classes = "" }: IImageFrame) {
+export function ImageFrame({ src }: IImageFrame) {
   return (
-    <div className={`aspect-4/1 overflow-hidden bg-gray-3 ${classes}`}>
+    <div className="aspect-4/1 overflow-hidden bg-gray-3">
       {src && (
         <Image
           src={src}
@@ -101,7 +96,9 @@ interface IProgress {
   goal: number | null;
 }
 
-/** the bar and "$raised of $goal" with a goal; "$raised raised" without one */
+/** the bar and "$raised of $goal" with a goal, pushed to the bottom of a
+ * card's flex column so neighbours in a row align; "$raised raised" without
+ * one, following the text */
 export function Progress({ title, raised, goal }: IProgress) {
   if (goal == null) {
     return (
@@ -109,11 +106,11 @@ export function Progress({ title, raised, goal }: IProgress) {
     );
   }
   return (
-    <>
+    <div className="mt-auto flex flex-col gap-2 pt-1">
       <GoalBar raised={raised} goal={goal} label={`${title}: amount raised`} />
       <p className="figures text-sm text-gray-11">
         {to_usd(raised)} of {to_usd(goal)}
       </p>
-    </>
+    </div>
   );
 }

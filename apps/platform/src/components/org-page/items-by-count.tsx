@@ -61,7 +61,11 @@ export function ItemsByCount({
         >
           {programs.map((p) => (
             <li key={p.id}>
-              <ProgramCard item={p} show_kind={show_kind} />
+              <ProgramCard
+                item={p}
+                feature={programs.length === 1 && !rows}
+                show_kind={show_kind}
+              />
             </li>
           ))}
         </ul>
