@@ -1,0 +1,7 @@
+# eve/ is its own pnpm project, separate from the root workspace.
+minimumReleaseAgeExclude:
+  - eve@0.83.2
+allowBuilds:
+  # kru-eve is installed from git and builds its dist with `eve extension build`.
+  "kru-eve@git+https://github.com/ap-justin/kru-eve.git#c5144e2908279bc70f40a4164674d7d9ca9457f5&path:/eve": true
+  esbuild: true

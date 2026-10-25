@@ -4,18 +4,20 @@ An [eve](https://eve.dev/docs) agent that works as a lead engineer on this repos
 
 It never merges, never deploys, never pushes to `main`, and never changes this `eve/` folder.
 
-This folder is a standalone npm project. It is not part of the pnpm workspace, the root Turbo pipeline, or any app's tsconfig, so it doesn't affect the platform's install, build, or tests. The root Biome config does lint it.
+This folder is a standalone pnpm project with its own `pnpm-workspace.yaml` and lockfile. It is not part of the pnpm workspace, the root Turbo pipeline, or any app's tsconfig, so it doesn't affect the platform's install, build, or tests. The root Biome config does lint it.
 
-> **TODO:** the shared subagents (test-writer, builders, hard-work, reviewer) and skills will move to a pinned Kru eve extension built by Kai. This folder will then mount that extension and keep only the Better Giving layer: repo settings, sandbox, guard, channel auth, and instructions.
+The subagents come from the [Kru eve extension](https://github.com/ap-justin/kru-eve) (`kru-eve`), mounted in `agent/extensions/kru.ts`. This folder keeps only the Better Giving layer: the repo, house rules and checks, the HTTP route for PMs, the guard, the sandbox, and the lead.
+
+> **TODO:** `kru-eve` is pinned to commit `c5144e2` on the unreleased `eve-extension` branch of ap-justin/kru-eve (PR 1). Once Kai releases it, change the `kru-eve` entry in `package.json` and the `allowBuilds` key in `pnpm-workspace.yaml` to the release, then run `pnpm install`. The shared skills will move into the extension too.
 
 ## How a run works
 
 1. **Start.** The PM bot (Ivy) calls the agent's authenticated route with a brief and a done-check. See [Starting a run](#starting-a-run).
 2. **Plan.** The lead clones the repo, reads `AGENTS.md`, branches from `origin/main`, and splits the work into slices, noting which ones touch UI.
-3. **Tests first.** `test-writer` commits failing tests for each slice.
-4. **Build.** The lead sends UI slices to `ui-builder` and the rest to `non-ui-builder`. A builder that fails twice on a slice calls its own `hard-work` subagent.
+3. **Tests first.** `kru__test-writer` commits failing tests for each slice.
+4. **Build.** The lead sends UI slices to `kru__ui-builder` and the rest to `kru__builder`. A builder that fails twice on a slice calls its own `hard-work` subagent.
 5. **Check.** The lead runs `pnpm lint`, `pnpm typecheck`, and `pnpm test`.
-6. **Review.** `reviewer` reads the diff and returns `PASS` or `FIX` with at most 10 findings and a `Gated areas:` line. On `FIX`, the builder fixes and the reviewer looks again, up to 3 rounds.
+6. **Review.** `kru__reviewer` reads the diff and returns `PASS` or `FIX` with at most 10 findings and a `Gated areas:` line. On `FIX`, the builder fixes and the reviewer looks again, up to 3 rounds.
 7. **Draft PR.** On `PASS` only, the lead pushes the branch and opens a draft PR. After 3 rounds of `FIX` it opens nothing and returns `BLOCKED`.
 8. **Result.** The run ends with `STATUS`, the PR URL, the gated areas, open findings, and done-check evidence.
 
@@ -28,13 +30,14 @@ The agent's job ends at the draft PR. Ivy checks the Vercel preview against the 
 | Agent | Model ID | Route | Why |
 | --- | --- | --- | --- |
 | Lead | `deepseek/deepseek-v4.1-flash` | Token Pass, `AI_GATEWAY_API_KEY` | Fast, cheap coordination: planning, routing, and reading evidence. |
-| `test-writer` | `zai/glm-5.3` | Token Pass | Careful, spec-driven test writing. |
-| `ui-builder` | `moonshotai/kimi-k3` | Token Pass | Frontend and UI code. |
-| `non-ui-builder` | `zai/glm-5.3` | Token Pass | Server, data, and library code. |
-| `ui-builder__hard-work`, `non-ui-builder__hard-work` | `claude-opus-5-5` | Anthropic direct, `ANTHROPIC_API_KEY` | Slices a builder failed twice. |
-| `reviewer` | `claude-opus-5-5` | Anthropic direct | Read-only review against the brief and the merge gate. |
+| `kru__test-writer` | `zai/glm-5.3` | Token Pass | Careful, spec-driven test writing. |
+| `kru__ui-builder` | `moonshotai/kimi-k3` | Token Pass | Frontend and UI code. |
+| `kru__builder` | `zai/glm-5.3` | Token Pass | Server, data, and library code. |
+| `hard-work` (nested under each builder) | `claude-opus-5-5` | Anthropic direct, `ANTHROPIC_API_KEY` | Slices a builder failed twice. |
+| `kru__reviewer` | `claude-opus-5-5` | Anthropic direct | Read-only review against the brief and the merge gate. |
 | `code__worker` (eve `code` extension) | `moonshotai/kimi-k3` | Token Pass | Read-only exploration. |
 
+- The subagent models are `kru-eve`'s defaults, which match this map, so `agent/extensions/kru.ts` overrides nothing. Overriding only a seat's `model` drops its default reasoning setting.
 - **Token Pass.** `AI_GATEWAY_API_KEY` must be a Token Pass key. It serves only the three featured models above, bills Token Pass credit, never falls back to gateway credits, and refuses every other model with a 403. DeepSeek V4.1 Flash (`deepseek/deepseek-v4.1-flash`) is the only DeepSeek model Token Pass offers. Gateway web search is off for the same reason.
 - **Anthropic.** `hard-work` and `reviewer` use eve's direct Anthropic provider (`eve/models/anthropic`), which reads `ANTHROPIC_API_KEY` and bills the Anthropic account. They don't go through AI Gateway BYOK on purpose: BYOK retries failed requests on gateway credits, and that fallback can't be turned off. Set a monthly spend limit on the Anthropic key, since gateway budgets don't cover it.
 
@@ -90,16 +93,11 @@ Without `outputSchema`, the final message has the same fields as text, starting 
 | --- | --- |
 | `agent/agent.ts` | The lead: model and settings. |
 | `agent/instructions.md` | The lead's loop, result format, and hard limits. |
-| `agent/subagents/test-writer/` | Writes the failing tests from the done-check before any code changes. Edits test files only. |
-| `agent/subagents/ui-builder/` | Writes UI code until the tests pass, and applies review fixes. |
-| `agent/subagents/non-ui-builder/` | Writes non-UI code until the tests pass, and applies review fixes. |
-| `agent/subagents/*-builder/subagents/hard-work/` | Called only by its builder, after two failed attempts. |
-| `agent/subagents/reviewer/` | Read-only review; returns `PASS` or `FIX`. |
+| `agent/extensions/kru.ts` | Mounts `kru-eve`: `kru__test-writer`, `kru__builder`, `kru__ui-builder` (each builder with a nested `hard-work`), and `kru__reviewer`. |
 | `agent/skills/` | `house-rules`, `testing`, and `reliable-work`, loaded by the lead. |
 | `agent/extensions/` | eve's `code` extension (read-only worker) and `git` extension. |
-| `agent/tools/bash.ts`, `agent/lib/guard.ts` | The shell, with refused commands. |
-| `agent/tools/write_file.ts` | `write_file`, refusing paths under `eve/`. |
-| `agent/lib/readonly.ts` | The reviewer's read-only shell allow-list. |
+| `agent/tools/bash.ts`, `agent/lib/guard.ts` | The lead's shell, with refused commands. |
+| `agent/tools/write_file.ts` | The lead's `write_file`, refusing paths under `eve/`. |
 | `agent/lib/repo.ts` | The one repo the agent works in, its checkout path, and the protected folder. |
 | `agent/sandbox.ts` | Vercel Sandbox setup: tooling, network allow-list, GitHub token brokering, and git hooks. |
 | `agent/channels/eve.ts` | Auth for the HTTP API. |
@@ -115,14 +113,16 @@ The GitHub token stays in the app runtime. The sandbox gets a placeholder, and t
 
 ### What the agent can't do
 
-Enforced in code:
+Enforced in code for the lead (`agent/lib/guard.ts`, `agent/tools/write_file.ts`), and for every subagent through the git hooks in the shared sandbox:
 
 - **Merge or deploy.** The shell refuses `gh pr merge`, merge and write calls through `gh api`, `vercel` deploy and project commands, and `npm`/`pnpm publish`.
 - **Push to `main`.** The shell refuses force, mirror, and delete pushes, pushes naming `main`, a bare `git push`, and pushing `HEAD`. A `pre-push` hook also refuses any push while on `main` or to `refs/heads/main`. That closes the `git push -u origin HEAD` gap.
 - **Change `eve/`.** The shell refuses any command that names `eve/` in the checkout, and bulk staging (`git add -A`, `.`, `-u`, `git commit -a`). `write_file` refuses paths under `eve/`. A `pre-commit` hook refuses staged changes under `eve/`, and the `pre-push` hook refuses pushing any commit that touches it. The shell refuses `--no-verify` and changes to `core.hooksPath`.
-- **Write as the reviewer.** The reviewer has no `write_file` and a shell limited to single read commands.
+- **Write as the reviewer.** `kru__reviewer` has no `write_file` and a shell limited to single read commands.
 
-Only in the instructions: the 3-round review cap, "open the PR only on `PASS`", and `hard-work` after two failures. The reviewer also flags any change under `eve/` as a high finding.
+**Gap:** the `kru-eve` subagents use Kru's own guard. It refuses merges, deploys, and pushes to `main`, but it doesn't know about `eve/`, `--no-verify`, or pushing `HEAD`. So a subagent could edit files under `eve/` in the checkout, or commit with `--no-verify`. The `pre-push` hook still refuses any push that changes `eve/` unless it's skipped with `--no-verify`. The fix belongs in `kru-eve`: a config option for extra refused patterns and protected paths, which this folder would then set.
+
+Only in the instructions: the 3-round review cap, "open the PR only on `PASS`", `hard-work` after two failures, and the lead repeating the `eve/` rule to each writer and treating any `eve/` change as a high finding.
 
 The shell guard is a pattern match and could miss an unusual command. The real backstops are branch protection on `main` and `CODEOWNERS`, which assigns `/eve/` to its maintainers.
 
@@ -157,7 +157,7 @@ Needs Node 24.
 
 ```bash
 cd eve
-npm ci
+pnpm install        # its own pnpm project (eve/pnpm-workspace.yaml), not the root workspace
 npx tsc
 npx eve build --skip-sandbox-prewarm   # compile check without Vercel credentials
 npx eve link && npx eve dev            # full local run, needs a linked Vercel project
