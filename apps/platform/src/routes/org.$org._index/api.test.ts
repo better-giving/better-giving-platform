@@ -180,9 +180,10 @@ const respond = (param: string, search = "") =>
 const load = (param: string, search = "") =>
   respond(param, search).then((r) => r.data);
 
-/** the document's cache-control, composed as react-router does: the route's
- * `headers` export over the loader's headers, or over the thrown response's
- * as `errorHeaders` when the loader threw */
+/** the document's cache-control, composed as react-router does. a route whose
+ * loader threw records no loaderData, so its `loaderHeaders` is empty and the
+ * thrown response's headers arrive only as `errorHeaders`; a successful load
+ * carries its `data()` init headers as `loaderHeaders`. */
 function cache_control(outcome: unknown) {
   const threw = outcome instanceof Response;
   const own = new Headers(
@@ -192,7 +193,7 @@ function cache_control(outcome: unknown) {
   );
   return new Headers(
     headers({
-      loaderHeaders: own,
+      loaderHeaders: threw ? new Headers() : own,
       parentHeaders: new Headers(),
       actionHeaders: new Headers(),
       errorHeaders: threw ? own : undefined,

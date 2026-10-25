@@ -190,9 +190,10 @@ function respond(url: string) {
 
 const load = (url: string) => respond(url).then((r) => r.data);
 
-/** the document's cache-control, composed as react-router does: the route's
- * `headers` export over the loader's headers, or over the thrown response's as
- * `errorHeaders` when the loader threw */
+/** the document's cache-control, composed as react-router does. a route whose
+ * loader threw records no loaderData, so its `loaderHeaders` is empty and the
+ * thrown response's headers arrive only as `errorHeaders`; a successful load
+ * carries its `data()` init headers as `loaderHeaders`. */
 function cache_control(outcome: unknown) {
   const threw = outcome instanceof Response;
   const own = new Headers(
@@ -202,7 +203,7 @@ function cache_control(outcome: unknown) {
   );
   return new Headers(
     headers({
-      loaderHeaders: own,
+      loaderHeaders: threw ? new Headers() : own,
       parentHeaders: new Headers(),
       actionHeaders: new Headers(),
       errorHeaders: threw ? own : undefined,
@@ -273,7 +274,24 @@ describe("public campaign page", () => {
     const npo = await org();
     await unpublish(npo.id);
     await campaign(npo.id);
-    // a member of a different org is not an admin of this one
+    // USER admins a *different* org, so `npo_admin_member`'s npo_id filter is
+    // what refuses this one — a dropped filter would wrongly grant access
+    const [other] = await test_db
+      .current!.db.insert(npos)
+      .values({
+        registration_number: "EIN-OTHER",
+        name: "Other",
+        slug: "other",
+        endow_designation: "Charity",
+        overview_pt: "[]",
+        hq_country: "United States",
+        active: true,
+        published: true,
+      })
+      .returning();
+    await test_db
+      .current!.db.insert(user_npo_memberships)
+      .values({ user_id: USER, npo_id: other!.id });
     get_session.mockResolvedValue({ user: { id: USER, role: null } });
 
     const res = await respond("https://x/org/acme/winter").catch(
