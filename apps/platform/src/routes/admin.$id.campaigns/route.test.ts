@@ -448,7 +448,7 @@ describe("campaign list loader", () => {
       legacy_fund_id: "fund-folded",
     });
     // a folded fund with several beneficiaries keeps its fund flow and editor,
-    // so it stays listed with its fund row
+    // so it lists once, as its fund row, and its campaign row is hidden
     const partner = await npo("EIN-LIST-2", "list-partner");
     await seed_fund(db(), {
       id: "fund-multi",
@@ -485,9 +485,10 @@ describe("campaign list loader", () => {
       throw new Error("expected the campaigns tab");
     expect(data.campaigns.map((c) => c.id).sort()).toEqual([
       "camp-folded",
-      "camp-multi",
       "camp-real",
     ]);
+    // the multi-beneficiary fold lists once, as its fund row: its campaign row
+    // is hidden because the fund keeps its own page and editor
     // the unfolded and multi-beneficiary org funds list; the single-beneficiary
     // fold is excluded (it is a campaign)
     expect(data.org_funds.map((f) => f.id).sort()).toEqual([

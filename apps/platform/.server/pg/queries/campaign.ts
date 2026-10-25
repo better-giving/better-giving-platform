@@ -21,6 +21,7 @@ import {
 } from "../schema/campaign";
 import { dists } from "../schema/dist";
 import { donation_donors, donations } from "../schema/donation";
+import { fund_members } from "../schema/fund";
 import { npos } from "../schema/npo";
 import { v_campaign_total_usd } from "../schema/views";
 import { from_target, to_target } from "./fmt";
@@ -111,9 +112,17 @@ function present(
 
 export type ICampaignRow = ReturnType<typeof present>;
 
+/** admin list. a campaign folded from a multi-beneficiary fund is left out:
+ * that fund keeps its own page and editor (see `folded_campaign_public`), so
+ * it lists once, as its fund row */
 export async function campaign_list(npo_id: number): Promise<ICampaignRow[]> {
   const rows = await campaign_query()
-    .where(eq(campaigns.owner_npo_id, npo_id))
+    .where(
+      and(
+        eq(campaigns.owner_npo_id, npo_id),
+        sql`(${campaigns.legacy_fund_id} IS NULL OR (SELECT count(*) FROM ${fund_members} WHERE ${fund_members.fund_id} = ${campaigns.legacy_fund_id}) <= 1)`
+      )
+    )
     .orderBy(desc(campaigns.created_at));
   return rows.map(present);
 }
