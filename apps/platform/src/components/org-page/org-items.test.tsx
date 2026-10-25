@@ -328,6 +328,22 @@ describe("card image", () => {
       (h) => getComputedStyle(h.parentElement as HTMLElement).padding
     );
     expect(new Set(insets).size).toBe(1);
+    // a lone program or campaign in a row keeps the normal title size: only a
+    // lone item in the count grid is a feature card
+    await cleanup();
+    const lone = await mount(
+      <div style={{ width: 768 }}>
+        <ItemsByCount items={[give(1), program(1)]} now={NOW} rows />
+      </div>
+    );
+    const lone_lists = lone.container.querySelectorAll("[data-count]");
+    expect(lone_lists).toHaveLength(2);
+    for (const list of lone_lists)
+      expect(list.getAttribute("data-count")).toBe("1");
+    const lone_sizes = Array.from(lone.container.querySelectorAll("h3")).map(
+      (h) => getComputedStyle(h).fontSize
+    );
+    expect(lone_sizes).toEqual([sizes[0], sizes[0]]);
   });
 });
 
@@ -424,11 +440,18 @@ describe("ItemsByCount", () => {
     expect(bars).toHaveLength(2);
     const [a, b] = bars.map((x) => x.getBoundingClientRect());
     expect(a.top).toBeCloseTo(b.top, 0);
-    const bottoms = screen
-      .getByRole("article")
-      .elements()
-      .map((x) => x.getBoundingClientRect().bottom);
-    expect(bottoms[0]).toBeCloseTo(bottoms[1], 0);
+    // the figures' line sits on the column's bottom padding plus the border;
+    // the articles' own bottoms match whatever happens, the grid stretches them
+    const edge = 16 + 1; // p-4 below the column, inside the 1px border
+    const articles = screen.getByRole("article").elements();
+    expect(articles).toHaveLength(2);
+    for (const [i, figures] of ["$1,200 of $5,000", "$300 of $900"].entries()) {
+      const line = screen.getByText(figures).element();
+      expect(articles[i].getBoundingClientRect().bottom).toBeCloseTo(
+        line.getBoundingClientRect().bottom + edge,
+        0
+      );
+    }
   });
 
   test("a lone program is a feature card: its title is larger than a program's in a pair", async () => {
@@ -461,6 +484,7 @@ describe("ItemsByCount", () => {
       .getByRole("article")
       .filter({ hasText: "School meals 1" })
       .element();
+    card.scrollIntoView({ block: "center" });
     const box = card.getBoundingClientRect();
     const chevron = (
       card.querySelector("svg.lucide-chevron-right") as Element
@@ -494,6 +518,7 @@ describe("ItemsByCount", () => {
       (chevron.left + chevron.right) / 2,
       (chevron.top + chevron.bottom) / 2
     );
+    expect(hit).not.toBeNull();
     expect(hit?.closest("a")?.textContent).toBe("School meals 1");
   });
 
