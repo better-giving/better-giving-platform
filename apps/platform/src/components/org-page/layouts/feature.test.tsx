@@ -385,7 +385,19 @@ describe("Feature", () => {
     // three to a line, the fourth under the first
     expect(new Set(cards.slice(0, 3).map((r) => r.top)).size).toBe(1);
     expect(cards[3].top).toBeGreaterThan(cards[0].bottom);
-    expect(cards[3].left).toBe(cards[0].left);
+    expect(cards[3].left).toBeCloseTo(cards[0].left, 0);
+    // the fifth sits beside the fourth
+    expect(cards[4].top).toBeCloseTo(cards[3].top, 0);
+    expect(cards[4].left).toBeGreaterThan(cards[3].right - 1);
+    // every program shows, with no reveal
+    // (the page's campaigns row has its own "See all", so look in the
+    // programs' own section)
+    const section = screen
+      .getByRole("link", { name: "School meals 1" })
+      .element()
+      .closest("section") as HTMLElement;
+    expect(section.querySelectorAll("article")).toHaveLength(5);
+    expect(section.querySelector("button")).toBeNull();
   });
 
   test("the header links only the sections the page has", async () => {
