@@ -72,7 +72,6 @@ export function Feature(props: IOrgLayout) {
         {k === "videos" ? (
           <VideoSet videos={lists.videos} />
         ) : (
-          // programs are rows at any count
           <ItemsByCount items={lists[k]} now={now} />
         )}
         {failed[k] && <FailedLine kind={k} />}

@@ -80,7 +80,6 @@ describe("GiveCard", () => {
     const screen = await mount(
       <div>
         <GiveCard
-          orientation="vertical"
           show_kind
           now={NOW}
           item={give(1, {
@@ -88,13 +87,11 @@ describe("GiveCard", () => {
           })}
         />
         <GiveCard
-          orientation="vertical"
           show_kind
           now={NOW}
           item={give(2, { ends_at: new Date(NOW + 3 * HOUR).toISOString() })}
         />
         <GiveCard
-          orientation="vertical"
           show_kind
           now={NOW}
           item={give(3, {
@@ -105,9 +102,8 @@ describe("GiveCard", () => {
             byline: "by Jane",
           })}
         />
-        <GiveCard orientation="vertical" show_kind now={NOW} item={give(4)} />
+        <GiveCard show_kind now={NOW} item={give(4)} />
         <GiveCard
-          orientation="vertical"
           show_kind
           now={NOW}
           item={give(5, { raised: 9500, goal: 7900 })}
@@ -162,7 +158,8 @@ describe("card image", () => {
         ...x,
         image: SQUARE,
       });
-      // one is the feature card, two are halves, three are thirds
+      // one is the feature card, two are halves, three are thirds; then a
+      // lone program, three programs and a swipe row of four campaigns
       const lists = [1, 2, 3].map((n) => gives(n).map(pictured));
       const screen = await mount(
         <div>
@@ -170,6 +167,15 @@ describe("card image", () => {
             <ItemsByCount key={items.length} items={items} now={NOW} />
           ))}
           <ItemsByCount items={[pictured(program(1))]} now={NOW} />
+          <ItemsByCount
+            items={[4, 5, 6].map((n) => pictured(program(n)))}
+            now={NOW}
+          />
+          <SwipeRow
+            heading="Campaigns"
+            items={gives(4).map(pictured)}
+            now={NOW}
+          />
         </div>
       );
       await expect
@@ -179,35 +185,17 @@ describe("card image", () => {
       const cards = Array.from(
         screen.container.querySelectorAll<HTMLElement>("article")
       );
-      expect(cards).toHaveLength(7);
-      const wide = width >= 768;
-      for (const [i, card] of cards.entries()) {
+      expect(cards).toHaveLength(14);
+      for (const card of cards) {
         const slot = (
           card.firstElementChild as HTMLElement
         ).getBoundingClientRect();
         const box = card.getBoundingClientRect();
         expect(Math.abs(slot.width / slot.height - 4) / 4).toBeLessThan(0.01);
-        const is_program = i === 6;
-        // the feature card (0), the halves (1, 2) and the program row sit
-        // beside their text
-        const beside = wide && (i < 3 || is_program);
-        const frame = card.firstElementChild as HTMLElement;
-        if (beside) {
-          // an inset thumbnail with its own corner, centred down the card:
-          // no empty panel above or below it, and never on the card's edge
-          const above = slot.top - box.top;
-          expect(Math.abs(above - (box.bottom - slot.bottom))).toBeLessThan(2);
-          expect(above).toBeGreaterThanOrEqual(16);
-          expect(slot.left - box.left).toBeGreaterThanOrEqual(16);
-          expect(getComputedStyle(frame).borderTopLeftRadius).not.toBe("0px");
-          // a thumbnail, not a banner
-          expect(slot.width).toBeLessThan(card.clientWidth / 2);
-          if (is_program) expect(slot.width).toBeLessThanOrEqual(15 * 16);
-        } else {
-          // across the top of the card, edge to edge
-          expect(slot.top).toBeCloseTo(box.top + 1, 0);
-          expect(slot.width).toBeCloseTo(card.clientWidth, 0);
-        }
+        // across the top of the card, edge to edge, at every count: the
+        // feature card, the halves, the thirds and the program alike
+        expect(slot.top).toBeCloseTo(box.top + 1, 0);
+        expect(slot.width).toBeCloseTo(card.clientWidth, 0);
         const img = card.querySelector("img") as HTMLImageElement;
         await expect.poll(() => img.complete).toBe(true);
         const shown = img.getBoundingClientRect();
@@ -274,7 +262,7 @@ describe("card image", () => {
     expect(new Set(boxes).size).toBe(1);
   });
 
-  test("a program row on a phone has its image across the top and the title on at most two lines", async () => {
+  test("a program card on a phone has its image across the top and the title on at most two lines", async () => {
     await page.viewport(375, 812);
     const screen = await mount(
       <ItemsByCount
@@ -290,11 +278,13 @@ describe("card image", () => {
     );
     const link = screen.getByRole("link", { name: /After-school reading/ });
     await expect.element(link).toBeVisible();
-    const row = link.element().closest("article") as HTMLElement;
-    const slot = (row.firstElementChild as HTMLElement).getBoundingClientRect();
-    const title = row.querySelector("h3") as HTMLElement;
+    const card = link.element().closest("article") as HTMLElement;
+    const slot = (
+      card.firstElementChild as HTMLElement
+    ).getBoundingClientRect();
+    const title = card.querySelector("h3") as HTMLElement;
     const text = (title.parentElement as HTMLElement).getBoundingClientRect();
-    expect(slot.width).toBeCloseTo(row.clientWidth, 0);
+    expect(slot.width).toBeCloseTo(card.clientWidth, 0);
     expect(Math.abs(slot.width / slot.height - 4) / 4).toBeLessThan(0.01);
     expect(text.top).toBeGreaterThanOrEqual(slot.bottom - 0.5);
     const lines =
@@ -311,27 +301,49 @@ describe("card image", () => {
       .toBeVisible();
   });
 
-  test("rows: every campaign a horizontal row, one per line, lined up with the program rows", async () => {
+  test("rows: one card per line, campaigns and programs alike", async () => {
     await page.viewport(1440, 900);
     const screen = await mount(
       <div style={{ width: 768 }}>
         <ItemsByCount
-          items={[...gives(2), { ...program(1), goal: 900 }]}
+          items={[
+            ...gives(2),
+            { ...program(1), goal: 900 },
+            program(2),
+            program(3),
+          ]}
           now={NOW}
           rows
         />
       </div>
     );
     const lists = screen.container.querySelectorAll("[data-count]");
-    expect(tracks(lists[0])).toBe(1);
+    expect(lists).toHaveLength(2);
+    for (const list of lists) expect(tracks(list)).toBe(1);
     const titles = Array.from(screen.container.querySelectorAll("h3"));
-    expect(titles).toHaveLength(3);
+    expect(titles).toHaveLength(5);
     const sizes = titles.map((h) => getComputedStyle(h).fontSize);
     expect(new Set(sizes).size).toBe(1);
     const insets = titles.map(
       (h) => getComputedStyle(h.parentElement as HTMLElement).padding
     );
     expect(new Set(insets).size).toBe(1);
+    // a lone program or campaign in a row keeps the normal title size: only a
+    // lone item in the count grid is a feature card
+    await cleanup();
+    const lone = await mount(
+      <div style={{ width: 768 }}>
+        <ItemsByCount items={[give(1), program(1)]} now={NOW} rows />
+      </div>
+    );
+    const lone_lists = lone.container.querySelectorAll("[data-count]");
+    expect(lone_lists).toHaveLength(2);
+    for (const list of lone_lists)
+      expect(list.getAttribute("data-count")).toBe("1");
+    const lone_sizes = Array.from(lone.container.querySelectorAll("h3")).map(
+      (h) => getComputedStyle(h).fontSize
+    );
+    expect(lone_sizes).toEqual([sizes[0], sizes[0]]);
   });
 });
 
@@ -369,20 +381,191 @@ describe("ItemsByCount", () => {
     expect(tracks(list_of(screen.container))).toBe(1);
   });
 
-  test("one program is a row, not a lone card", async () => {
+  test("programs take the count grid: one across the row, then halves, then thirds", async () => {
     await page.viewport(1440, 900);
-    const screen = await mount(<ItemsByCount items={[program(1)]} now={NOW} />);
-    const rows = list_of(screen.container);
-    expect(tracks(rows)).toBe(1);
-    // a row runs the list's full width
-    const row = rows.querySelector("article") as HTMLElement;
-    expect(row.getBoundingClientRect().width).toBe(
-      rows.getBoundingClientRect().width
+    const one = await mount(<ItemsByCount items={[program(1)]} now={NOW} />);
+    const list = list_of(one.container);
+    expect(tracks(list)).toBe(1);
+    const card = list.querySelector("article") as HTMLElement;
+    expect(card.getBoundingClientRect().width).toBeCloseTo(
+      list.getBoundingClientRect().width,
+      0
     );
     await expect
-      .element(screen.getByRole("link", { name: "School meals 1" }))
+      .element(one.getByRole("link", { name: "School meals 1" }))
       .toBeVisible();
+    await cleanup();
+
+    const two = await mount(
+      <ItemsByCount items={[program(1), program(2)]} now={NOW} />
+    );
+    expect(tracks(list_of(two.container))).toBe(2);
+    const halves = two
+      .getByRole("article")
+      .elements()
+      .map((a) => a.getBoundingClientRect());
+    expect(halves[0].top).toBeCloseTo(halves[1].top, 0);
+    expect(halves[1].left).toBeGreaterThan(halves[0].right - 1);
+    await cleanup();
+
+    const four = await mount(
+      <ItemsByCount items={[1, 2, 3, 4].map((n) => program(n))} now={NOW} />
+    );
+    expect(tracks(list_of(four.container))).toBe(3);
+    // every program shows; there is no reveal
+    await expect
+      .element(four.getByRole("link", { name: "School meals 4" }))
+      .toBeVisible();
+    expect(four.getByRole("button").query()).toBeNull();
   });
+
+  test("programs in halves anchor their progress to the card's bottom, whatever the summary", async () => {
+    await page.viewport(1440, 900);
+    const screen = await mount(
+      <ItemsByCount
+        items={[
+          { ...program(1), goal: 5000, raised: 1200, summary: "" },
+          {
+            ...program(2),
+            goal: 900,
+            raised: 300,
+            summary:
+              "Breakfast and a hot lunch for every pupil in four district schools, every school day of the year, cooked by parents on site from local produce bought at the weekly market.",
+          },
+        ]}
+        now={NOW}
+      />
+    );
+    const bars = screen.getByRole("progressbar").elements();
+    expect(bars).toHaveLength(2);
+    const [a, b] = bars.map((x) => x.getBoundingClientRect());
+    expect(a.top).toBeCloseTo(b.top, 0);
+    // the figures' line sits on the column's bottom padding plus the border;
+    // the articles' own bottoms match whatever happens, the grid stretches them
+    const edge = 16 + 1; // p-4 below the column, inside the 1px border
+    const articles = screen.getByRole("article").elements();
+    expect(articles).toHaveLength(2);
+    for (const [i, figures] of ["$1,200 of $5,000", "$300 of $900"].entries()) {
+      const line = screen.getByText(figures).element();
+      expect(articles[i].getBoundingClientRect().bottom).toBeCloseTo(
+        line.getBoundingClientRect().bottom + edge,
+        0
+      );
+    }
+  });
+
+  test("a lone program is a feature card: its title is larger than a program's in a pair", async () => {
+    await page.viewport(1440, 900);
+    const size = (container: HTMLElement) =>
+      Number.parseFloat(
+        getComputedStyle(container.querySelector("h3") as HTMLElement).fontSize
+      );
+    const one = await mount(<ItemsByCount items={[program(1)]} now={NOW} />);
+    const lone = size(one.container);
+    await cleanup();
+    const two = await mount(
+      <ItemsByCount items={[program(1), program(2)]} now={NOW} />
+    );
+    expect(lone).toBeGreaterThan(size(two.container));
+  });
+
+  test("a program's chevron sits in the card's bottom-right corner, clear of its figures", async () => {
+    await page.viewport(1440, 900);
+    const screen = await mount(
+      <ItemsByCount
+        items={[
+          { ...program(1), goal: 5000, raised: 1200 },
+          { ...program(2), goal: 900, raised: 300 },
+        ]}
+        now={NOW}
+      />
+    );
+    const card = screen
+      .getByRole("article")
+      .filter({ hasText: "School meals 1" })
+      .element();
+    card.scrollIntoView({ block: "center" });
+    const box = card.getBoundingClientRect();
+    const chevron = (
+      card.querySelector("svg.lucide-chevron-right") as Element
+    ).getBoundingClientRect();
+    expect(chevron.right).toBeLessThanOrEqual(box.right);
+    expect(chevron.bottom).toBeLessThanOrEqual(box.bottom);
+    expect(chevron.left).toBeGreaterThan(box.left + box.width / 2);
+    expect(chevron.top).toBeGreaterThan(box.top + box.height / 2);
+    // the figures' own text, not their block, which spans the column
+    const figures = page
+      .elementLocator(card)
+      .getByText("$1,200 of $5,000")
+      .element();
+    const range = document.createRange();
+    range.selectNodeContents(figures);
+    const text = range.getBoundingClientRect();
+    const overlaps =
+      text.left < chevron.right &&
+      chevron.left < text.right &&
+      text.top < chevron.bottom &&
+      chevron.top < text.bottom;
+    expect(overlaps).toBe(false);
+    // the text column spans the card, as a campaign's does
+    const bar = card.querySelector('[role="progressbar"]') as Element;
+    expect(bar.getBoundingClientRect().width).toBeCloseTo(
+      card.clientWidth - 32,
+      0
+    ); // p-4 either side, inside the border
+    // the title's stretched link covers the card, chevron included
+    const hit = document.elementFromPoint(
+      (chevron.left + chevron.right) / 2,
+      (chevron.top + chevron.bottom) / 2
+    );
+    expect(hit).not.toBeNull();
+    expect(hit?.closest("a")?.textContent).toBe("School meals 1");
+  });
+
+  test.each([
+    { layout: "a lone feature card at 1440", width: 1440, n: 1 },
+    { layout: "halves at 1440", width: 1440, n: 2 },
+    { layout: "thirds at 1440", width: 1440, n: 3 },
+    { layout: "a phone's stack at 375", width: 375, n: 2 },
+  ])(
+    "without a goal, a program's title and clamped summary stay clear of its chevron: $layout",
+    async ({ width, n }) => {
+      await page.viewport(width, 900);
+      const goalless = (i: number): IProgramItem => ({
+        ...program(i),
+        title: `School meals and a weekly take-home ration for every pupil in the district ${i}`,
+        summary:
+          "Breakfast and a hot lunch for every pupil in four district schools, every school day of the year, cooked by parents on site from local produce bought at the weekly market, with a take-home ration on Fridays for the pupils whose families need it most. In the holidays the kitchens stay open three mornings a week, and the parents who cook are paid a stipend that the programme reviews each term with the school boards and the district health office. Every kitchen keeps a log of what it served and to how many pupils, and the logs are published at the end of each term so that donors, parents and teachers can see where each shilling went.",
+      });
+      const screen = await mount(
+        <ItemsByCount
+          items={Array.from({ length: n }, (_, i) => goalless(i + 1))}
+          now={NOW}
+        />
+      );
+      for (const card of screen.getByRole("article").elements()) {
+        const chevron = (
+          card.querySelector("svg.lucide-chevron-right") as Element
+        ).getBoundingClientRect();
+        const summary = card.querySelector("h3 + p") as HTMLElement;
+        // it clamps: the summary's text runs past the lines it shows
+        expect(summary.scrollHeight).toBeGreaterThan(summary.clientHeight);
+        const title = card.querySelector("h3 a") as Element;
+        // the text's own ranges, not their blocks, which span the column
+        for (const el of [title, summary]) {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const text = range.getBoundingClientRect();
+          const overlaps =
+            text.left < chevron.right &&
+            chevron.left < text.right &&
+            text.top < chevron.bottom &&
+            chevron.top < text.bottom;
+          expect(overlaps, el.textContent ?? "").toBe(false);
+        }
+      }
+    }
+  );
 
   test("videos: one full, two halves, three as one large over two", async () => {
     await page.viewport(1440, 900);
@@ -435,6 +618,23 @@ describe("ShowMoreGrid", () => {
     const screen = await mount(<ShowMoreGrid items={gives(8)} now={NOW} />);
     const link = (n: number) =>
       screen.getByRole("link", { name: `Clean water ${n}`, exact: true });
+
+    expect(tracks(list_of(screen.container))).toBe(3);
+    await expect.element(link(6)).toBeVisible();
+    expect(link(7).query()).toBeNull();
+
+    await screen.getByRole("button", { name: "Show 2 more" }).click();
+    await expect.element(link(8)).toBeVisible();
+    await expect.element(link(7)).toHaveFocus();
+    expect(screen.getByRole("button", { name: /more/ }).query()).toBeNull();
+  });
+
+  test('programs take the same grid: 8 in thirds, 6 shown, the rest on "Show 2 more"', async () => {
+    await page.viewport(1440, 900);
+    const programs = Array.from({ length: 8 }, (_, i) => program(i + 1));
+    const screen = await mount(<ShowMoreGrid items={programs} now={NOW} />);
+    const link = (n: number) =>
+      screen.getByRole("link", { name: `School meals ${n}`, exact: true });
 
     expect(tracks(list_of(screen.container))).toBe(3);
     await expect.element(link(6)).toBeVisible();

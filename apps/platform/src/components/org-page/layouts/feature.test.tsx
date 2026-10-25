@@ -368,13 +368,13 @@ describe("Feature", () => {
     expect(two.getByRole("button", { name: /^See all/ }).query()).toBeNull();
   });
 
-  test("programs stay full-width rows at any count", async () => {
+  test("programs past three sit in thirds, every one shown", async () => {
     await page.viewport(1440, 900);
     const screen = await mount({ programs: many(program, 5) });
     await expect
       .element(screen.getByRole("link", { name: "School meals 5" }))
       .toBeVisible();
-    const rows = many(
+    const cards = many(
       (n) =>
         screen
           .getByRole("link", { name: `School meals ${n}` })
@@ -382,16 +382,22 @@ describe("Feature", () => {
           .closest("article") as HTMLElement,
       5
     ).map((r) => r.getBoundingClientRect());
-    const list = (
-      screen
-        .getByRole("heading", { name: "Programs", level: 2 })
-        .element()
-        .closest("section") as HTMLElement
-    ).getBoundingClientRect();
-    for (const [i, r] of rows.entries()) {
-      expect(r.width).toBe(list.width);
-      if (i > 0) expect(r.top).toBeGreaterThan(rows[i - 1].bottom);
-    }
+    // three to a line, the fourth under the first
+    expect(new Set(cards.slice(0, 3).map((r) => r.top)).size).toBe(1);
+    expect(cards[3].top).toBeGreaterThan(cards[0].bottom);
+    expect(cards[3].left).toBeCloseTo(cards[0].left, 0);
+    // the fifth sits beside the fourth
+    expect(cards[4].top).toBeCloseTo(cards[3].top, 0);
+    expect(cards[4].left).toBeGreaterThan(cards[3].right - 1);
+    // every program shows, with no reveal
+    // (the page's campaigns row has its own "See all", so look in the
+    // programs' own section)
+    const section = screen
+      .getByRole("link", { name: "School meals 1" })
+      .element()
+      .closest("section") as HTMLElement;
+    expect(section.querySelectorAll("article")).toHaveLength(5);
+    expect(section.querySelector("button")).toBeNull();
   });
 
   test("the header links only the sections the page has", async () => {
