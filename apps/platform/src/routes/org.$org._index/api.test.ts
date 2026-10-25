@@ -1126,7 +1126,10 @@ describe("donors api", () => {
     const npo = await seed_npo({ published: false });
     const cmp = `api-cmp-feed-${npo.id}`;
     await seed_campaign(npo.id, cmp);
-    expect((await donors_feed(npo.id, cmp)).status).toBe(404);
+    const denied = await donors_feed(npo.id, cmp);
+    expect(denied.status).toBe(404);
+    // the denial depends on who asked, so it must stay out of shared caches
+    expect(denied.headers.get("cache-control")).toBe("private, no-store");
 
     const off = await seed_npo({ active: false });
     const off_cmp = `api-cmp-off-${off.id}`;

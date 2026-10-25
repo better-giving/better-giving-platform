@@ -25,7 +25,13 @@ export const loader: LoaderFunction = async ({ params, request }) => {
     const npo = await npo_get(id);
     if (!npo || npo.active === false) throw resp.status(404);
     if (!npo.published) {
-      if (!(await can_preview(request, npo.id))) throw resp.status(404);
+      // a preview denial depends on who asked, so its 404 stays out of shared
+      // caches — otherwise a cached denial could outlast the viewer's sign-in
+      if (!(await can_preview(request, npo.id)))
+        throw new Response(null, {
+          status: 404,
+          headers: { "cache-control": "private, no-store" },
+        });
       preview = true;
     }
   }
