@@ -3,5 +3,5 @@ minimumReleaseAgeExclude:
   - eve@0.83.2
 allowBuilds:
   # kru-eve is installed from git and builds its dist with `eve extension build`.
-  "kru-eve@git+https://github.com/ap-justin/kru-eve.git#c5144e2908279bc70f40a4164674d7d9ca9457f5&path:/eve": true
+  "kru-eve@git+https://github.com/ap-justin/kru-eve.git#42f5156453f253aaacd58dfc1858c6a28601d9bc&path:/eve": true
   esbuild: true

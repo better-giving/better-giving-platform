@@ -170,8 +170,8 @@ importers:
         specifier: ^0.83.2
         version: 0.83.2(ai@7.0.152(zod@4.6.7))
       kru-eve:
-        specifier: github:ap-justin/kru-eve#c5144e2908279bc70f40a4164674d7d9ca9457f5&path:/eve
-        version: git+https://github.com/ap-justin/kru-eve.git#c5144e2908279bc70f40a4164674d7d9ca9457f5&path:/eve(eve@0.83.2(ai@7.0.152(zod@4.6.7)))
+        specifier: github:ap-justin/kru-eve#42f5156453f253aaacd58dfc1858c6a28601d9bc&path:/eve
+        version: git+https://github.com/ap-justin/kru-eve.git#42f5156453f253aaacd58dfc1858c6a28601d9bc&path:/eve(eve@0.83.2(ai@7.0.152(zod@4.6.7)))
       zod:
         specifier: ^4.5.4
         version: 4.6.7
@@ -393,8 +393,8 @@ packages:
   json-schema@0.4.0:
     resolution: {integrity: sha512-es94M3nTIfsEPisRafak+HDLfHXnKBhV3vU5eqPcS3flIWqcxJWgXHXiey3YrpaNsanY5ei1VoYEbOzijuq9BA==}
 
-  kru-eve@git+https://github.com/ap-justin/kru-eve.git#c5144e2908279bc70f40a4164674d7d9ca9457f5&path:/eve:
-    resolution: {commit: c5144e2908279bc70f40a4164674d7d9ca9457f5, path: /eve, repo: https://github.com/ap-justin/kru-eve.git, type: git}
+  kru-eve@git+https://github.com/ap-justin/kru-eve.git#42f5156453f253aaacd58dfc1858c6a28601d9bc&path:/eve:
+    resolution: {commit: 42f5156453f253aaacd58dfc1858c6a28601d9bc, path: /eve, repo: https://github.com/ap-justin/kru-eve.git, type: git}
     version: 0.160.0
     engines: {node: 24.x}
     peerDependencies:
@@ -586,7 +586,7 @@ snapshots:
 
   json-schema@0.4.0: {}
 
-  kru-eve@git+https://github.com/ap-justin/kru-eve.git#c5144e2908279bc70f40a4164674d7d9ca9457f5&path:/eve(eve@0.83.2(ai@7.0.152(zod@4.6.7))):
+  kru-eve@git+https://github.com/ap-justin/kru-eve.git#42f5156453f253aaacd58dfc1858c6a28601d9bc&path:/eve(eve@0.83.2(ai@7.0.152(zod@4.6.7))):
     dependencies:
       eve: 0.83.2(ai@7.0.152(zod@4.6.7))
       zod: 4.5.4

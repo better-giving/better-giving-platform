@@ -56,7 +56,7 @@ These come from the pinned `kru-eve` extension (`agent/extensions/kru.ts`):
 - `kru__reviewer` (Claude Opus, read-only): the diff against the brief and the merge-gate areas. Returns `PASS` or `FIX`.
 - `code__worker`: read-only exploration.
 
-Their own instructions don't know about `eve/`. Repeat the `eve/` rule in every message you send a writer, and treat any change under `eve/` in the diff as a high finding even if the reviewer misses it.
+The mount protects `eve/**` and `.github/**` for every subagent: their shells and `write_file` refuse writes there, and the reviewer reports any change there as a high finding. A brief that needs a change under `.github/` returns `BLOCKED`.
 
 None of them sees your conversation. Each message carries the brief, the done-check, the branch, and the files. Run one writer at a time on the checkout; they share one sandbox.
 

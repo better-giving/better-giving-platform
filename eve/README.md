@@ -8,7 +8,7 @@ This folder is a standalone pnpm project with its own `pnpm-workspace.yaml` and 
 
 The subagents come from the [Kru eve extension](https://github.com/ap-justin/kru-eve) (`kru-eve`), mounted in `agent/extensions/kru.ts`. This folder keeps only the Better Giving layer: the repo, house rules and checks, the HTTP route for PMs, the guard, the sandbox, and the lead.
 
-> **TODO:** `kru-eve` is pinned to commit `c5144e2` on the unreleased `eve-extension` branch of ap-justin/kru-eve (PR 1). Once Kai releases it, change the `kru-eve` entry in `package.json` and the `allowBuilds` key in `pnpm-workspace.yaml` to the release, then run `pnpm install`. The shared skills will move into the extension too.
+> **TODO:** `kru-eve` is pinned to commit `42f5156` on the unreleased `eve-extension` branch of ap-justin/kru-eve (PR 1). Once Kai releases it, change the `kru-eve` entry in `package.json` and the `allowBuilds` key in `pnpm-workspace.yaml` to the release, then run `pnpm install`. The shared skills will move into the extension too.
 
 ## How a run works
 
@@ -120,9 +120,11 @@ Enforced in code for the lead (`agent/lib/guard.ts`, `agent/tools/write_file.ts`
 - **Change `eve/`.** The shell refuses any command that names `eve/` in the checkout, and bulk staging (`git add -A`, `.`, `-u`, `git commit -a`). `write_file` refuses paths under `eve/`. A `pre-commit` hook refuses staged changes under `eve/`, and the `pre-push` hook refuses pushing any commit that touches it. The shell refuses `--no-verify` and changes to `core.hooksPath`.
 - **Write as the reviewer.** `kru__reviewer` has no `write_file` and a shell limited to single read commands.
 
-**Gap:** the `kru-eve` subagents use Kru's own guard. It refuses merges, deploys, and pushes to `main`, but it doesn't know about `eve/`, `--no-verify`, or pushing `HEAD`. So a subagent could edit files under `eve/` in the checkout, or commit with `--no-verify`. The `pre-push` hook still refuses any push that changes `eve/` unless it's skipped with `--no-verify`. The fix belongs in `kru-eve`: a config option for extra refused patterns and protected paths, which this folder would then set.
+**Subagents.** `agent/extensions/kru.ts` sets kru-eve's `protect` option: paths `eve/**` and `.github/**`, plus bulk staging (`git add -A`, `.`, `-u`, `commit -a`) and pushes to `main`. On top of kru-eve's built-in refusals (`--no-verify`, `git commit -n`, `git -c`, `core.hooksPath`, `GIT_*` overrides, pushing `HEAD`, `@` or `--all`), every builder, test-writer, and hard-work refuses `write_file` and shell writes to a protected path. The reviewer's `protected_changes` tool turns any protected change into a high finding.
 
-Only in the instructions: the 3-round review cap, "open the PR only on `PASS`", `hard-work` after two failures, and the lead repeating the `eve/` rule to each writer and treating any `eve/` change as a high finding.
+**Limits.** All shell guards read the command text. They don't catch a write made by a program the command runs (`node -e`, `python`, a package script, `git apply`), a path built from a variable at runtime, or a `cd` into a protected folder followed by a relative write. The git hooks catch those at commit and push time. CODEOWNERS on `/eve/` plus branch protection on `main` stay the backstop.
+
+Only in the instructions: the 3-round review cap, "open the PR only on `PASS`", `hard-work` after two failures.
 
 The shell guard is a pattern match and could miss an unusual command. The real backstops are branch protection on `main` and `CODEOWNERS`, which assigns `/eve/` to its maintainers.
 

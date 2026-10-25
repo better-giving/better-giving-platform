@@ -13,7 +13,7 @@
   "dependencies": {
     "eve": "^0.83.2",
     "zod": "^4.5.4",
-    "kru-eve": "github:ap-justin/kru-eve#c5144e2908279bc70f40a4164674d7d9ca9457f5&path:/eve"
+    "kru-eve": "github:ap-justin/kru-eve#42f5156453f253aaacd58dfc1858c6a28601d9bc&path:/eve"
   },
   "devDependencies": {
     "@types/node": "24.x",
