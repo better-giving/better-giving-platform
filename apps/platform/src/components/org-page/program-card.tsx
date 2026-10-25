@@ -21,9 +21,9 @@ export function ProgramCard({
   feature = false,
   show_kind,
 }: IProgramCard) {
-  // without a goal the title or summary is the column's last line and runs
-  // its full width: the chevron's 16px plus the column's gap keeps it clear.
-  // a goal's figures are short, and its bar spans the column
+  // without a goal the title or summary can be the column's last line and run
+  // its full width: 24px is the 16px chevron plus 8px of clearance. a goal's
+  // figures are short, and its bar spans the column
   const clear_chevron = item.goal == null ? "pr-6" : "";
   return (
     <article
