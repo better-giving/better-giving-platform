@@ -597,7 +597,7 @@ describe("funds — opt out", () => {
     expect(vi.mocked(enqueue)).toHaveBeenCalledTimes(1);
   });
 
-  it("last member opts out — fund becomes inactive, shows closed on the owner's campaigns", async () => {
+  it("last member opts out — fund leaves the supporter view and the member's profile", async () => {
     const npo = await seed_npo();
     const other_npo = await seed_npo({
       registration_number: "EIN-SOLO",
@@ -639,20 +639,6 @@ describe("funds — opt out", () => {
     await expect.element(screen.getByText("Solo Fund")).not.toBeInTheDocument();
     await cleanup();
 
-    // the owner lists it under its own campaigns, now closed
-    const owner = await render_funds(other_npo.id, {
-      ...MOCK_USER,
-      endowments: [other_npo.id],
-    });
-    await owner
-      .getByRole("tab", { name: "Your campaigns", exact: true })
-      .click();
-    const solo = owner.getByRole("listitem").filter({ hasText: "Solo Fund" });
-    await expect
-      .element(solo.getByText("Closed", { exact: true }))
-      .toBeVisible();
-    await cleanup();
-
     // fund deactivated — profile page won't show it (published filter requires active)
     const profile_screen = await render_profile(npo.id);
     await expect
@@ -662,7 +648,7 @@ describe("funds — opt out", () => {
 });
 
 describe("funds — edit visibility", () => {
-  it("edit link visible for own funds, hidden for supporter funds", async () => {
+  it("supporter fund shows View not Edit; an org's own fund stays off the supporter tab", async () => {
     const npo = await seed_npo();
     const other_npo = await seed_npo({
       registration_number: "EIN-EDIT-OTHER",
@@ -699,19 +685,9 @@ describe("funds — edit visibility", () => {
     await expect
       .element(screen.getByText("Supporter Fund", { exact: true }))
       .toBeInTheDocument();
+    // the org's own fund is a campaign now (BG-1943), so it never lists as a
+    // fund on either tab — only supporter funds remain here
     expect(screen.getByText("Editable Fund").query()).toBeNull();
-
-    await screen
-      .getByRole("tab", { name: "Your campaigns", exact: true })
-      .click();
-    const editable = screen
-      .getByRole("listitem")
-      .filter({ hasText: "Editable Fund" });
-    await expect
-      .element(
-        editable.getByRole("link", { name: "Edit Editable Fund", exact: true })
-      )
-      .toBeVisible();
 
     await cleanup();
 
@@ -791,7 +767,7 @@ describe("funds — published visibility on npo profile", () => {
       .not.toBeInTheDocument();
   });
 
-  it("admin page shows its own funds on Your campaigns regardless of published status", async () => {
+  it("org funds no longer list on Your campaigns — they're campaigns now (BG-1943)", async () => {
     const npo = await seed_npo();
     const creator = await seed_user("admin-vis@test.com", "Admin", "Vis");
 
@@ -821,12 +797,11 @@ describe("funds — published visibility on npo profile", () => {
       .getByRole("tab", { name: "Your campaigns", exact: true })
       .click();
 
-    await expect
-      .element(screen.getByText("Published Admin Fund"))
-      .toBeInTheDocument();
-    await expect
-      .element(screen.getByText("Draft Admin Fund"))
-      .toBeInTheDocument();
+    // Your campaigns lists real campaigns; none seeded, so the empty state shows
+    await expect.element(screen.getByText("No campaigns yet")).toBeVisible();
+    // the org's own funds are not listed here anymore
+    expect(screen.getByText("Published Admin Fund").query()).toBeNull();
+    expect(screen.getByText("Draft Admin Fund").query()).toBeNull();
   });
 });
 
