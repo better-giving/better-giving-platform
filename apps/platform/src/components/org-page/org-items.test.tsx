@@ -80,7 +80,6 @@ describe("GiveCard", () => {
     const screen = await mount(
       <div>
         <GiveCard
-          orientation="vertical"
           show_kind
           now={NOW}
           item={give(1, {
@@ -88,13 +87,11 @@ describe("GiveCard", () => {
           })}
         />
         <GiveCard
-          orientation="vertical"
           show_kind
           now={NOW}
           item={give(2, { ends_at: new Date(NOW + 3 * HOUR).toISOString() })}
         />
         <GiveCard
-          orientation="vertical"
           show_kind
           now={NOW}
           item={give(3, {
@@ -105,9 +102,8 @@ describe("GiveCard", () => {
             byline: "by Jane",
           })}
         />
-        <GiveCard orientation="vertical" show_kind now={NOW} item={give(4)} />
+        <GiveCard show_kind now={NOW} item={give(4)} />
         <GiveCard
-          orientation="vertical"
           show_kind
           now={NOW}
           item={give(5, { raised: 9500, goal: 7900 })}
@@ -180,34 +176,16 @@ describe("card image", () => {
         screen.container.querySelectorAll<HTMLElement>("article")
       );
       expect(cards).toHaveLength(7);
-      const wide = width >= 768;
-      for (const [i, card] of cards.entries()) {
+      for (const card of cards) {
         const slot = (
           card.firstElementChild as HTMLElement
         ).getBoundingClientRect();
         const box = card.getBoundingClientRect();
         expect(Math.abs(slot.width / slot.height - 4) / 4).toBeLessThan(0.01);
-        const is_program = i === 6;
-        // the feature card (0), the halves (1, 2) and the program row sit
-        // beside their text
-        const beside = wide && (i < 3 || is_program);
-        const frame = card.firstElementChild as HTMLElement;
-        if (beside) {
-          // an inset thumbnail with its own corner, centred down the card:
-          // no empty panel above or below it, and never on the card's edge
-          const above = slot.top - box.top;
-          expect(Math.abs(above - (box.bottom - slot.bottom))).toBeLessThan(2);
-          expect(above).toBeGreaterThanOrEqual(16);
-          expect(slot.left - box.left).toBeGreaterThanOrEqual(16);
-          expect(getComputedStyle(frame).borderTopLeftRadius).not.toBe("0px");
-          // a thumbnail, not a banner
-          expect(slot.width).toBeLessThan(card.clientWidth / 2);
-          if (is_program) expect(slot.width).toBeLessThanOrEqual(15 * 16);
-        } else {
-          // across the top of the card, edge to edge
-          expect(slot.top).toBeCloseTo(box.top + 1, 0);
-          expect(slot.width).toBeCloseTo(card.clientWidth, 0);
-        }
+        // across the top of the card, edge to edge, at every count: the
+        // feature card, the halves, the thirds and the program alike
+        expect(slot.top).toBeCloseTo(box.top + 1, 0);
+        expect(slot.width).toBeCloseTo(card.clientWidth, 0);
         const img = card.querySelector("img") as HTMLImageElement;
         await expect.poll(() => img.complete).toBe(true);
         const shown = img.getBoundingClientRect();
@@ -274,7 +252,7 @@ describe("card image", () => {
     expect(new Set(boxes).size).toBe(1);
   });
 
-  test("a program row on a phone has its image across the top and the title on at most two lines", async () => {
+  test("a program card on a phone has its image across the top and the title on at most two lines", async () => {
     await page.viewport(375, 812);
     const screen = await mount(
       <ItemsByCount
@@ -311,7 +289,7 @@ describe("card image", () => {
       .toBeVisible();
   });
 
-  test("rows: every campaign a horizontal row, one per line, lined up with the program rows", async () => {
+  test("rows: one card per line, campaigns and programs alike", async () => {
     await page.viewport(1440, 900);
     const screen = await mount(
       <div style={{ width: 768 }}>
@@ -323,7 +301,8 @@ describe("card image", () => {
       </div>
     );
     const lists = screen.container.querySelectorAll("[data-count]");
-    expect(tracks(lists[0])).toBe(1);
+    expect(lists).toHaveLength(2);
+    for (const list of lists) expect(tracks(list)).toBe(1);
     const titles = Array.from(screen.container.querySelectorAll("h3"));
     expect(titles).toHaveLength(3);
     const sizes = titles.map((h) => getComputedStyle(h).fontSize);
@@ -369,18 +348,33 @@ describe("ItemsByCount", () => {
     expect(tracks(list_of(screen.container))).toBe(1);
   });
 
-  test("one program is a row, not a lone card", async () => {
+  test("programs take the count grid: one across the row, then halves, then thirds", async () => {
     await page.viewport(1440, 900);
-    const screen = await mount(<ItemsByCount items={[program(1)]} now={NOW} />);
-    const rows = list_of(screen.container);
-    expect(tracks(rows)).toBe(1);
-    // a row runs the list's full width
-    const row = rows.querySelector("article") as HTMLElement;
-    expect(row.getBoundingClientRect().width).toBe(
-      rows.getBoundingClientRect().width
+    const one = await mount(<ItemsByCount items={[program(1)]} now={NOW} />);
+    const list = list_of(one.container);
+    expect(tracks(list)).toBe(1);
+    const card = list.querySelector("article") as HTMLElement;
+    expect(card.getBoundingClientRect().width).toBe(
+      list.getBoundingClientRect().width
     );
     await expect
-      .element(screen.getByRole("link", { name: "School meals 1" }))
+      .element(one.getByRole("link", { name: "School meals 1" }))
+      .toBeVisible();
+    await cleanup();
+
+    const two = await mount(
+      <ItemsByCount items={[program(1), program(2)]} now={NOW} />
+    );
+    expect(tracks(list_of(two.container))).toBe(2);
+    await cleanup();
+
+    const four = await mount(
+      <ItemsByCount items={[1, 2, 3, 4].map((n) => program(n))} now={NOW} />
+    );
+    expect(tracks(list_of(four.container))).toBe(3);
+    // every program shows; there is no reveal
+    await expect
+      .element(four.getByRole("link", { name: "School meals 4" }))
       .toBeVisible();
   });
 

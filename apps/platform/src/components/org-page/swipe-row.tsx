@@ -65,12 +65,7 @@ export function SwipeRow({ heading, items, now }: ISwipeRow) {
                 // staggered among the cards that rise, not by position
                 style={rises ? reveal_delay(rising++) : undefined}
               >
-                <GiveCard
-                  item={x}
-                  orientation="vertical"
-                  now={now}
-                  show_kind={show_kind}
-                />
+                <GiveCard item={x} now={now} show_kind={show_kind} />
               </li>
             );
           })}
@@ -87,12 +82,7 @@ export function SwipeRow({ heading, items, now }: ISwipeRow) {
           <ul className="grid auto-cols-[75%] grid-flow-col gap-4 md:auto-cols-[30%]">
             {items.map((x) => (
               <li key={x.id} className="snap-start">
-                <GiveCard
-                  item={x}
-                  orientation="vertical"
-                  now={now}
-                  show_kind={show_kind}
-                />
+                <GiveCard item={x} now={now} show_kind={show_kind} />
               </li>
             ))}
           </ul>

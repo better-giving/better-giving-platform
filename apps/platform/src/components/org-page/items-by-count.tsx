@@ -7,7 +7,7 @@ import {
   names_kind,
   type TOrgItem,
 } from "./items";
-import { ProgramRow } from "./program-row";
+import { ProgramCard } from "./program-card";
 import { REVEAL_IN, reveal_delay } from "./reveal";
 import { VideoSet } from "./video-set";
 
@@ -15,8 +15,7 @@ export interface IItemsByCount {
   items: TOrgItem[];
   /** epoch ms, see `GiveCard` */
   now: number;
-  /** every campaign a `horizontal` row, one per line, whatever the count, so
-   * it lines up with the program rows: a reading column's list */
+  /** one card per line whatever the count: a reading column's list */
   rows?: boolean;
   /** each card names its kind; by default when `items` mixes kinds. a caller
    * that lays out part of a list elsewhere passes the whole list's answer */
@@ -25,9 +24,10 @@ export interface IItemsByCount {
 
 /** a list laid out by its own count, never leaving an empty slot: 1 is a
  * feature card, 2 halves, 3 thirds, 4+ the first 3 and "See all N". programs
- * are rows and videos follow their own rule whatever the count, so a mixed
- * list renders campaigns and supporter campaigns, then programs, then videos. on a
- * phone every count is a single stack. nothing for no items */
+ * take the same grid by their own count, all shown, and videos follow their
+ * own rule, so a mixed list renders campaigns and supporter campaigns, then
+ * programs, then videos. on a phone every count is a single stack. nothing
+ * for no items */
 export function ItemsByCount({
   items,
   now,
@@ -47,12 +47,7 @@ export function ItemsByCount({
           <ul data-count={give.length} className="grid gap-4">
             {give.map((x) => (
               <li key={x.id}>
-                <GiveCard
-                  item={x}
-                  orientation="horizontal"
-                  now={now}
-                  show_kind={show_kind}
-                />
+                <GiveCard item={x} now={now} show_kind={show_kind} />
               </li>
             ))}
           </ul>
@@ -60,10 +55,13 @@ export function ItemsByCount({
           <GiveByCount items={give} now={now} show_kind={show_kind} />
         ))}
       {programs.length > 0 && (
-        <ul data-count={programs.length} className="grid gap-4">
+        <ul
+          data-count={programs.length}
+          className={`grid gap-4 ${rows ? "" : count_grid(programs.length)}`}
+        >
           {programs.map((p) => (
             <li key={p.id}>
-              <ProgramRow item={p} show_kind={show_kind} />
+              <ProgramCard item={p} show_kind={show_kind} />
             </li>
           ))}
         </ul>
@@ -92,19 +90,13 @@ function GiveByCount({ items, now, show_kind }: IGiveByCount) {
       />
     );
   }
-  const [grid, orientation] =
-    n === 1
-      ? (["", "feature"] as const)
-      : n === 2
-        ? (["md:grid-cols-2", "horizontal"] as const)
-        : (["md:grid-cols-3", "vertical"] as const);
   return (
-    <ul data-count={n} className={`grid gap-4 ${grid}`}>
+    <ul data-count={n} className={`grid gap-4 ${count_grid(n)}`}>
       {items.map((x) => (
         <li key={x.id}>
           <GiveCard
             item={x}
-            orientation={orientation}
+            feature={n === 1}
             now={now}
             show_kind={show_kind}
           />
@@ -112,6 +104,11 @@ function GiveByCount({ items, now, show_kind }: IGiveByCount) {
       ))}
     </ul>
   );
+}
+
+/** a lone card across the row, 2 halves, 3 or more thirds, all from md */
+function count_grid(n: number): string {
+  return n === 1 ? "" : n === 2 ? "md:grid-cols-2" : "md:grid-cols-3";
 }
 
 export interface IShowMoreGrid {
@@ -122,7 +119,7 @@ export interface IShowMoreGrid {
 }
 
 /** a tab's content: the first 6 in three columns (3 on a phone), and "Show N
- * more" for the rest. programs stay full-width rows */
+ * more" for the rest */
 export function ShowMoreGrid({ items, now }: IShowMoreGrid) {
   return (
     <RevealGrid
@@ -194,26 +191,15 @@ function RevealGrid({ items, now, show_kind, first, label }: IRevealGrid) {
         onTransitionEnd={settle}
         onTransitionCancel={settle}
       >
-        {items.map((x, i) =>
-          x.kind === "program" ? (
-            <li
-              key={x.id}
-              className={`col-span-full ${held(i)}`}
-              style={delay(i)}
-            >
-              <ProgramRow item={x} show_kind={show_kind} />
-            </li>
-          ) : (
-            <li key={x.id} className={held(i)} style={delay(i)}>
-              <GiveCard
-                item={x}
-                orientation="vertical"
-                now={now}
-                show_kind={show_kind}
-              />
-            </li>
-          )
-        )}
+        {items.map((x, i) => (
+          <li key={x.id} className={held(i)} style={delay(i)}>
+            {x.kind === "program" ? (
+              <ProgramCard item={x} show_kind={show_kind} />
+            ) : (
+              <GiveCard item={x} now={now} show_kind={show_kind} />
+            )}
+          </li>
+        ))}
       </ul>
       {!open && hidden_phone > 0 && (
         <button
