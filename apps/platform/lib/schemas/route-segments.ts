@@ -106,6 +106,7 @@ export const top_level_route_segments = [
   "form-embed.js",
   "forms",
   "fund-management",
+  "fundraisers",
   "funds",
   "giving-tuesday",
   "llms.txt",
