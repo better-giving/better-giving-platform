@@ -25,7 +25,7 @@ export const SUPPORTER_SQL = join(
 const FIXTURE_NPOS = ["VERIFY0001", "VERIFY0003"] as const;
 
 const NEITHER_FIXTURE =
-  "seed-preview-fundraiser: neither VERIFY0001 nor VERIFY0003 exists; not seeding";
+  "seed-preview-campaign: neither VERIFY0001 nor VERIFY0003 exists; not seeding";
 
 export interface SeedSession {
   connect(): Promise<unknown>;
@@ -96,7 +96,7 @@ function url_problem(url: string | undefined): string | undefined {
 }
 
 /** exit code of one preview seed. 0 is "wrote nothing" as well as "wrote" */
-export async function seed_preview_fundraiser({
+export async function seed_preview_campaign({
   vercel_env,
   url,
   sql,
@@ -106,7 +106,7 @@ export async function seed_preview_fundraiser({
   if (!vercel_env || vercel_env === "production") return 0;
   const bad_url = url_problem(url);
   if (!url || bad_url) {
-    log.error(`seed-preview-fundraiser: ${bad_url}; not seeding`);
+    log.error(`seed-preview-campaign: ${bad_url}; not seeding`);
     return 1;
   }
   const session = open(url);
@@ -128,14 +128,14 @@ export async function seed_preview_fundraiser({
       await session.query("commit");
     } catch (err) {
       await session.query("rollback").catch((rollback_err) => {
-        log.error("seed-preview-fundraiser: rollback failed:", rollback_err);
+        log.error("seed-preview-campaign: rollback failed:", rollback_err);
       });
       throw err;
     }
     return 0;
   } catch (err) {
     const why = (err as { message?: unknown } | null)?.message ?? err;
-    log.error(`seed-preview-fundraiser: failed: ${why}`);
+    log.error(`seed-preview-campaign: failed: ${why}`);
     return 1;
   } finally {
     await session.end().catch(() => {});
@@ -150,7 +150,7 @@ function session(url: string): SeedSession {
   // a socket error also rejects the pending query; unheard, it crashes the
   // process before the exit code is set
   client.on("error", (err) => {
-    console.error("seed-preview-fundraiser: session lost:", err);
+    console.error("seed-preview-campaign: session lost:", err);
   });
   return {
     connect: () => client.connect(),
@@ -165,7 +165,7 @@ const is_entry =
 
 if (is_entry) {
   process.exit(
-    await seed_preview_fundraiser({
+    await seed_preview_campaign({
       vercel_env: process.env.VERCEL_ENV,
       url: process.env.DATABASE_URL_UNPOOLED,
       sql: readFileSync(SUPPORTER_SQL, "utf8"),

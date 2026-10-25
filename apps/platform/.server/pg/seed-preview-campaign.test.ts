@@ -5,9 +5,9 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import {
   type SeedSession,
   SUPPORTER_SQL,
-  seed_preview_fundraiser,
+  seed_preview_campaign,
   sql_statements,
-} from "./seed-preview-fundraiser.ts";
+} from "./seed-preview-campaign.ts";
 import {
   create_test_db,
   seed_npo_sql,
@@ -18,7 +18,7 @@ const DIRECT = "postgresql://u:p@127.0.0.1:9/db";
 const USER = "b0000000-0000-4000-8000-0000000000bb";
 const FUND = "f0000000-0000-4000-8000-000000000002";
 const NEITHER =
-  "seed-preview-fundraiser: neither VERIFY0001 nor VERIFY0003 exists; not seeding";
+  "seed-preview-campaign: neither VERIFY0001 nor VERIFY0003 exists; not seeding";
 
 function capture() {
   const lines: string[] = [];
@@ -50,11 +50,11 @@ function fake(
   return { client, queries, ended: () => ended };
 }
 
-describe("seed_preview_fundraiser", () => {
+describe("seed_preview_campaign", () => {
   test("exits 0 without opening a session when VERCEL_ENV is production or unset", async () => {
     const opened: string[] = [];
     const run = (vercel_env: string | undefined) =>
-      seed_preview_fundraiser({
+      seed_preview_campaign({
         vercel_env,
         url: DIRECT,
         sql: "insert into funds (id) values ('x');",
@@ -78,7 +78,7 @@ describe("seed_preview_fundraiser", () => {
     };
     const missing = capture();
     expect(
-      await seed_preview_fundraiser({
+      await seed_preview_campaign({
         vercel_env: "preview",
         url: undefined,
         sql: "insert into funds (id) values ('x');",
@@ -90,7 +90,7 @@ describe("seed_preview_fundraiser", () => {
 
     const pooled = capture();
     expect(
-      await seed_preview_fundraiser({
+      await seed_preview_campaign({
         vercel_env: "preview",
         url: "postgresql://u:p@ep-x-pooler.aws.neon.tech/db",
         sql: "insert into funds (id) values ('x');",
@@ -102,7 +102,7 @@ describe("seed_preview_fundraiser", () => {
 
     const bad = capture();
     expect(
-      await seed_preview_fundraiser({
+      await seed_preview_campaign({
         vercel_env: "preview",
         url: "postgresql://u:s3cr#t@127.0.0.1/db",
         sql: "insert into funds (id) values ('x');",
@@ -119,7 +119,7 @@ describe("seed_preview_fundraiser", () => {
   test("logs once and writes nothing when neither fixture nonprofit exists", async () => {
     const { client, queries, ended } = fake([]);
     const out = capture();
-    const code = await seed_preview_fundraiser({
+    const code = await seed_preview_campaign({
       vercel_env: "preview",
       url: DIRECT,
       sql: "insert into \"user\" (id) values ('b'); insert into npos (name) values ('nope');",
@@ -137,7 +137,7 @@ describe("seed_preview_fundraiser", () => {
 
   test("runs the script in one transaction when a fixture nonprofit exists", async () => {
     const { client, queries } = fake([{ ok: 1 }]);
-    const code = await seed_preview_fundraiser({
+    const code = await seed_preview_campaign({
       vercel_env: "preview",
       url: DIRECT,
       sql: "insert into \"user\" (id) values ('b'); insert into funds (id) values ('f');",
@@ -155,7 +155,7 @@ describe("seed_preview_fundraiser", () => {
 
   test("keeps a semicolon inside a quoted value in that insert", async () => {
     const { client, queries } = fake([{ ok: 1 }]);
-    const code = await seed_preview_fundraiser({
+    const code = await seed_preview_campaign({
       vercel_env: "preview",
       url: DIRECT,
       sql: "insert into funds (description_pt) values ('a;b');",
@@ -172,7 +172,7 @@ describe("seed_preview_fundraiser", () => {
       sql.includes("funds") ? new Error("duplicate slug") : undefined
     );
     const out = capture();
-    const code = await seed_preview_fundraiser({
+    const code = await seed_preview_campaign({
       vercel_env: "preview",
       url: DIRECT,
       sql: "insert into \"user\" (id) values ('b'); insert into funds (id) values ('f');",
@@ -210,8 +210,8 @@ describe("seed_preview_fundraiser", () => {
   });
 });
 
-describe("seed-preview-fundraiser.ts entry", () => {
-  const script = join(import.meta.dirname, "seed-preview-fundraiser.ts");
+describe("seed-preview-campaign.ts entry", () => {
+  const script = join(import.meta.dirname, "seed-preview-campaign.ts");
 
   function run_script(extra: Record<string, string>) {
     // the child must not inherit a database url. ProcessEnv types those keys
@@ -278,7 +278,7 @@ describe("supporter fundraiser sql", () => {
     await wipe();
     const sql = readFileSync(SUPPORTER_SQL, "utf8");
     const out = capture();
-    const code = await seed_preview_fundraiser({
+    const code = await seed_preview_campaign({
       vercel_env: "preview",
       url: DIRECT,
       sql,
@@ -393,7 +393,7 @@ describe("supporter fundraiser sql", () => {
     ).toBe(1);
 
     const out = capture();
-    const code = await seed_preview_fundraiser({
+    const code = await seed_preview_campaign({
       vercel_env: "preview",
       url: DIRECT,
       sql,
