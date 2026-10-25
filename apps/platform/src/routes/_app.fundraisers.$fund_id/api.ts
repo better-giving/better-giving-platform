@@ -42,9 +42,13 @@ export const loader = async ({ request, params }: Route.LoaderArgs) => {
   if (p.issues) throw resp.status(400, p.issues[0].message);
   const fund = await get_fund(p.output);
   if (!fund) throw new Response(null, { status: 404 });
-  // a fund folded into a campaign lives there now; an unfolded fund still renders
+  // a fund folded into a campaign lives there now; an unfolded fund still
+  // renders. a draft campaign is absent from the public page (it 404s), so keep
+  // serving the fund until its campaign goes live, rather than 301ing to a 404
   const campaign = await campaign_by_legacy_fund(fund.id);
-  if (campaign) throw campaign_moved(campaign, url.search);
+  if (campaign && campaign.status !== "draft") {
+    throw campaign_moved(campaign, url.search);
+  }
   return {
     ...fund,
     url: url.toString(),

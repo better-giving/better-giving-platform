@@ -27,9 +27,11 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
   const id = p.output;
   const fund = await get_fund(id);
   if (!fund) throw new Response(null, { status: 404 });
-  // the campaign page carries the donation form; a folded fund donates there
+  // the campaign page carries the donation form; a folded fund donates there. a
+  // draft campaign is absent from the public page, so keep serving the fund's
+  // own donate page until its campaign goes live rather than 301ing to a 404
   const campaign = await campaign_by_legacy_fund(fund.id);
-  if (campaign) {
+  if (campaign && campaign.status !== "draft") {
     throw campaign_moved(campaign, new URL(request.url).search);
   }
 

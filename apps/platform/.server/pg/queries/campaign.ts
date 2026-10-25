@@ -325,6 +325,7 @@ export async function campaign_by_legacy_fund(fund_id: string): Promise<
   | {
       id: string;
       slug: string;
+      status: TCampaignStatus;
       owner_npo_id: number | null;
       owner_slug: string | null;
     }
@@ -334,6 +335,7 @@ export async function campaign_by_legacy_fund(fund_id: string): Promise<
     .select({
       id: campaigns.id,
       slug: campaigns.slug,
+      status: campaigns.status,
       owner_npo_id: campaigns.owner_npo_id,
       owner_slug: npos.slug,
     })

@@ -126,4 +126,59 @@ describe("folded fund redirects", () => {
     expect(data).not.toBeInstanceOf(Response);
     expect((data as { id: string }).id).toBe(fund.id);
   });
+
+  it("keeps serving a fund whose campaign is still a draft (the campaign page would 404)", async () => {
+    const fund = await seed_fund(db(), {
+      id: crypto.randomUUID(),
+      slug: "draft-drive",
+      npo_owner: npo_id,
+      creator_id,
+      members: [npo_id],
+    });
+    await db()
+      .insert(campaigns)
+      .values({
+        id: `camp-${fund.id}`,
+        owner_npo_id: npo_id,
+        creator_id,
+        name: "Winter",
+        slug: "winter",
+        status: "draft",
+        legacy_fund_id: fund.id,
+      });
+
+    const data = await load(fund.id);
+    expect(data).not.toBeInstanceOf(Response);
+    expect((data as { id: string }).id).toBe(fund.id);
+  });
+
+  it("redirects to the owner's numeric id when the org has no slug", async () => {
+    const slugless = await seed_npo(db(), {
+      registration_number: "EIN-NOSLUG",
+      slug: null,
+      published: true,
+    });
+    const fund = await seed_fund(db(), {
+      id: crypto.randomUUID(),
+      slug: "noslug-drive",
+      npo_owner: slugless.id,
+      creator_id,
+      members: [slugless.id],
+    });
+    await db()
+      .insert(campaigns)
+      .values({
+        id: `camp-${fund.id}`,
+        owner_npo_id: slugless.id,
+        creator_id,
+        name: "Winter",
+        slug: "winter",
+        status: "live",
+        legacy_fund_id: fund.id,
+      });
+
+    const res = (await load(fund.id).catch((e: unknown) => e)) as Response;
+    expect(res.status).toBe(301);
+    expect(res.headers.get("location")).toBe(`/org/${slugless.id}/winter`);
+  });
 });

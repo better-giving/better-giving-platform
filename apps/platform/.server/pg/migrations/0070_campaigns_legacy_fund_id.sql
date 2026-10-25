@@ -1,3 +1,4 @@
+SET LOCAL lock_timeout = '2s';--> statement-breakpoint
 -- contract: 7a17e28 v_campaign_total_usd recreated with the same columns (campaign_id, total); it only adds legacy-fund settled gifts to the sum, so the deployment still serving reads it unchanged
 DROP VIEW "public"."v_campaign_total_usd";--> statement-breakpoint
 ALTER TABLE "campaigns" ADD COLUMN "legacy_fund_id" text;--> statement-breakpoint

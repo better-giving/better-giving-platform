@@ -42,6 +42,10 @@ export interface BackfillCounts {
   campaigns_created: number;
   /** fund_members rows copied into campaign_members */
   members_copied: number;
+  /** funds that failed to fold this run (e.g. a slug colliding with an existing
+   * campaign for the same org); the rest still migrate, so a re-run retries only
+   * these once the clash is resolved */
+  errored: number;
 }
 
 /** a fund's open/closed state maps onto the campaign status ladder. an expired
@@ -85,7 +89,9 @@ export async function backfill_campaign_funds(
     already_migrated: 0,
     campaigns_created: 0,
     members_copied: 0,
+    errored: 0,
   };
+  const errored_ids: string[] = [];
 
   for (const f of org_funds) {
     if (done.has(f.id)) {
@@ -105,43 +111,59 @@ export async function backfill_campaign_funds(
     }
 
     const id = crypto.randomUUID();
-    await db.transaction(async (tx) => {
-      await tx.insert(campaigns).values({
-        id,
-        owner_npo_id: f.npo_owner,
-        creator_id: f.creator_id,
-        name: f.name,
-        // funds.slug is a nullable unique; a slugless fund keeps its stable id
-        slug: f.slug ?? f.id,
-        description_pt: f.description_pt,
-        description_v2: f.description_v2,
-        banner: f.banner,
-        logo: f.logo,
-        videos: f.videos,
-        status: status_of(f),
-        published_at: f.published ? f.created_at : null,
-        ends_at: f.expiration,
-        donate_methods: f.fund_donate_methods,
-        increments: f.increments,
-        target_number: f.target_number,
-        target_smart: f.target_smart,
-        hide_bg_tip: f.hide_bg_tip,
-        legacy_fund_id: f.id,
-        created_at: f.created_at,
+    try {
+      await db.transaction(async (tx) => {
+        await tx.insert(campaigns).values({
+          id,
+          owner_npo_id: f.npo_owner,
+          creator_id: f.creator_id,
+          name: f.name,
+          // funds.slug is a nullable unique; a slugless fund keeps its stable id
+          slug: f.slug ?? f.id,
+          description_pt: f.description_pt,
+          description_v2: f.description_v2,
+          banner: f.banner,
+          logo: f.logo,
+          videos: f.videos,
+          status: status_of(f),
+          published_at: f.published ? f.created_at : null,
+          ends_at: f.expiration,
+          donate_methods: f.fund_donate_methods,
+          increments: f.increments,
+          target_number: f.target_number,
+          target_smart: f.target_smart,
+          hide_bg_tip: f.hide_bg_tip,
+          legacy_fund_id: f.id,
+          created_at: f.created_at,
+        });
+        if (members.length > 0) {
+          await tx.insert(campaign_members).values(
+            members.map((m) => ({
+              campaign_id: id,
+              npo_id: m.npo_id,
+              position: m.position,
+            }))
+          );
+        }
       });
-      if (members.length > 0) {
-        await tx.insert(campaign_members).values(
-          members.map((m) => ({
-            campaign_id: id,
-            npo_id: m.npo_id,
-            position: m.position,
-          }))
-        );
-      }
-    });
+      counts.campaigns_created++;
+      counts.members_copied += members.length;
+    } catch (err) {
+      // one fund failing (e.g. its slug collides with an existing campaign for
+      // the same org) must not abort the whole run or swallow the counts of
+      // what succeeded. record it, carry on; a re-run is idempotent on the rest
+      counts.errored++;
+      errored_ids.push(f.id);
+      console.error(
+        `[backfill-campaign-funds] fund ${f.id} (slug ${f.slug ?? "<none>"}) failed to fold: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
 
-    counts.campaigns_created++;
-    counts.members_copied += members.length;
+  if (errored_ids.length > 0) {
+    console.error(
+      `[backfill-campaign-funds] ${errored_ids.length} fund(s) failed: ${errored_ids.join(", ")}`
+    );
   }
 
   return counts;

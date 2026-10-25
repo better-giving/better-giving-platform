@@ -189,6 +189,7 @@ describe("backfill org funds into campaigns", () => {
       already_migrated: 0,
       campaigns_created: 1,
       members_copied: 2,
+      errored: 0,
     });
     expect(await db().select().from(campaigns)).toHaveLength(0);
   });
@@ -228,8 +229,15 @@ describe("backfill org funds into campaigns", () => {
       already_migrated: 1,
       campaigns_created: 0,
       members_copied: 0,
+      errored: 0,
     });
     expect(await db().select().from(campaigns)).toHaveLength(1);
+    // and no duplicate member rows were inserted on the re-run
+    const members_after = await db()
+      .select()
+      .from(campaign_members)
+      .where(eq(campaign_members.campaign_id, campaign!.id));
+    expect(members_after).toHaveLength(2);
   });
 
   it("gives the migrated campaign the fund's settled total, net of fees", async () => {
@@ -250,9 +258,61 @@ describe("backfill org funds into campaigns", () => {
       .from(v_campaign_total_usd)
       .where(eq(v_campaign_total_usd.campaign_id, campaign!.id));
 
-    // settled only, net of fees: the pending gift of 3 is excluded
+    // settled only, net of fees: the pending gift of 3 is excluded. anchored to
+    // the seeded literal (7.5), not just to the fund view, so a wrong column in
+    // the campaign view's legacy branch can't pass by matching a wrong fund view
     expect(fund_total!.total ?? 0).toBeCloseTo(7.5, 2);
+    expect(campaign_total!.total ?? 0).toBeCloseTo(7.5, 2);
     expect(campaign_total!.total ?? 0).toBeCloseTo(fund_total!.total ?? 0, 2);
+  });
+
+  it("adds a folded campaign's own campaign_id gifts to its legacy fund gifts, once each", async () => {
+    const { org, fund } = await seed_org_fund();
+    await backfill_campaign_funds();
+
+    const [campaign] = await db()
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.legacy_fund_id, fund.id));
+
+    // a new gift made to the campaign directly (donations.campaign_id), settled,
+    // net 10 — rides the first UNION arm, not the legacy fund_id arm
+    counter++;
+    const donation_id = `d-camp-${counter}`;
+    await db().insert(donations).values({
+      id: donation_id,
+      campaign_id: campaign!.id,
+      upusd: 1,
+      status: "settled",
+      amount_base: 10,
+      amount_tip: 0,
+      amount_fee_allowance: 0,
+      currency: "USD",
+      frequency: "one-time",
+      source: "bg-marketplace",
+      via: "stripe:card",
+    });
+    await db()
+      .insert(dists)
+      .values({
+        id: `dist-camp-${counter}`,
+        donation_id,
+        status: "settled",
+        date_created: new Date().toISOString(),
+        to_id: org.id,
+        amount_denom: "USD",
+        net: 10,
+        // a campaign-routed gift carries no fund_id, so it can't land in both arms
+        fund_id: null,
+      });
+
+    const [campaign_total] = await db()
+      .select()
+      .from(v_campaign_total_usd)
+      .where(eq(v_campaign_total_usd.campaign_id, campaign!.id));
+
+    // 7.5 legacy + 10 direct = 17.5; each gift counted exactly once
+    expect(campaign_total!.total ?? 0).toBeCloseTo(17.5, 2);
   });
 
   it("leaves a fund whose creator never joined the owning org alone", async () => {
@@ -286,5 +346,86 @@ describe("backfill org funds into campaigns", () => {
     const counts = await backfill_campaign_funds();
     expect(counts.org_funds).toBe(0);
     expect(counts.campaigns_created).toBe(0);
+  });
+
+  it("folds a slugless fund, using its id as the campaign slug", async () => {
+    const o = await npo("slugless-org");
+    const creator = await member(o.id);
+    await db().insert(funds).values({
+      id: "fund-slugless",
+      name: "Slugless drive",
+      slug: null,
+      description_pt: "[]",
+      banner: "b",
+      logo: "l",
+      npo_owner: o.id,
+      creator_id: creator,
+    });
+
+    const counts = await backfill_campaign_funds();
+    expect(counts.campaigns_created).toBe(1);
+
+    const [c] = await db()
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.legacy_fund_id, "fund-slugless"));
+    expect(c!.slug).toBe("fund-slugless");
+  });
+
+  it("errors one fund on a slug clash and still folds the rest", async () => {
+    const o = await npo("clash-org");
+    const creator = await member(o.id);
+    // a campaign already owns the slug "shared" for this org
+    await db().insert(campaigns).values({
+      id: "camp-existing",
+      owner_npo_id: o.id,
+      creator_id: creator,
+      name: "Existing",
+      slug: "shared",
+      status: "live",
+    });
+    // two org funds: one slug clashes with the existing campaign, one is clean
+    await db()
+      .insert(funds)
+      .values([
+        {
+          id: "fund-clash",
+          name: "Clash",
+          slug: "shared",
+          description_pt: "[]",
+          banner: "b",
+          logo: "l",
+          npo_owner: o.id,
+          creator_id: creator,
+        },
+        {
+          id: "fund-ok",
+          name: "OK",
+          slug: "ok-drive",
+          description_pt: "[]",
+          banner: "b",
+          logo: "l",
+          npo_owner: o.id,
+          creator_id: creator,
+        },
+      ]);
+
+    const counts = await backfill_campaign_funds();
+    expect(counts.org_funds).toBe(2);
+    expect(counts.errored).toBe(1);
+    expect(counts.campaigns_created).toBe(1);
+    // the clashing fund did not fold; the clean one did
+    expect(
+      await db()
+        .select()
+        .from(campaigns)
+        .where(eq(campaigns.legacy_fund_id, "fund-clash"))
+    ).toHaveLength(0);
+    expect(
+      await db()
+        .select()
+        .from(campaigns)
+        .where(eq(campaigns.legacy_fund_id, "fund-ok"))
+    ).toHaveLength(1);
   });
 });
