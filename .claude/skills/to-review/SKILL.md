@@ -24,7 +24,7 @@ Push the branch, then open the PR against `main` with the GitHub MCP tools. The 
 
 ## 4. Wait for the review
 
-Events wake the session — don't poll. Greptile posts a summary comment whose heading reads `Confidence Score: N/5` (also `<!-- greptile_confidence_score:N -->`), plus inline threads. CI is `checks`, `test`, and `gate` (`.github/workflows/ci.yml`).
+Greptile reviews a new PR on its own; don't comment to start it. Events wake the session — don't poll. Greptile posts a summary comment whose heading reads `Confidence Score: N/5` (also `<!-- greptile_confidence_score:N -->`), plus inline threads. CI is `checks`, `test`, and `gate` (`.github/workflows/ci.yml`).
 
 ## 5. Merge, or fix and ask again
 
@@ -35,7 +35,7 @@ Read the score on the **current head** — the summary's "Last reviewed commit" 
   - Verify the finding before fixing it. One that doesn't hold gets a reply saying why.
   - Fix, run the changed files' tests, `pnpm typecheck` and `pnpm lint` (root `AGENTS.md` → Commands), and push.
   - Reply on each thread naming the commit, and resolve it.
-  - Post a standalone PR comment `@greptileai` to re-request the review, then back to step 4.
+  - Post a standalone PR comment `@greptileai`, which is what re-runs a review after the first, then back to step 4.
 
   CI stops at the first failing test file, so after a red `test` run the whole platform suite locally before pushing — a second failure may be hiding behind the first.
 
