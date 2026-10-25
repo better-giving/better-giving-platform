@@ -1,5 +1,5 @@
-import type { ITo } from "@/donations";
 import { fund_is_open } from "@/campaign/is-open";
+import type { ITo } from "@/donations";
 import { fund_get } from "$/pg/queries/fund";
 import { npo_get } from "$/pg/queries/npo";
 
