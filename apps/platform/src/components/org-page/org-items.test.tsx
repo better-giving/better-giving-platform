@@ -489,7 +489,7 @@ describe("ItemsByCount", () => {
       card.clientWidth - 32,
       0
     ); // p-4 either side, inside the border
-    // the title's stretched link still covers the card, chevron included
+    // the title's stretched link covers the card, chevron included
     const hit = document.elementFromPoint(
       (chevron.left + chevron.right) / 2,
       (chevron.top + chevron.bottom) / 2
