@@ -192,7 +192,10 @@ describe("npo profile — fundraisers section", () => {
       .getByRole("region", WAYS_TO_HELP)
       .getByRole("article")
       .filter({ hasText: "Spring Drive" });
-    await expect.element(card.getByText("Supporter campaign")).toBeVisible();
+    // the only kind listed, so the card carries no kind line
+    await expect
+      .element(card.getByText("Supporter campaign"))
+      .not.toBeInTheDocument();
     await expect.element(card.getByText("by Maya Lin")).toBeVisible();
     // the card's one link: the fundraiser's page carries its donation form
     await expect

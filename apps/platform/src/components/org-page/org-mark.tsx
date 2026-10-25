@@ -21,7 +21,6 @@ const RING_WIDTH: Record<TOrgMarkSize, string> = {
 const RING_INK: Record<TGround, string> = {
   page: "border-background",
   tint: "border-band",
-  primary: "border-primary",
   deep: "border-primary-fg",
 };
 

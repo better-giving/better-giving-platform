@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { createRoutesStub, useLocation, useNavigate } from "react-router";
 import {
   afterAll,
@@ -398,10 +399,8 @@ describe("donation form tab — defaults", () => {
       .element(screen.getByText(/click the plus symbol/i))
       .toBeInTheDocument();
 
-    // goal: "No goal or progress bar" selected
-    await expect
-      .element(screen.getByRole("radio", { name: /no goal or progress bar/i }))
-      .toBeChecked();
+    // the org has no goal setting
+    expect(screen.getByRole("radio", { name: /goal/i }).query()).toBeNull();
 
     // submit disabled
     await expect
@@ -413,7 +412,7 @@ describe("donation form tab — defaults", () => {
 // --- donation form tab — pre-filled ---
 
 describe("donation form tab — pre-filled", () => {
-  it("shows seeded methods, increments, goal, frequencies", async () => {
+  it("shows seeded methods, increments, frequencies, and no goal even when one is stored", async () => {
     const npo = await seed_npo({
       donate_methods: ["stripe", "crypto"],
       increments: [{ value: "25", label: "Feed a child" }],
@@ -465,18 +464,15 @@ describe("donation form tab — pre-filled", () => {
       expect(textarea.value).toBe("Feed a child");
     });
 
-    // goal: fixed at 5000
-    await expect
-      .element(screen.getByRole("radio", { name: /set my own goal/i }))
-      .toBeChecked();
-    await expect
-      .element(screen.getByLabelText(/how much money/i))
-      .toHaveDisplayValue("5000");
-
     // frequencies
     await expect.element(screen.getByLabelText(/one time/i)).toBeChecked();
     await expect.element(screen.getByLabelText(/monthly/i)).toBeChecked();
     await expect.element(screen.getByLabelText(/weekly/i)).not.toBeChecked();
+
+    const panel = screen.getByRole("tabpanel", { name: "Donation Form" });
+    expect(panel.getByText("Donation goal").query()).toBeNull();
+    expect(panel.getByRole("radio", { name: /goal/i }).query()).toBeNull();
+    expect(panel.getByLabelText(/how much money/i).query()).toBeNull();
   });
 });
 
@@ -625,9 +621,15 @@ describe("donation form tab — add increment", () => {
   });
 });
 
-describe("donation form tab — set fixed goal", () => {
-  it("sets a fixed goal and revalidates", async () => {
-    const npo = await seed_npo();
+describe("donation form tab — save without a goal", () => {
+  it.each([
+    ["fixed goal", { target_number: 5000, target_smart: null }],
+    ["smart goal", { target_number: null, target_smart: true }],
+  ])("saves the form and leaves the stored %s as it was", async (_, goal) => {
+    const npo = await seed_npo({
+      donate_frequencies: ["one-time", "monthly"],
+      ...goal,
+    });
     const screen = await render_settings(npo.id);
 
     await expect
@@ -635,67 +637,27 @@ describe("donation form tab — set fixed goal", () => {
       .toBeVisible();
     await screen.getByRole("tab", { name: /donation form/i }).click();
 
-    await expect
-      .element(screen.getByRole("radio", { name: /no goal or progress bar/i }))
-      .toBeInTheDocument();
-
-    // select "Set my own goal" — dispatch via JS (element below fold)
-    (
-      screen
-        .getByRole("radio", { name: /set my own goal/i })
-        .element() as HTMLElement
-    ).click();
-
-    // type goal amount
-    const goal_input = screen.getByLabelText(/how much money/i);
-    await expect.element(goal_input).toBeVisible();
-    await goal_input.fill("10000");
-
-    await screen.getByRole("button", { name: /submit changes/i }).click();
-
-    await expect
-      .element(screen.getByRole("button", { name: /submit changes/i }))
-      .toBeDisabled();
-
-    await expect
-      .element(screen.getByRole("radio", { name: /set my own goal/i }))
-      .toBeChecked();
-    await expect
-      .element(screen.getByLabelText(/how much money/i))
-      .toHaveDisplayValue("10000");
-  });
-});
-
-describe("donation form tab — set smart goal", () => {
-  it("sets smart milestones and revalidates", async () => {
-    const npo = await seed_npo();
-    const screen = await render_settings(npo.id);
-
-    await expect
-      .element(screen.getByRole("tab", { name: /donation form/i }))
-      .toBeVisible();
-    await screen.getByRole("tab", { name: /donation form/i }).click();
-
-    await expect
-      .element(screen.getByRole("radio", { name: /no goal or progress bar/i }))
-      .toBeInTheDocument();
-    // dispatch via JS (element below fold)
-    (
-      screen
-        .getByRole("radio", { name: /use smart milestones/i })
-        .element() as HTMLElement
-    ).click();
+    await expect.element(screen.getByLabelText(/one time/i)).toBeVisible();
+    await screen.getByLabelText(/weekly/i).click();
 
     const submit = screen
       .getByRole("tabpanel", { name: "Donation Form" })
       .getByRole("button", { name: /submit changes/i });
     await submit.click();
-
     await expect.element(submit).toBeDisabled();
+    await expect.element(screen.getByLabelText(/weekly/i)).toBeChecked();
 
-    await expect
-      .element(screen.getByRole("radio", { name: /use smart milestones/i }))
-      .toBeChecked();
+    const [row] = await test_db
+      .current!.db.select({
+        donate_frequencies: npos.donate_frequencies,
+        target_number: npos.target_number,
+        target_smart: npos.target_smart,
+      })
+      .from(npos)
+      .where(eq(npos.id, npo.id));
+    expect(row.donate_frequencies).toContain("weekly");
+    expect(row.target_number).toBe(goal.target_number);
+    expect(row.target_smart).toBe(goal.target_smart);
   });
 });
 

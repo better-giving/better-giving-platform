@@ -2,16 +2,15 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { RichText, to_text } from "#/components/rich-text";
 import { STORY_CLAMP } from "@/org-shape";
 import { BrandBand } from "../brand-band";
-import { DonateButton } from "../donate";
 import { first_sentence } from "../first-sentence";
+import { GivePanel } from "../give-panel";
 import type { IHeaderSection } from "../header";
 import { ItemsByCount } from "../items-by-count";
-import { OrgBanner } from "../org-banner";
-import { OrgMark } from "../org-mark";
 import { OrgMeta } from "../org-meta";
 import { OrgName } from "../org-name";
 import { QuoteStrip } from "../quote-strip";
-import { RaisedStats } from "../raised-stats";
+import { SECTION_HEADING } from "../section-heading";
+import { SectionLink } from "../section-link";
 import { SwipeRow } from "../swipe-row";
 import { VideoSet } from "../video-set";
 import { OrgPageFrame } from "./org-page-frame";
@@ -37,17 +36,20 @@ const ANCHOR: Record<TKind | "story", string> = {
   videos: "videos",
 };
 
-const H2 = "text-xl font-bold lg:text-2xl";
-
 /** clears the sticky header when an anchor lands on a section */
 const ANCHORED = "scroll-mt-20";
 
-/** a long story, 4+ items: the story beside a give panel that sticks while it
- * scrolls, then a section per kind. on a phone the panel sits in the hero */
+/** the hero text's column and the give card's, shared by every row the card
+ * runs beside so their edges line up */
+const COLUMNS =
+  "md:grid md:grid-cols-[minmax(0,1fr)_20rem] md:gap-x-12 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-x-16";
+
+/** a long story, 4+ items: a tint hero, the story beside a give card that
+ * rises into the hero and sticks while the story scrolls, then a section per
+ * kind. a phone reads the hero, the card, the section links, then the story */
 export function Feature(props: IOrgLayout) {
   const { npo, shape, failed, now } = props;
   const [hero_donate, set_hero_donate] = useState<HTMLElement | null>(null);
-  const [phone_donate, set_phone_donate] = useState<HTMLElement | null>(null);
   const lists = {
     give: props.give,
     programs: props.programs,
@@ -79,39 +81,36 @@ export function Feature(props: IOrgLayout) {
   }
 
   return (
-    <OrgPageFrame
-      page={props}
-      hero_donate={hero_donate}
-      hero_donate_phone={phone_donate}
-      sections={sections}
-    >
-      <FeatureHero
-        page={props}
-        donate_ref={set_hero_donate}
-        phone_donate_ref={set_phone_donate}
-      />
-      <SectionStrip sections={sections} />
-      <div className="page flex flex-col gap-10 py-8 md:gap-12 md:py-12">
-        <div className="flex flex-col gap-8 md:grid md:grid-cols-[minmax(0,1fr)_20rem] md:items-start md:gap-12">
-          {has_story && (
+    <OrgPageFrame page={props} hero_donate={hero_donate} sections={sections}>
+      {/* from md the card's rail overlays the hero, the strip and the story
+          as one cell, so the card sticks for all three; its 1fr row grows
+          when the card outruns the story */}
+      <div className="flex flex-col md:grid md:grid-rows-[auto_auto_1fr]">
+        <FeatureHero page={props} />
+        <div
+          className={`page max-md:border-b max-md:bg-band max-md:pb-8 md:pointer-events-none md:col-start-1 md:row-span-full md:row-start-1 md:pt-10 ${COLUMNS}`}
+        >
+          <GivePanel
+            name={npo.name}
+            banner={npo.image}
+            donate_to={props.donate_to}
+            donate_ref={set_hero_donate}
+            classes="md:pointer-events-auto md:sticky md:top-20 md:col-start-2 md:self-start"
+          />
+        </div>
+        <SectionStrip sections={sections} />
+        {has_story && (
+          <div
+            className={`page pt-8 md:col-start-1 md:row-start-3 md:pt-12 ${COLUMNS}`}
+          >
             <Story
               json={npo.overview_pt}
               clamp={shape.story_chars > STORY_CLAMP}
             />
-          )}
-          <aside
-            aria-label={`Give to ${npo.name}`}
-            className="card sticky top-20 flex flex-col gap-4 max-md:hidden md:col-start-2"
-          >
-            <RaisedStats
-              raised={npo.contributions_total}
-              donors={props.donors}
-              target={npo.target}
-              variant="panel"
-            />
-            <DonateButton to={props.donate_to} size="lg" />
-          </aside>
-        </div>
+          </div>
+        )}
+      </div>
+      <div className="page flex flex-col gap-10 py-8 md:gap-12 md:py-12">
         {kinds.map((k) =>
           k === "give" && lists.give.length > 3 ? (
             <div
@@ -140,69 +139,30 @@ export function Feature(props: IOrgLayout) {
 
 interface IFeatureHero {
   page: IOrgLayout;
-  donate_ref: (el: HTMLElement | null) => void;
-  /** the phone panel's Donate, shown below md in place of `donate_ref`'s */
-  phone_donate_ref: (el: HTMLElement | null) => void;
 }
 
-/** the banner over a tint band, the ringed mark overlapping it; no banner,
- * and the band is the brand's. the mark, the meta row, the name, the tagline
- * (or the story's first sentence), then Donate; a phone's Donate comes with
- * the raised figures, in a panel */
-function FeatureHero({ page, donate_ref, phone_donate_ref }: IFeatureHero) {
+/** the facts, the name and the lead line (the tagline, or the story's first
+ * sentence) on the tint, in the text's column */
+function FeatureHero({ page }: IFeatureHero) {
   const { npo } = page;
-  const banner = !!npo.image;
   const lead = npo.tagline?.trim() || first_sentence(to_text(npo.overview_pt));
   return (
-    <>
-      <OrgBanner src={npo.image} />
-      <BrandBand
-        tone={banner ? "tint" : "primary"}
-        classes={banner ? "pb-8 md:pb-10" : "py-8 md:py-10"}
-      >
-        <div className="page flex flex-col gap-4">
-          <OrgMark
-            name={npo.name}
-            logo={npo.logo}
-            size="lg"
-            ring={banner}
-            classes={banner ? "-mt-10 md:-mt-12" : ""}
-          />
+    <BrandBand
+      tone="tint"
+      classes="pt-8 pb-6 md:col-start-1 md:row-start-1 md:border-b md:py-10"
+    >
+      <div className={`page ${COLUMNS}`}>
+        <div className="flex flex-col gap-4">
           <OrgMeta npo={npo} credential={page.credential} />
           <OrgName name={npo.name} scale="md" />
           {lead && (
-            <p
-              className={`line-clamp-3 max-w-3xl text-lg md:text-xl ${banner ? "text-gray-11" : ""}`}
-            >
+            <p className="line-clamp-3 max-w-3xl text-lg text-gray-11 md:text-xl">
               {lead}
             </p>
           )}
-          <DonateButton
-            to={page.donate_to}
-            size="lg"
-            ref={donate_ref}
-            classes="self-start max-md:hidden"
-          />
-          {/* the tint is blue-2, the panel's rung in another hue, so a card
-              on it goes up a step; on the brand fill the band is the card */}
-          <div
-            className={`flex flex-col gap-4 md:hidden ${banner ? "card-on-band" : ""}`}
-          >
-            <RaisedStats
-              raised={npo.contributions_total}
-              donors={page.donors}
-              target={npo.target}
-              variant="panel"
-            />
-            <DonateButton
-              to={page.donate_to}
-              size="lg"
-              ref={phone_donate_ref}
-            />
-          </div>
         </div>
-      </BrandBand>
-    </>
+      </div>
+    </BrandBand>
   );
 }
 
@@ -214,20 +174,25 @@ interface ISectionStrip {
 function SectionStrip({ sections }: ISectionStrip) {
   if (sections.length === 0) return null;
   return (
-    <nav aria-label="Sections" className="border-b lg:hidden">
-      <ul className="page scrollbars flex gap-1 overflow-x-auto">
-        {sections.map((s) => (
-          // the first label's text, not its target, on the page's edge
-          <li key={s.id} className="shrink-0 first:-ml-2.5">
-            <a
-              href={`#${s.id}`}
-              className="link flex min-h-11 items-center px-2.5 font-semibold"
-            >
-              {s.label}
-            </a>
-          </li>
-        ))}
-      </ul>
+    <nav
+      aria-label="Sections"
+      className="border-b md:col-start-1 md:row-start-2 lg:hidden"
+    >
+      <div className={`page ${COLUMNS}`}>
+        {/* the first label's text, not its target, on the page's edge */}
+        <ul className="scrollbars -ml-2.5 flex gap-1 overflow-x-auto">
+          {sections.map((s) => (
+            <li key={s.id} className="shrink-0">
+              <SectionLink
+                id={s.id}
+                classes="link flex min-h-11 items-center px-2.5 font-semibold"
+              >
+                {s.label}
+              </SectionLink>
+            </li>
+          ))}
+        </ul>
+      </div>
     </nav>
   );
 }
@@ -288,16 +253,12 @@ function Story({ json, clamp }: IStory) {
       aria-labelledby={heading_id}
       className={`flex min-w-0 flex-col gap-4 ${ANCHORED}`}
     >
-      <h2 id={heading_id} className={H2}>
+      <h2 id={heading_id} className={SECTION_HEADING}>
         Our story
       </h2>
       {/* no gap over the button: while clamped, the fade is the gap */}
       <div className="flex flex-col">
-        <div
-          id={body_id}
-          ref={body}
-          className={clamped ? "relative max-h-120 overflow-hidden" : ""}
-        >
+        <div id={body_id} ref={body} className={clamp ? story_box(open) : ""}>
           <RichText
             readOnly
             content={{ value: json }}
@@ -306,11 +267,11 @@ function Story({ json, clamp }: IStory) {
                 "flex max-w-3xl flex-col gap-4 text-base leading-relaxed md:text-lg",
             }}
           />
-          {clamped && cut && (
+          {clamp && cut && (
             <div
               ref={fade}
               aria-hidden
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-b from-transparent to-background"
+              className={`pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-b from-transparent to-background ${open ? "opacity-0 transition-opacity duration-slow ease-in" : ""}`}
             />
           )}
         </div>
@@ -328,6 +289,16 @@ function Story({ json, clamp }: IStory) {
       </div>
     </section>
   );
+}
+
+/** a story past the clamp. opening grows the box to its content's height
+ * where `interpolate-size` is supported, and snaps where it is not; closing
+ * snaps, since the cut is measured against the box at rest. open, it clips
+ * the block axis alone, so a link's focus ring at the column's edge shows */
+function story_box(open: boolean): string {
+  return open
+    ? "relative max-h-max overflow-y-clip transition-[max-height] duration-slow ease-out [interpolate-size:allow-keywords]"
+    : "relative max-h-120 overflow-hidden";
 }
 
 /** the bottom of the last whole line that ends within `cap` of `box`'s top,
@@ -378,7 +349,7 @@ function Section({ id, heading, children }: ISection) {
       aria-labelledby={heading_id}
       className={`flex flex-col gap-3 ${ANCHORED}`}
     >
-      <h2 id={heading_id} className={H2}>
+      <h2 id={heading_id} className={SECTION_HEADING}>
         {heading}
       </h2>
       {children}

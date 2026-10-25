@@ -5,9 +5,28 @@ import { BookmarkBtn } from "./bookmark-btn";
 
 const user_mock = vi.hoisted(() => ({ current: null as unknown }));
 const toggle_mock = vi.hoisted(() => vi.fn());
-vi.mock("#/hooks/use-user", () => ({
-  use_user: () => ({ user: user_mock.current, toggle_bookmark: toggle_mock }),
-}));
+vi.mock("#/hooks/use-user", async () => {
+  // stateful: a toggle really flips the bookmark, as the real hook does
+  const { useState } = await import("react");
+  return {
+    use_user: () => {
+      const [user, set_user] = useState(user_mock.current as any);
+      return {
+        user,
+        toggle_bookmark: async (n: { id: number }, u: any) => {
+          await toggle_mock(n, u);
+          const saved = u.bookmarks.some((b: { id: number }) => b.id === n.id);
+          set_user({
+            ...u,
+            bookmarks: saved
+              ? u.bookmarks.filter((b: { id: number }) => b.id !== n.id)
+              : [...u.bookmarks, n],
+          });
+        },
+      };
+    },
+  };
+});
 
 afterEach(async () => {
   await cleanup();
@@ -52,5 +71,41 @@ describe("favorites heart", () => {
     user_mock.current = { bookmarks: [npo] };
     await screen.rerender(btn());
     await expect.element(fav).toHaveAttribute("aria-pressed", "true");
+  });
+
+  describe("heart pop", () => {
+    // the pop is the heart's transition class; only a press that saves earns it
+    const heart = (screen: Awaited<ReturnType<typeof render>>) =>
+      screen.getByRole("button").element().querySelector("svg") as SVGElement;
+
+    it("a heart already saved on load stays still", async () => {
+      user_mock.current = { bookmarks: [npo] };
+      const screen = await render(btn());
+      await expect
+        .element(screen.getByRole("button"))
+        .toHaveAttribute("aria-pressed", "true");
+      expect(heart(screen).getAttribute("class")).toContain("fill-destructive");
+      expect(heart(screen).getAttribute("class")).not.toContain("starting:");
+    });
+
+    it("pressing to save pops the filled heart in; pressing to unsave does not", async () => {
+      user_mock.current = { bookmarks: [] };
+      const screen = await render(btn());
+      const button = screen.getByRole("button");
+
+      await button.click();
+      await expect.element(button).toHaveAttribute("aria-pressed", "true");
+      expect(heart(screen).getAttribute("class")).toContain("fill-destructive");
+      expect(heart(screen).getAttribute("class")).toContain(
+        "starting:scale-75"
+      );
+
+      await button.click();
+      await expect.element(button).toHaveAttribute("aria-pressed", "false");
+      expect(heart(screen).getAttribute("class")).not.toContain(
+        "fill-destructive"
+      );
+      expect(heart(screen).getAttribute("class")).not.toContain("starting:");
+    });
   });
 });

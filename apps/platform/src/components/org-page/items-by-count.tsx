@@ -1,7 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { type TransitionEvent, useEffect, useRef, useState } from "react";
 import { GiveCard } from "./give-card";
-import type { IGiveItem, IProgramItem, IVideoItem, TOrgItem } from "./items";
+import {
+  type IGiveItem,
+  type IProgramItem,
+  type IVideoItem,
+  names_kind,
+  type TOrgItem,
+} from "./items";
 import { ProgramRow } from "./program-row";
+import { REVEAL_IN, reveal_delay } from "./reveal";
 import { VideoSet } from "./video-set";
 
 export interface IItemsByCount {
@@ -11,6 +18,9 @@ export interface IItemsByCount {
   /** every campaign a `horizontal` row, one per line, whatever the count, so
    * it lines up with the program rows: a reading column's list */
   rows?: boolean;
+  /** each card names its kind; by default when `items` mixes kinds. a caller
+   * that lays out part of a list elsewhere passes the whole list's answer */
+  show_kind?: boolean;
 }
 
 /** a list laid out by its own count, never leaving an empty slot: 1 is a
@@ -18,7 +28,12 @@ export interface IItemsByCount {
  * are rows and videos follow their own rule whatever the count, so a mixed
  * list renders campaigns and supporter campaigns, then programs, then videos. on a
  * phone every count is a single stack. nothing for no items */
-export function ItemsByCount({ items, now, rows = false }: IItemsByCount) {
+export function ItemsByCount({
+  items,
+  now,
+  rows = false,
+  show_kind = names_kind(items),
+}: IItemsByCount) {
   if (items.length === 0) return null;
   const give = items.filter(
     (x): x is IGiveItem => x.kind === "campaign" || x.kind === "supporter"
@@ -32,18 +47,23 @@ export function ItemsByCount({ items, now, rows = false }: IItemsByCount) {
           <ul data-count={give.length} className="grid gap-4">
             {give.map((x) => (
               <li key={x.id}>
-                <GiveCard item={x} orientation="horizontal" now={now} />
+                <GiveCard
+                  item={x}
+                  orientation="horizontal"
+                  now={now}
+                  show_kind={show_kind}
+                />
               </li>
             ))}
           </ul>
         ) : (
-          <GiveByCount items={give} now={now} />
+          <GiveByCount items={give} now={now} show_kind={show_kind} />
         ))}
       {programs.length > 0 && (
         <ul data-count={programs.length} className="grid gap-4">
           {programs.map((p) => (
             <li key={p.id}>
-              <ProgramRow item={p} />
+              <ProgramRow item={p} show_kind={show_kind} />
             </li>
           ))}
         </ul>
@@ -56,15 +76,17 @@ export function ItemsByCount({ items, now, rows = false }: IItemsByCount) {
 interface IGiveByCount {
   items: IGiveItem[];
   now: number;
+  show_kind: boolean;
 }
 
-function GiveByCount({ items, now }: IGiveByCount) {
+function GiveByCount({ items, now, show_kind }: IGiveByCount) {
   const n = items.length;
   if (n > 3) {
     return (
       <RevealGrid
         items={items}
         now={now}
+        show_kind={show_kind}
         first={{ phone: 3, wide: 3 }}
         label={(_, total) => `See all ${total}`}
       />
@@ -80,7 +102,12 @@ function GiveByCount({ items, now }: IGiveByCount) {
     <ul data-count={n} className={`grid gap-4 ${grid}`}>
       {items.map((x) => (
         <li key={x.id}>
-          <GiveCard item={x} orientation={orientation} now={now} />
+          <GiveCard
+            item={x}
+            orientation={orientation}
+            now={now}
+            show_kind={show_kind}
+          />
         </li>
       ))}
     </ul>
@@ -88,7 +115,7 @@ function GiveByCount({ items, now }: IGiveByCount) {
 }
 
 export interface IShowMoreGrid {
-  /** one kind, as a tab holds it */
+  /** a tab's items */
   items: (IGiveItem | IProgramItem)[];
   /** epoch ms, see `GiveCard` */
   now: number;
@@ -101,6 +128,7 @@ export function ShowMoreGrid({ items, now }: IShowMoreGrid) {
     <RevealGrid
       items={items}
       now={now}
+      show_kind={names_kind(items)}
       first={{ phone: 3, wide: 6 }}
       label={(hidden) => `Show ${hidden} more`}
     />
@@ -113,6 +141,7 @@ const WIDE = "(width >= 48rem)";
 interface IRevealGrid {
   items: (IGiveItem | IProgramItem)[];
   now: number;
+  show_kind: boolean;
   /** how many show before the reveal, under and from `md` */
   first: { phone: number; wide: number };
   label: (hidden: number, total: number) => string;
@@ -120,9 +149,12 @@ interface IRevealGrid {
 
 /** the rest are in the dom from the start, hidden by css alone, so the server
  * render needs no viewport. the reveal is one way: its button goes, and focus
- * moves to the first item it brought in */
-function RevealGrid({ items, now, first, label }: IRevealGrid) {
+ * moves to the first item it brought in. the rise plays once: a tab panel
+ * hidden and shown again would replay `@starting-style`, so the entrance
+ * classes go once the last item has settled */
+function RevealGrid({ items, now, show_kind, first, label }: IRevealGrid) {
   const [revealed_from, set_revealed_from] = useState<number | null>(null);
+  const [rising, set_rising] = useState(false);
   const list = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
@@ -135,24 +167,50 @@ function RevealGrid({ items, now, first, label }: IRevealGrid) {
   const hidden_phone = Math.max(0, n - first.phone);
   const hidden_wide = Math.max(0, n - first.wide);
 
+  const rises = (i: number) =>
+    rising && revealed_from != null && i >= revealed_from;
   function held(i: number): string {
-    if (open) return "";
+    if (revealed_from != null) return rises(i) ? REVEAL_IN : "";
     if (i >= first.wide) return "hidden";
     if (i >= first.phone) return "max-md:hidden";
     return "";
   }
+  const delay = (i: number) =>
+    revealed_from != null && rises(i)
+      ? reveal_delay(i - revealed_from)
+      : undefined;
+  // the last item has the longest delay, so it settles last; a panel hidden
+  // mid-rise cancels it
+  function settle(e: TransitionEvent<HTMLUListElement>) {
+    if (e.target === e.currentTarget.lastElementChild) set_rising(false);
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      <ul ref={list} data-count={n} className="grid gap-4 md:grid-cols-3">
+      <ul
+        ref={list}
+        data-count={n}
+        className="grid gap-4 md:grid-cols-3"
+        onTransitionEnd={settle}
+        onTransitionCancel={settle}
+      >
         {items.map((x, i) =>
           x.kind === "program" ? (
-            <li key={x.id} className={`col-span-full ${held(i)}`}>
-              <ProgramRow item={x} />
+            <li
+              key={x.id}
+              className={`col-span-full ${held(i)}`}
+              style={delay(i)}
+            >
+              <ProgramRow item={x} show_kind={show_kind} />
             </li>
           ) : (
-            <li key={x.id} className={held(i)}>
-              <GiveCard item={x} orientation="vertical" now={now} />
+            <li key={x.id} className={held(i)} style={delay(i)}>
+              <GiveCard
+                item={x}
+                orientation="vertical"
+                now={now}
+                show_kind={show_kind}
+              />
             </li>
           )
         )}
@@ -160,11 +218,12 @@ function RevealGrid({ items, now, first, label }: IRevealGrid) {
       {!open && hidden_phone > 0 && (
         <button
           type="button"
-          onClick={() =>
+          onClick={() => {
+            set_rising(true);
             set_revealed_from(
               window.matchMedia(WIDE).matches ? first.wide : first.phone
-            )
-          }
+            );
+          }}
           className={`btn btn-secondary self-center ${hidden_wide === 0 ? "md:hidden" : ""}`}
         >
           {hidden_phone === hidden_wide ? (

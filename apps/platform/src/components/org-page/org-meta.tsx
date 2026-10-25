@@ -1,9 +1,15 @@
-import { Badge, type BadgeTone, ExtLink } from "@better-giving/ui";
-import { BadgeCheck, Globe, type LucideIcon, MapPin } from "lucide-react";
+import { Badge, ExtLink } from "@better-giving/ui";
+import {
+  BadgeCheck,
+  Globe,
+  Heart,
+  type LucideIcon,
+  MapPin,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { website_link } from "#/routes/org.$org.$campaign/format";
 import type { INpoPublic } from "$/pg/queries/npo";
-import { is_brand_ground, type TGround, use_ground } from "./brand-band";
+import { is_brand_ground, use_ground } from "./brand-band";
 import type { IOrgLayout } from "./layouts/types";
 
 type TMetaNpo = Pick<INpoPublic, "endow_designation" | "hq_country" | "url">;
@@ -15,23 +21,12 @@ interface IOrgMeta {
   classes?: string;
 }
 
-/** `on-primary` is scoped to `surface-primary` by Badge itself; the deep fill
- * has no tone of its own, so it takes secondary, an opaque surface + ink pair
- * whose legibility does not depend on the ground under it */
-const BADGE_TONE: Record<TGround, BadgeTone> = {
-  page: "secondary",
-  tint: "secondary",
-  primary: "on-primary",
-  deep: "secondary",
-};
-
 /** the org's facts, each in its own place: the designation as a badge, then
  * the country, the website named by its host, and the registration, each
- * behind its glyph. "Other" is no designation and is left out, as is any
+ * behind its glyph, the badge's in its own ink. "Other" is no designation and is left out, as is any
  * fact that is missing */
 export function OrgMeta({ npo, credential, classes = "" }: IOrgMeta) {
-  const ground = use_ground();
-  const brand = is_brand_ground(ground);
+  const brand = is_brand_ground(use_ground());
   const website = website_link(npo.url);
   if (
     npo.endow_designation === "Other" &&
@@ -48,7 +43,12 @@ export function OrgMeta({ npo, credential, classes = "" }: IOrgMeta) {
     >
       {npo.endow_designation !== "Other" && (
         <li className="flex">
-          <Badge tone={BADGE_TONE[ground]}>{npo.endow_designation}</Badge>
+          {/* secondary on every ground, the deep fill included: an opaque
+              surface + ink pair, legible whatever is under it */}
+          <Badge tone="secondary">
+            <Heart aria-hidden className="icon-xs mr-1" />
+            {npo.endow_designation}
+          </Badge>
         </li>
       )}
       {npo.hq_country && <Fact icon={MapPin}>{npo.hq_country}</Fact>}

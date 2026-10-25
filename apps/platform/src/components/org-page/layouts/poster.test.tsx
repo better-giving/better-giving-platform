@@ -4,20 +4,29 @@ import { page } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import {
   BANNER,
+  donate_on_banner,
   donates,
+  give_panel,
   header_donate,
+  imgs_outside_panel,
+  keyboard_ring,
+  panel_banner,
+  panel_parts,
   pinned_to_bottom,
   scroll_past_hero_donate,
+  token_color,
 } from "#/__tests__/fixtures/layout-dom";
 import {
   above_fold,
   EIN,
   give,
+  header_donate_in_view,
   in_view,
   LONG_NAME,
   many,
   message,
   npo,
+  org_figures,
   org_layout,
   program,
   story,
@@ -42,6 +51,9 @@ afterEach(async () => {
 const STORY_AT_MAX =
   "Riverside Literacy puts a trained reading tutor beside every adult learner who asks for one, twice a week, in libraries and church halls across three counties. Last year 212 adults read their first full book with us, and most of them came back the next year to tutor the newcomers who followed them in.";
 
+const follows = (a: Element, b: Element) =>
+  !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
 /** a short-story org with a banner that loads offline, unless told otherwise */
 function mount(o: Partial<IOrgLayout> = {}, n: Partial<INpoPublic> = {}) {
   const props = org_layout({ ...o, npo: npo({ image: BANNER, ...n }) });
@@ -52,6 +64,18 @@ function mount(o: Partial<IOrgLayout> = {}, n: Partial<INpoPublic> = {}) {
 }
 
 describe("Poster", () => {
+  test.each([3322, 0])(
+    "shows none of the org's figures, with %i raised and a goal stored",
+    async (raised) => {
+      const org = { contributions_total: raised, target: "8000" };
+      const screen = await mount({}, org);
+      await expect
+        .element(screen.getByRole("heading", { level: 1 }))
+        .toBeVisible();
+      expect(org_figures(screen.container, npo(org))).toEqual([]);
+    }
+  );
+
   test("no middle dot anywhere in the rendered page", async () => {
     await page.viewport(1440, 900);
     const screen = await mount({
@@ -122,8 +146,6 @@ describe("Poster", () => {
     const lead = screen.getByText(STORY_AT_MAX, { exact: true });
     await expect.element(deck).toBeVisible();
     await expect.element(lead).toBeVisible();
-    const follows = (a: Element, b: Element) =>
-      !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
     expect(follows(h1.element(), deck.element())).toBe(true);
     expect(follows(deck.element(), lead.element())).toBe(true);
   });
@@ -132,24 +154,111 @@ describe("Poster", () => {
     [375, 812],
     [1440, 900],
   ])(
-    "the figures come before Donate in reading order; a phone shows them so, wider Donate leads the row, at %i",
+    "the give card: the banner at 4:1 with Donate floating on its bottom-right corner, at %i",
     async (w, h) => {
       await page.viewport(w, h);
       const screen = await mount();
-      const [donate] = donates(
-        screen.container.querySelector("main") as HTMLElement
-      );
+      const panel = give_panel(screen.container);
+      const [donate] = donates(panel);
       await expect.poll(() => in_view(donate)).toBe(true);
-      const figures = donate.parentElement?.firstElementChild as HTMLElement;
-      expect(figures).not.toBe(donate);
-      expect(
-        figures.compareDocumentPosition(donate) &
-          Node.DOCUMENT_POSITION_FOLLOWING
-      ).toBeTruthy();
-      const f = figures.getBoundingClientRect();
-      const d = donate.getBoundingClientRect();
-      if (w < 768) expect(f.bottom).toBeLessThanOrEqual(d.top);
-      else expect(d.right).toBeLessThanOrEqual(f.left);
+      await expect
+        .poll(() => panel_banner(panel)?.ratio ?? 0)
+        .toBeCloseTo(4, 1);
+      expect(panel_banner(panel)?.flush).toBe(true);
+      expect(panel_parts(panel)).toEqual(["banner", "donate"]);
+      const at = donate_on_banner(panel);
+      expect(at?.inside).toBe(true);
+      expect(at?.right).toBeCloseTo(12, 0);
+      expect(at?.bottom).toBeCloseTo(12, 0);
+      expect(donate.getBoundingClientRect().width).toBeLessThan(
+        panel.getBoundingClientRect().width / 2
+      );
+    }
+  );
+
+  test("on the deep band, Donate on the banner is the primary button", async () => {
+    const screen = await mount();
+    const panel = give_panel(screen.container);
+    const [donate] = donates(panel);
+    await expect.poll(() => donate.checkVisibility()).toBe(true);
+    expect(panel.closest(".bg-primary-deep")).not.toBeNull();
+    expect(donate).toHaveClass("btn-primary");
+  });
+
+  test("with no banner, Donate alone on the deep band takes the inverse fill", async () => {
+    const screen = await mount({}, { image: null });
+    const panel = give_panel(screen.container);
+    const [donate] = donates(panel);
+    await expect.poll(() => donate.checkVisibility()).toBe(true);
+    expect(panel_parts(panel)).toEqual(["donate"]);
+    expect(donate).not.toHaveClass("btn-primary");
+    expect(donate).toHaveClass("bg-primary-fg", "text-primary");
+  });
+
+  /** the colour a keyboard focus would show on `el`: the base layer draws
+   * every outline in --ring, so it is readable at rest */
+  const ring = (el: Element) => getComputedStyle(el).outlineColor;
+
+  test("Donate on the banner draws its focus ring inside the fill, in the fill's own ink", async () => {
+    await page.viewport(1440, 900);
+    const screen = await mount();
+    const [donate] = donates(give_panel(screen.container));
+    await expect.poll(() => donate.checkVisibility()).toBe(true);
+    const focused = await keyboard_ring(donate);
+    expect(focused.style).toBe("solid");
+    expect(focused.color).toBe(token_color("--primary-fg"));
+    expect(focused.offset).toBeLessThan(0);
+  });
+
+  test("Donate alone on the deep band takes the band's white focus ring", async () => {
+    await page.viewport(1440, 900);
+    const screen = await mount({}, { image: null });
+    const panel = give_panel(screen.container);
+    const [donate] = donates(panel);
+    await expect.poll(() => donate.checkVisibility()).toBe(true);
+    const band = panel.closest(".bg-primary-deep") as HTMLElement;
+    expect(ring(donate)).toBe(ring(band));
+    expect(ring(donate)).not.toBe(ring(document.body));
+    const focused = await keyboard_ring(donate);
+    expect(focused.style).toBe("solid");
+    expect(focused.color).toBe(ring(band));
+    expect(focused.offset).toBeGreaterThan(0);
+  });
+
+  test.each([
+    [375, 812],
+    [1440, 900],
+  ])(
+    "the mark and facts, the name, the tagline, the card and the story read in that order, and the card sits beside them from md, at %i",
+    async (w, h) => {
+      await page.viewport(w, h);
+      const screen = await mount({}, { overview_pt: story(STORY_AT_MAX) });
+      const facts = screen
+        .getByText(EIN, { exact: true })
+        .element()
+        .closest("ul") as HTMLElement;
+      const h1 = screen.getByRole("heading", { level: 1 }).element();
+      const deck = screen
+        .getByText("Every adult a reader.", { exact: true })
+        .element();
+      const panel = give_panel(screen.container);
+      const lead = screen.getByText(STORY_AT_MAX, { exact: true }).element();
+      await expect.poll(() => lead.checkVisibility()).toBe(true);
+      const order = [facts, h1, deck, panel, lead];
+      for (const [i, el] of order.entries()) {
+        if (i > 0) expect(follows(order[i - 1], el)).toBe(true);
+      }
+      const top = (el: Element) => el.getBoundingClientRect().top;
+      const p = panel.getBoundingClientRect();
+      if (w < 768) {
+        expect(top(panel)).toBeGreaterThan(deck.getBoundingClientRect().bottom);
+        expect(top(lead)).toBeGreaterThan(p.bottom);
+      } else {
+        for (const el of [facts, h1, deck, lead]) {
+          expect(el.getBoundingClientRect().right).toBeLessThanOrEqual(p.left);
+        }
+        expect(top(lead)).toBeGreaterThan(deck.getBoundingClientRect().bottom);
+      }
     }
   );
 
@@ -182,11 +291,13 @@ describe("Poster", () => {
       .toBeVisible();
   });
 
-  test("with no banner there is no img and the deep band leads the page", async () => {
+  test("with no banner there is no img, the deep band leads the page, and the card is Donate alone", async () => {
     const screen = await mount({}, { image: null });
     const h1 = screen.getByRole("heading", { level: 1 });
     await expect.element(h1).toBeVisible();
     expect(screen.container.querySelector("img")).toBeNull();
+    const panel = give_panel(screen.container);
+    expect(panel_parts(panel)).toEqual(["donate"]);
     const main = screen.container.querySelector("main") as HTMLElement;
     expect(main.firstElementChild).toHaveClass("bg-primary-deep");
     expect(main.firstElementChild).toContainElement(
@@ -194,16 +305,12 @@ describe("Poster", () => {
     );
   });
 
-  test("a banner sits over the band", async () => {
+  test("the banner is the give card's top, never a strip across the page", async () => {
     const screen = await mount();
-    const main = screen.container.querySelector("main") as HTMLElement;
-    const band = main.querySelector(".bg-primary-deep") as HTMLElement;
-    const banner = main.querySelector("img") as HTMLImageElement;
-    expect(banner).not.toBeNull();
-    expect(band.contains(banner)).toBe(false);
-    expect(
-      banner.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+    const panel = give_panel(screen.container);
+    await expect.poll(() => panel_banner(panel)?.ratio ?? 0).toBeCloseTo(4, 1);
+    expect(imgs_outside_panel(screen.container)).toEqual([]);
+    expect(panel.closest(".bg-primary-deep")).not.toBeNull();
   });
 
   test("a failed list shows what did load with its line under it, and the others still render", async () => {
@@ -295,7 +402,7 @@ describe("Poster", () => {
     }
   );
 
-  test("on a phone the header's Donate waits until the hero's has scrolled away", async () => {
+  test("on a phone the header's Donate waits until the card's has scrolled away", async () => {
     await page.viewport(375, 812);
     const screen = await mount({ give: many(give, 3), messages: [message(1)] });
     const root = screen.container;
@@ -306,7 +413,7 @@ describe("Poster", () => {
     expect(header_donate(root)).toBeUndefined();
     scroll_past_hero_donate(root);
     await expect.poll(() => header_donate(root)).toBeDefined();
-    await expect.poll(() => in_view(header_donate(root))).toBe(true);
+    await expect.poll(() => header_donate_in_view(root)).toBe(true);
   });
 
   test.each([

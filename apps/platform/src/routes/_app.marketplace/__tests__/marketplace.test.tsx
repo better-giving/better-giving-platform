@@ -15,7 +15,12 @@ import {
   it,
   vi,
 } from "vitest";
+import { page } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
+import { seed_contribution } from "#/__tests__/fixtures/contributions";
+import { npo, org_figures } from "#/__tests__/fixtures/org-layout";
+import { dists } from "$/pg/schema/dist";
+import { donations } from "$/pg/schema/donation";
 import { npos } from "$/pg/schema/npo";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
@@ -43,6 +48,7 @@ vi.mock("remix-client-cache", () => ({
 
 // --- imports (after mocks hoisted) ---
 
+import { reset_viewport } from "#/__tests__/fixtures/viewport";
 import FilterPage from "#/routes/_app.marketplace.filter/route";
 import { create_test_db } from "$/pg/test-utils/pglite";
 import MarketplacePage, { loader } from "../route";
@@ -94,6 +100,9 @@ let counter = 0;
 beforeEach(async () => {
   await cleanup();
   counter = 0;
+  // seeded gifts reference their npo
+  await test_db.current!.db.delete(dists);
+  await test_db.current!.db.delete(donations);
   await test_db.current!.db.delete(npos);
 });
 
@@ -191,6 +200,67 @@ describe("marketplace — basic listing", () => {
     await expect.element(screen.getByText("Org Beta")).toBeInTheDocument();
     await expect.element(screen.getByText("Alpha tagline")).toBeInTheDocument();
     await expect.element(screen.getByText("Beta tagline")).toBeInTheDocument();
+  });
+});
+
+describe("marketplace — card rows", () => {
+  afterEach(reset_viewport);
+
+  it("cards in a row keep their Donate rows aligned whatever the tagline's length, and nothing follows the tagline", async () => {
+    await page.viewport(1440, 900);
+    const SHORT = "Clean water.";
+    const LONG =
+      "Clean water for every village school in the district, drilled, piped and kept running by people who live there.";
+    await seed_npo({ name: "Org Short", tagline: SHORT });
+    await seed_npo({ name: "Org Long", tagline: LONG });
+    const screen = await render_marketplace();
+
+    const short = screen.getByText(SHORT, { exact: true });
+    const long = screen.getByText(LONG, { exact: true });
+    await expect.element(short).toBeVisible();
+    await expect.element(long).toBeVisible();
+    const [a, b] = screen
+      .getByRole("link", { name: "Donate", exact: true })
+      .elements()
+      .map((el) => el.getBoundingClientRect());
+    expect(a.top).toBe(b.top);
+    expect(a.bottom).toBe(b.bottom);
+
+    // the body ends at the longer tagline's own margin plus the body's inset
+    const tagline = long.element() as HTMLElement;
+    const body = tagline.parentElement as HTMLElement;
+    const after =
+      body.getBoundingClientRect().bottom -
+      tagline.getBoundingClientRect().bottom;
+    expect(after).toBeCloseTo(
+      Number.parseFloat(getComputedStyle(tagline).marginBottom) +
+        Number.parseFloat(getComputedStyle(body).paddingBottom),
+      0
+    );
+  });
+});
+
+describe("marketplace — card figures", () => {
+  it("shows an org's name and tagline but not its stored goal or raised total", async () => {
+    const org = await seed_npo({
+      name: "Target Org",
+      tagline: "Has a stored target",
+      target_number: 8000,
+    });
+    await seed_contribution(test_db.current!.db, org.id, 3322);
+    const screen = await render_marketplace();
+
+    await expect.element(screen.getByText("Target Org")).toBeInTheDocument();
+    await expect
+      .element(screen.getByText("Has a stored target"))
+      .toBeInTheDocument();
+    expect(
+      org_figures(
+        screen.container,
+        npo({ contributions_total: 3322, contributions_count: 1 })
+      )
+    ).toEqual([]);
+    expect(screen.container).not.toMatchTextContent(/8,000| of \$/);
   });
 });
 

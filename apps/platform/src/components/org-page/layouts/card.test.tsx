@@ -12,10 +12,12 @@ import {
 import {
   above_fold,
   EIN,
+  header_donate_in_view,
   in_view,
   LONG_NAME,
   message,
   npo,
+  org_figures,
   org_layout,
   TAGLINE_MAX,
 } from "#/__tests__/fixtures/org-layout";
@@ -64,6 +66,18 @@ const card_of = (root: Element) =>
 const block_of = (root: Element) => card_of(root).parentElement as HTMLElement;
 
 describe("Card", () => {
+  test.each([3322, 0])(
+    "shows none of the org's figures, with %i raised and a goal stored",
+    async (raised) => {
+      const org = { contributions_total: raised, target: "8000" };
+      const screen = await mount({}, org);
+      await expect
+        .element(screen.getByRole("heading", { level: 1 }))
+        .toBeVisible();
+      expect(org_figures(screen.container, npo(org))).toEqual([]);
+    }
+  );
+
   test.each(SIZES)(
     "Donate and the registration are in view on first load at %i",
     async (w, h) => {
@@ -184,13 +198,6 @@ describe("Card", () => {
     expect(h1.element().parentElement?.children).toHaveLength(1);
   });
 
-  test("nothing raised asks for the first gift", async () => {
-    const screen = await mount({ donors: 0 }, { contributions_total: 0 });
-    await expect
-      .element(screen.getByText("Be the first to give", { exact: true }))
-      .toBeVisible();
-  });
-
   test("messages bring the quote strip under the card, and none leave it out", async () => {
     const screen = await mount({ messages: [message(1), message(2)] });
     const strip = screen.getByRole("region", { name: "Donor messages" });
@@ -270,7 +277,7 @@ describe("Card", () => {
 
       scroll_past_hero_donate(root);
       await expect.poll(() => header_donate(root)).toBeDefined();
-      await expect.poll(() => in_view(header_donate(root))).toBe(true);
+      await expect.poll(() => header_donate_in_view(root)).toBe(true);
 
       window.scrollTo(0, 0);
       await expect.poll(() => header_donate(root)).toBeUndefined();

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
@@ -57,6 +57,30 @@ describe("org header", () => {
       await cleanup();
     }
   });
+
+  it.each([1280, 375])(
+    "sets Share and Favorite's glyphs 20px apart, overlapping Share's target by no more than 4px, at %i",
+    async (w) => {
+      await page.viewport(w, 800);
+      const screen = await render(header());
+      const share = screen.getByRole("button", { name: "Share", exact: true });
+      const fav = screen.getByRole("link", { name: "Add to favorites" });
+      await expect.element(fav).toBeVisible();
+      for (const el of [share.element(), fav.element()]) {
+        const r = el.getBoundingClientRect();
+        expect(r.width).toBeGreaterThanOrEqual(44);
+        expect(r.height).toBeGreaterThanOrEqual(44);
+      }
+      const glyph = (el: Element) =>
+        (el.querySelector("svg") as SVGElement).getBoundingClientRect();
+      const gap = glyph(fav.element()).left - glyph(share.element()).right;
+      expect(gap).toBeCloseTo(20, 0);
+      const overlap =
+        share.element().getBoundingClientRect().right -
+        fav.element().getBoundingClientRect().left;
+      expect(overlap).toBeLessThanOrEqual(4);
+    }
+  );
 
   it("leads with the monogram when the org has no logo", async () => {
     const screen = await render(header());
@@ -119,7 +143,7 @@ describe("org header", () => {
             name="Acme Relief"
             to="/org/acme"
             donate_to="/donate/7"
-            donate_after={[hero_donate]}
+            donate_after={hero_donate}
           />
           <main className="h-[300dvh]">
             <DonateButton to="/donate/7" size="lg" ref={set_hero_donate} />
@@ -164,37 +188,30 @@ describe("org header", () => {
       await expect.element(in_header).toBeVisible();
     });
 
-    it("waits on every hero Donate it is given, and one with no box counts as away", async () => {
+    it("counts a hero Donate with no box as away", async () => {
       await page.viewport(1280, 900);
-      function Split() {
-        const [wide, set_wide] = useState<HTMLElement | null>(null);
-        const [phone, set_phone] = useState<HTMLElement | null>(null);
-        const after = useMemo(() => [wide, phone], [wide, phone]);
+      function Hidden() {
+        const [hero, set_hero] = useState<HTMLElement | null>(null);
         return (
           <MemoryRouter>
             <OrgHeader
               name="Acme Relief"
               to="/org/acme"
               donate_to="/donate/7"
-              donate_after={after}
+              donate_after={hero}
             />
-            <main className="h-[300dvh]">
-              <DonateButton to="/donate/7" ref={set_wide} />
-              <DonateButton to="/donate/7" ref={set_phone} classes="hidden" />
+            <main>
+              <DonateButton to="/donate/7" ref={set_hero} classes="hidden" />
             </main>
           </MemoryRouter>
         );
       }
-      const screen = await render(<Split />);
-      const in_header = screen
-        .getByRole("banner")
-        .getByRole("link", { name: "Donate" });
+      const screen = await render(<Hidden />);
       await expect
-        .element(screen.getByRole("main").getByRole("link", { name: "Donate" }))
+        .element(
+          screen.getByRole("banner").getByRole("link", { name: "Donate" })
+        )
         .toBeVisible();
-      await expect.element(in_header).not.toBeInTheDocument();
-      window.scrollTo(0, 2000);
-      await expect.element(in_header).toBeVisible();
     });
   });
 });

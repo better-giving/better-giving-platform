@@ -15,6 +15,9 @@ interface IBookmarkBtn {
   idle_ink?: string;
 }
 
+/** the heart a save fills grows into place */
+const POP_IN = "transition-[scale] ease-out starting:scale-75";
+
 const focus_ring =
   "focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2";
 
@@ -25,6 +28,8 @@ export function BookmarkBtn({
 }: IBookmarkBtn) {
   const { user, toggle_bookmark } = use_user();
   const [pending, set_pending] = useState(false);
+  // set by the press that saves, so a heart already saved on load stays still
+  const [saved_here, set_saved_here] = useState(false);
   const { pathname, search } = useLocation();
 
   if (user === "loading") {
@@ -77,16 +82,19 @@ export function BookmarkBtn({
         aria-pressed={is_bookmarked}
         className={`glyph-btn disabled:text-gray-11 ${focus_ring} ${classes}`}
         onClick={async () => {
+          set_saved_here(!is_bookmarked);
           set_pending(true);
           await toggle_bookmark(npo, user);
           set_pending(false);
         }}
       >
+        {/* keyed, so the filled heart is a new node and can pop in */}
         <Heart
+          key={String(is_bookmarked)}
           aria-hidden
           className={`icon-xl ${
             is_bookmarked ? "fill-destructive text-destructive" : ""
-          }`}
+          } ${is_bookmarked && saved_here ? POP_IN : ""}`}
         />
       </button>
     </Tooltip>

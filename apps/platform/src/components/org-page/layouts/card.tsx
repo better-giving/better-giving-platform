@@ -5,16 +5,15 @@ import { OrgMark } from "../org-mark";
 import { OrgMeta } from "../org-meta";
 import { OrgName } from "../org-name";
 import { QuoteStrip } from "../quote-strip";
-import { RaisedStats } from "../raised-stats";
 import { OrgPageFrame } from "./org-page-frame";
 import type { IOrgLayout } from "./types";
 import { WaysToHelp } from "./ways-to-help";
 
 /** no story and nothing to list: one centred identity card on the page
  * ground, the banner as its top strip, then the mark, the name, the tagline,
- * the facts, Donate and the figures, with the donors' words under it. a list
- * that failed to load (so counted as nothing to list) keeps its line between
- * the card and the donors' words. all of it sits in the middle of main when
+ * the facts and Donate, with the donors' words under it. a list that failed
+ * to load (so counted as nothing to list) keeps its line between the card and
+ * the donors' words. all of it sits in the middle of main when
  * the page is shorter than the screen */
 export function Card(props: IOrgLayout) {
   const { npo } = props;
@@ -50,13 +49,6 @@ export function Card(props: IOrgLayout) {
                 to={props.donate_to}
                 size="lg"
                 classes="max-md:self-stretch"
-              />
-              <RaisedStats
-                raised={npo.contributions_total}
-                donors={props.donors}
-                target={npo.target}
-                variant="inline"
-                classes="w-full items-center"
               />
             </div>
           </article>

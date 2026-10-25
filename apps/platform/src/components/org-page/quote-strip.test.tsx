@@ -43,6 +43,9 @@ describe("QuoteStrip", () => {
     await expect.element(position).toHaveTextContent("Message 2");
     expect(live?.textContent).toContain("Message body 2");
     expect(live?.textContent).toContain("Donor 2");
+    // the message eases in as a new node; the region around it is the same
+    // one, or a screen reader would meet it new and say nothing
+    expect(position.element().closest('[aria-live="polite"]')).toBe(live);
 
     await next.click();
     await next.click();
@@ -75,13 +78,34 @@ describe("QuoteStrip", () => {
       .toBeInTheDocument();
   });
 
+  test("as a pull-quote it keeps the donor's name under the message and steps on with next", async () => {
+    await page.viewport(1440, 900);
+    const screen = await render(<QuoteStrip messages={msgs(2)} tone="pull" />);
+    const message = screen.getByText("Message body 1");
+    const donor = screen.getByText("Donor 1", { exact: true });
+    await expect.element(message).toBeVisible();
+    await expect.element(donor).toBeVisible();
+    expect(donor.element().getBoundingClientRect().top).toBeGreaterThan(
+      message.element().getBoundingClientRect().top
+    );
+
+    await screen.getByRole("button", { name: "Next message" }).click();
+    await expect.element(screen.getByText("Message body 2")).toBeVisible();
+    await expect
+      .element(screen.getByText("Donor 2", { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText("Message 2", { exact: true }))
+      .toBeInTheDocument();
+  });
+
   test("one message with nothing more shows no navigation", async () => {
     const screen = await render(<QuoteStrip messages={msgs(1)} tone="light" />);
     await expect.element(screen.getByText("Message body 1")).toBeVisible();
     expect(screen.getByRole("button").query()).toBeNull();
   });
 
-  test.each(["light", "dark"] as const)(
+  test.each(["light", "dark", "pull"] as const)(
     "on a phone the %s box ends at the donor's name, next on the name's line and the mark opening the message",
     async (tone) => {
       await page.viewport(375, 812);

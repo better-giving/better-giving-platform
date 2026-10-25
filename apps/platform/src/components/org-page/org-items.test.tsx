@@ -81,6 +81,7 @@ describe("GiveCard", () => {
       <div>
         <GiveCard
           orientation="vertical"
+          show_kind
           now={NOW}
           item={give(1, {
             ends_at: new Date(NOW + 5 * DAY + HOUR).toISOString(),
@@ -88,11 +89,13 @@ describe("GiveCard", () => {
         />
         <GiveCard
           orientation="vertical"
+          show_kind
           now={NOW}
           item={give(2, { ends_at: new Date(NOW + 3 * HOUR).toISOString() })}
         />
         <GiveCard
           orientation="vertical"
+          show_kind
           now={NOW}
           item={give(3, {
             ends_at: new Date(NOW - HOUR).toISOString(),
@@ -102,7 +105,13 @@ describe("GiveCard", () => {
             byline: "by Jane",
           })}
         />
-        <GiveCard orientation="vertical" now={NOW} item={give(4)} />
+        <GiveCard orientation="vertical" show_kind now={NOW} item={give(4)} />
+        <GiveCard
+          orientation="vertical"
+          show_kind
+          now={NOW}
+          item={give(5, { raised: 9500, goal: 7900 })}
+        />
       </div>
     );
     const card = (n: number) =>
@@ -122,6 +131,15 @@ describe("GiveCard", () => {
       )
       .toBeVisible();
     await expect.element(card(1)).toMatchTextContent("$2,400 of $7,900");
+    const bar = card(1).getByRole("progressbar").element();
+    expect(bar.getAttribute("aria-valuenow")).toBe("2400");
+    expect(bar.getAttribute("aria-valuemax")).toBe("7900");
+    // the line states the sum, never a percent
+    await expect.element(card(1)).not.toMatchTextContent("%");
+    // past its goal the bar reads full, not over
+    const over = card(5).getByRole("progressbar").element();
+    expect(over.getAttribute("aria-valuenow")).toBe("7900");
+    await expect.element(card(5)).toMatchTextContent("$9,500 of $7,900");
     expect(card(3).getByRole("progressbar").query()).toBeNull();
     await expect.element(card(3)).toMatchTextContent("$540 raised");
     await expect.element(card(3)).toMatchTextContent("Supporter campaign");
@@ -170,25 +188,24 @@ describe("card image", () => {
         const box = card.getBoundingClientRect();
         expect(Math.abs(slot.width / slot.height - 4) / 4).toBeLessThan(0.01);
         const is_program = i === 6;
-        // the feature card (0) and the halves (1, 2) sit beside their text
-        const beside = wide && i < 3;
+        // the feature card (0), the halves (1, 2) and the program row sit
+        // beside their text
+        const beside = wide && (i < 3 || is_program);
+        const frame = card.firstElementChild as HTMLElement;
         if (beside) {
-          // centred down its column: no dead block under it
-          expect(
-            Math.abs(slot.top - box.top - (box.bottom - slot.bottom))
-          ).toBeLessThanOrEqual(2);
-        } else {
-          // on top, or a top-aligned thumbnail
-          expect(slot.top).toBeCloseTo(box.top + 1, 0);
-        }
-        if (is_program && wide) {
+          // an inset thumbnail with its own corner, centred down the card:
+          // no empty panel above or below it, and never on the card's edge
+          const above = slot.top - box.top;
+          expect(Math.abs(above - (box.bottom - slot.bottom))).toBeLessThan(2);
+          expect(above).toBeGreaterThanOrEqual(16);
+          expect(slot.left - box.left).toBeGreaterThanOrEqual(16);
+          expect(getComputedStyle(frame).borderTopLeftRadius).not.toBe("0px");
           // a thumbnail, not a banner
-          expect(slot.width).toBeLessThanOrEqual(15 * 16);
-        } else if (beside) {
-          expect(slot.width / card.clientWidth).toBeLessThanOrEqual(0.45);
-          expect(slot.width / card.clientWidth).toBeGreaterThan(0.3);
+          expect(slot.width).toBeLessThan(card.clientWidth / 2);
+          if (is_program) expect(slot.width).toBeLessThanOrEqual(15 * 16);
         } else {
-          // on top, across the card
+          // across the top of the card, edge to edge
+          expect(slot.top).toBeCloseTo(box.top + 1, 0);
           expect(slot.width).toBeCloseTo(card.clientWidth, 0);
         }
         const img = card.querySelector("img") as HTMLImageElement;
@@ -429,6 +446,34 @@ describe("ShowMoreGrid", () => {
     expect(screen.getByRole("button", { name: /more/ }).query()).toBeNull();
   });
 
+  test("a reveal rises in only what it brought, the first at no delay", async () => {
+    await page.viewport(1440, 900);
+    const screen = await mount(<ShowMoreGrid items={gives(8)} now={NOW} />);
+    await screen.getByRole("button", { name: "Show 2 more" }).click();
+    await expect
+      .element(screen.getByRole("link", { name: "Clean water 8", exact: true }))
+      .toBeVisible();
+
+    const items = [...list_of(screen.container).children] as HTMLElement[];
+    const rises = items.map((li) => /\bstarting:/.test(li.className));
+    expect(rises).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+    ]);
+    // what was there before the press carries no delay either
+    expect(items.slice(0, 6).map((li) => li.style.transitionDelay)).toEqual(
+      Array(6).fill("")
+    );
+    expect(items[6].style.transitionDelay).toContain("* 0 /");
+    expect(items[7].style.transitionDelay).toContain("* 1 /");
+  });
+
   test("a phone shows 3 first", async () => {
     await page.viewport(375, 812);
     const screen = await mount(<ShowMoreGrid items={gives(8)} now={NOW} />);
@@ -440,6 +485,73 @@ describe("ShowMoreGrid", () => {
     await screen.getByRole("button", { name: "Show 5 more" }).click();
     await expect.element(link(8)).toBeVisible();
     await expect.element(link(4)).toHaveFocus();
+  });
+});
+
+describe("kind line", () => {
+  const KIND_LINE = /^(Campaign|Supporter campaign|Program)$/;
+  const kind_lines = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll("article p")).filter((p) =>
+      KIND_LINE.test(p.textContent ?? "")
+    );
+
+  test("a grid names each card's kind only when it mixes kinds", async () => {
+    await page.viewport(1440, 900);
+    const mixed = await mount(
+      <ItemsByCount
+        items={[give(1), give(2, { kind: "supporter" }), program(1)]}
+        now={NOW}
+      />
+    );
+    await expect
+      .element(mixed.getByText("Supporter campaign", { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(mixed.getByText("Program", { exact: true }))
+      .toBeVisible();
+    expect(kind_lines(mixed.container)).toHaveLength(3);
+    await cleanup();
+
+    // a tab of campaigns, under a heading that already says so
+    const single = await mount(<ShowMoreGrid items={gives(4)} now={NOW} />);
+    await expect
+      .element(single.getByRole("link", { name: "Clean water 4" }))
+      .toBeVisible();
+    expect(kind_lines(single.container)).toHaveLength(0);
+    await cleanup();
+
+    // programs beside a video: a mixed list, so each program is named
+    const programs = await mount(
+      <ItemsByCount items={[program(1), program(2), video(1)]} now={NOW} />
+    );
+    await expect
+      .element(programs.getByRole("link", { name: "School meals 2" }))
+      .toBeVisible();
+    expect(kind_lines(programs.container)).toHaveLength(2);
+  });
+
+  test("a swipe row names each card's kind only when it mixes kinds", async () => {
+    await page.viewport(1440, 900);
+    const single = await mount(
+      <SwipeRow heading="Campaigns" items={gives(4)} now={NOW} />
+    );
+    await expect
+      .element(single.getByRole("link", { name: "Clean water 4" }))
+      .toBeInTheDocument();
+    expect(kind_lines(single.container)).toHaveLength(0);
+    await cleanup();
+
+    const mixed = await mount(
+      <SwipeRow
+        heading="Campaigns"
+        items={[...gives(3), give(4, { kind: "supporter" })]}
+        now={NOW}
+      />
+    );
+    await expect
+      .element(mixed.getByText("Supporter campaign", { exact: true }))
+      .toBeInTheDocument();
+    expect(kind_lines(mixed.container)).toHaveLength(4);
   });
 });
 
@@ -473,5 +585,26 @@ describe("SwipeRow", () => {
     await shown.click();
     await expect.element(toggle).toHaveAttribute("aria-expanded", "false");
     await expect.element(region).toBeVisible();
+  });
+
+  test('"See all" rises in only the cards that were not already in view', async () => {
+    await page.viewport(1440, 900);
+    const screen = await mount(
+      <SwipeRow heading="Campaigns" items={gives(5)} now={NOW} />
+    );
+    const row = screen.getByRole("region", { name: "Campaigns" });
+    await expect.element(row).toBeVisible();
+    await screen.getByRole("button", { name: "See all 5" }).click();
+    await expect
+      .element(screen.getByRole("link", { name: "Clean water 5" }))
+      .toBeVisible();
+
+    const items = [...list_of(screen.container).children] as HTMLElement[];
+    const rises = items.map((li) => /\bstarting:/.test(li.className));
+    // three whole cards show in the row at this width; the fourth is cut off
+    expect(rises).toEqual([false, false, false, true, true]);
+    // the stagger counts from the first card that rises
+    expect(items[3].style.transitionDelay).toContain("* 0 /");
+    expect(items[4].style.transitionDelay).toContain("* 1 /");
   });
 });

@@ -1,6 +1,7 @@
 import { useId } from "react";
 import type { IGiveItem, TOrgItem } from "../items";
 import { ItemsByCount } from "../items-by-count";
+import { SECTION_HEADING } from "../section-heading";
 import type { IOrgLayout } from "./types";
 
 /** what shows for a list that failed to load, in place of it or under the
@@ -65,7 +66,7 @@ export function WaysToHelp({
       aria-labelledby={heading_id}
       className={`flex flex-col gap-3 md:gap-4 ${classes}`}
     >
-      <h2 id={heading_id} className="text-xl font-bold md:text-2xl">
+      <h2 id={heading_id} className={SECTION_HEADING}>
         Ways to help
       </h2>
       <ItemsByCount items={items} now={now} rows={rows} />

@@ -1,16 +1,12 @@
-import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, test } from "vitest";
 import { page } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import { reset_viewport } from "#/__tests__/fixtures/viewport";
 import { NAME_DISPLAY_MAX } from "@/org-shape";
-import { BrandBand } from "./brand-band";
-import { DonateButton } from "./donate";
 import { OrgBanner } from "./org-banner";
 import { OrgMark } from "./org-mark";
 import { OrgMeta } from "./org-meta";
 import { OrgName } from "./org-name";
-import { RaisedStats } from "./raised-stats";
 
 // a real 1x1 pixel, so the img stays mounted rather than falling back
 const PIXEL =
@@ -118,9 +114,9 @@ describe("org hero", () => {
     const [short_h1, long_h1] = screen
       .getByRole("heading", { level: 1 })
       .elements();
-    expect(short_h1).toHaveClass("text-4xl", "md:text-6xl");
-    expect(long_h1).toHaveClass("text-3xl", "md:text-5xl");
-    expect(long_h1).not.toHaveClass("md:text-6xl");
+    expect(short_h1).toHaveClass("hero-heading");
+    expect(long_h1).toHaveClass("text-2xl", "md:text-3xl", "lg:text-5xl");
+    expect(long_h1).not.toHaveClass("hero-heading");
 
     const s = getComputedStyle(long_h1);
     expect(s.webkitLineClamp).toBe("none");
@@ -176,23 +172,6 @@ describe("org hero", () => {
     expect(bare.querySelectorAll("li")).toHaveLength(1);
   });
 
-  test("on the brand fill the badge takes the on-primary tone and the row the band's ink", async () => {
-    const screen = await render(
-      <BrandBand tone="primary">
-        <OrgMeta
-          npo={{ endow_designation: "Charity", hq_country: "Kenya", url: null }}
-          credential={null}
-        />
-      </BrandBand>
-    );
-    const list = screen.getByRole("list").element();
-    expect(list).not.toHaveClass("text-gray-11");
-    expect(list.querySelector("[data-tone]")).toHaveAttribute(
-      "data-tone",
-      "on-primary"
-    );
-  });
-
   test("a meta row that wraps on a phone keeps each glyph on its item's first line", async () => {
     await page.viewport(375, 812);
     const screen = await render(
@@ -223,97 +202,5 @@ describe("org hero", () => {
     expect(glyph.bottom).toBeLessThanOrEqual(
       text.getBoundingClientRect().top + line
     );
-  });
-});
-
-describe("raised stats", () => {
-  test("$0 raised asks for the first gift instead of showing the figures", async () => {
-    const screen = await render(
-      <RaisedStats raised={0} donors={0} target={undefined} variant="inline" />
-    );
-    await expect
-      .element(screen.getByText("Be the first to give"))
-      .toBeVisible();
-    expect(screen.container).not.toMatchTextContent("$0");
-    expect(screen.getByRole("progressbar").query()).toBeNull();
-  });
-
-  test("figures are pairs, a figure over its label, the donors only when the count is known; a goal adds the bar and the goal in dollars", async () => {
-    const screen = await render(
-      <>
-        <RaisedStats
-          raised={3322}
-          donors={49}
-          target={undefined}
-          variant="inline"
-        />
-        <RaisedStats
-          raised={3322}
-          donors={null}
-          target="8000"
-          variant="panel"
-        />
-      </>
-    );
-    const [inline, panel] = Array.from(screen.container.children);
-    const pairs = Array.from(inline.querySelectorAll("p"));
-    expect(pairs.map((p) => p.textContent)).toEqual([
-      "$3,322 raised",
-      "49 donors",
-    ]);
-    for (const p of pairs) {
-      const [figure, label] = Array.from(p.children);
-      expect(figure.tagName).toBe("STRONG");
-      // the figure over its label
-      expect(figure.getBoundingClientRect().bottom).toBeLessThanOrEqual(
-        label.getBoundingClientRect().top
-      );
-    }
-    expect(inline.textContent).not.toContain("·");
-    expect(inline.querySelector("[role=progressbar]")).toBeNull();
-
-    expect(panel).not.toMatchTextContent("donor");
-    expect(panel.querySelector("strong")).toHaveTextContent("$3,322");
-    const bar = screen.getByRole("progressbar");
-    await expect.element(bar).toHaveAttribute("aria-valuenow", "3322");
-    await expect.element(bar).toHaveAttribute("aria-valuemax", "8000");
-    expect(panel.textContent).toContain("$3,322 of $8,000 goal");
-    expect(panel.textContent).not.toContain("%");
-  });
-
-  test("a supporter count in the thousands is written with its separator", async () => {
-    const screen = await render(
-      <RaisedStats
-        raised={3322}
-        donors={12_345}
-        target={undefined}
-        variant="inline"
-      />
-    );
-    const pairs = Array.from(screen.container.querySelectorAll("p"));
-    expect(pairs.map((p) => p.textContent)).toEqual([
-      "$3,322 raised",
-      "12,345 donors",
-    ]);
-  });
-});
-
-describe("donate", () => {
-  test("Donate inverts on a brand band, where the primary fill would vanish", async () => {
-    const screen = await render(
-      <MemoryRouter>
-        <DonateButton to="/donate/7" />
-        <BrandBand tone="deep">
-          <DonateButton to="/donate/7" size="lg" />
-        </BrandBand>
-      </MemoryRouter>
-    );
-    const [plain, inverse] = screen
-      .getByRole("link", { name: "Donate" })
-      .elements();
-    expect(plain).toHaveAttribute("href", "/donate/7");
-    expect(plain).toHaveClass("btn-primary");
-    expect(inverse).toHaveClass("bg-primary-fg", "text-primary", "btn-lg");
-    expect(inverse).not.toHaveClass("btn-primary");
   });
 });

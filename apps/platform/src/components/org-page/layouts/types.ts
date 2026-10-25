@@ -12,7 +12,6 @@ import type {
 export interface IOrgLayout {
   npo: INpoPublic;
   shape: IOrgShape;
-  donors: number | null;
   donate_to: string;
   /** the header's share target */
   share: { recipientName: string; url: string };

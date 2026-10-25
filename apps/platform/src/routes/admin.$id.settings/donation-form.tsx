@@ -1,5 +1,5 @@
 import { Field as BaseField } from "@ark-ui/react/field";
-import { Actions, Form as F, Field, Increments } from "@better-giving/ui";
+import { Actions, Form as F, Increments } from "@better-giving/ui";
 import { valibotResolver } from "@hookform/resolvers/valibot";
 import { DollarSign } from "lucide-react";
 import { useController, useFieldArray, useForm } from "react-hook-form";
@@ -7,12 +7,6 @@ import { useFetcher } from "react-router";
 import * as v from "valibot";
 import { DonateFrequencies } from "#/components/donate-frequencies";
 import { DonateMethods, fill } from "#/components/donate-methods";
-import {
-  GoalSelector,
-  target,
-  to_form_target,
-  to_target,
-} from "#/components/goal-selector";
 import { donate_method } from "#/types/components";
 import { to_freq_bools, to_freqs } from "@/helpers/donation";
 import type { DonateMethodId, INpoUpdate } from "@/npo";
@@ -39,7 +33,6 @@ const schema = v.object({
     v.minLength(1, "at least one payment option should be active")
   ),
   freqs: donate_freq_opts_bool,
-  target,
 });
 
 type FV = v.InferInput<typeof schema>;
@@ -47,7 +40,6 @@ type FV = v.InferInput<typeof schema>;
 interface Props {
   donate_methods: DonateMethodId[];
   increments: { label: string; value: string }[];
-  target: string | undefined;
   freqs: TFrequency[] | undefined;
 }
 
@@ -66,7 +58,6 @@ export function DonationFormTab(p: Props) {
     values: {
       donate_methods: fill(p.donate_methods),
       increments: p.increments,
-      target: to_form_target(p.target),
       freqs: to_freq_bools(p.freqs),
     },
   });
@@ -81,11 +72,6 @@ export function DonationFormTab(p: Props) {
     name: "increments",
   });
 
-  const { field: target } = useController({
-    control,
-    name: "target.type",
-  });
-
   const { field: freqs } = useController({
     control,
     name: "freqs",
@@ -93,24 +79,21 @@ export function DonationFormTab(p: Props) {
 
   const incs = watch("increments");
 
-  const onSubmit = handleSubmit(
-    async ({ donate_methods, target: fvTarget, freqs, ...fv }) => {
-      const update: Partial<INpoUpdate> = {
-        ...fv,
-        target: to_target(fvTarget),
-        donate_methods: donate_methods
-          .filter((m) => !m.disabled)
-          .map((m) => m.id),
-        donate_frequencies: to_freqs(freqs),
-      };
+  const onSubmit = handleSubmit(async ({ donate_methods, freqs, ...fv }) => {
+    const update: Partial<INpoUpdate> = {
+      ...fv,
+      donate_methods: donate_methods
+        .filter((m) => !m.disabled)
+        .map((m) => m.id),
+      donate_frequencies: to_freqs(freqs),
+    };
 
-      fetcher.submit(update as any, {
-        method: "POST",
-        action: ".",
-        encType: "application/json",
-      });
-    }
-  );
+    fetcher.submit(update as any, {
+      method: "POST",
+      action: ".",
+      encType: "application/json",
+    });
+  });
 
   return (
     <F
@@ -186,20 +169,6 @@ export function DonationFormTab(p: Props) {
           </>
         )}
       />
-
-      <div>
-        <p className="label mb-3">Donation goal</p>
-        <GoalSelector value={target.value} onChange={target.onChange} />
-        {target.value === "fixed" && (
-          <Field
-            {...register("target.value", { shouldUnregister: true })}
-            label="How much money do you want to raise?"
-            classes="mt-4 mb-6"
-            placeholder="$"
-            error={errors?.target?.value?.message}
-          />
-        )}
-      </div>
 
       <div className="mt-8">
         <SaveAlert data={fetcher.data} />

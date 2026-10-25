@@ -13,10 +13,12 @@ import {
   above_fold,
   EIN,
   give,
+  header_donate_in_view,
   in_view,
   LONG_NAME,
   message,
   npo,
+  org_figures,
   org_layout,
   program,
   story,
@@ -62,6 +64,18 @@ const root_of = (container: HTMLElement) =>
   container.querySelector("main")?.parentElement as HTMLElement;
 
 describe("Letter", () => {
+  test.each([3322, 0])(
+    "shows none of the org's figures, with %i raised and a goal stored",
+    async (raised) => {
+      const org = { contributions_total: raised, target: "8000" };
+      const screen = await mount({}, org);
+      await expect
+        .element(screen.getByRole("heading", { level: 1 }))
+        .toBeVisible();
+      expect(org_figures(screen.container, npo(org))).toEqual([]);
+    }
+  );
+
   test("no middle dot anywhere in the rendered page", async () => {
     await page.viewport(1440, 900);
     const screen = await mount({ give: [give(1)], messages: [message(1)] });
@@ -112,7 +126,7 @@ describe("Letter", () => {
     [375, 812],
     [1440, 900],
   ])(
-    "Donate is under the figures at %i, and the header's waits for it to leave",
+    "Donate is under the deck at %i, and the header's waits for it to leave",
     async (w, h) => {
       await page.viewport(w, h);
       const screen = await mount();
@@ -304,7 +318,7 @@ describe("Letter", () => {
     expect(header_donate(root)).toBeUndefined();
     scroll_past_hero_donate(root);
     await expect.poll(() => header_donate(root)).toBeDefined();
-    await expect.poll(() => in_view(header_donate(root))).toBe(true);
+    await expect.poll(() => header_donate_in_view(root)).toBe(true);
   });
 
   test.each([

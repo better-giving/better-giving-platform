@@ -2,15 +2,14 @@ import { TabPanel, Tabs } from "@better-giving/ui";
 import { type ReactNode, useId, useState } from "react";
 import { RichText, to_text } from "#/components/rich-text";
 import { BrandBand } from "../brand-band";
-import { DonateButton } from "../donate";
-import type { TOrgItem } from "../items";
+import { GivePanel } from "../give-panel";
+import { names_kind, type TOrgItem } from "../items";
 import { ItemsByCount, ShowMoreGrid } from "../items-by-count";
-import { OrgBanner } from "../org-banner";
 import { OrgMark } from "../org-mark";
 import { OrgMeta } from "../org-meta";
 import { OrgName } from "../org-name";
 import { QuoteStrip } from "../quote-strip";
-import { RaisedStats } from "../raised-stats";
+import { SECTION_HEADING } from "../section-heading";
 import { VideoSet } from "../video-set";
 import { OrgPageFrame } from "./org-page-frame";
 import type { IOrgLayout } from "./types";
@@ -26,8 +25,6 @@ const LABEL: Record<Exclude<TTab, "give">, string> = {
   videos: "Videos",
   messages: "Messages",
 };
-
-const H2 = "text-xl font-bold lg:text-2xl";
 
 /** short or no story, 4+ items: a compact identity hero, then a tab per kind
  * of item. a kind with one item sits above the tabs as Featured, the kind
@@ -55,11 +52,15 @@ export function Hub(props: IOrgLayout) {
 
   const label = (t: TTab) => (t === "give" ? give_label(lists.give) : LABEL[t]);
 
-  /** a tab's label with its item count. messages arrive a page at a time, so
-   * they have no count to give */
-  function tab_label(t: TTab): string {
+  /** a tab's label with its item count in muted ink. messages arrive a page
+   * at a time, so they have no count to give */
+  function tab_label(t: TTab): ReactNode {
     if (t === "messages" || failed[t]) return label(t);
-    return `${label(t)} ${lists[t].length}`;
+    return (
+      <>
+        {label(t)} <span className="text-gray-11">{lists[t].length}</span>
+      </>
+    );
   }
 
   function content(t: TTab): ReactNode {
@@ -92,7 +93,12 @@ export function Hub(props: IOrgLayout) {
         {featured.length > 0 && (
           <Section heading="Featured">
             <div className="flex flex-col gap-4">
-              <ItemsByCount items={featured_cards} now={now} />
+              {/* the video beside them is a kind too */}
+              <ItemsByCount
+                items={featured_cards}
+                now={now}
+                show_kind={names_kind(featured)}
+              />
               {/* a lone video at the content's full width outweighs the
                   tabs under it, so it takes the reading measure, on the
                   heading's edge */}
@@ -126,63 +132,59 @@ interface IHubHero {
   donate_ref: (el: HTMLElement | null) => void;
 }
 
-/** the banner over a tint band, the ringed mark overlapping it; no banner,
- * and the band is the brand's. the figures and Donate come ahead of the story,
- * in the dom as on screen, so they land in a phone's first screen; from md they
- * sit at the identity row's end, the story under that row */
+/** the tint band: the mark, the facts over the name, the tagline and story,
+ * and the give card. a phone stacks the facts, the mark beside the name, the
+ * tagline, the card, then the story, so Donate lands in its first screen.
+ * from md the mark and the card are columns either side of the text, whose
+ * empty last row takes up a taller column's height */
 function HubHero({ page, donate_ref }: IHubHero) {
   const { npo } = page;
-  const banner = !!npo.image;
   const tagline = npo.tagline?.trim();
   const has_story = !!to_text(npo.overview_pt).trim();
   return (
-    <>
-      <OrgBanner src={npo.image} />
-      <BrandBand
-        tone={banner ? "tint" : "primary"}
-        classes={`border-b pb-6 md:pb-8 ${banner ? "pt-4" : "pt-6 md:pt-8"}`}
-      >
-        <div className="page grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-end md:gap-x-6">
-          <OrgMark
-            name={npo.name}
-            logo={npo.logo}
-            size="lg"
-            ring={banner}
-            // the overlap plus the band's pt-4, which is what keeps the name
-            // clear of the banner
-            classes={banner ? "-mt-14 md:-mt-16 md:self-start" : ""}
+    <BrandBand tone="tint" classes="border-b py-6 md:py-10">
+      <div className="page grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3.5 md:grid-cols-[auto_minmax(0,1fr)_18rem] md:grid-rows-[auto_auto_auto_auto_1fr] md:items-start md:gap-x-6 md:gap-y-0 lg:grid-cols-[auto_minmax(0,1fr)_24rem] lg:gap-x-8">
+        <OrgMark
+          name={npo.name}
+          logo={npo.logo}
+          size="lg"
+          classes="row-start-2 md:row-span-full md:row-start-1"
+        />
+        <OrgMeta
+          npo={npo}
+          credential={page.credential}
+          classes="col-span-2 row-start-1 md:col-span-1 md:col-start-2"
+        />
+        <OrgName
+          name={npo.name}
+          scale="sm"
+          classes="row-start-2 md:col-start-2 md:pt-3"
+        />
+        {tagline && (
+          <p className="col-span-2 max-w-2xl text-lg md:col-span-1 md:col-start-2 md:row-start-3 md:pt-3">
+            {tagline}
+          </p>
+        )}
+        <GivePanel
+          name={npo.name}
+          banner={npo.image}
+          donate_to={page.donate_to}
+          donate_ref={donate_ref}
+          classes="col-span-2 md:col-span-1 md:col-start-3 md:row-span-full md:row-start-1"
+        />
+        {has_story && (
+          <RichText
+            readOnly
+            content={{ value: npo.overview_pt }}
+            classes={{
+              container:
+                "col-span-2 md:col-span-1 md:col-start-2 md:row-start-4 md:pt-3",
+              field: "flex max-w-2xl flex-col gap-2 text-gray-11",
+            }}
           />
-          <div className="flex min-w-0 flex-col gap-3 md:gap-2">
-            <OrgName name={npo.name} scale="sm" />
-            {/* the tagline in the band's ink */}
-            {tagline && <p className="max-w-2xl">{tagline}</p>}
-            <OrgMeta npo={npo} credential={page.credential} />
-          </div>
-          <div className="flex flex-col gap-3 pt-1 md:items-end md:pt-0">
-            <RaisedStats
-              raised={npo.contributions_total}
-              donors={page.donors}
-              target={npo.target}
-              variant="inline"
-              classes="md:text-right"
-            />
-            <DonateButton to={page.donate_to} size="lg" ref={donate_ref} />
-          </div>
-          {has_story && (
-            <RichText
-              readOnly
-              content={{ value: npo.overview_pt }}
-              // muted on the tint; on the brand fill a story link takes the
-              // band's ink, as the editor's primary link ink vanishes on it
-              classes={{
-                container: "md:col-start-2",
-                field: `flex max-w-2xl flex-col gap-2 ${banner ? "text-gray-11" : "[&_a]:text-primary-fg"}`,
-              }}
-            />
-          )}
-        </div>
-      </BrandBand>
-    </>
+        )}
+      </div>
+    </BrandBand>
   );
 }
 
@@ -195,7 +197,7 @@ function Section({ heading, children }: ISection) {
   const id = useId();
   return (
     <section aria-labelledby={id} className="flex flex-col gap-3 md:gap-4">
-      <h2 id={id} className={H2}>
+      <h2 id={id} className={SECTION_HEADING}>
         {heading}
       </h2>
       {children}

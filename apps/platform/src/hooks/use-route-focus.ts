@@ -50,7 +50,7 @@ function hash_target(hash: string) {
   }
 }
 
-function focus_without_ring(el: HTMLElement, options?: FocusOptions) {
+export function focus_without_ring(el: HTMLElement, options?: FocusOptions) {
   if (!el.hasAttribute("tabindex")) {
     el.setAttribute("tabindex", "-1");
     // chromium paints the UA focus-visible ring on script focus that follows a keypress

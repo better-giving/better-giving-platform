@@ -1,3 +1,4 @@
+import { to_usd } from "@better-giving/ui/helpers";
 import type {
   IDonorMessage,
   IGiveItem,
@@ -7,7 +8,7 @@ import type {
 import type { IOrgLayout } from "#/components/org-page/layouts/types";
 import { to_text } from "#/components/rich-text/helpers";
 import type { INpoPublic } from "$/pg/queries/npo";
-import { BANNER } from "./layout-dom";
+import { BANNER, header_donate } from "./layout-dom";
 
 /** the clock the cards count end dates from */
 export const NOW = Date.parse("2026-10-01T12:00:00Z");
@@ -38,6 +39,15 @@ export function in_view(el: Element): boolean {
     r.bottom <= window.innerHeight &&
     r.right <= window.innerWidth
   );
+}
+
+/** the header's Donate is shown and wholly in the viewport; throws, naming
+ * the cause, when the header shows none, so a poll over it reports that and
+ * not a TypeError from `in_view(undefined)` */
+export function header_donate_in_view(root: Element): boolean {
+  const donate = header_donate(root);
+  if (!donate) throw new Error("the header shows no Donate link");
+  return in_view(donate);
 }
 
 /** room the first screen keeps under Donate, so a wrap the fixture didn't
@@ -156,6 +166,41 @@ export const npo = (o: Partial<INpoPublic> = {}): INpoPublic => ({
   ...o,
 });
 
+/** the org-wide figures a page shows, each as the text or role that gave it
+ * away: the raised total, a donor count, a goal bar or goal line, the
+ * first-gift ask. `toEqual([])` prints whichever is back. `org_figures.test`
+ * renders each shape this reads, so a pattern that stops matching goes red
+ * there rather than letting a page that shows the figure pass */
+export function org_figures(root: Element, org: INpoPublic): string[] {
+  const text = root.textContent ?? "";
+  const found = Array.from(
+    root.querySelectorAll("[role=progressbar], [role=meter], progress, meter")
+  ).map((bar) => `progressbar ${bar.getAttribute("aria-label") ?? ""}`.trim());
+  // a bar drawn as a sized div carries no role, only its percent width
+  if (root.querySelector("[style*='width'][style*='%']")) found.push("bar");
+  const total = org.contributions_total;
+  // a $0 total prints as "0" in too much unrelated text to search for
+  const spellings = [to_usd(total)];
+  if (total >= 1000) {
+    spellings.push(
+      total.toLocaleString("en-US"),
+      `${(total / 1000).toFixed(1)}K`
+    );
+  }
+  const spelled = spellings.find((spelling) => text.includes(spelling));
+  if (spelled) found.push(spelled);
+  for (const re of [
+    /\b(raised|given|funded|donated)\b/i,
+    /[\d,]+\s*(donors?|supporters?|givers?|backers?)\b/i,
+    /\bgoal\b/i,
+    /be the first to give/i,
+  ]) {
+    const m = text.match(re);
+    if (m) found.push(m[0]);
+  }
+  return found;
+}
+
 /** a page's props. the shape is measured from the npo and the lists given,
  * as the loader measures it, unless `shape` says otherwise */
 export function org_layout(o: Partial<IOrgLayout> = {}): IOrgLayout {
@@ -172,7 +217,6 @@ export function org_layout(o: Partial<IOrgLayout> = {}): IOrgLayout {
       programs: 0,
       videos: 0,
     },
-    donors: 49,
     donate_to: "/donate/7",
     share: { recipientName: "Riverside Literacy", url: "https://x/org/7" },
     now: NOW,

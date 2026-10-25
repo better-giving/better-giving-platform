@@ -521,12 +521,11 @@ describe("payment_intent.succeeded → settlement → UI", () => {
       .toBeInTheDocument();
   });
 
-  it("profile page Target shows contributions_total after settlement", async () => {
+  it("profile page shows no org-wide total or goal after settlement", async () => {
     await fire_webhook();
 
-    // npo has target_smart → the raised card shows its goal bar
-    // v_contributions: amount_usd=100, so progress=100
-    // smart_next(100) → 200 (100 <= 100, doubles)
+    // targets live in campaigns and programs only, so the settled $100 shows
+    // nowhere on the org page while the program keeps its own target
     const Stub = createRoutesStub([
       {
         path: "/org/:org",
@@ -545,11 +544,12 @@ describe("payment_intent.succeeded → settlement → UI", () => {
     render_screen = screen;
 
     await expect
-      .element(screen.getByText("$100", { exact: true }))
+      .element(screen.getByRole("progressbar", { name: /Test Program/ }))
       .toBeInTheDocument();
-    await expect
-      .element(screen.getByText("$100 of $200 goal", { exact: true }))
-      .toBeInTheDocument();
+    expect(screen.getByText("$100", { exact: true }).elements()).toHaveLength(
+      0
+    );
+    expect(screen.getByText(/goal/).elements()).toHaveLength(0);
   });
 
   it("increments form ltd and program total_donations after settlement", async () => {
