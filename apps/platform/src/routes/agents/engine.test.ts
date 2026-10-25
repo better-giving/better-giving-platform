@@ -588,7 +588,7 @@ const local_page = {
     {
       id: 7,
       name: "Verify Test Nonprofit",
-      registration_number: "VERIFY-0001",
+      registration_number: "VERIFY0001",
       hq_country: "United States",
     },
   ],
