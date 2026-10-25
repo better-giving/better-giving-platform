@@ -1,4 +1,3 @@
-import { href } from "react-router";
 import { admin_ctx, user_ctx } from "#/.server/auth";
 import { get_funds_npo_memberof } from "#/.server/funds";
 import { resp } from "@/helpers/https";
@@ -27,8 +26,6 @@ export const loader = async ({ context, request }: Route.LoaderArgs) => {
     campaign_list(id),
     get_funds_npo_memberof(id, { creator: "ours" }),
   ]);
-  // Stale clients still read supporter_funds on the default tab; empty avoids a crash after the tab move.
-  const supporter_funds: typeof org_funds = [];
   return {
     view: "campaigns" as const,
     endow,
@@ -37,9 +34,5 @@ export const loader = async ({ context, request }: Route.LoaderArgs) => {
       status_label: campaign_shown_status(c),
     })),
     org_funds,
-    supporter_funds,
-    // the list no longer shows a profile row; kept for clients still on the
-    // old bundle, now landing on the folded profile fields
-    profile_to: `${href("/admin/:id/organization", { id: String(id) })}#page`,
   };
 };

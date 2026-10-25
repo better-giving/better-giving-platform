@@ -435,7 +435,6 @@ describe("campaign list loader", () => {
     if (data.view !== "campaigns")
       throw new Error("expected the campaigns tab");
     expect(data.org_funds.map((f) => f.id)).toEqual(["fund-owned"]);
-    expect(data.supporter_funds).toEqual([]);
 
     const tab = await list_loader({
       request: new Request("https://x/admin/list/campaigns?tab=fundraisers"),

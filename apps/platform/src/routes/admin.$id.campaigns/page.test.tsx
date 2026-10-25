@@ -164,7 +164,6 @@ describe("campaign list", () => {
             endow,
             campaigns,
             org_funds,
-            profile_to: "/admin/7/organization#page",
           };
         },
       },

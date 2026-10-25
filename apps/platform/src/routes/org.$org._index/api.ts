@@ -1,5 +1,5 @@
 import { data, href } from "react-router";
-import { get_session } from "#/.server/auth";
+import { can_preview } from "#/.server/can-preview";
 import { get_funds_npo_memberof } from "#/.server/funds";
 import { to_excerpt, to_text } from "#/components/rich-text/helpers";
 import { report_error } from "#/errors/report";
@@ -21,7 +21,6 @@ import {
 } from "$/pg/queries/npo";
 import { npo_media_list } from "$/pg/queries/npo-media";
 import { npo_programs } from "$/pg/queries/program";
-import { npo_admin_member } from "$/pg/queries/user";
 import type { Route } from "./+types/route";
 import { layout_lists, shape_counts } from "./layout-data";
 
@@ -185,10 +184,3 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
     npo.published ? undefined : { headers: PRIVATE }
   );
 };
-
-/** an unpublished org shows to its own admins and to platform admins */
-async function can_preview(request: Request, npo_id: number) {
-  const { user } = await get_session(request);
-  if (!user) return false;
-  return user.role === "admin" || npo_admin_member(user.id, npo_id);
-}
