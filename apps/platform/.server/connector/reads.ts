@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { to_text } from "#/components/rich-text/helpers";
 import type { TCampaignStatus } from "@/campaign";
-import { fund_closes_at } from "@/fundraiser/is-open";
+import { fund_closes_at } from "@/campaign/is-open";
 import type { IIncrement } from "@/schemas";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { campaigns } from "../pg/schema/campaign";

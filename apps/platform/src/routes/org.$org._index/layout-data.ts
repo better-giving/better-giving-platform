@@ -10,9 +10,9 @@ import { to_excerpt } from "#/components/rich-text/helpers";
 import { extract_youtube_id } from "#/components/youtube-player";
 import { program_href } from "#/helpers/org-href";
 import { goal_amount } from "#/routes/org.$org.$campaign/format";
-import type { IFundItem } from "@/fundraiser";
-import { fund_closes_at, fund_item_is_open } from "@/fundraiser/is-open";
-import { MAX_EXPIRATION_ISO } from "@/fundraiser/schema";
+import type { IFundItem } from "@/campaign";
+import { fund_closes_at, fund_item_is_open } from "@/campaign/is-open";
+import { MAX_EXPIRATION_ISO } from "@/campaign/schema";
 import type { IMedia, IProgramDb } from "@/npo";
 import type { IOrgShape } from "@/org-shape";
 

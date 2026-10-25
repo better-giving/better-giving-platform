@@ -17,12 +17,12 @@ import type {
   IFundItem,
   IFundItemsPage,
   IFundsPageOpts,
-} from "@/fundraiser/interfaces";
+} from "@/campaign/interfaces";
 import type {
   IFundsNpoMemberOfSearchObj,
   IFundsSearchObj,
   IFundUpdate,
-} from "@/fundraiser/schema";
+} from "@/campaign/schema";
 import type { IPageKeyed } from "@/types/api";
 import { db } from "../db";
 import { user } from "../schema/auth";

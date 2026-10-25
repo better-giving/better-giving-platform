@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { IFundItem } from "@/fundraiser";
+import type { IFundItem } from "@/campaign";
 import type { IMedia, IProgramDb } from "@/npo";
 import {
   campaign_give,

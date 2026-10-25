@@ -73,7 +73,7 @@ import {
 import { loader as campaigns_loader } from "#/routes/admin.$id.campaigns/api";
 import CampaignsPage from "#/routes/admin.$id.campaigns/route";
 import { loader as profile_loader } from "#/routes/org.$org._index/api";
-import type { IFundItem } from "@/fundraiser";
+import type { IFundItem } from "@/campaign";
 import { admin_ctx, user_ctx } from "$/auth/test-utils";
 import { enqueue } from "$/kit/queue";
 import { create_test_db } from "$/pg/test-utils/pglite";

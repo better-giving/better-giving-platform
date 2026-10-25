@@ -3,7 +3,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { to_text } from "#/components/rich-text/helpers";
 import { org_href } from "#/helpers/org-href";
 import { extract_youtube_id } from "#/components/youtube-player";
-import { fund_item_is_open } from "@/fundraiser/is-open";
+import { fund_item_is_open } from "@/campaign/is-open";
 import {
   type IOrgShape,
   items_total,

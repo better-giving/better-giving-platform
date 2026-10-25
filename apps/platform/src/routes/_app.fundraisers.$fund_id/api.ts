@@ -4,7 +4,7 @@ import { get_fund } from "#/.server/fund";
 import { segment } from "#/api/schema/segment";
 import { moved } from "#/helpers/moved";
 import type { IFund } from "#/types/fund";
-import { fund_id } from "@/fundraiser/schema";
+import { fund_id } from "@/campaign/schema";
 import { resp } from "@/helpers/https";
 import {
   campaign_by_legacy_fund,

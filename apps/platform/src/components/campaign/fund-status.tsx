@@ -1,7 +1,7 @@
 import { Badge, type BadgeTone } from "@better-giving/ui";
 import { unpack } from "@better-giving/ui/helpers";
-import { fund_is_open } from "@/fundraiser/is-open";
-import { MAX_EXPIRATION_ISO } from "@/fundraiser/schema";
+import { fund_is_open } from "@/campaign/is-open";
+import { MAX_EXPIRATION_ISO } from "@/campaign/schema";
 
 interface IStatus {
   active: boolean;
