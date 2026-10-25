@@ -13,7 +13,7 @@ interface Props extends Pick<DonateData, "program"> {
 export function OrgCard({ classes = "", program, ...props }: Props) {
   return (
     <div
-      className={`md:card max-md:p-4 grid grid-cols-[auto-1fr] gap-x-4 justify-start ${classes}`}
+      className={`md:card max-md:p-4 grid grid-cols-[auto_1fr] gap-x-4 justify-start ${classes}`}
     >
       <Image
         src={props.logo}

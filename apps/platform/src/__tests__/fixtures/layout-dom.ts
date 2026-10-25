@@ -1,3 +1,6 @@
+import { expect } from "vitest";
+import { userEvent } from "vitest/browser";
+
 /** a 4:1 banner that loads with no network, so the img stays mounted rather
  * than falling back to the placeholder */
 export const BANNER = `data:image/svg+xml,${encodeURIComponent(
@@ -100,4 +103,28 @@ export function scroll_past_hero_donate(root: Element) {
     a.checkVisibility()
   ) as HTMLElement;
   window.scrollTo(0, hero.getBoundingClientRect().bottom + window.scrollY);
+}
+
+/** a colour token as the browser computes it, for comparing with a computed
+ * colour of the same notation */
+export function token_color(name: `--${string}`) {
+  const probe = document.createElement("span");
+  probe.style.color = `var(${name})`;
+  document.body.append(probe);
+  const color = getComputedStyle(probe).color;
+  probe.remove();
+  return color;
+}
+
+/** the outline `el` shows under keyboard focus */
+export async function keyboard_ring(el: HTMLElement) {
+  await userEvent.keyboard("{Tab}");
+  el.focus();
+  await expect.poll(() => el.matches(":focus-visible")).toBe(true);
+  const s = getComputedStyle(el);
+  return {
+    style: s.outlineStyle,
+    color: s.outlineColor,
+    offset: Number.parseFloat(s.outlineOffset),
+  };
 }

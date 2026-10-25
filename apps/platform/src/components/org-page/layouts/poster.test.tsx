@@ -1,6 +1,6 @@
 import { createRoutesStub } from "react-router";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { page, userEvent } from "vitest/browser";
+import { page } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import {
   BANNER,
@@ -9,10 +9,12 @@ import {
   give_panel,
   header_donate,
   imgs_outside_panel,
+  keyboard_ring,
   panel_banner,
   panel_parts,
   pinned_to_bottom,
   scroll_past_hero_donate,
+  token_color,
 } from "#/__tests__/fixtures/layout-dom";
 import {
   above_fold,
@@ -197,25 +199,15 @@ describe("Poster", () => {
    * every outline in --ring, so it is readable at rest */
   const ring = (el: Element) => getComputedStyle(el).outlineColor;
 
-  async function focus_ring(donate: HTMLElement) {
-    await userEvent.keyboard("{Tab}");
-    donate.focus();
-    await expect.poll(() => donate.matches(":focus-visible")).toBe(true);
-    const s = getComputedStyle(donate);
-    expect(s.outlineStyle).toBe("solid");
-    return s.outlineColor;
-  }
-
-  test("Donate on the banner takes the page's focus ring, not the deep band's white one", async () => {
+  test("Donate on the banner draws its focus ring inside the fill, in the fill's own ink", async () => {
     await page.viewport(1440, 900);
     const screen = await mount();
-    const panel = give_panel(screen.container);
-    const [donate] = donates(panel);
+    const [donate] = donates(give_panel(screen.container));
     await expect.poll(() => donate.checkVisibility()).toBe(true);
-    const band = panel.closest(".bg-primary-deep") as HTMLElement;
-    expect(ring(donate)).toBe(ring(document.body));
-    expect(ring(donate)).not.toBe(ring(band));
-    expect(await focus_ring(donate)).toBe(ring(document.body));
+    const focused = await keyboard_ring(donate);
+    expect(focused.style).toBe("solid");
+    expect(focused.color).toBe(token_color("--primary-fg"));
+    expect(focused.offset).toBeLessThan(0);
   });
 
   test("Donate alone on the deep band takes the band's white focus ring", async () => {
@@ -227,7 +219,10 @@ describe("Poster", () => {
     const band = panel.closest(".bg-primary-deep") as HTMLElement;
     expect(ring(donate)).toBe(ring(band));
     expect(ring(donate)).not.toBe(ring(document.body));
-    expect(await focus_ring(donate)).toBe(ring(band));
+    const focused = await keyboard_ring(donate);
+    expect(focused.style).toBe("solid");
+    expect(focused.color).toBe(ring(band));
+    expect(focused.offset).toBeGreaterThan(0);
   });
 
   test.each([

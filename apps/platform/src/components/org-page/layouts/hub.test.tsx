@@ -9,10 +9,12 @@ import {
   give_panel,
   header_donate,
   imgs_outside_panel,
+  keyboard_ring,
   panel_banner,
   panel_parts,
   pinned_to_bottom,
   scroll_past_hero_donate,
+  token_color,
 } from "#/__tests__/fixtures/layout-dom";
 import {
   above_fold,
@@ -274,6 +276,17 @@ describe("Hub", () => {
     expect(mark.getBoundingClientRect().top).toBeGreaterThanOrEqual(
       band.getBoundingClientRect().top
     );
+  });
+
+  test("Donate on the banner draws its focus ring inside the fill, in the fill's own ink", async () => {
+    await page.viewport(1440, 900);
+    const screen = await mount(org_layout({ npo: npo({ image: BANNER }) }));
+    const [donate] = donates(give_panel(screen.container));
+    await expect.poll(() => donate.checkVisibility()).toBe(true);
+    const focused = await keyboard_ring(donate);
+    expect(focused.style).toBe("solid");
+    expect(focused.color).toBe(token_color("--primary-fg"));
+    expect(focused.offset).toBeLessThan(0);
   });
 
   test("with no banner the band stays the tint and the give card is Donate alone", async () => {

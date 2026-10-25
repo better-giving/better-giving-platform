@@ -10,10 +10,10 @@ const PLACEHOLDER_TAGLINE = " ";
 
 export function Card({ name, card_img, id, tagline }: EndowmentCard) {
   return (
-    <div className="relative bg-panel border rounded has-[.pending]:grayscale has-[.pending]:pointer-events-none  grid grid-rows-subgrid row-span-4 gap-y-0">
+    <div className="relative bg-panel border rounded has-[.pending]:grayscale has-[.pending]:pointer-events-none  grid grid-rows-subgrid row-span-3 gap-y-0">
       <NavLink
         to={href("/org/:org", { org: id.toString() })}
-        className="grid grid-rows-subgrid row-span-4 h-full overflow-clip"
+        className="grid grid-rows-subgrid row-span-3 h-full overflow-clip"
       >
         <Image
           loading="lazy"
@@ -21,7 +21,7 @@ export function Card({ name, card_img, id, tagline }: EndowmentCard) {
           className="h-40 w-full object-cover bg-secondary"
           onError={(e) => e.currentTarget.classList.add("bg-secondary")}
         />
-        <div className="grid grid-rows-subgrid row-start-2 row-span-3 p-3 pb-16 gap-3">
+        <div className="grid grid-rows-subgrid row-start-2 row-span-2 p-3 pb-16 gap-3">
           {/* nonprofit name */}
           <h3 className="text-ellipsis line-clamp-2 text-center mb-2">
             <span className="inline">{name}</span>
