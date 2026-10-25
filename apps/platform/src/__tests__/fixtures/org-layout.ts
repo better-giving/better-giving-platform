@@ -89,12 +89,12 @@ export const give = (n: number): IGiveItem => ({
   excerpt: "Wells for three villages before the dry season.",
 });
 
-export const fundraiser = (n: number): IGiveItem => ({
+export const supporter_fund = (n: number): IGiveItem => ({
   ...give(n),
   kind: "supporter",
-  id: `fundraiser-${n}`,
+  id: `supporter-${n}`,
   title: `Read-a-thon ${n}`,
-  to: `/fundraisers/${n}`,
+  to: `/campaigns/${n}`,
   byline: "by Jane",
 });
 
@@ -213,7 +213,7 @@ export function org_layout(o: Partial<IOrgLayout> = {}): IOrgLayout {
       has_banner: false,
       has_logo: false,
       campaigns: 0,
-      fundraisers: 0,
+      supporters: 0,
       programs: 0,
       videos: 0,
     },
@@ -238,7 +238,7 @@ export function org_layout(o: Partial<IOrgLayout> = {}): IOrgLayout {
       has_banner: !!p.npo.image,
       has_logo: !!p.npo.logo,
       campaigns: p.give.filter((x) => x.kind === "campaign").length,
-      fundraisers: p.give.filter((x) => x.kind === "supporter").length,
+      supporters: p.give.filter((x) => x.kind === "supporter").length,
       programs: p.programs.length,
       videos: p.videos.length,
       ...o.shape,

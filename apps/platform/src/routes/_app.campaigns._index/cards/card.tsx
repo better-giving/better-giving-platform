@@ -18,7 +18,7 @@ export function Card({
   return (
     <div className="relative has-[.pending]:grayscale has-[.pending]:pointer-events-none grid grid-rows-subgrid row-span-4">
       <NavLink
-        to={href("/fundraisers/:fund_id", { fund_id: id })}
+        to={href("/campaigns/:fund_id", { fund_id: id })}
         className="grid grid-rows-subgrid row-span-4 h-full overflow-clip rounded border hover:border-primary"
       >
         <div className="aspect-4/1 w-full relative">
@@ -56,7 +56,7 @@ export function Card({
         <ShareButton
           classes="justify-self-start"
           orgName={name}
-          url={`${base_url}${href("/fundraisers/:fund_id", { fund_id: id })}`}
+          url={`${base_url}${href("/campaigns/:fund_id", { fund_id: id })}`}
         />
         <NavLink
           to={href("/donate-fund/:fund_id", { fund_id: id })}

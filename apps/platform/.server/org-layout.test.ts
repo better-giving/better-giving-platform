@@ -14,7 +14,7 @@ const shape: IOrgShape = {
   has_banner: true,
   has_logo: false,
   campaigns: 1,
-  fundraisers: 0,
+  supporters: 0,
   programs: 2,
   videos: 0,
 };

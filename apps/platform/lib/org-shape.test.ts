@@ -8,7 +8,7 @@ const shape = (over: Partial<IOrgShape> = {}): IOrgShape => ({
   has_banner: false,
   has_logo: false,
   campaigns: 0,
-  fundraisers: 0,
+  supporters: 0,
   programs: 0,
   videos: 0,
   ...over,
@@ -62,14 +62,14 @@ describe("threshold_layout", () => {
   });
 
   test("items count across kinds: 3 fit one row, 4 need navigation", () => {
-    const three = { campaigns: 1, fundraisers: 1, programs: 1 };
+    const three = { campaigns: 1, supporters: 1, programs: 1 };
     expect(threshold_layout(shape(three))).toBe("poster");
     expect(threshold_layout(shape({ ...three, videos: 1 }))).toBe("hub");
     expect(threshold_layout(shape({ ...three, story_chars: 900 }))).toBe(
       "letter"
     );
     expect(
-      threshold_layout(shape({ ...three, fundraisers: 2, story_chars: 900 }))
+      threshold_layout(shape({ ...three, supporters: 2, story_chars: 900 }))
     ).toBe("feature");
   });
 });

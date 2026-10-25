@@ -270,14 +270,14 @@ describe("donation tab — validation", () => {
   });
 });
 
-// --- fundraiser tab ---
+// --- campaign tab ---
 
-describe("fundraiser tab — defaults", () => {
+describe("campaign tab — defaults", () => {
   it("renders unchecked when fund_opt_in not set", async () => {
     const npo = await seed_npo();
     const screen = await render_settings(npo.id);
 
-    // switch to fundraiser tab
+    // switch to campaign tab
     await expect
       .element(
         screen.getByRole("tab", { name: "Supporter campaigns", exact: true })
@@ -301,7 +301,7 @@ describe("fundraiser tab — defaults", () => {
   });
 });
 
-describe("fundraiser tab — pre-filled", () => {
+describe("campaign tab — pre-filled", () => {
   it("renders checked when fund_opt_in is true", async () => {
     const npo = await seed_npo({ fund_opt_in: true });
     const screen = await render_settings(npo.id);
@@ -321,7 +321,7 @@ describe("fundraiser tab — pre-filled", () => {
   });
 });
 
-describe("fundraiser tab — toggle on", () => {
+describe("campaign tab — toggle on", () => {
   it("enables fund_opt_in and revalidates", async () => {
     const npo = await seed_npo();
     const screen = await render_settings(npo.id);
@@ -730,7 +730,7 @@ async function render_tab_history(npo_id: number, entry: string) {
 }
 
 describe("settings tabs", () => {
-  it("opens Fundraisers for the previous campaign param", async () => {
+  it("opens Campaigns for the previous campaign param", async () => {
     const npo = await seed_npo();
     const screen = await render_tab_history(
       npo.id,
@@ -787,7 +787,7 @@ describe("settings tabs", () => {
       .click();
     await expect
       .element(screen.getByTestId("url-search"))
-      .toHaveTextContent("?tab=fundraisers");
+      .toHaveTextContent("?tab=campaigns");
     await expect
       .element(screen.getByLabelText(/allow campaigns/i))
       .toBeVisible();

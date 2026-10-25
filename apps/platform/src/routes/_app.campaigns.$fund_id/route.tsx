@@ -4,8 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { href, Link, NavLink } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import flying_character from "#/assets/images/flying-character.webp";
-import { DonorMsgs } from "#/components/donor-msgs";
 import { FundCreator, FundStatus, status_fn } from "#/components/campaign";
+import { DonorMsgs } from "#/components/donor-msgs";
 import { RichText, richtext_styles, to_text } from "#/components/rich-text";
 import { app_name, base_url } from "#/constants/env";
 import { metas } from "#/helpers/seo";
@@ -56,7 +56,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
           <div className="absolute -top-8 flex items-center justify-between w-full">
             <Link
               className="flex items-center gap-x-1 active:-translate-x-1"
-              to="../fundraisers"
+              to="../campaigns"
             >
               <ArrowLeft className="icon-md" />
               <span>Campaigns</span>

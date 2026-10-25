@@ -61,7 +61,7 @@ beforeEach(async () => {
 
 function load(fund_id: string, search = "") {
   return loader({
-    request: new Request(`https://x/fundraisers/${fund_id}${search}`),
+    request: new Request(`https://x/campaigns/${fund_id}${search}`),
     params: { fund_id },
   } as any);
 }

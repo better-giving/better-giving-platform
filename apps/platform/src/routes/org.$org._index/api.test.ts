@@ -763,7 +763,7 @@ describe("profile shape", () => {
       has_banner: true,
       has_logo: false,
       campaigns: 2,
-      fundraisers: 1,
+      supporters: 1,
       programs: 1,
       videos: 2,
     });
@@ -791,7 +791,7 @@ describe("profile shape", () => {
     await Promise.all([d.funds, d.media]);
   });
 
-  it("keeps and counts the campaigns when the fundraisers' read fails, flagging the give list", async () => {
+  it("keeps and counts the campaigns when the supporters' read fails, flagging the give list", async () => {
     const npo = await seed_npo();
     await seed_campaign(npo.id, "shape-funds-down-cmp");
     vi.spyOn(funds_queries, "get_funds_npo_memberof").mockRejectedValueOnce(
@@ -803,7 +803,7 @@ describe("profile shape", () => {
 
     expect(d.lists.give.map((g) => g.id)).toEqual(["shape-funds-down-cmp"]);
     expect(d.lists.failed.give).toBe(true);
-    expect(d.shape).toMatchObject({ campaigns: 1, fundraisers: 0 });
+    expect(d.shape).toMatchObject({ campaigns: 1, supporters: 0 });
   });
 
   it("sends the layout's lists resolved, a campaign without the org's banner, and a failed read flagged", async () => {

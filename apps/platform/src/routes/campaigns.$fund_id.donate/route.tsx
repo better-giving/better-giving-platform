@@ -36,7 +36,7 @@ function Page({
       <div className="bg-panel h-14.75 w-full flex items-center justify-between px-10 mb-4">
         <DappLogo classes="h-12" />
         <Link
-          to={href("/fundraisers/:fund_id", { fund_id: fund.id })}
+          to={href("/campaigns/:fund_id", { fund_id: fund.id })}
           className="font-semibold link"
         >
           Cancel

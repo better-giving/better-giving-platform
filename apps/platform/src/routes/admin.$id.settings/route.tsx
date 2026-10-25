@@ -4,9 +4,9 @@ import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
 import type { DonateMethodId } from "@/schemas";
 import type { Route } from "./+types/route";
+import { CampaignTab } from "./campaign";
 import { DonationTab } from "./donation";
 import { DonationFormTab } from "./donation-form";
-import { FundraiserTab } from "./fundraiser";
 
 export { action, loader } from "./api";
 export const clientLoader = createClientLoaderCache<Route.ClientLoaderArgs>();
@@ -19,15 +19,16 @@ export default CacheRoute(Page);
 
 const TABS = [
   { id: "donation", name: "Donation" },
-  { id: "fundraisers", name: "Supporter campaigns" },
+  { id: "campaigns", name: "Supporter campaigns" },
   { id: "donation-form", name: "Donation Form" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
 
-/** a missing or unknown `tab` is Donation; `campaign` is the previous Fundraisers value */
+/** a missing or unknown `tab` is Donation; `fundraisers`/`campaign` are previous values of this tab */
 function shown_tab(raw: string | null): TabId {
-  if (raw === "fundraisers" || raw === "campaign") return "fundraisers";
+  if (raw === "campaigns" || raw === "fundraisers" || raw === "campaign")
+    return "campaigns";
   if (raw === "donation-form") return "donation-form";
   return "donation";
 }
@@ -55,8 +56,8 @@ function Page({ loaderData: endow }: Route.ComponentProps) {
               hide_bg_tip={endow.hide_bg_tip ?? false}
             />
           </TabPanel>
-          <TabPanel value="fundraisers">
-            <FundraiserTab fund_opt_in={endow.fund_opt_in ?? false} />
+          <TabPanel value="campaigns">
+            <CampaignTab fund_opt_in={endow.fund_opt_in ?? false} />
           </TabPanel>
 
           <TabPanel value="donation-form">

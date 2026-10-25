@@ -7,3 +7,9 @@ export type {
   IFundsSearchObj,
   IFundUpdate,
 } from "./schema";
+export {
+  CAMPAIGN_STATUSES,
+  CAMPAIGN_TYPES,
+  type TCampaignStatus,
+  type TCampaignType,
+} from "./types";

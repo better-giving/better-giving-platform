@@ -19,7 +19,7 @@ export function Stocks(props: StocksDonationDetails) {
   const { don, don_set } = use_donation();
   const id = don.recipient.id;
   const path = is_fund(id)
-    ? href("/fundraisers/:fund_id", { fund_id: id })
+    ? href("/campaigns/:fund_id", { fund_id: id })
     : href("/org/:org", { org: id });
 
   const tipv = tip_val(props.tip_format, props.tip, +props.ticker.amount);

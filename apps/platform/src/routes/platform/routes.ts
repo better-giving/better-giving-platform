@@ -9,5 +9,5 @@ export const routes = {
   losses: "losses",
   owed: "owed",
   donation_settlements: "donation-settlements",
-  fundraiser_moderation: "fundraiser-moderation",
+  campaign_moderation: "campaign-moderation",
 } as const;
