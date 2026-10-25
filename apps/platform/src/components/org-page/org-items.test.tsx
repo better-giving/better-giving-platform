@@ -106,6 +106,12 @@ describe("GiveCard", () => {
           })}
         />
         <GiveCard orientation="vertical" show_kind now={NOW} item={give(4)} />
+        <GiveCard
+          orientation="vertical"
+          show_kind
+          now={NOW}
+          item={give(5, { raised: 9500, goal: 7900 })}
+        />
       </div>
     );
     const card = (n: number) =>
@@ -125,6 +131,15 @@ describe("GiveCard", () => {
       )
       .toBeVisible();
     await expect.element(card(1)).toMatchTextContent("$2,400 of $7,900");
+    const bar = card(1).getByRole("progressbar").element();
+    expect(bar.getAttribute("aria-valuenow")).toBe("2400");
+    expect(bar.getAttribute("aria-valuemax")).toBe("7900");
+    // the line states the sum, never a percent
+    await expect.element(card(1)).not.toMatchTextContent("%");
+    // past its goal the bar reads full, not over
+    const over = card(5).getByRole("progressbar").element();
+    expect(over.getAttribute("aria-valuenow")).toBe("7900");
+    await expect.element(card(5)).toMatchTextContent("$9,500 of $7,900");
     expect(card(3).getByRole("progressbar").query()).toBeNull();
     await expect.element(card(3)).toMatchTextContent("$540 raised");
     await expect.element(card(3)).toMatchTextContent("Supporter campaign");

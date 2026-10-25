@@ -309,7 +309,7 @@ describe("Feature", () => {
     const screen = await mount();
     const panel = give_panel(screen.container);
     await expect.poll(() => panel.checkVisibility()).toBe(true);
-    expect(getComputedStyle(panel).position).not.toBe("sticky");
+    expect(getComputedStyle(panel).position).toBe("relative");
     const band = screen.container.querySelector("main .bg-band") as HTMLElement;
     const lead = band.querySelector("p") as HTMLElement;
     const strip = screen

@@ -168,17 +168,30 @@ export const npo = (o: Partial<INpoPublic> = {}): INpoPublic => ({
 
 /** the org-wide figures a page shows, each as the text or role that gave it
  * away: the raised total, a donor count, a goal bar or goal line, the
- * first-gift ask. `toEqual([])` prints whichever is back */
+ * first-gift ask. `toEqual([])` prints whichever is back. `org_figures.test`
+ * renders each shape this reads, so a pattern that stops matching goes red
+ * there rather than letting a page that shows the figure pass */
 export function org_figures(root: Element, org: INpoPublic): string[] {
   const text = root.textContent ?? "";
-  const found = Array.from(root.querySelectorAll("[role=progressbar]")).map(
-    (bar) => `progressbar ${bar.getAttribute("aria-label") ?? ""}`.trim()
-  );
-  const raised = to_usd(org.contributions_total);
-  if (text.includes(raised)) found.push(raised);
+  const found = Array.from(
+    root.querySelectorAll("[role=progressbar], [role=meter], progress, meter")
+  ).map((bar) => `progressbar ${bar.getAttribute("aria-label") ?? ""}`.trim());
+  // a bar drawn as a sized div carries no role, only its percent width
+  if (root.querySelector("[style*='width'][style*='%']")) found.push("bar");
+  const total = org.contributions_total;
+  // a $0 total prints as "0" in too much unrelated text to search for
+  const spellings = [to_usd(total)];
+  if (total >= 1000) {
+    spellings.push(
+      total.toLocaleString("en-US"),
+      `${(total / 1000).toFixed(1)}K`
+    );
+  }
+  const spelled = spellings.find((spelling) => text.includes(spelling));
+  if (spelled) found.push(spelled);
   for (const re of [
-    /\braised\b/i,
-    /[\d,]+ donors?\b/i,
+    /\b(raised|given|funded|donated)\b/i,
+    /[\d,]+\s*(donors?|supporters?|givers?|backers?)\b/i,
     /\bgoal\b/i,
     /be the first to give/i,
   ]) {

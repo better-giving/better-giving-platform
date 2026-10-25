@@ -622,11 +622,13 @@ describe("donation form tab — add increment", () => {
 });
 
 describe("donation form tab — save without a goal", () => {
-  it("saves the form and leaves the stored goal columns as they were", async () => {
+  it.each([
+    ["fixed goal", { target_number: 5000, target_smart: null }],
+    ["smart goal", { target_number: null, target_smart: true }],
+  ])("saves the form and leaves the stored %s as it was", async (_, goal) => {
     const npo = await seed_npo({
       donate_frequencies: ["one-time", "monthly"],
-      target_number: 5000,
-      target_smart: null,
+      ...goal,
     });
     const screen = await render_settings(npo.id);
 
@@ -654,8 +656,8 @@ describe("donation form tab — save without a goal", () => {
       .from(npos)
       .where(eq(npos.id, npo.id));
     expect(row.donate_frequencies).toContain("weekly");
-    expect(row.target_number).toBe(5000);
-    expect(row.target_smart).toBeNull();
+    expect(row.target_number).toBe(goal.target_number);
+    expect(row.target_smart).toBe(goal.target_smart);
   });
 });
 
