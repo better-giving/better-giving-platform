@@ -9,6 +9,7 @@ import {
 } from "vitest";
 import { seed_fund, seed_npo, seed_user } from "#/__tests__/fixtures/funds";
 import { user } from "$/pg/schema/auth";
+import { campaigns } from "$/pg/schema/campaign";
 import { fund_members, funds } from "$/pg/schema/fund";
 import { npos } from "$/pg/schema/npo";
 import { user_fund_memberships, user_npo_memberships } from "$/pg/schema/user";
@@ -105,6 +106,8 @@ afterAll(async () => {
 beforeEach(async () => {
   await db().delete(user_fund_memberships);
   await db().delete(user_npo_memberships);
+  // campaigns reference funds (legacy_fund_id) and npos, so drop them first
+  await db().delete(campaigns);
   await db().delete(fund_members);
   await db().delete(funds);
   await db().delete(npos);
@@ -190,5 +193,66 @@ describe("fundraiser edit authorization", () => {
     await call_action({ close: true });
 
     expect((await fund_get_or_slug(FUND_ID))?.active).toBe(false);
+  });
+});
+
+describe("folded fund edit redirect", () => {
+  async function fold(
+    member_npos: number[],
+    owner_id: number,
+    creator_id: string
+  ) {
+    await seed_fund(db(), {
+      id: FUND_ID,
+      name: "Original",
+      npo_owner: owner_id,
+      creator_id,
+      members: member_npos,
+    });
+    await db().insert(campaigns).values({
+      id: "camp-edit",
+      owner_npo_id: owner_id,
+      creator_id,
+      name: "Winter",
+      slug: "winter",
+      status: "live",
+      legacy_fund_id: FUND_ID,
+    });
+  }
+
+  it("301s a single-beneficiary folded fund's editor to the admin campaign editor", async () => {
+    const owner = await seed_npo(db(), {
+      registration_number: "EIN-SINGLE",
+      slug: "acme-org",
+    });
+    const creator = await seed_user(db(), "edit-single@test.com");
+    await fold([owner.id], owner.id, creator.id);
+    as(creator);
+
+    const res = (await call_loader().catch((e: unknown) => e)) as Response;
+    expect(res).toBeInstanceOf(Response);
+    expect(res.status).toBe(301);
+    expect(res.headers.get("location")).toBe(
+      `/admin/${owner.id}/campaigns/camp-edit`
+    );
+  });
+
+  it("does not redirect a multi-beneficiary folded fund's editor (keeps the fund editor)", async () => {
+    const owner = await seed_npo(db(), {
+      registration_number: "EIN-MULTI",
+      slug: "acme-org",
+    });
+    const other = await seed_npo(db(), {
+      registration_number: "EIN-MULTI-2",
+      slug: "other-org",
+    });
+    const creator = await seed_user(db(), "edit-multi@test.com");
+    await fold([owner.id, other.id], owner.id, creator.id);
+    // a platform admin passes the fund editor gate, so a non-redirect returns data
+    as(creator, "admin");
+
+    const data = await call_loader();
+    expect(data).not.toBeInstanceOf(Response);
+    expect((data as { fund: { id: string } }).fund.id).toBe(FUND_ID);
   });
 });

@@ -21,6 +21,7 @@ import {
 } from "../schema/campaign";
 import { dists } from "../schema/dist";
 import { donation_donors, donations } from "../schema/donation";
+import { fund_members } from "../schema/fund";
 import { npos } from "../schema/npo";
 import { v_campaign_total_usd } from "../schema/views";
 import { from_target, to_target } from "./fmt";
@@ -111,9 +112,17 @@ function present(
 
 export type ICampaignRow = ReturnType<typeof present>;
 
+/** admin list. a campaign folded from a multi-beneficiary fund is left out:
+ * that fund keeps its own page and editor (see `folded_campaign_public`), so
+ * it lists once, as its fund row */
 export async function campaign_list(npo_id: number): Promise<ICampaignRow[]> {
   const rows = await campaign_query()
-    .where(eq(campaigns.owner_npo_id, npo_id))
+    .where(
+      and(
+        eq(campaigns.owner_npo_id, npo_id),
+        sql`(${campaigns.legacy_fund_id} IS NULL OR (SELECT count(*) FROM ${fund_members} WHERE ${fund_members.fund_id} = ${campaigns.legacy_fund_id}) <= 1)`
+      )
+    )
     .orderBy(desc(campaigns.created_at));
   return rows.map(present);
 }
@@ -317,6 +326,41 @@ export async function campaign_by_id(
 ): Promise<ICampaignRow | undefined> {
   const [row] = await campaign_query().where(eq(campaigns.id, id));
   return row && present(row);
+}
+
+/** the campaign an org fund was folded into, if any, with its owner's slug for
+ * the public url and the owner's publication state; the 301s off `/fundraisers/*`
+ * read this */
+export interface IFoldedCampaign {
+  id: string;
+  slug: string;
+  status: TCampaignStatus;
+  owner_npo_id: number | null;
+  owner_slug: string | null;
+  /** owner npo publication state; the public campaign page 404s when the owner
+   * is unpublished or inactive, so a 301 must check these first */
+  owner_published: boolean | null;
+  owner_active: boolean | null;
+}
+
+export async function campaign_by_legacy_fund(
+  fund_id: string
+): Promise<IFoldedCampaign | undefined> {
+  const [row] = await db
+    .select({
+      id: campaigns.id,
+      slug: campaigns.slug,
+      status: campaigns.status,
+      owner_npo_id: campaigns.owner_npo_id,
+      owner_slug: npos.slug,
+      owner_published: npos.published,
+      owner_active: npos.active,
+    })
+    .from(campaigns)
+    .leftJoin(npos, eq(npos.id, campaigns.owner_npo_id))
+    .where(eq(campaigns.legacy_fund_id, fund_id))
+    .limit(1);
+  return row;
 }
 
 /** stored `live` reads as ended once `ends_at` has passed. the row stays live. */
@@ -528,7 +572,8 @@ export async function campaign_gift_count(
   return row?.n ?? 0;
 }
 
-/** false when another nonprofit owns it, it has gifts, or it is missing */
+/** false when another nonprofit owns it, it has gifts, it was folded from a
+ * fund, or it is missing */
 export async function campaign_delete(
   npo_id: number,
   id: string
@@ -536,6 +581,10 @@ export async function campaign_delete(
   const current = await campaign_get(npo_id, id);
   if (!current) return false;
   if ((await campaign_gift_count(id)) > 0) return false;
+  // a folded campaign carries historic legacy gifts (settled dists keyed on its
+  // legacy_fund_id) that campaign_gift_count never sees; deleting it would
+  // orphan that revenue, so it is undeletable like one with its own gifts
+  if (current.legacy_fund_id) return false;
   await db
     .delete(campaigns)
     .where(and(eq(campaigns.id, id), eq(campaigns.owner_npo_id, npo_id)));

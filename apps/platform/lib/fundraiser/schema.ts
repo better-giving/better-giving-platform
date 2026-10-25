@@ -91,6 +91,9 @@ const funds_npo_memberof_search = object({
   published: optional(boolean()),
   /** "ours" = npo is owner, "others" = npo is member but not owner */
   creator: optional(picklist(["ours", "others"])),
+  /** when true, drop funds already folded into a campaign (a campaign whose
+   * `legacy_fund_id` is the fund's id); the folded ones live on as campaigns */
+  exclude_folded: optional(boolean()),
 });
 
 export interface IFundNew extends InferOutput<typeof fund_new> {}

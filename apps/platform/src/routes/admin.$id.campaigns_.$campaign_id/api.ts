@@ -81,9 +81,10 @@ export const action = async ({
   if ("op" in read && read.op === "delete") {
     const ok = await campaign_delete(id, campaign_id);
     if (!ok) {
-      return data(refusal("A campaign with gifts cannot be deleted."), {
-        status: 400,
-      });
+      const note = current.legacy_fund_id
+        ? "A campaign with past gifts cannot be deleted."
+        : "A campaign with gifts cannot be deleted.";
+      return data(refusal(note), { status: 400 });
     }
     return redirectWithSuccess(
       href("/admin/:id/campaigns", { id: String(id) }),

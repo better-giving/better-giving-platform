@@ -22,9 +22,12 @@ export const loader = async ({ context, request }: Route.LoaderArgs) => {
     };
   }
 
+  // org funds fold into campaigns (BG-1943). a folded fund lives on as its
+  // campaign, so it is excluded here; an org fund not yet folded (the backfill
+  // is gated) still lists alongside the real campaigns so it never vanishes
   const [campaigns, org_funds] = await Promise.all([
     campaign_list(id),
-    get_funds_npo_memberof(id, { creator: "ours" }),
+    get_funds_npo_memberof(id, { creator: "ours", exclude_folded: true }),
   ]);
   return {
     view: "campaigns" as const,

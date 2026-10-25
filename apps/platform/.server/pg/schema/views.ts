@@ -27,12 +27,14 @@ export const v_contributions = pgView("v_contributions", {
 );
 
 // per-campaign settled donation total, net (after fees). the gift stays an
-// npo dist; the campaign is only the donation that produced it
+// npo dist; the campaign is only the donation that produced it. a campaign
+// folded from an org fund also counts that fund's historic settled gifts,
+// which live on `dists.fund_id` rather than `donations.campaign_id`
 export const v_campaign_total_usd = pgView("v_campaign_total_usd", {
   campaign_id: text("campaign_id"),
   total: numeric_as_number("total", { precision: 38, scale: 18 }),
 }).as(
-  sql`SELECT d.campaign_id, COALESCE(SUM(dists.net), 0) as total FROM donations d INNER JOIN dists ON dists.donation_id = d.id WHERE d.campaign_id IS NOT NULL AND dists.status = 'settled' GROUP BY d.campaign_id`
+  sql`SELECT campaign_id, COALESCE(SUM(net), 0) as total FROM (SELECT d.campaign_id as campaign_id, dists.net as net FROM donations d INNER JOIN dists ON dists.donation_id = d.id WHERE d.campaign_id IS NOT NULL AND dists.status = 'settled' UNION ALL SELECT c.id as campaign_id, dists.net as net FROM campaigns c INNER JOIN dists ON dists.fund_id = c.legacy_fund_id WHERE c.legacy_fund_id IS NOT NULL AND dists.status = 'settled') s GROUP BY campaign_id`
 );
 
 // per-fund settled donation total, net (after fees)

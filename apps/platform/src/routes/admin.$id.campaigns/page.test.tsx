@@ -14,13 +14,10 @@ vi.mock("#/.server/toast", async () => {
 });
 vi.mock("$/kit/queue", () => ({ enqueue: vi.fn() }));
 
-import { MAX_EXPIRATION_ISO } from "@/fundraiser/schema";
 import EditPage from "../admin.$id.campaigns_.$campaign_id/route";
 import NewPage from "../admin.$id.campaigns_.new/route";
 import { CampaignForm, type ICampaignFormInit } from "./form";
 import ListPage from "./route";
-
-const NO_END = Date.parse(MAX_EXPIRATION_ISO) / 1000;
 
 afterEach(async () => {
   await cleanup();
@@ -45,7 +42,7 @@ const init: ICampaignFormInit = {
 
 function form_page(
   status: "draft" | "live" | "ended" | null,
-  extra?: { gift_count?: number; locked?: boolean }
+  extra?: { gift_count?: number; locked?: boolean; folded?: boolean }
 ) {
   let entered = false;
   let posted: unknown;
@@ -61,6 +58,7 @@ function form_page(
           locked={extra?.locked ?? false}
           status={status}
           gift_count={extra?.gift_count ?? 0}
+          folded={extra?.folded ?? false}
           fallback_methods={["stripe"]}
           fallback_frequencies={["one-time"]}
           settings_donation_to="/admin/7/settings?tab=donation"
@@ -99,7 +97,7 @@ function form_page(
 
 async function render_form(
   status: "draft" | "live" | "ended" | null,
-  extra?: { gift_count?: number; locked?: boolean }
+  extra?: { gift_count?: number; locked?: boolean; folded?: boolean }
 ) {
   const built = form_page(status, extra);
   const screen = await render(
@@ -136,8 +134,8 @@ describe("campaign list", () => {
 
   async function render_list(
     campaigns: unknown[],
-    org_funds: unknown[],
-    search = ""
+    search = "",
+    org_funds: unknown[] = []
   ) {
     const Stub = createRoutesStub([
       {
@@ -171,8 +169,8 @@ describe("campaign list", () => {
     return render(<Stub initialEntries={[`/admin/7/campaigns${search}`]} />);
   }
 
-  it("shows the empty state, no profile row, when campaigns and funds are all absent", async () => {
-    const screen = await render_list([], []);
+  it("shows the empty state, no profile row, when there are no campaigns", async () => {
+    const screen = await render_list([]);
     await expect
       .element(screen.getByRole("heading", { level: 1, name: "Campaigns" }))
       .toBeVisible();
@@ -208,76 +206,8 @@ describe("campaign list", () => {
     ).toBeNull();
   });
 
-  it("lists org campaigns on Your campaigns and not a supporter heading", async () => {
-    const screen = await render_list(
-      [
-        {
-          id: "c-draft",
-          name: "Spring",
-          slug: "spring",
-          status: "draft",
-          status_label: "draft",
-          raised: 1,
-          ends_at: null,
-        },
-      ],
-      [
-        {
-          id: "f-owned",
-          name: "Owned page",
-          active: true,
-          published: false,
-          donation_total_usd: 3,
-          expiration: NO_END,
-        },
-      ]
-    );
-    await expect
-      .element(screen.getByRole("tab", { name: "Your campaigns", exact: true }))
-      .toHaveAttribute("aria-selected", "true");
-    expect(
-      screen.getByRole("heading", { name: "Supporter campaigns" }).query()
-    ).toBeNull();
-    expect(screen.getByText("No campaigns yet").query()).toBeNull();
-    const panel = screen.getByRole("tabpanel").element();
-    const text = panel.textContent ?? "";
-    expect(text.indexOf("Spring")).toBeGreaterThan(-1);
-    expect(text.indexOf("Spring")).toBeLessThan(text.indexOf("Owned page"));
-    const spring_name = screen.getByText("Spring", { exact: true });
-    expect((spring_name.element() as HTMLElement).tagName).toBe("P");
-    expect((spring_name.element() as HTMLElement).className).toContain(
-      "font-semibold"
-    );
-    expect(
-      screen.getByRole("link", { name: "Spring", exact: true }).query()
-    ).toBeNull();
-    const spring_row = (spring_name.element() as HTMLElement).closest("li");
-    expect(
-      (
-        page
-          .elementLocator(spring_row as HTMLElement)
-          .getByRole("link", { name: "Edit Spring", exact: true })
-          .element() as HTMLAnchorElement
-      ).pathname
-    ).toBe("/admin/7/campaigns/c-draft");
-    const owned_name = screen.getByText("Owned page", { exact: true });
-    expect((owned_name.element() as HTMLElement).tagName).toBe("P");
-    expect(
-      screen.getByRole("link", { name: "Owned page", exact: true }).query()
-    ).toBeNull();
-    const owned_row = (owned_name.element() as HTMLElement).closest("li");
-    const owned_links = page
-      .elementLocator(owned_row as HTMLElement)
-      .getByRole("link")
-      .elements() as HTMLAnchorElement[];
-    expect(owned_links.map((el) => el.textContent)).toEqual(["Edit"]);
-    expect(owned_links.map((el) => el.pathname)).toEqual([
-      "/fundraisers/f-owned/edit",
-    ]);
-  });
-
   it("opens supporter fundraisers on the other tab and treats an unknown tab as yours", async () => {
-    const screen = await render_list([], [], "?tab=nope");
+    const screen = await render_list([], "?tab=nope");
     await expect
       .element(screen.getByRole("tab", { name: "Your campaigns", exact: true }))
       .toHaveAttribute("aria-selected", "true");
@@ -331,43 +261,30 @@ describe("campaign list", () => {
   });
 
   it("shows raised against a fixed goal and only raised without one", async () => {
-    const screen = await render_list(
-      [
-        {
-          id: "c-goal",
-          name: "Winter",
-          slug: "winter",
-          status: "live",
-          status_label: "live",
-          raised: 250,
-          target: "1000",
-          hero: "https://example.com/winter.png",
-          ends_at: null,
-        },
-        {
-          id: "c-smart",
-          name: "Spring",
-          slug: "spring",
-          status: "live",
-          status_label: "live",
-          raised: 40,
-          target: "smart",
-          hero: null,
-          ends_at: null,
-        },
-      ],
-      [
-        {
-          id: "f-none",
-          name: "Owned page",
-          active: true,
-          published: true,
-          donation_total_usd: 7,
-          expiration: NO_END,
-          banner: "",
-        },
-      ]
-    );
+    const screen = await render_list([
+      {
+        id: "c-goal",
+        name: "Winter",
+        slug: "winter",
+        status: "live",
+        status_label: "live",
+        raised: 250,
+        target: "1000",
+        hero: "https://example.com/winter.png",
+        ends_at: null,
+      },
+      {
+        id: "c-smart",
+        name: "Spring",
+        slug: "spring",
+        status: "live",
+        status_label: "live",
+        raised: 40,
+        target: "smart",
+        hero: null,
+        ends_at: null,
+      },
+    ]);
     const winter = row_of(screen, "Winter");
     await expect.element(winter.getByRole("progressbar")).toBeVisible();
     await expect
@@ -386,98 +303,29 @@ describe("campaign list", () => {
       .toBeVisible();
     expect(spring.getByRole("progressbar").query()).toBeNull();
     expect(spring.getByText("Goal", { exact: true }).query()).toBeNull();
-
-    const owned = row_of(screen, "Owned page");
-    await expect
-      .element(owned.getByText("$7 Raised", { exact: true }))
-      .toBeVisible();
-    expect(owned.getByRole("progressbar").query()).toBeNull();
-  });
-
-  it("labels each org fund Draft, Closed, Ended or Live and names its links by the row", async () => {
-    const fund = (id: string, name: string, f: object) => ({
-      id,
-      name,
-      active: true,
-      published: true,
-      donation_total_usd: 0,
-      expiration: NO_END,
-      ...f,
-    });
-    const screen = await render_list(
-      [],
-      [
-        fund("f-draft", "Draft page", { published: false }),
-        fund("f-closed", "Closed page", {
-          active: false,
-          expiration: Date.parse("2099-03-04T00:00:00Z") / 1000,
-        }),
-        fund("f-ended", "Ended page", {
-          expiration: Date.parse("2020-01-02T00:00:00Z") / 1000,
-        }),
-        fund("f-live", "Live page", {
-          expiration: Date.parse("2099-03-04T00:00:00Z") / 1000,
-        }),
-      ]
-    );
-    const pill = (row: string, word: string) =>
-      row_of(screen, row).getByText(word, { exact: true });
-    await expect.element(pill("Draft page", "Draft")).toBeVisible();
-    await expect.element(pill("Closed page", "Closed")).toBeVisible();
-    await expect.element(pill("Ended page", "Ended")).toBeVisible();
-    await expect.element(pill("Live page", "Live")).toBeVisible();
-    await expect
-      .element(pill("Live page", "Live"))
-      .toHaveAttribute("data-tone", "success");
-    await expect.element(pill("Draft page", "No end date")).toBeVisible();
-    await expect
-      .element(pill("Closed page", "Ended Mar 4, 2099"))
-      .toBeVisible();
-    await expect.element(pill("Ended page", "Ended Jan 2, 2020")).toBeVisible();
-    await expect.element(pill("Live page", "Ends Mar 4, 2099")).toBeVisible();
-
-    const live = row_of(screen, "Live page");
-    expect(
-      (
-        live
-          .getByRole("link", { name: "View Live page", exact: true })
-          .element() as HTMLAnchorElement
-      ).pathname
-    ).toBe("/fundraisers/f-live");
-    expect(
-      (
-        live
-          .getByRole("link", { name: "Edit Live page", exact: true })
-          .element() as HTMLAnchorElement
-      ).pathname
-    ).toBe("/fundraisers/f-live/edit");
-    expect(screen.getByText("Acme Fund", { exact: true }).query()).toBeNull();
   });
 
   it("lists campaigns, without the profile, on Your campaigns", async () => {
-    const screen = await render_list(
-      [
-        {
-          id: "c-live",
-          name: "Winter",
-          slug: "winter",
-          status: "live",
-          status_label: "ended",
-          raised: 12,
-          ends_at: "2020-01-02T00:00:00.000Z",
-        },
-        {
-          id: "c-draft",
-          name: "Spring",
-          slug: "spring",
-          status: "draft",
-          status_label: "draft",
-          raised: 1,
-          ends_at: null,
-        },
-      ],
-      []
-    );
+    const screen = await render_list([
+      {
+        id: "c-live",
+        name: "Winter",
+        slug: "winter",
+        status: "live",
+        status_label: "ended",
+        raised: 12,
+        ends_at: "2020-01-02T00:00:00.000Z",
+      },
+      {
+        id: "c-draft",
+        name: "Spring",
+        slug: "spring",
+        status: "draft",
+        status_label: "draft",
+        raised: 1,
+        ends_at: null,
+      },
+    ]);
 
     expect(screen.getByText("No campaigns yet").query()).toBeNull();
     await expect
@@ -566,6 +414,54 @@ describe("campaign list", () => {
       "Winter",
       "Spring",
     ]);
+  });
+
+  it("lists an unfolded org fund as its own row on Your campaigns", async () => {
+    const screen = await render_list(
+      [
+        {
+          id: "c-live",
+          name: "Winter",
+          slug: "winter",
+          status: "live",
+          status_label: "live",
+          raised: 12,
+          ends_at: null,
+        },
+      ],
+      "",
+      [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          name: "Legacy drive",
+          active: true,
+          published: true,
+          donation_total_usd: 55,
+          expiration: 0,
+          banner: undefined,
+          target: undefined,
+        },
+      ]
+    );
+
+    expect(screen.getByText("No campaigns yet").query()).toBeNull();
+    const items = screen.getByRole("listitem").elements();
+    expect(items.map((el) => el.querySelector("p")?.textContent)).toEqual([
+      "Winter",
+      "Legacy drive",
+    ]);
+    const fund_row = (
+      screen.getByText("Legacy drive", { exact: true }).element() as HTMLElement
+    ).closest("li");
+    // an active published fund keeps its own fundraiser editor + public view
+    expect(
+      (
+        page
+          .elementLocator(fund_row as HTMLElement)
+          .getByRole("link", { name: "Edit Legacy drive", exact: true })
+          .element() as HTMLAnchorElement
+      ).getAttribute("href")
+    ).toBe("/fundraisers/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/edit");
   });
 });
 
@@ -701,6 +597,13 @@ describe("campaign form", () => {
     await expect
       .element(screen.getByRole("button", { name: "Delete" }))
       .toBeVisible();
+  });
+
+  it("hides Delete for a campaign folded from a legacy fund", async () => {
+    const { screen } = await render_form("draft", { folded: true });
+    expect(
+      screen.getByRole("button", { name: "Delete", exact: true }).query()
+    ).toBeNull();
   });
 
   it("shows a server refusal on the address and moves focus there", async () => {

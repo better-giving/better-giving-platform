@@ -491,6 +491,13 @@
       "when": 1792713467150,
       "tag": "0069_donations_program_id_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1792927144229,
+      "tag": "0070_campaigns_legacy_fund_id",
+      "breakpoints": true
     }
   ]
 }

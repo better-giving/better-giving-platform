@@ -409,13 +409,62 @@ describe("campaign slug", () => {
 });
 
 describe("campaign list loader", () => {
-  it("puts an org-owned fund with campaigns and a member fund with supporters", async () => {
+  it("lists real campaigns and unfolded org funds on Your campaigns, supporter funds on the other tab", async () => {
     const org = await npo("EIN-LIST", "list-org");
+    await db().insert(campaigns).values({
+      id: "camp-real",
+      owner_npo_id: org.id,
+      creator_id: USER,
+      name: "Real drive",
+      slug: "real-drive",
+      status: "live",
+    });
+    await db()
+      .insert(campaign_members)
+      .values({ campaign_id: "camp-real", npo_id: org.id });
+    // an org fund not yet folded still lists on the campaigns tab as its own row
+    // (the backfill is gated), so it never vanishes
     await seed_fund(db(), {
       id: "fund-owned",
       name: "Owned drive",
       npo_owner: org.id,
       creator_id: USER,
+    });
+    // an org fund already folded into a campaign lives on as that campaign, so
+    // it is dropped from the fund list and not shown twice
+    await seed_fund(db(), {
+      id: "fund-folded",
+      name: "Folded drive",
+      npo_owner: org.id,
+      creator_id: USER,
+    });
+    await db().insert(campaigns).values({
+      id: "camp-folded",
+      owner_npo_id: org.id,
+      creator_id: USER,
+      name: "Folded drive",
+      slug: "folded-drive",
+      status: "live",
+      legacy_fund_id: "fund-folded",
+    });
+    // a folded fund with several beneficiaries keeps its fund flow and editor,
+    // so it lists once, as its fund row, and its campaign row is hidden
+    const partner = await npo("EIN-LIST-2", "list-partner");
+    await seed_fund(db(), {
+      id: "fund-multi",
+      name: "Shared drive",
+      npo_owner: org.id,
+      creator_id: USER,
+      members: [org.id, partner.id],
+    });
+    await db().insert(campaigns).values({
+      id: "camp-multi",
+      owner_npo_id: org.id,
+      creator_id: USER,
+      name: "Shared drive",
+      slug: "shared-drive",
+      status: "live",
+      legacy_fund_id: "fund-multi",
     });
     await seed_fund(db(), {
       id: "fund-supporter",
@@ -434,7 +483,18 @@ describe("campaign list loader", () => {
     } as any);
     if (data.view !== "campaigns")
       throw new Error("expected the campaigns tab");
-    expect(data.org_funds.map((f) => f.id)).toEqual(["fund-owned"]);
+    expect(data.campaigns.map((c) => c.id).sort()).toEqual([
+      "camp-folded",
+      "camp-real",
+    ]);
+    // the multi-beneficiary fold lists once, as its fund row: its campaign row
+    // is hidden because the fund keeps its own page and editor
+    // the unfolded and multi-beneficiary org funds list; the single-beneficiary
+    // fold is excluded (it is a campaign)
+    expect(data.org_funds.map((f) => f.id).sort()).toEqual([
+      "fund-multi",
+      "fund-owned",
+    ]);
 
     const tab = await list_loader({
       request: new Request("https://x/admin/list/campaigns?tab=fundraisers"),

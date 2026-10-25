@@ -14,6 +14,7 @@ import type { TCampaignStatus, TCampaignType } from "@/campaign";
 import type { DonateMethodId, IIncrement, TFrequency } from "@/schemas";
 import { user } from "./auth";
 import { numeric_as_number, timestamptz, timestamptz_now } from "./columns";
+import { funds } from "./fund";
 import { npos } from "./npo";
 import { programs } from "./program";
 
@@ -55,6 +56,11 @@ export const campaigns = pgTable(
       onDelete: "set null",
     }),
     program_name: text("program_name"),
+    // the org fund this campaign was folded from, if any; its historic gifts
+    // (settled dists carrying `fund_id`) still count toward the campaign total
+    legacy_fund_id: text("legacy_fund_id")
+      .unique()
+      .references(() => funds.id),
     created_at: timestamptz_now("created_at"),
     updated_at: timestamptz_now("updated_at"),
   },
