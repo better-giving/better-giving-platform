@@ -1107,29 +1107,51 @@ describe("donors api", () => {
     return org;
   }
 
-  it("serves an unpublished org's campaign feed, which its public campaign page reads, and 404s an inactive org's", async () => {
-    for (const [o, status] of [
-      [{ published: false }, 200],
-      [{ active: false }, 404],
-    ] as const) {
-      const npo = await seed_npo(o);
-      const cmp = `api-cmp-feed-${npo.id}`;
-      await seed_campaign(npo.id, cmp);
+  /** the donors feed as a resource route answers it: a Response, or the one it
+   * throws, for `id` with an optional `campaign_id` */
+  const donors_feed = (id: number | string, campaign_id?: string) =>
+    (
+      donors_api.loader({
+        params: { id: String(id) },
+        request: new Request(
+          `http://localhost/api/npo/${id}/donors${
+            campaign_id ? `?campaign_id=${campaign_id}` : ""
+          }`
+        ),
+      } as any) as Promise<Response>
+    ).catch((e: unknown) => e as Response);
 
-      const res = await (
-        donors_api.loader({
-          params: { id: String(npo.id) },
-          request: new Request(
-            `http://localhost/api/npo/${npo.id}/donors?campaign_id=${cmp}`
-          ),
-        } as any) as Promise<Response>
-      ).catch((e: unknown) => e);
+  it("404s an unpublished org's campaign feed for an anonymous visitor, and an inactive org's", async () => {
+    const npo = await seed_npo({ published: false });
+    const cmp = `api-cmp-feed-${npo.id}`;
+    await seed_campaign(npo.id, cmp);
+    expect((await donors_feed(npo.id, cmp)).status).toBe(404);
 
-      expect((res as Response).status).toBe(status);
+    const off = await seed_npo({ active: false });
+    const off_cmp = `api-cmp-off-${off.id}`;
+    await seed_campaign(off.id, off_cmp);
+    expect((await donors_feed(off.id, off_cmp)).status).toBe(404);
+  });
+
+  it("serves an unpublished org's campaign feed to its own admin and a platform admin, kept out of shared caches", async () => {
+    const npo = await seed_npo({ published: false });
+    const cmp = `api-cmp-admin-${npo.id}`;
+    await seed_campaign(npo.id, cmp);
+    const member = await seed_creator();
+    await db()
+      .insert(user_npo_memberships)
+      .values({ user_id: member.id, npo_id: npo.id });
+    const platform_admin = { ...(await seed_creator()), role: "admin" };
+
+    for (const viewer of [member, platform_admin]) {
+      get_session.mockResolvedValueOnce({ user: viewer });
+      const res = await donors_feed(npo.id, cmp);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("cache-control")).toBe("private, no-store");
     }
   });
 
-  it("answers 404 for an unpublished or inactive org's whole feed", async () => {
+  it("answers 404 for an unpublished or inactive org's whole feed to an anonymous visitor", async () => {
     for (const o of [{ published: false }, { active: false }]) {
       const org = String((await seed_npo(o)).id);
       await db()
@@ -1141,15 +1163,21 @@ describe("donors api", () => {
           date: hours_ago(1),
         });
 
-      const res = await (
-        donors_api.loader({
-          params: { id: org },
-          request: new Request(`http://localhost/api/npo/${org}/donors`),
-        } as any) as Promise<Response>
-      ).catch((e: unknown) => e);
-
-      expect((res as Response).status).toBe(404);
+      expect((await donors_feed(org)).status).toBe(404);
     }
+  });
+
+  it("serves an unpublished org's whole feed to its own admin, kept out of shared caches", async () => {
+    const npo = await seed_npo({ published: false });
+    const member = await seed_creator();
+    await db()
+      .insert(user_npo_memberships)
+      .values({ user_id: member.id, npo_id: npo.id });
+    get_session.mockResolvedValueOnce({ user: member });
+
+    const res = await donors_feed(npo.id);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
   });
 
   it("serves only messages, paged by them, given with_message=1", async () => {

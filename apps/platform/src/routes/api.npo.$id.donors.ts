@@ -1,5 +1,6 @@
 import type { LoaderFunction } from "react-router";
 import * as v from "valibot";
+import { can_preview } from "#/.server/can-preview";
 import { npo_donors } from "#/.server/npo-donors";
 import { fund_id } from "@/fundraiser/schema";
 import { resp, search } from "@/helpers/https";
@@ -17,17 +18,23 @@ export const loader: LoaderFunction = async ({ params, request }) => {
   const q = new URL(request.url).searchParams;
   const campaign_id = q.get("campaign_id") || undefined;
 
+  // an unpublished org's feed follows its pages: it shows, whole or a single
+  // campaign's, only to its own admins and to platform admins
+  let preview = false;
   if (typeof id === "number") {
     const npo = await npo_get(id);
     if (!npo || npo.active === false) throw resp.status(404);
-    // the whole feed is public only while the profile is; a campaign's is
-    // public with its page, which serves whether or not the org is published
-    if (!npo.published && !campaign_id) throw resp.status(404);
+    if (!npo.published) {
+      if (!(await can_preview(request, npo.id))) throw resp.status(404);
+      preview = true;
+    }
   }
 
   const { next } = search(request);
   const with_message = q.get("with_message") === "1";
 
   const page = await npo_donors(id.toString(), next, campaign_id, with_message);
-  return resp.json(page, 200, { "cache-control": cache });
+  return resp.json(page, 200, {
+    "cache-control": preview ? "private, no-store" : cache,
+  });
 };

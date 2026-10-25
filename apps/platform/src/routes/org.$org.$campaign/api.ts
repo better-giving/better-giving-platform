@@ -1,7 +1,8 @@
 import { to_usd } from "@better-giving/ui/helpers";
-import { href } from "react-router";
+import { data, href } from "react-router";
 import { safeParse } from "valibot";
 import { get_session } from "#/.server/auth";
+import { can_preview } from "#/.server/can-preview";
 import { moved } from "#/helpers/moved";
 import { resp } from "@/helpers/https";
 import { frequency } from "@/schemas";
@@ -16,6 +17,20 @@ import {
 import { npo_get } from "$/pg/queries/npo";
 import { reg_public_ein } from "$/pg/queries/registration";
 import type { Route } from "./+types/route";
+
+/** a preview of an unpublished owner depends on who asked, so it stays out of
+ * shared caches; the public page keeps whatever cache it already had */
+const PRIVATE = { "cache-control": "private, no-store" };
+
+export const headers: Route.HeadersFunction = ({
+  loaderHeaders,
+  errorHeaders,
+}) => {
+  const h: Record<string, string> = {};
+  const cc = (errorHeaders ?? loaderHeaders).get("cache-control");
+  if (cc) h["cache-control"] = cc;
+  return h;
+};
 
 function prefill_amount(raw: string | null) {
   if (!raw) return;
@@ -56,6 +71,12 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
     throw moved(
       `${href("/org/:org/:campaign", { org: campaign.owner_slug, campaign: campaign.slug })}${url.search}`
     );
+  }
+  // the campaign page follows its owner: an unpublished owner's pages show only
+  // to its own admins and to platform admins, as `/org/:org` does
+  const preview = campaign.owner_published === false;
+  if (preview && !(await can_preview(request, campaign.owner_npo_id))) {
+    throw new Response(null, { status: 404, headers: PRIVATE });
   }
   const donation_id = url.searchParams.get("donation_id")?.trim() ?? "";
   const redirect_failed =
@@ -103,43 +124,46 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
 
   const { user } = await get_session(request);
   const now = new Date();
-  return {
-    campaign,
-    npo: {
-      id: npo.id,
-      name: npo.name,
-      donor_address_required: npo.donor_address_required ?? false,
-      hide_bg_tip: npo.hide_bg_tip,
-      url: npo.url,
-      ein: registration?.ein ?? null,
+  return data(
+    {
+      campaign,
+      npo: {
+        id: npo.id,
+        name: npo.name,
+        donor_address_required: npo.donor_address_required ?? false,
+        hide_bg_tip: npo.hide_bg_tip,
+        url: npo.url,
+        ein: registration?.ein ?? null,
+      },
+      closed: !campaign_accepts(campaign, now),
+      now: now.toISOString(),
+      base_url: url.origin,
+      canonical: `${url.origin}/org/${params.org}/${params.campaign}`,
+      prefill_amount_usd: amount,
+      prefill_frequency: frequency_ok ?? monthly_default,
+      donor_count,
+      thanks_amount: thanks.thanks_amount,
+      thanks_name: thanks.thanks_name,
+      thanks_receipt:
+        thanks.thanks_amount && donation_id
+          ? `/donations/${encodeURIComponent(donation_id)}`
+          : null,
+      gift_failed: redirect_failed,
+      // the return amount is the rail charge in the url currency. any return
+      // with a donation id counts the gift base before settlement, net of tip
+      // and the donor-covered fee. a stripe redirect_status of failed will not
+      // settle, so it adds nothing.
+      thanks_usd: count_base && !thanks_settled ? base_usd : null,
+      thanks_settled,
+      thanks_repeat,
+      user: user
+        ? {
+            email: user.email,
+            first_name: user.first_name,
+            last_name: user.last_name,
+          }
+        : undefined,
     },
-    closed: !campaign_accepts(campaign, now),
-    now: now.toISOString(),
-    base_url: url.origin,
-    canonical: `${url.origin}/org/${params.org}/${params.campaign}`,
-    prefill_amount_usd: amount,
-    prefill_frequency: frequency_ok ?? monthly_default,
-    donor_count,
-    thanks_amount: thanks.thanks_amount,
-    thanks_name: thanks.thanks_name,
-    thanks_receipt:
-      thanks.thanks_amount && donation_id
-        ? `/donations/${encodeURIComponent(donation_id)}`
-        : null,
-    gift_failed: redirect_failed,
-    // the return amount is the rail charge in the url currency. any return
-    // with a donation id counts the gift base before settlement, net of tip
-    // and the donor-covered fee. a stripe redirect_status of failed will not
-    // settle, so it adds nothing.
-    thanks_usd: count_base && !thanks_settled ? base_usd : null,
-    thanks_settled,
-    thanks_repeat,
-    user: user
-      ? {
-          email: user.email,
-          first_name: user.first_name,
-          last_name: user.last_name,
-        }
-      : undefined,
-  };
+    preview ? { headers: PRIVATE } : undefined
+  );
 };

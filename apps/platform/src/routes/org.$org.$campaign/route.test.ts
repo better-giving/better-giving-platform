@@ -11,9 +11,13 @@ import {
 import { user } from "$/pg/schema/auth";
 import { npos } from "$/pg/schema/npo";
 import { registrations } from "$/pg/schema/registration";
+import { user_npo_memberships } from "$/pg/schema/user";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
+const get_session = vi.hoisted(() =>
+  vi.fn(async (_: Request) => ({ user: undefined as any }))
+);
 
 vi.mock("$/pg/db", () => ({
   db: new Proxy(
@@ -28,11 +32,10 @@ vi.mock("$/pg/db", () => ({
   ),
 }));
 
-vi.mock("#/.server/auth", async () =>
-  (await import("$/auth/test-utils")).make_auth_mock({
-    session: { user: undefined },
-  })
-);
+vi.mock("#/.server/auth", async () => ({
+  ...(await import("$/auth/test-utils")).make_auth_mock(),
+  get_session,
+}));
 
 const { campaign_members, campaigns } = await import("$/pg/schema/campaign");
 const { dists } = await import("$/pg/schema/dist");
@@ -40,7 +43,7 @@ const { donation_donors, donations } = await import("$/pg/schema/donation");
 const { donation_messages } = await import("$/pg/schema/donation-message");
 const { create_test_db } = await import("$/pg/test-utils/pglite");
 const { npo_donors } = await import("#/.server/npo-donors");
-const { loader } = await import("./api");
+const { headers, loader } = await import("./api");
 const { shown_totals } = await import("./format");
 
 const USER = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -55,6 +58,8 @@ afterAll(async () => {
 
 beforeEach(async () => {
   const db = test_db.current!.db;
+  get_session.mockReset();
+  get_session.mockResolvedValue({ user: undefined as any });
   await db.delete(dists);
   await db.delete(donation_messages);
   await db.delete(donation_donors);
@@ -62,6 +67,7 @@ beforeEach(async () => {
   await db.delete(campaign_members);
   await db.delete(campaigns);
   await db.delete(registrations);
+  await db.delete(user_npo_memberships);
   await db.delete(npos);
   await db.delete(user);
   await db.insert(user).values({
@@ -87,6 +93,7 @@ async function org(active = true, url: string | null = null) {
       overview_pt: "[]",
       hq_country: "United States",
       active,
+      published: true,
       url,
     })
     .returning();
@@ -169,7 +176,8 @@ function email_keys(value: unknown): string[] {
   );
 }
 
-function load(url: string) {
+/** the loader's answer as it leaves the route: its data plus response init */
+function respond(url: string) {
   const u = new URL(url);
   return loader({
     request: new Request(url),
@@ -178,6 +186,28 @@ function load(url: string) {
       campaign: u.pathname.split("/")[3],
     },
   } as any);
+}
+
+const load = (url: string) => respond(url).then((r) => r.data);
+
+/** the document's cache-control, composed as react-router does: the route's
+ * `headers` export over the loader's headers, or over the thrown response's as
+ * `errorHeaders` when the loader threw */
+function cache_control(outcome: unknown) {
+  const threw = outcome instanceof Response;
+  const own = new Headers(
+    threw
+      ? outcome.headers
+      : (outcome as Awaited<ReturnType<typeof respond>>).init?.headers
+  );
+  return new Headers(
+    headers({
+      loaderHeaders: own,
+      parentHeaders: new Headers(),
+      actionHeaders: new Headers(),
+      errorHeaders: threw ? own : undefined,
+    })
+  ).get("cache-control");
 }
 
 async function status_of(p: Promise<unknown>) {
@@ -217,18 +247,80 @@ describe("public campaign page", () => {
     );
   });
 
-  it("serves an unpublished owner's campaign at its id url, naming no slug", async () => {
-    const npo = await org();
+  async function unpublish(npo_id: number) {
     await test_db
       .current!.db.update(npos)
       .set({ published: false })
-      .where(eq(npos.id, npo.id));
+      .where(eq(npos.id, npo_id));
+  }
+
+  it("404s an unpublished owner's campaign for an anonymous visitor, kept out of shared caches", async () => {
+    const npo = await org();
+    await unpublish(npo.id);
     await campaign(npo.id);
 
-    const data = await load(`https://x/org/${npo.id}/winter`);
+    for (const param of ["acme", String(npo.id)]) {
+      const res = await respond(`https://x/org/${param}/winter`).catch(
+        (e: unknown) => e
+      );
+      expect(res).toBeInstanceOf(Response);
+      expect((res as Response).status).toBe(404);
+      expect(cache_control(res)).toBe("private, no-store");
+    }
+  });
 
-    expect(data.campaign.slug).toBe("winter");
-    expect(data.npo.id).toBe(npo.id);
+  it("404s an unpublished owner's campaign for a signed-in admin of another org", async () => {
+    const npo = await org();
+    await unpublish(npo.id);
+    await campaign(npo.id);
+    // a member of a different org is not an admin of this one
+    get_session.mockResolvedValue({ user: { id: USER, role: null } });
+
+    const res = await respond("https://x/org/acme/winter").catch(
+      (e: unknown) => e
+    );
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).status).toBe(404);
+    expect(cache_control(res)).toBe("private, no-store");
+  });
+
+  it("serves an unpublished owner's campaign to its own admin at its id url, naming no slug, kept out of shared caches", async () => {
+    const npo = await org();
+    await unpublish(npo.id);
+    await campaign(npo.id);
+    await test_db
+      .current!.db.insert(user_npo_memberships)
+      .values({ user_id: USER, npo_id: npo.id });
+    get_session.mockResolvedValue({ user: { id: USER, role: null } });
+
+    const res = await respond(`https://x/org/${npo.id}/winter`);
+
+    expect(res.data.campaign.slug).toBe("winter");
+    expect(res.data.npo.id).toBe(npo.id);
+    expect(cache_control(res)).toBe("private, no-store");
+  });
+
+  it("serves an unpublished owner's campaign to a platform admin, kept out of shared caches", async () => {
+    const npo = await org();
+    await unpublish(npo.id);
+    await campaign(npo.id);
+    get_session.mockResolvedValue({ user: { id: USER, role: "admin" } });
+
+    const res = await respond("https://x/org/acme/winter");
+
+    expect(res.data.campaign.slug).toBe("winter");
+    expect(res.data.npo.id).toBe(npo.id);
+    expect(cache_control(res)).toBe("private, no-store");
+  });
+
+  it("serves a published owner's campaign without a private cache header", async () => {
+    const npo = await org();
+    await campaign(npo.id);
+
+    const res = await respond("https://x/org/acme/winter");
+
+    expect(res.data.campaign.slug).toBe("winter");
+    expect(cache_control(res)).toBeNull();
   });
 
   it("serves a slugless owner's campaign at the owner's id url", async () => {

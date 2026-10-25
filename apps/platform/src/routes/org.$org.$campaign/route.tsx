@@ -15,7 +15,7 @@ import { app_name } from "#/constants/env";
 import { metas } from "#/helpers/seo";
 import { use_now } from "#/hooks/use-now";
 import type { Route } from "./+types/route";
-import { loader } from "./api";
+import { headers, loader } from "./api";
 import {
   closed_body,
   donor_label,
@@ -30,7 +30,7 @@ import {
 } from "./format";
 import { CampaignPage } from "./page";
 
-export { loader };
+export { headers, loader };
 export const links: LinksFunction = () => [...richtext_styles];
 
 export const meta: Route.MetaFunction = ({ loaderData, params, error }) => {
