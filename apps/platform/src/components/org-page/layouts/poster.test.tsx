@@ -4,6 +4,7 @@ import { page, userEvent } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import {
   BANNER,
+  donate_on_banner,
   donates,
   give_panel,
   header_donate,
@@ -151,7 +152,7 @@ describe("Poster", () => {
     [375, 812],
     [1440, 900],
   ])(
-    "the give card: the banner on top at 4:1, then Donate across it, at %i",
+    "the give card: the banner at 4:1 with Donate floating on its bottom-right corner, at %i",
     async (w, h) => {
       await page.viewport(w, h);
       const screen = await mount();
@@ -163,16 +164,17 @@ describe("Poster", () => {
         .toBeCloseTo(4, 1);
       expect(panel_banner(panel)?.flush).toBe(true);
       expect(panel_parts(panel)).toEqual(["banner", "donate"]);
-      const body = donate.parentElement as HTMLElement;
-      const inset = Number.parseFloat(getComputedStyle(body).paddingLeft);
-      expect(donate.getBoundingClientRect().width).toBeCloseTo(
-        body.getBoundingClientRect().width - 2 * inset,
-        0
+      const at = donate_on_banner(panel);
+      expect(at?.inside).toBe(true);
+      expect(at?.right).toBeCloseTo(12, 0);
+      expect(at?.bottom).toBeCloseTo(12, 0);
+      expect(donate.getBoundingClientRect().width).toBeLessThan(
+        panel.getBoundingClientRect().width / 2
       );
     }
   );
 
-  test("on the deep band the card is a light surface and Donate is the primary button", async () => {
+  test("on the deep band, Donate on the banner is the primary button", async () => {
     const screen = await mount();
     const panel = give_panel(screen.container);
     const [donate] = donates(panel);
@@ -181,25 +183,51 @@ describe("Poster", () => {
     expect(donate).toHaveClass("btn-primary");
   });
 
-  test("the card's Donate takes the page's focus ring, not the deep band's white one", async () => {
+  test("with no banner, Donate alone on the deep band takes the inverse fill", async () => {
+    const screen = await mount({}, { image: null });
+    const panel = give_panel(screen.container);
+    const [donate] = donates(panel);
+    await expect.poll(() => donate.checkVisibility()).toBe(true);
+    expect(panel_parts(panel)).toEqual(["donate"]);
+    expect(donate).not.toHaveClass("btn-primary");
+    expect(donate).toHaveClass("bg-primary-fg", "text-primary");
+  });
+
+  /** the colour a keyboard focus would show on `el`: the base layer draws
+   * every outline in --ring, so it is readable at rest */
+  const ring = (el: Element) => getComputedStyle(el).outlineColor;
+
+  async function focus_ring(donate: HTMLElement) {
+    await userEvent.keyboard("{Tab}");
+    donate.focus();
+    await expect.poll(() => donate.matches(":focus-visible")).toBe(true);
+    const s = getComputedStyle(donate);
+    expect(s.outlineStyle).toBe("solid");
+    return s.outlineColor;
+  }
+
+  test("Donate on the banner takes the page's focus ring, not the deep band's white one", async () => {
     await page.viewport(1440, 900);
     const screen = await mount();
     const panel = give_panel(screen.container);
     const [donate] = donates(panel);
     await expect.poll(() => donate.checkVisibility()).toBe(true);
     const band = panel.closest(".bg-primary-deep") as HTMLElement;
-    const ring = (el: Element) => getComputedStyle(el).outlineColor;
-    // the base layer draws every outline in --ring, so the colour a keyboard
-    // focus would show is readable at rest
     expect(ring(donate)).toBe(ring(document.body));
     expect(ring(donate)).not.toBe(ring(band));
+    expect(await focus_ring(donate)).toBe(ring(document.body));
+  });
 
-    await userEvent.keyboard("{Tab}");
-    donate.focus();
-    await expect.poll(() => donate.matches(":focus-visible")).toBe(true);
-    const s = getComputedStyle(donate);
-    expect(s.outlineStyle).toBe("solid");
-    expect(s.outlineColor).toBe(ring(document.body));
+  test("Donate alone on the deep band takes the band's white focus ring", async () => {
+    await page.viewport(1440, 900);
+    const screen = await mount({}, { image: null });
+    const panel = give_panel(screen.container);
+    const [donate] = donates(panel);
+    await expect.poll(() => donate.checkVisibility()).toBe(true);
+    const band = panel.closest(".bg-primary-deep") as HTMLElement;
+    expect(ring(donate)).toBe(ring(band));
+    expect(ring(donate)).not.toBe(ring(document.body));
+    expect(await focus_ring(donate)).toBe(ring(band));
   });
 
   test.each([

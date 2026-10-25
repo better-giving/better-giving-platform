@@ -1,5 +1,5 @@
 import type { Ref } from "react";
-import { GroundContext, is_brand_ground, use_ground } from "./brand-band";
+import { GroundContext } from "./brand-band";
 import { DonateButton } from "./donate";
 import { OrgBanner } from "./org-banner";
 
@@ -14,11 +14,11 @@ interface IGivePanel {
   classes?: string;
 }
 
-/** the banner and a full-width Donate on a light card. a media frame: the
- * banner bleeds to its edges, so the inset is the body's. inside, the ground is
- * the page's whatever band it sits on. on a brand band the fill is its edge,
- * and the ring is the page's, since the band's white one vanishes on this
- * surface: blue-8 is --ring's step in packages/brand/src/colors.css */
+/** the banner with Donate floating on its bottom-right corner, or Donate alone
+ * on whatever ground the panel sits in. on the banner the ground is the page's
+ * whatever band is around it, and so is the ring: the deep band's white one
+ * vanishes on a pale photo. blue-8 is --ring's step in
+ * packages/brand/src/colors.css */
 export function GivePanel({
   name,
   banner,
@@ -26,24 +26,26 @@ export function GivePanel({
   donate_ref,
   classes = "",
 }: IGivePanel) {
-  const frame = is_brand_ground(use_ground())
-    ? "[--ring:var(--blue-8)]"
-    : "border";
+  if (!banner) {
+    return (
+      <aside aria-label={`Give to ${name}`} className={`flex ${classes}`}>
+        <DonateButton ref={donate_ref} to={donate_to} size="lg" />
+      </aside>
+    );
+  }
   return (
     <aside
       aria-label={`Give to ${name}`}
-      className={`flex flex-col overflow-hidden rounded bg-surface text-gray-12 ${frame} ${classes}`}
+      className={`relative [--ring:var(--blue-8)] ${classes}`}
     >
       <GroundContext value="page">
-        <OrgBanner src={banner} />
-        <div className="p-4 md:p-6">
-          <DonateButton
-            ref={donate_ref}
-            to={donate_to}
-            size="lg"
-            classes="w-full"
-          />
-        </div>
+        <OrgBanner src={banner} classes="rounded" />
+        <DonateButton
+          ref={donate_ref}
+          to={donate_to}
+          size="lg"
+          classes="absolute right-3 bottom-3 shadow-floating"
+        />
       </GroundContext>
     </aside>
   );

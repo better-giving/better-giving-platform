@@ -4,6 +4,7 @@ import { page } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import {
   BANNER,
+  donate_on_banner,
   donates,
   give_panel,
   header_donate,
@@ -263,6 +264,10 @@ describe("Hub", () => {
     await expect.poll(() => panel_banner(panel)?.ratio ?? 0).toBeCloseTo(4, 1);
     expect(panel_banner(panel)?.flush).toBe(true);
     expect(panel_parts(panel)).toEqual(["banner", "donate"]);
+    const at = donate_on_banner(panel);
+    expect(at?.inside).toBe(true);
+    expect(at?.right).toBeCloseTo(12, 0);
+    expect(at?.bottom).toBeCloseTo(12, 0);
     expect(imgs_outside_panel(screen.container)).toEqual([]);
     // the mark sits inside the band
     const mark = band.querySelector("[data-monogram]") as HTMLElement;

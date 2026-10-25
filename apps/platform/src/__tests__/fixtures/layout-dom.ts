@@ -15,8 +15,8 @@ export const imgs_outside_panel = (root: Element) =>
     (img) => !give_panel(root).contains(img)
   );
 
-/** the give card's banner: its first child, at 4:1 and flush with its top
- * and sides; null when the card starts elsewhere */
+/** the give card's banner: its first child, at 4:1 and flush with the card's
+ * top and sides; null when the card starts elsewhere */
 export function panel_banner(panel: Element): {
   ratio: number;
   flush: boolean;
@@ -25,14 +25,36 @@ export function panel_banner(panel: Element): {
   if (!(img instanceof HTMLImageElement)) return null;
   const b = img.getBoundingClientRect();
   const p = panel.getBoundingClientRect();
-  const s = getComputedStyle(panel);
-  const edge = Number.parseFloat(s.borderTopWidth);
   return {
     ratio: b.width / b.height,
     flush:
-      Math.abs(b.top - p.top - edge) <= 1 &&
-      Math.abs(b.left - p.left - edge) <= 1 &&
-      Math.abs(p.right - b.right - edge) <= 1,
+      Math.abs(b.top - p.top) <= 1 &&
+      Math.abs(b.left - p.left) <= 1 &&
+      Math.abs(p.right - b.right) <= 1,
+  };
+}
+
+/** where the give card's Donate floats on its banner: its insets from the
+ * banner's right and bottom edges, and whether it lies wholly within the
+ * banner; null with no banner */
+export function donate_on_banner(panel: Element): {
+  right: number;
+  bottom: number;
+  inside: boolean;
+} | null {
+  const img = panel.firstElementChild;
+  const [donate] = donates(panel);
+  if (!(img instanceof HTMLImageElement) || !donate) return null;
+  const b = img.getBoundingClientRect();
+  const d = donate.getBoundingClientRect();
+  return {
+    right: b.right - d.right,
+    bottom: b.bottom - d.bottom,
+    inside:
+      d.left >= b.left &&
+      d.top >= b.top &&
+      d.right <= b.right &&
+      d.bottom <= b.bottom,
   };
 }
 
@@ -42,8 +64,8 @@ export const donates = (root: Element) =>
     (a) => a.textContent === "Donate"
   );
 
-/** the give card's blocks, top to bottom: "banner" for its image, "donate"
- * for a block holding Donate and nothing else, else that block's text */
+/** the give card's children in dom order: "banner" for its image, "donate"
+ * for Donate or a block holding it and nothing else, else that block's text */
 export const panel_parts = (panel: Element) =>
   Array.from(panel.children).map((el) => {
     if (el instanceof HTMLImageElement) return "banner";
