@@ -333,10 +333,12 @@ export async function fund_npo_memberof(
   }
 
   if (params.exclude_folded) {
-    // a fund already folded into a campaign lives on as that campaign; drop it
-    // here so it is not listed twice. an unfolded org fund still shows
+    // a folded fund whose page and editor redirect to its campaign lives on as
+    // that campaign; drop it here so it is not listed twice. a multi-beneficiary
+    // fold keeps the fund flow and fund editor (see `folded_campaign_public`),
+    // so it stays listed, as does an unfolded org fund
     conditions.push(
-      sql`NOT EXISTS (SELECT 1 FROM ${campaigns} WHERE ${campaigns.legacy_fund_id} = ${funds.id})`
+      sql`NOT (EXISTS (SELECT 1 FROM ${campaigns} WHERE ${campaigns.legacy_fund_id} = ${funds.id}) AND (SELECT count(*) FROM ${fund_members} WHERE ${fund_members.fund_id} = ${funds.id}) <= 1)`
     );
   }
 

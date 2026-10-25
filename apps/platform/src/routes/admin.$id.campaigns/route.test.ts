@@ -447,6 +447,25 @@ describe("campaign list loader", () => {
       status: "live",
       legacy_fund_id: "fund-folded",
     });
+    // a folded fund with several beneficiaries keeps its fund flow and editor,
+    // so it stays listed with its fund row
+    const partner = await npo("EIN-LIST-2", "list-partner");
+    await seed_fund(db(), {
+      id: "fund-multi",
+      name: "Shared drive",
+      npo_owner: org.id,
+      creator_id: USER,
+      members: [org.id, partner.id],
+    });
+    await db().insert(campaigns).values({
+      id: "camp-multi",
+      owner_npo_id: org.id,
+      creator_id: USER,
+      name: "Shared drive",
+      slug: "shared-drive",
+      status: "live",
+      legacy_fund_id: "fund-multi",
+    });
     await seed_fund(db(), {
       id: "fund-supporter",
       name: "Supporter drive",
@@ -466,10 +485,15 @@ describe("campaign list loader", () => {
       throw new Error("expected the campaigns tab");
     expect(data.campaigns.map((c) => c.id).sort()).toEqual([
       "camp-folded",
+      "camp-multi",
       "camp-real",
     ]);
-    // the unfolded org fund lists; the folded one is excluded (it is a campaign)
-    expect(data.org_funds.map((f) => f.id)).toEqual(["fund-owned"]);
+    // the unfolded and multi-beneficiary org funds list; the single-beneficiary
+    // fold is excluded (it is a campaign)
+    expect(data.org_funds.map((f) => f.id).sort()).toEqual([
+      "fund-multi",
+      "fund-owned",
+    ]);
 
     const tab = await list_loader({
       request: new Request("https://x/admin/list/campaigns?tab=fundraisers"),
