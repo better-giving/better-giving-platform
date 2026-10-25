@@ -14,7 +14,7 @@ interface IDonateButton {
 
 /** the filled Donate. on a brand fill it inverts, since --primary on
  * --primary-deep is no button at all; the inverse has no hover rung of its
- * own, so it keeps only `.btn-primary`'s press */
+ * own, so it copies only `.btn-primary`'s press */
 export function DonateButton({
   to,
   size = "md",
