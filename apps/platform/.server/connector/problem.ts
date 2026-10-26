@@ -9,7 +9,8 @@ export type ProblemCode =
   | "not_found"
   | "write_failed"
   | "campaign_ended"
-  | "already_published";
+  | "already_published"
+  | "confirm_required";
 
 export type FieldError = { path: string; message: string };
 

@@ -8,7 +8,7 @@ import {
 import type { DbOrTx } from "../pg/queries/helpers";
 import { npo_program_get } from "../pg/queries/program";
 import { json, open_key, valid_day } from "./http";
-import { usd_amount } from "./money";
+import { AMOUNT, AMOUNT_MSG, usd_amount } from "./money";
 import { type FieldError, invalid, not_found, problem } from "./problem";
 import { campaign_status, read_campaign_detail } from "./reads";
 import { read_body, TITLE_MAX, unknown_keys } from "./writes";
@@ -31,11 +31,6 @@ async function open_action(
   const live = await open_key(db, request);
   return live instanceof Response ? live : live.npo_id;
 }
-
-// past 12 whole digits a dollar amount stops holding its cents as a double
-const AMOUNT = /^\d{1,12}(\.\d{1,2})?$/;
-const AMOUNT_MSG =
-  'is a positive amount in US dollars, written like "2500" or "2500.50"';
 
 /** a `Money` the detail would show, as dollars; null clears. undefined when
  * it is malformed, with the issues pushed */

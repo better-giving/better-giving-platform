@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { update_form } from "$/connector/form-writes";
 import { open_key } from "$/connector/http";
 import { problem } from "$/connector/problem";
 import { get_form } from "$/connector/reads";
@@ -12,6 +13,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return get_form(db, live.npo_id, id, new URL(request.url));
 }
 
-export function action(_args: ActionFunctionArgs) {
-  return problem(404, "unknown_action");
+export function action({ request, params }: ActionFunctionArgs) {
+  return update_form(db, request, params.id ?? "");
 }

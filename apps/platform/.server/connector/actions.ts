@@ -17,6 +17,8 @@ export const CONNECTOR_ACTIONS = [
   "get_block_catalog",
   "list_forms",
   "get_form",
+  "create_form",
+  "update_form",
   "get_results",
   "list_donations",
   "list_donors",

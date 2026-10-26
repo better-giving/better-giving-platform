@@ -500,7 +500,8 @@ describe("forms", () => {
         {
           id: "owned",
           owner_npo_id: a.npo.id,
-          name: "Owned",
+          name: "Alpha",
+          tag: "Owned",
           status: "active",
           increments: [{ value: "25", label: "25" }],
           program_id: "prog_1",
@@ -553,6 +554,7 @@ describe("forms", () => {
       (await list.json()) as {
         data: {
           id: string;
+          name: string;
           status: string;
           suggested_amounts: { amount: string; currency: string }[];
           minimum: unknown;
@@ -573,6 +575,7 @@ describe("forms", () => {
     expect(ids).not.toContain("theirs");
     const owned = data.find((row) => row.id === "owned");
     expect(owned).toMatchObject({
+      name: "Owned",
       status: "live",
       suggested_amounts: [{ amount: "25.00", currency: "USD" }],
       minimum: null,
@@ -580,6 +583,16 @@ describe("forms", () => {
       allowed_origins: [],
       gifts_go_to: { mode: "pinned", program_id: "prog_1" },
       campaign_id: null,
+      // unset columns read as what the donate form falls back to
+      frequencies: ["one-time", "monthly"],
+      donate_methods: [
+        "stripe",
+        "stripe_bank",
+        "daf",
+        "stocks",
+        "ira_qcd",
+        "crypto",
+      ],
     });
     expect(data.find((row) => row.id === "owned-campaign")?.campaign_id).toBe(
       "fund-a"
@@ -587,6 +600,10 @@ describe("forms", () => {
     expect(
       data.find((row) => row.id === "foreign-fund")?.campaign_id
     ).toBeNull();
+    // no label reads as the form's name, as the admin list shows it
+    expect(data.find((row) => row.id === "foreign-fund")?.name).toBe(
+      "Points away"
+    );
 
     const missing = await get(
       form_loader,

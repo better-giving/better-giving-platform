@@ -1,8 +1,12 @@
 import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
+import {
+  all_method_ids,
+  freqs_default,
+} from "#/components/donation/common/constants";
 import { to_text } from "#/components/rich-text/helpers";
 import type { TCampaignStatus } from "@/campaign";
 import { fund_closes_at } from "@/fundraiser/is-open";
-import type { IIncrement } from "@/schemas";
+import type { DonateMethodId, IIncrement, TFrequency } from "@/schemas";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { campaigns } from "../pg/schema/campaign";
 import { pg_text_to_iso } from "../pg/schema/columns";
@@ -332,8 +336,11 @@ function form_stamp() {
 type FormRow = {
   id: string;
   name: string;
+  tag: string | null;
   status: string | null;
   increments: IIncrement[] | null;
+  freq_opts: TFrequency[] | null;
+  donate_methods: DonateMethodId[] | null;
   program_id: string | null;
   recipient_fund_id: string | null;
   fund_owner: number | null;
@@ -352,9 +359,14 @@ function form_of(row: FormRow, npo_id: number) {
     row.recipient_fund_id !== null && row.fund_owner === npo_id;
   return {
     id: row.id,
-    name: row.name,
+    // the form's label; `name` is the recipient donors see. the admin list's
+    // fallback, so an unlabelled form reads as it does there
+    name: row.tag || row.name,
     status: row.status === "active" ? "live" : "draft",
     suggested_amounts,
+    // unset (and, for frequencies, empty) is what the donate form defaults
+    frequencies: row.freq_opts?.length ? row.freq_opts : freqs_default,
+    donate_methods: row.donate_methods ?? all_method_ids,
     minimum: null,
     maximum: null,
     allowed_origins: [] as string[],
@@ -373,8 +385,11 @@ function forms_for(npo_id: number) {
 const form_cols = {
   id: forms.id,
   name: forms.name,
+  tag: forms.tag,
   status: forms.status,
   increments: forms.increments,
+  freq_opts: forms.freq_opts,
+  donate_methods: forms.donate_methods,
   program_id: forms.program_id,
   recipient_fund_id: forms.recipient_fund_id,
   fund_owner: funds.npo_owner,
@@ -417,17 +432,7 @@ export async function list_forms(
   });
 }
 
-function normalize_form(row: {
-  id: string;
-  name: string;
-  status: string | null;
-  increments: IIncrement[] | null;
-  program_id: string | null;
-  recipient_fund_id: string | null;
-  fund_owner: number | null;
-  date_created: string | null;
-  stamped: string;
-}): FormRow {
+function normalize_form(row: FormRow): FormRow {
   return {
     ...row,
     date_created: row.date_created ? pg_text_to_iso(row.date_created) : null,
@@ -445,13 +450,25 @@ export async function get_form(
   stray_params(url, [], issues);
   const refused = refuse(issues);
   if (refused) return refused;
+  const form = await read_form(db, npo_id, id);
+  if (!form) return not_found(`Form ${id} does not exist for this nonprofit.`);
+  return json(form);
+}
+
+export type ConnectorForm = ReturnType<typeof form_of>;
+
+/** the get_form shape of a form this nonprofit owns, or null */
+export async function read_form(
+  db: DbOrTx,
+  npo_id: number,
+  id: string
+): Promise<ConnectorForm | null> {
   const [row] = await db
     .select(form_cols)
     .from(forms)
     .leftJoin(funds, eq(forms.recipient_fund_id, funds.id))
     .where(and(eq(forms.id, id), forms_for(npo_id)));
-  if (!row) return not_found(`Form ${id} does not exist for this nonprofit.`);
-  return json(form_of(normalize_form(row), npo_id));
+  return row ? form_of(normalize_form(row), npo_id) : null;
 }
 
 function tenant_gifts(npo_id: number) {
