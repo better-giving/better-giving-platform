@@ -549,16 +549,53 @@ export async function campaign_publish(
   return rows.length > 0;
 }
 
+/** sets where gifts go and publishes, in one write that only a never-published,
+ * not-ended campaign takes; false leaves the row as it was */
+export async function campaign_first_publish(
+  npo_id: number,
+  id: string,
+  program: { id: string; title: string } | null
+): Promise<boolean> {
+  const now = new Date().toISOString();
+  const rows = await db
+    .update(campaigns)
+    .set({
+      program_id: program?.id ?? null,
+      program_name: program?.title ?? null,
+      status: "live",
+      published_at: now,
+      updated_at: now,
+    })
+    .where(
+      and(
+        eq(campaigns.id, id),
+        eq(campaigns.owner_npo_id, npo_id),
+        sql`${campaigns.status} <> 'ended'`,
+        isNull(campaigns.published_at)
+      )
+    )
+    .returning({ id: campaigns.id });
+  return rows.length > 0;
+}
+
 export async function campaign_end(
   npo_id: number,
   id: string
 ): Promise<boolean> {
+  // an ended campaign is left as it is, its updated_at included
   const rows = await db
     .update(campaigns)
     .set({ status: "ended", updated_at: new Date().toISOString() })
-    .where(and(eq(campaigns.id, id), eq(campaigns.owner_npo_id, npo_id)))
+    .where(
+      and(
+        eq(campaigns.id, id),
+        eq(campaigns.owner_npo_id, npo_id),
+        sql`${campaigns.status} <> 'ended'`
+      )
+    )
     .returning({ id: campaigns.id });
-  return rows.length > 0;
+  if (rows.length > 0) return true;
+  return (await campaign_get(npo_id, id)) !== undefined;
 }
 
 export async function campaign_gift_count(

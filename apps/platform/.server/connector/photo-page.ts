@@ -1,4 +1,4 @@
-import { upload_limits } from "@/constants/upload";
+import { photo_too_large, upload_limits } from "@/constants/upload";
 import {
   basename,
   IMAGE_TYPES,
@@ -16,7 +16,8 @@ import {
 } from "./photo-links";
 
 /** what `/photo-upload/:token` shows. `gone` is one shape for an unknown,
- * malformed, expired or spent link, so the page tells a guesser nothing. */
+ * malformed, expired or spent link, or one whose campaign was deleted, so the
+ * page tells a guesser nothing. */
 export type PhotoPage =
   | { state: "gone" }
   | { state: "limited" }
@@ -30,8 +31,6 @@ const GONE: PhotoResult = { page: { state: "gone" }, status: 404 };
 
 /** a multipart body's framing beside the file itself */
 const MULTIPART_SLACK = 64 * 1024;
-
-const MAX_MB = upload_limits.max_bytes / (1024 * 1024);
 
 /** the live link and its campaign's name, or null */
 async function open_link(db: DbOrTx, token: string) {
@@ -76,10 +75,9 @@ export async function save_photo(
     status,
   });
 
-  const too_large = `That photo is over ${MAX_MB} MB. Choose a smaller one.`;
   const declared = Number(request.headers.get("content-length"));
   if (declared > upload_limits.max_bytes + MULTIPART_SLACK) {
-    return refuse(413, too_large);
+    return refuse(413, photo_too_large);
   }
   let file: FormDataEntryValue | null;
   try {
@@ -92,7 +90,7 @@ export async function save_photo(
   }
   const type = type_of(file, basename(file.name), IMAGE_TYPES);
   if (!type) return refuse(415, "Choose a JPEG, PNG or WebP photo.");
-  if (file.size > upload_limits.max_bytes) return refuse(413, too_large);
+  if (file.size > upload_limits.max_bytes) return refuse(413, photo_too_large);
   if ((await sniff(file)) !== type) {
     return refuse(
       415,

@@ -14,6 +14,10 @@ export const upload_limits = {
   max_bytes: 4 * 1024 * 1024,
 };
 
+/** the refusal for a photo past `max_bytes`: the photo page's server check
+ * and its file input both show it */
+export const photo_too_large = `That photo is over ${upload_limits.max_bytes / (1024 * 1024)} MB. Choose a smaller one.`;
+
 /** the opening bytes each binary format must carry; `null` is any byte.
  * svg is text with no fixed signature, so it has no entry here. */
 export const upload_signatures: Record<string, readonly (number | null)[]> = {

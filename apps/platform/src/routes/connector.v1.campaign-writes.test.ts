@@ -40,6 +40,25 @@ vi.mock("$/pg/db", () => ({
   }),
 }));
 
+// a write landing between the connector's read of the campaign and its own
+// write; one-shot, fired after the first campaign_get resolves
+const between = vi.hoisted(() => ({
+  write: null as (() => Promise<void>) | null,
+}));
+vi.mock("$/pg/queries/campaign", async (load) => {
+  const real = await load<typeof import("$/pg/queries/campaign")>();
+  return {
+    ...real,
+    campaign_get: async (...args: Parameters<typeof real.campaign_get>) => {
+      const row = await real.campaign_get(...args);
+      const write = between.write;
+      between.write = null;
+      await write?.();
+      return row;
+    },
+  };
+});
+
 const db = () => test_db.current!.db;
 const as_db = (x: unknown) => x as DbOrTx;
 
@@ -52,6 +71,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  between.write = null;
   reset_rate_limits();
   await db().delete(campaign_members);
   await db().delete(campaigns);
@@ -186,10 +206,12 @@ describe("end_campaign", () => {
     const body = (await ended.json()) as { id: string; status: string };
     expect(body).toMatchObject({ id, status: "ended" });
     expect((await row_of(id)).status).toBe("ended");
+    const before = await row_of(id);
 
     const again = await send(end_action, "POST", id, "/end", a.key);
     expect(again.status).toBe(200);
     expect(await again.json()).toMatchObject({ id, status: "ended" });
+    expect(await row_of(id)).toEqual(before);
   });
 
   test("refuses a body with fields, and another org's campaign is 404", async () => {
@@ -349,6 +371,97 @@ describe("publish_campaign", () => {
     expect(await row_of(id)).toEqual(before);
   });
 
+  test("published from the dashboard after the connector's read: another program is 409 and the live destination stays", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const theirs = await seed_program(a.npo.id, "Literacy");
+    const mine = await seed_program(a.npo.id, "Meals");
+    const id = await seed_campaign(a);
+    between.write = async () => {
+      await db()
+        .update(campaigns)
+        .set({
+          status: "live",
+          published_at: "2026-01-01T00:00:00.000Z",
+          program_id: theirs,
+          program_name: "Literacy",
+        })
+        .where(eq(campaigns.id, id));
+    };
+    const res = await publish(id, a.key, { gifts_go_to: mine });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "already_published" });
+    expect(await row_of(id)).toMatchObject({
+      status: "live",
+      published_at: "2026-01-01T00:00:00.000Z",
+      program_id: theirs,
+      program_name: "Literacy",
+    });
+  });
+
+  test("published from the dashboard after the connector's read to the same program is the unchanged detail", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const program = await seed_program(a.npo.id, "Literacy");
+    const id = await seed_campaign(a);
+    between.write = async () => {
+      await db()
+        .update(campaigns)
+        .set({
+          status: "live",
+          published_at: "2026-01-01T00:00:00.000Z",
+          program_id: program,
+          program_name: "Literacy",
+        })
+        .where(eq(campaigns.id, id));
+    };
+    const res = await publish(id, a.key, { gifts_go_to: program });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id, status: "published" });
+    expect(await row_of(id)).toMatchObject({
+      status: "live",
+      published_at: "2026-01-01T00:00:00.000Z",
+      program_id: program,
+    });
+  });
+
+  test("ended after the connector's read: 409 campaign_ended, and neither program nor status moves", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const program = await seed_program(a.npo.id, "Literacy");
+    const id = await seed_campaign(a);
+    between.write = async () => {
+      await db()
+        .update(campaigns)
+        .set({ status: "ended" })
+        .where(eq(campaigns.id, id));
+    };
+
+    const res = await publish(id, a.key, { gifts_go_to: program });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "campaign_ended" });
+    expect(await row_of(id)).toMatchObject({
+      status: "ended",
+      program_id: null,
+      program_name: null,
+      published_at: null,
+    });
+  });
+
+  test("deleted after the connector's read: 404, and nothing is recreated", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a);
+    between.write = async () => {
+      await db()
+        .delete(campaign_members)
+        .where(eq(campaign_members.campaign_id, id));
+      await db().delete(campaigns).where(eq(campaigns.id, id));
+    };
+
+    const res = await publish(id, a.key, { gifts_go_to: null });
+    expect(res.status).toBe(404);
+    expect(
+      await db().select().from(campaigns).where(eq(campaigns.id, id))
+    ).toHaveLength(0);
+  });
+
   test("an ended campaign is 409 campaign_ended", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
     const id = await seed_campaign(a, {
@@ -460,11 +573,33 @@ describe("update_campaign_settings", () => {
     }
   });
 
-  test("time_zone and sharing are refused alongside every other issue", async () => {
+  test("time_zone and sharing sent back as get_campaign shows them write nothing", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a, { target_number: 50 });
+    const before = await row_of(id);
+    const got = (await (await read(id, a.key)).json()) as {
+      time_zone: unknown;
+      sharing: unknown;
+    };
+
+    const res = await patch(id, a.key, {
+      time_zone: got.time_zone,
+      sharing: got.sharing,
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      time_zone: got.time_zone,
+      sharing: got.sharing,
+    });
+    expect(await row_of(id)).toEqual(before);
+  });
+
+  test("time_zone and sharing other than as read are refused alongside every other issue", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
     const id = await seed_campaign(a, { target_number: 50 });
     const res = await patch(id, a.key, {
-      time_zone: null,
+      time_zone: "America/New_York",
       sharing: { message: "hi" },
       goal: { amount: "0", currency: "USD" },
       end_date: "2020-01-01",
@@ -486,6 +621,18 @@ describe("update_campaign_settings", () => {
       ])
     );
     expect(body.errors).toHaveLength(5);
+    for (const [key, value] of [
+      ["time_zone", "UTC"],
+      ["sharing", null],
+      ["sharing", { message: null, channels: ["email"] }],
+      ["sharing", { message: null }],
+    ] as const) {
+      const one = await patch(id, a.key, { [key]: value });
+      expect(one.status, JSON.stringify(value)).toBe(422);
+      expect(await one.json()).toMatchObject({
+        errors: [{ path: key, message: "is not supported on Better Giving" }],
+      });
+    }
     expect((await row_of(id)).target_number).toBe(50);
   });
 
@@ -572,9 +719,9 @@ describe("update_campaign_blocks", () => {
 
   test("writes every block in one update and returns the detail; the slug stays", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
-    const id = await seed_campaign(a, { status: "ended" });
+    const id = await seed_campaign(a);
     const { slug } = await row_of(id);
-    const image = `${BLOB}/campaigns/hero.webp`;
+    const image = `${BLOB}/u/hero-Xk2Lm9.webp`;
 
     const res = await patch(id, a.key, {
       blocks: [
@@ -739,6 +886,18 @@ describe("update_campaign_blocks", () => {
         ],
         "blocks[2].image_url",
       ],
+      ...[
+        "/assets/entry-abc123.js",
+        "/migrated/static/logo.png",
+        "/a.png",
+        "/u/nested/a.png",
+        "/u/statement-Q1.pdf",
+        "/u/logo-x.svg",
+        "/u/photo.png.html",
+      ].map((path): [unknown, string] => [
+        [title, story, { type: "hero", image_url: `${BLOB}${path}` }, goal],
+        "blocks[2].image_url",
+      ]),
       [
         [
           title,
@@ -769,6 +928,50 @@ describe("update_campaign_blocks", () => {
     expect(none.status).toBe(422);
     expect(await none.json()).toMatchObject({ errors: [{ path: "blocks" }] });
     expect(await row_of(id)).toEqual(before);
+  });
+
+  test("a photo the upload page stored is a hero, whatever the extension's case", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a);
+    const blocks = await blocks_of(id, a.key);
+    for (const name of [
+      "Garden day-Xk2Lm9.png",
+      "IMG_0042-Ab3.JPEG",
+      "a-1.jpg",
+      "b-2.WebP",
+    ]) {
+      const image = `${BLOB}/u/${encodeURIComponent(name)}`;
+      blocks[2] = { type: "hero", image_url: image };
+      const res = await patch(id, a.key, { blocks });
+      expect(res.status, name).toBe(200);
+      expect((await row_of(id)).banner).toBe(image);
+    }
+  });
+
+  test("an ended campaign is 409 campaign_ended, after the blocks are checked, and nothing is written", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const stored = await seed_campaign(a, { status: "ended" });
+    const lapsed = await seed_campaign(a, {
+      status: "live",
+      published_at: "2026-01-01T00:00:00.000Z",
+      ends_at: "2026-01-31T23:59:59.999Z",
+    });
+    for (const id of [stored, lapsed]) {
+      const before = await row_of(id);
+      const blocks = await blocks_of(id, a.key);
+      blocks[0] = { type: "title", text: "Rewritten" };
+
+      const res = await patch(id, a.key, { blocks });
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({
+        code: "campaign_ended",
+        status: 409,
+      });
+
+      const malformed = await patch(id, a.key, { blocks: "title" });
+      expect(malformed.status).toBe(422);
+      expect(await row_of(id)).toEqual(before);
+    }
   });
 
   test("another org's campaign is 404 and a missing key is 401", async () => {

@@ -1,7 +1,7 @@
 import { Button, Label } from "@better-giving/ui";
-import type { ReactNode } from "react";
-import { data } from "react-router";
-import { upload_limits } from "@/constants/upload";
+import type { FormEvent, ReactNode } from "react";
+import { data, Form, useNavigation } from "react-router";
+import { photo_too_large, upload_limits } from "@/constants/upload";
 import { read_photo_page, save_photo } from "$/connector/photo-page";
 import { db } from "$/pg/db";
 import type { Route } from "./+types/photo-upload.$token";
@@ -39,13 +39,41 @@ export function meta() {
 const ACCEPT = "image/jpeg,image/png,image/webp";
 const MAX_MB = upload_limits.max_bytes / (1024 * 1024);
 
+type PhotoInput = Pick<
+  HTMLInputElement,
+  "setCustomValidity" | "reportValidity"
+> & {
+  files: ArrayLike<{ size: number }> | null;
+};
+
+/** refuses a pick past the cap before it is sent: Vercel answers a body over
+ * its 4.5 MB limit with its own error page before the action runs */
+export function hold_oversized(input: PhotoInput) {
+  const file = input.files?.[0];
+  if (file && file.size > upload_limits.max_bytes) {
+    input.setCustomValidity(photo_too_large);
+    input.reportValidity();
+  } else input.setCustomValidity("");
+}
+
 interface IUploadForm {
   error?: string;
 }
 
 function UploadForm({ error }: IUploadForm) {
+  // a second submit aborts the first only in the browser: the server still
+  // spends the link, and the second request reads it as gone
+  const busy = useNavigation().state !== "idle";
+  const hold = (e: FormEvent) => {
+    if (busy) e.preventDefault();
+  };
   return (
-    <form method="post" encType="multipart/form-data" className="grid gap-4">
+    <Form
+      method="post"
+      encType="multipart/form-data"
+      className="grid gap-4"
+      onSubmit={hold}
+    >
       <div className="grid gap-2">
         <Label htmlFor="photo" required>
           Photo
@@ -56,6 +84,7 @@ function UploadForm({ error }: IUploadForm) {
           name="photo"
           accept={ACCEPT}
           required
+          onChange={(e) => hold_oversized(e.currentTarget)}
           aria-describedby={error ? "photo-error" : undefined}
           aria-invalid={error ? true : undefined}
         />
@@ -69,10 +98,15 @@ function UploadForm({ error }: IUploadForm) {
           </p>
         )}
       </div>
-      <Button variant="primary" type="submit" classes="justify-self-start">
+      <Button
+        variant="primary"
+        type="submit"
+        classes="justify-self-start"
+        aria-disabled={busy || undefined}
+      >
         Upload photo
       </Button>
-    </form>
+    </Form>
   );
 }
 

@@ -1,7 +1,15 @@
 import { eq } from "drizzle-orm";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { createStaticHandler } from "react-router";
+import {
+  createMemoryRouter,
+  createRequestHandler,
+  createStaticHandler,
+  RouterProvider,
+  type ServerBuild,
+  useActionData,
+  useLoaderData,
+} from "react-router";
 import {
   afterAll,
   beforeAll,
@@ -136,10 +144,45 @@ const submit = async (
   } as unknown as Parameters<typeof route.action>[0])) as unknown as Result;
 };
 
+/** the page in a data router, as `<Form>` and `useNavigation` need; its
+ * action never settles, so a submit stays in flight */
+const router_of = (loaderData: unknown, actionData?: unknown) => {
+  function Page() {
+    return createElement(route.default as any, {
+      loaderData: useLoaderData(),
+      actionData: useActionData(),
+    });
+  }
+  return createMemoryRouter(
+    [
+      {
+        id: "photo",
+        path: "/p",
+        loader: () => loaderData,
+        action: () => new Promise(() => {}),
+        Component: Page,
+      },
+    ],
+    {
+      initialEntries: ["/p"],
+      hydrationData: {
+        loaderData: { photo: loaderData },
+        ...(actionData === undefined
+          ? {}
+          : { actionData: { photo: actionData } }),
+      },
+    }
+  );
+};
+
+const markup = (router: ReturnType<typeof router_of>) =>
+  renderToStaticMarkup(createElement(RouterProvider, { router })).replaceAll(
+    "&#x27;",
+    "'"
+  );
+
 const html_of = (loaderData: unknown, actionData?: unknown) =>
-  renderToStaticMarkup(
-    createElement(route.default as any, { loaderData, actionData })
-  ).replaceAll("&#x27;", "'");
+  markup(router_of(loaderData, actionData));
 
 describe("GET /photo-upload/:token", () => {
   test("a live link shows the campaign and a single image field, never the token", async () => {
@@ -249,6 +292,30 @@ describe("POST /photo-upload/:token", () => {
     expect(put).toHaveBeenCalledTimes(1);
     expect(await banner_of(campaign_id)).toBe(BLOB_URL);
   });
+
+  test.each([
+    ["image/png", "pic.png", [PNG], "u/pic.png"],
+    ["image/jpeg", "pic.jpg", [bytes(0xff, 0xd8, 0xff, 0xe0)], "u/pic.jpg"],
+    [
+      "image/webp",
+      "pic.webp",
+      ["RIFF", bytes(1, 2, 3, 4), "WEBPVP8 "],
+      "u/pic.webp",
+    ],
+  ] as const)(
+    "a %s photo is stored under its own extension and type",
+    async (type, name, parts, path) => {
+      const { token, campaign_id } = await seed();
+
+      const res = await submit(token, photo([...parts], type, name));
+
+      expect(res.init.status).toBe(200);
+      expect(await banner_of(campaign_id)).toBe(BLOB_URL);
+      const [stored_path, , opts] = put.mock.calls[0]!;
+      expect(stored_path).toBe(path);
+      expect(opts).toMatchObject({ contentType: type });
+    }
+  );
 
   test("a name with nothing left after basename is stored as campaign-photo", async () => {
     const { token } = await seed();
@@ -365,6 +432,8 @@ describe("POST /photo-upload/:token", () => {
 
     expect(res.init.status).toBe(404);
     expect(res.data).toEqual({ state: "gone" });
+    // the file is stored before the campaign is checked
+    expect(put).toHaveBeenCalledTimes(1);
   });
 
   test("the 31st post in a minute from one address is 429, another address still passes", async () => {
@@ -386,6 +455,75 @@ describe("POST /photo-upload/:token", () => {
       ip: "203.0.113.51",
     });
     expect(other.data).toMatchObject({ state: "saved" });
+  });
+});
+
+describe("picking a photo in the browser", () => {
+  const input = (size?: number) => {
+    const state = { validity: "", reported: 0 };
+    return {
+      state,
+      files: size === undefined ? [] : [{ size }],
+      setCustomValidity: (m: string) => {
+        state.validity = m;
+      },
+      reportValidity: () => {
+        state.reported++;
+        return state.validity === "";
+      },
+    };
+  };
+
+  test("a photo past the cap holds the form with the server's own 413 copy, a smaller pick clears it", async () => {
+    const { token } = await seed();
+    const big = input(upload_limits.max_bytes + 1);
+
+    route.hold_oversized(big);
+
+    const server = await submit(
+      token,
+      photo(
+        [PNG, new Uint8Array(upload_limits.max_bytes)],
+        "image/png",
+        "a.png"
+      )
+    );
+    expect(server.init.status).toBe(413);
+    expect(big.state.validity).toBe(server.data.error);
+    expect(big.state.reported).toBe(1);
+
+    const fits = Object.assign(big, {
+      files: [{ size: upload_limits.max_bytes }],
+    });
+    route.hold_oversized(fits);
+    expect(fits.state.validity).toBe("");
+  });
+
+  test("the upload button is held while the photo is on its way, so a second press can't spend the link", async () => {
+    const router = router_of({ state: "ready", campaign: "Library drive" });
+    const button = () => /<button[^>]*>/.exec(markup(router))?.[0] ?? "";
+    expect(button()).not.toContain("aria-disabled");
+
+    const form = new FormData();
+    form.set("photo", photo([PNG], "image/png", "a.png"));
+    void router.navigate("/p", {
+      formMethod: "post",
+      formEncType: "multipart/form-data",
+      formData: form,
+    });
+    await vi.waitFor(() =>
+      expect(router.state.navigation.state).toBe("submitting")
+    );
+
+    expect(button()).toContain('aria-disabled="true"');
+    router.dispose();
+  });
+
+  test("clearing the pick clears the hold", () => {
+    const none = input(upload_limits.max_bytes + 1);
+    route.hold_oversized(none);
+    route.hold_oversized(Object.assign(none, { files: [] }));
+    expect(none.state.validity).toBe("");
   });
 });
 
@@ -430,7 +568,63 @@ describe("every response from this page", () => {
     });
   });
 
-  test("a thrown error lands on this route's own boundary, so its headers still apply", () => {
-    expect(route.ErrorBoundary).toBeTypeOf("function");
+  // the framework merges a route's `headers` export into the document
+  // response; this runs that merge on a hand-built server build, with the
+  // real route module and a loader that can be swapped for one that throws
+  const document_headers = async (
+    url: string,
+    loader: unknown = route.loader
+  ) => {
+    const mod = { ...route, loader } as any;
+    const build = {
+      entry: {
+        module: {
+          default: (_req: Request, status: number, headers: Headers) =>
+            new Response(null, { status, headers }),
+        },
+      },
+      routes: {
+        photo: {
+          id: "photo",
+          path: "photo-upload/:token",
+          module: mod,
+          children: [],
+        },
+      },
+      assets: { routes: {}, entry: {}, url: "", version: "" },
+      publicPath: "/",
+      assetsBuildDirectory: "build",
+      future: {},
+      ssr: true,
+      isSpaMode: false,
+      prerender: [],
+      routeDiscovery: { mode: "initial", manifestPath: "/__manifest" },
+    } as unknown as ServerBuild;
+    return createRequestHandler(build, "test")(new Request(url));
+  };
+
+  const no_leak = (res: Response) => {
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(res.headers.get("x-robots-tag")).toBe("noindex");
+  };
+
+  test("the generic 404 for a dead link carries them", async () => {
+    const res = await document_headers("https://bg.test/photo-upload/nope");
+
+    expect(res.status).toBe(404);
+    no_leak(res);
+  });
+
+  test("a loader that throws lands on this route's boundary, with them", async () => {
+    const res = await document_headers(
+      "https://bg.test/photo-upload/any",
+      () => {
+        throw new Error("db down");
+      }
+    );
+
+    expect(res.status).toBe(500);
+    no_leak(res);
   });
 });

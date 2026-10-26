@@ -344,6 +344,39 @@ describe("create_form", () => {
     expect(await db().select().from(forms)).toHaveLength(3);
   });
 
+  test("the same Idempotency-Key from another nonprofit is its own create", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const b = await pair("Beta", "EIN-B", "b@test.com");
+
+    const first = await create(a.key, { name: "Shared" }, "idem-shared");
+    const other = await create(b.key, { name: "Shared" }, "idem-shared");
+
+    expect(first.status).toBe(201);
+    expect(other.status).toBe(201);
+    const a_id = ((await first.json()) as { id: string }).id;
+    const b_id = ((await other.json()) as { id: string }).id;
+    expect(b_id).not.toBe(a_id);
+    expect((await row_of(b_id)).owner_npo_id).toBe(b.npo.id);
+    expect(await db().select().from(forms)).toHaveLength(2);
+  });
+
+  test("the same Idempotency-Key with a different body is a conflict and creates nothing", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+
+    const first = await create(a.key, { name: "One" }, "idem-body");
+    const changed = await create(a.key, { name: "Two" }, "idem-body");
+
+    expect(first.status).toBe(201);
+    expect(changed.status).toBe(409);
+    expect(await changed.json()).toMatchObject({
+      code: "idempotency_conflict",
+      status: 409,
+    });
+    const rows = await db().select().from(forms);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.tag).toBe("One");
+  });
+
   test("no key is 401, and a method other than POST is unknown_action", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
 
@@ -452,6 +485,10 @@ describe("update_form", () => {
       frequencies: ["one-time", "weekly"],
       donate_methods: ["crypto"],
       gifts_go_to: { mode: "pinned", program_id: program },
+      suggested_amounts: [
+        { amount: "10", currency: "USD" },
+        { amount: "40", currency: "USD" },
+      ],
     };
 
     for (const [key, value] of Object.entries(change)) {
@@ -465,6 +502,10 @@ describe("update_form", () => {
       freq_opts: null,
       donate_methods: null,
       program_id: null,
+      increments: [
+        { value: "25", label: "Feeds a family" },
+        { value: "50", label: "" },
+      ],
     });
 
     const applied = await update(id, a.key, { ...change, confirm: true });
@@ -474,8 +515,16 @@ describe("update_form", () => {
       frequencies: ["one-time", "weekly"],
       donate_methods: ["crypto"],
       gifts_go_to: { mode: "pinned", program_id: program },
+      suggested_amounts: [
+        { amount: "10.00", currency: "USD" },
+        { amount: "40.00", currency: "USD" },
+      ],
     });
     expect((await row_of(id)).program_name).toBe("Literacy");
+    expect((await row_of(id)).increments).toEqual([
+      { value: "10", label: "" },
+      { value: "40", label: "" },
+    ]);
 
     const cleared = await update(id, a.key, {
       gifts_go_to: { mode: "none" },

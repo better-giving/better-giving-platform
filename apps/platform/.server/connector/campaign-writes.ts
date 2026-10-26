@@ -1,8 +1,9 @@
 import { BLOB_STORE_HOST } from "#/constants/urls";
+import { IMAGE_TYPES } from "../blob-upload";
 import {
   campaign_end,
+  campaign_first_publish,
   campaign_get,
-  campaign_publish,
   campaign_update,
 } from "../pg/queries/campaign";
 import type { DbOrTx } from "../pg/queries/helpers";
@@ -112,6 +113,12 @@ const GIFTS_GO_TO_REQUIRED =
 const GIFTS_GO_TO_SHAPE =
   "is a program id of this nonprofit, or null for the general fund";
 
+const already_published = () =>
+  problem(409, "already_published", {
+    detail:
+      "This campaign is live. Where its gifts go is changed in the Better Giving dashboard.",
+  });
+
 export async function publish_campaign(
   db: DbOrTx,
   request: Request,
@@ -136,10 +143,7 @@ export async function publish_campaign(
   // where a live campaign's gifts go is not re-routed from a chat
   if (row.published_at) {
     if (!sent || to === row.program_id) return detail(db, npo_id, id);
-    return problem(409, "already_published", {
-      detail:
-        "This campaign is live. Where its gifts go is changed in the Better Giving dashboard.",
-    });
+    return already_published();
   }
 
   if (!sent) {
@@ -153,17 +157,27 @@ export async function publish_campaign(
     }
     program = found;
   }
-  const wrote = await campaign_update(npo_id, id, {
-    program_id: program?.id ?? null,
-    program_name: program?.title ?? null,
-  });
-  if (wrote !== "ok") return missing(id);
-  // false only when it ended since the read above
-  if (!(await campaign_publish(npo_id, id))) return ended();
-  return detail(db, npo_id, id);
+  if (await campaign_first_publish(npo_id, id, program)) {
+    return detail(db, npo_id, id);
+  }
+  // published, ended or deleted since the read above
+  const current = await campaign_get(npo_id, id);
+  if (!current) return missing(id);
+  if (campaign_status(current.status, current.ends_at) === "ended") {
+    return ended();
+  }
+  if (current.program_id === (program?.id ?? null)) {
+    return detail(db, npo_id, id);
+  }
+  return already_published();
 }
 
 const UNSUPPORTED = "is not supported on Better Giving";
+/** shown by get_campaign but never set here: sent back as read, they pass */
+const READ_ONLY = ["time_zone", "sharing"] as const;
+
+const same = (a: unknown, b: unknown) =>
+  JSON.stringify(a) === JSON.stringify(b);
 
 export async function update_campaign_settings(
   db: DbOrTx,
@@ -179,8 +193,8 @@ export async function update_campaign_settings(
   const { body } = parsed;
   const issues: FieldError[] = [];
   unknown_keys(body, ["goal", "end_date", "time_zone", "sharing"], issues);
-  for (const key of ["time_zone", "sharing"]) {
-    if (Object.hasOwn(body, key))
+  for (const key of READ_ONLY) {
+    if (Object.hasOwn(body, key) && !same(body[key], current[key]))
       issues.push({ path: key, message: UNSUPPORTED });
   }
   const patch: { target?: string; ends_at?: string | null } = {};
@@ -224,10 +238,22 @@ const BLOCKS_MSG = `is the campaign's ${BLOCK_ORDER.length} blocks, ${BLOCK_ORDE
 const is_block_type = (t: unknown): t is BlockType =>
   BLOCK_ORDER.includes(t as BlockType);
 
+const photo_exts = Object.values(IMAGE_TYPES)
+  .flat()
+  .map((e) => e.slice(1))
+  .join("|");
+/** a name `store_upload` gives a photo: one segment under `u/`, an image
+ * extension. The store also holds the build's js and migrated files. */
+const UPLOADED_PHOTO = new RegExp(`^/u/[^/]+\\.(${photo_exts})$`, "i");
+
 const own_image = (value: string) => {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.host === BLOB_STORE_HOST;
+    return (
+      url.protocol === "https:" &&
+      url.host === BLOB_STORE_HOST &&
+      UPLOADED_PHOTO.test(url.pathname)
+    );
   } catch {
     return false;
   }
@@ -354,6 +380,7 @@ export async function update_campaign_blocks(
   unknown_keys(parsed.body, ["blocks"], issues);
   const patch = read_blocks(parsed.body.blocks, current, issues);
   if (issues.length > 0) return invalid(issues);
+  if (current.status === "ended") return ended();
   if (Object.keys(patch).length === 0) return json(current);
   if ((await campaign_update(npo_id, id, patch)) !== "ok") return missing(id);
   return detail(db, npo_id, id);
