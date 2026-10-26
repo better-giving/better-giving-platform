@@ -382,6 +382,30 @@ describe("publish_campaign", () => {
     });
   });
 
+  test("a draft that ended yesterday publishes until noon UTC today; a day and a half past, it is refused as ended", async () => {
+    // NOW() in pglite follows the real clock, so the ends are seeded from it
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const hours_ago = (h: number) =>
+      new Date(Date.now() - h * 60 * 60 * 1000).toISOString();
+    const recent = await seed_campaign(a, { ends_at: hours_ago(6) });
+    const lapsed = await seed_campaign(a, { ends_at: hours_ago(36) });
+
+    const open = await publish(recent, a.key, { gifts_go_to: null });
+    expect(open.status).toBe(200);
+    expect(await row_of(recent)).toMatchObject({ status: "live" });
+    expect((await row_of(recent)).published_at).not.toBeNull();
+
+    const closed = await publish(lapsed, a.key, { gifts_go_to: null });
+    expect(closed.status).toBe(422);
+    expect(await closed.json()).toMatchObject({
+      errors: [{ path: "end_date" }],
+    });
+    expect(await row_of(lapsed)).toMatchObject({
+      status: "draft",
+      published_at: null,
+    });
+  });
+
   test("already published: absent or the same destination is 200 and writes nothing, another is 409", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
     const program = await seed_program(a.npo.id, "Literacy");
@@ -635,6 +659,52 @@ describe("update_campaign_settings", () => {
       sharing: got.sharing,
     });
     expect(await row_of(id)).toEqual(before);
+  });
+
+  test("sharing sent back with its keys in another order is still as read", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a);
+    const before = await row_of(id);
+    const got = (await (await read(id, a.key)).json()) as {
+      sharing: Record<string, unknown>;
+    };
+    const keys = Object.keys(got.sharing);
+    expect(keys.length).toBeGreaterThan(1);
+    const reordered = Object.fromEntries(Object.entries(got.sharing).reverse());
+    expect(Object.keys(reordered)).not.toEqual(keys);
+
+    const res = await patch(id, a.key, { sharing: reordered });
+
+    expect(res.status).toBe(200);
+    expect(await row_of(id)).toEqual(before);
+  });
+
+  test("an end date is open until noon UTC the day after, as the campaign itself is", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a);
+    const later = await seed_campaign(a);
+    try {
+      // the evening of 2026-03-10 in California
+      vi.useFakeTimers({
+        toFake: ["Date"],
+        now: Date.parse("2026-03-11T02:00:00Z"),
+      });
+      const evening = await patch(id, a.key, { end_date: "2026-03-10" });
+      expect(evening.status).toBe(200);
+      expect((await row_of(id)).ends_at).toBe("2026-03-10T23:59:59.999Z");
+
+      vi.setSystemTime(Date.parse("2026-03-11T12:00:00Z"));
+      const noon = await patch(later, a.key, { end_date: "2026-03-10" });
+      expect(noon.status).toBe(422);
+      expect(await noon.json()).toMatchObject({
+        errors: [{ path: "end_date" }],
+      });
+      expect((await row_of(later)).ends_at).toBeNull();
+      const today = await patch(later, a.key, { end_date: "2026-03-11" });
+      expect(today.status).toBe(200);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("time_zone and sharing other than as read are refused alongside every other issue", async () => {

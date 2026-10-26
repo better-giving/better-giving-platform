@@ -30,8 +30,8 @@ async function options_of(entry: () => Promise<unknown>): Promise<Options> {
   return init.mock.calls[0]![0] as Options;
 }
 
-/** each hook sentry runs on outgoing data that the init sets must strip the
- * token; `beforeSend` is the one an error report always passes through */
+/** every hook the init sets on outgoing data must strip the token;
+ * `beforeSend` is the one an error report always passes through */
 function expect_redacting(options: Options) {
   expect(options.beforeSend).toBeTypeOf("function");
   const hooks = [

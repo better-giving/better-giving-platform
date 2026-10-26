@@ -4,6 +4,7 @@ import {
   type Reservation,
   reserve,
 } from "#/.server/auth/rate-limit";
+import { photo_upload_quota } from "@/constants/upload";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { find_live_key } from "./keys";
 import { problem } from "./problem";
@@ -11,7 +12,7 @@ import { problem } from "./problem";
 const IP_QUOTA = {
   hello: { max: 120, window_s: 60 },
   exchange: { max: 30, window_s: 60 },
-  photo_upload: { max: 30, window_s: 60 },
+  photo_upload: photo_upload_quota,
 } as const satisfies Record<string, Quota>;
 
 const KEY_QUOTA: Quota = { max: 120, window_s: 60 };

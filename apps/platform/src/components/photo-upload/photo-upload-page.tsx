@@ -15,13 +15,19 @@ import {
   type DragEvent,
   type FormEvent,
   type ReactNode,
+  type RefObject,
   useEffect,
   useId,
   useRef,
   useState,
 } from "react";
 import { DappLogo } from "#/components/image";
-import { upload_limits } from "@/constants/upload";
+import {
+  photo_link_ttl_ms,
+  photo_types,
+  photo_upload_quota,
+  upload_limits,
+} from "@/constants/upload";
 
 /** `gone | limited | ready | failed | unknown | saved` mirror the server's `PhotoPage`,
  * so the route passes a server page straight through */
@@ -47,23 +53,42 @@ export interface IPhotoUploadPage {
   view: PhotoView;
   /** JS path only: the route intercepts the submit (preventDefault) and uploads itself */
   on_submit?: (e: FormEvent<HTMLFormElement>) => void;
-  /** called with the file input after every pick or drop, so the caller can hold an oversized pick with setCustomValidity/reportValidity */
+  /** called with the file input after every pick or drop, so the caller can hold an oversized or wrong-type pick with setCustomValidity; the page shows the hold */
   on_pick?: (input: HTMLInputElement) => void;
 }
 
-const ACCEPT = "image/jpeg,image/png,image/webp";
+const ACCEPT = photo_types.join(",");
 const MIB = 1024 * 1024;
+
+const count = (n: number, unit: string) =>
+  n === 1 ? `a ${unit}` : `${n} ${unit}s`;
+
+/** a span of whole seconds as prose: 60 → "a minute", 120 → "2 minutes", 30 → "30 seconds" */
+export function format_duration(seconds: number): string {
+  return seconds % 60 === 0
+    ? count(seconds / 60, "minute")
+    : count(seconds, "second");
+}
+
+const LINK_TTL = format_duration(photo_link_ttl_ms / 1000);
 
 /** bytes as MB to one decimal, in the same MiB `upload_limits.max_bytes` is counted in */
 export function format_mb(bytes: number): string {
   return (bytes / MIB).toFixed(1);
 }
 
+const FORM_STATES: ReadonlySet<PhotoView["state"]> = new Set([
+  "ready",
+  "failed",
+  "uploading",
+]);
+
 const STATUS: Record<Exclude<PhotoView["state"], "uploading">, string> = {
   ready: "",
-  failed: "The photo couldn't be saved",
+  // the failed band takes focus and reads itself
+  failed: "",
   unknown:
-    "We couldn't confirm your photo saved. Open this link again to check; if it's been used up, ask for a new one.",
+    "We couldn't confirm your photo was saved. Open this link again to check; if it's been used up, ask for a new one.",
   saved: "Photo added",
   limited: "Too many uploads",
   gone: "This link can't be used",
@@ -74,6 +99,18 @@ export function PhotoUploadPage({
   on_submit,
   on_pick,
 }: IPhotoUploadPage) {
+  // an outcome that replaces the form takes focus from the button that was pressed;
+  // one the server rendered first (a reopened, spent link) leaves focus alone
+  const result = useRef<HTMLHeadingElement>(null);
+  const prev_state = useRef(view.state);
+  useEffect(() => {
+    const was = prev_state.current;
+    prev_state.current = view.state;
+    if (FORM_STATES.has(was) && !FORM_STATES.has(view.state)) {
+      result.current?.focus();
+    }
+  }, [view.state]);
+
   // the region outlives every swap so each outcome is a change it announces,
   // not a node that arrives already holding it
   const status =
@@ -88,7 +125,8 @@ export function PhotoUploadPage({
             tone="neutral"
             Icon={Link2Off}
             title="This link can't be used"
-            lede="Upload links work once and expire after 15 minutes. Ask whoever sent you this link for a new one."
+            heading={result}
+            lede={`Upload links work once and expire after ${LINK_TTL}. Ask whoever sent you this link for a new one.`}
           />
         </Shell>
       );
@@ -99,7 +137,8 @@ export function PhotoUploadPage({
             tone="neutral"
             Icon={Clock}
             title="Too many uploads"
-            lede="Too many uploads came from this connection. Wait a minute, then try again."
+            heading={result}
+            lede={`Too many uploads came from this connection. Wait ${format_duration(photo_upload_quota.window_s)}, then try again.`}
           >
             {/* a GET of the link's own url: the link was not used up */}
             <Button variant="secondary" size="lg" href="" classes="w-full">
@@ -114,7 +153,8 @@ export function PhotoUploadPage({
           <Outcome
             tone="neutral"
             Icon={CircleAlert}
-            title="We couldn't confirm your photo saved."
+            title="We couldn't confirm your photo was saved"
+            heading={result}
             lede="Open this link again to check; if it's been used up, ask for a new one."
           />
         </Shell>
@@ -126,6 +166,7 @@ export function PhotoUploadPage({
             tone="success"
             Icon={CircleCheck}
             title="Photo added"
+            heading={result}
             lede={
               <>
                 It's now the banner of{" "}
@@ -143,7 +184,7 @@ export function PhotoUploadPage({
             {/* not a second status: the shell's region already announces the save */}
             <p className="flex items-start gap-2.5 rounded px-4 py-3 bg-success-subtle text-success-subtle-fg text-sm font-semibold">
               <Check className="icon-md mt-px" aria-hidden />
-              Saved. This link is now used up, so you can close this tab.
+              This link is now used up. You can close this tab.
             </p>
           </Outcome>
         </Shell>
@@ -159,7 +200,7 @@ export function PhotoUploadPage({
           foot={
             view.state === "uploading"
               ? "Keep this tab open until the upload finishes."
-              : "This link works once and expires 15 minutes after it was created. No sign-in needed."
+              : `This link works once and expires ${LINK_TTL} after it was created. No sign-in needed.`
           }
           status={status}
         >
@@ -226,7 +267,7 @@ function Head({ campaign, title_id }: IHead) {
         Add a photo to <span className="text-gray-12">{campaign}</span>
       </h1>
       <p className="text-gray-11 text-pretty">
-        It becomes the banner at the top of the campaign page.
+        It replaces the banner at the top of the campaign page, if there is one.
       </p>
     </div>
   );
@@ -270,6 +311,8 @@ function UploadForm({ view, on_submit, on_pick }: IUploadForm) {
   const [dragging, set_dragging] = useState(false);
 
   const uploading = view.state === "uploading";
+  // every byte is sent; the server is still checking and storing it
+  const saving = uploading && view.total > 0 && view.loaded >= view.total;
   const failed = view.state === "failed";
   const server_error = view.state === "ready" ? view.error : undefined;
 
@@ -291,6 +334,17 @@ function UploadForm({ view, on_submit, on_pick }: IUploadForm) {
   useEffect(() => {
     if (failed) band.current?.focus();
   }, [failed]);
+
+  // a drop that misses the area would open the file in the tab and leave the page
+  useEffect(() => {
+    const hold = (e: globalThis.DragEvent) => e.preventDefault();
+    document.addEventListener("dragover", hold);
+    document.addEventListener("drop", hold);
+    return () => {
+      document.removeEventListener("dragover", hold);
+      document.removeEventListener("drop", hold);
+    };
+  }, []);
 
   const pick = (el: HTMLInputElement) => {
     set_picked(el.files?.[0]?.name ?? null);
@@ -317,7 +371,6 @@ function UploadForm({ view, on_submit, on_pick }: IUploadForm) {
       method="post"
       encType="multipart/form-data"
       aria-labelledby={title_id}
-      aria-busy={uploading || undefined}
       onSubmit={(e) => {
         // the held button stays enabled, so a second press still submits: it must not send twice
         if (uploading) e.preventDefault();
@@ -392,15 +445,12 @@ function UploadForm({ view, on_submit, on_pick }: IUploadForm) {
                 </span>
               </span>
               <span className="hidden group-has-valid:inline">
-                Photo chosen. Ready to upload.
+                Photo chosen
               </span>
             </span>
           )}
-          <span className="text-sm text-gray-11 text-balance">
-            Replaces the current banner, if there is one.
-          </span>
         </label>
-        {uploading && <Progress {...view} />}
+        {uploading && <Progress {...view} saving={saving} />}
         {error && (
           <p
             id={error_id}
@@ -422,7 +472,7 @@ function UploadForm({ view, on_submit, on_pick }: IUploadForm) {
           classes="w-full gap-2 pending"
         >
           <LoaderCircle className="icon-md animate-spin" aria-hidden />
-          Uploading…
+          {saving ? "Saving…" : "Uploading…"}
         </Button>
       ) : (
         <Button
@@ -439,9 +489,17 @@ function UploadForm({ view, on_submit, on_pick }: IUploadForm) {
   );
 }
 
-type IProgress = Extract<PhotoView, { state: "uploading" }>;
+interface IProgress extends Extract<PhotoView, { state: "uploading" }> {
+  saving: boolean;
+}
 
-function Progress({ file_name, preview_url, loaded, total }: IProgress) {
+function Progress({
+  file_name,
+  preview_url,
+  loaded,
+  total,
+  saving,
+}: IProgress) {
   const pct =
     total > 0
       ? Math.min(100, Math.max(0, Math.round((loaded / total) * 100)))
@@ -455,7 +513,7 @@ function Progress({ file_name, preview_url, loaded, total }: IProgress) {
         <span className="truncate text-sm font-semibold">{file_name}</span>
         <div
           role="progressbar"
-          aria-label="Uploading photo"
+          aria-label={saving ? "Saving photo" : "Uploading photo"}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={pct}
@@ -482,6 +540,8 @@ interface IOutcome {
   Icon: LucideIcon;
   title: string;
   lede: ReactNode;
+  /** focused when the outcome replaces the form */
+  heading: RefObject<HTMLHeadingElement | null>;
   children?: ReactNode;
 }
 
@@ -490,7 +550,7 @@ const RING: Record<IOutcome["tone"], string> = {
   neutral: "bg-gray-3 text-gray-11",
 };
 
-function Outcome({ tone, Icon, title, lede, children }: IOutcome) {
+function Outcome({ tone, Icon, title, lede, heading, children }: IOutcome) {
   const title_id = `${useId()}-title`;
   return (
     <section aria-labelledby={title_id} className={CARD}>
@@ -501,8 +561,10 @@ function Outcome({ tone, Icon, title, lede, children }: IOutcome) {
           <Icon className="pictogram-md" aria-hidden />
         </span>
         <h1
+          ref={heading}
           id={title_id}
-          className="text-2xl font-bold tracking-tight text-balance"
+          tabIndex={-1}
+          className="text-2xl font-bold tracking-tight text-balance focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2"
         >
           {title}
         </h1>

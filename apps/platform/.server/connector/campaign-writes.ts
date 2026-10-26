@@ -28,7 +28,7 @@ import {
   read_campaign_detail,
   version_sql,
 } from "./reads";
-import { read_body, TITLE_MAX, unknown_keys } from "./writes";
+import { read_body, same_json, TITLE_MAX, unknown_keys } from "./writes";
 
 const missing = (id: string) =>
   not_found(`Campaign ${id} does not exist for this nonprofit.`);
@@ -178,7 +178,7 @@ const GIFTS_GO_TO_SHAPE =
 const already_published = () =>
   problem(409, "already_published", {
     detail:
-      "This campaign is live. Where its gifts go is changed in the Better Giving dashboard.",
+      "This campaign is live. Change where its gifts go in the Better Giving dashboard.",
   });
 
 export async function publish_campaign(
@@ -242,9 +242,6 @@ const UNSUPPORTED = "is not supported on Better Giving";
 /** shown by get_campaign but never set here: sent back as read, they pass */
 const READ_ONLY = ["time_zone", "sharing"] as const;
 
-const same = (a: unknown, b: unknown) =>
-  JSON.stringify(a) === JSON.stringify(b);
-
 export async function update_campaign_settings(
   db: DbOrTx,
   request: Request,
@@ -265,7 +262,7 @@ export async function update_campaign_settings(
   );
   const expected = read_version(body, issues);
   for (const key of READ_ONLY) {
-    if (Object.hasOwn(body, key) && !same(body[key], current[key]))
+    if (Object.hasOwn(body, key) && !same_json(body[key], current[key]))
       issues.push({ path: key, message: UNSUPPORTED });
   }
   const patch: { target?: string; ends_at?: string | null } = {};
@@ -278,12 +275,11 @@ export async function update_campaign_settings(
   }
   const end_date = body.end_date;
   if (end_date !== undefined && end_date !== current.end_date) {
-    const today = new Date().toISOString().slice(0, 10);
     if (end_date === null) patch.ends_at = null;
     else if (
       typeof end_date === "string" &&
       valid_day(end_date) &&
-      end_date >= today
+      Date.now() < fund_closes_at(end_date).getTime()
     ) {
       patch.ends_at = ends_at_of(end_date);
     } else issues.push({ path: "end_date", message: END_DATE_MSG });

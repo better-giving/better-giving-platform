@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   afterAll,
   beforeAll,
@@ -18,10 +19,14 @@ import {
 import { npos } from "../pg/schema/npo";
 import { user_npo_memberships } from "../pg/schema/user";
 import { create_test_db, type TestDb } from "../pg/test-utils/pglite";
-import { with_idempotency } from "./idempotency";
+import {
+  IDEMPOTENCY_PENDING_RECLAIM_MS,
+  with_idempotency,
+} from "./idempotency";
 import { exchange_code, issue_code } from "./keys";
 
 const as_db = (x: unknown) => x as DbOrTx;
+const HASH_OF_EMPTY = createHash("sha256").update("{}", "utf8").digest("hex");
 
 let t: TestDb;
 
@@ -134,14 +139,37 @@ describe("with_idempotency", () => {
     const res = await call(key_id, "same", '{ "n": 1 }', handler);
 
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({
+    expect(await res.json()).toMatchObject({
       code: "idempotency_conflict",
       status: 409,
+      detail: expect.stringMatching(/already used for a different request/),
     });
     expect(handler).toHaveBeenCalledOnce();
   });
 
-  test("a pending row is 409 and does not call the handler", async () => {
+  test("a fresh pending row of the same body is in progress: 409 with Retry-After, and the handler does not run", async () => {
+    const key_id = await seed_key();
+    await t.db.insert(connector_idempotency).values({
+      key_id,
+      idem_key: "flight",
+      request_hash: HASH_OF_EMPTY,
+      status: "pending",
+    });
+    const handler = vi.fn(async () => Response.json({ ok: true }));
+
+    const res = await call(key_id, "flight", "{}", handler);
+
+    expect(res.status).toBe(409);
+    expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
+    const body = (await res.json()) as { code: string; detail: string };
+    expect(body.code).toBe("idempotency_in_progress");
+    expect(body.detail).toMatch(/same Idempotency-Key and the same body/);
+    expect(handler).not.toHaveBeenCalled();
+    const [row] = await t.db.select().from(connector_idempotency);
+    expect(row.status).toBe("pending");
+  });
+
+  test("a pending row of a different body is a conflict, not in progress", async () => {
     const key_id = await seed_key();
     await t.db.insert(connector_idempotency).values({
       key_id,
@@ -154,10 +182,90 @@ describe("with_idempotency", () => {
     const res = await call(key_id, "flight", "{}", handler);
 
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({
-      code: "idempotency_conflict",
-      status: 409,
+    expect(res.headers.get("retry-after")).toBeNull();
+    const body = (await res.json()) as { code: string; detail: string };
+    expect(body.code).toBe("idempotency_conflict");
+    expect(body.detail).toMatch(/already used for a different request/);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  test("a pending row past the reclaim window is taken over: the handler runs once and its answer is stored", async () => {
+    const key_id = await seed_key();
+    await t.db.insert(connector_idempotency).values({
+      key_id,
+      idem_key: "dead",
+      request_hash: HASH_OF_EMPTY,
+      status: "pending",
+      created_at: new Date(
+        Date.now() - IDEMPOTENCY_PENDING_RECLAIM_MS - 5_000
+      ).toISOString(),
     });
+    const handler = vi.fn(async () =>
+      Response.json({ made: 1 }, { status: 201 })
+    );
+
+    const res = await call(key_id, "dead", "{}", handler);
+
+    expect(res.status).toBe(201);
+    expect(handler).toHaveBeenCalledOnce();
+    const [row] = await t.db.select().from(connector_idempotency);
+    expect(row.status).toBe("stored");
+    expect(row.response_body).toEqual({ made: 1 });
+  });
+
+  test("two retries of a dead pending row: only one takes it over, the other is in progress", async () => {
+    const key_id = await seed_key();
+    await t.db.insert(connector_idempotency).values({
+      key_id,
+      idem_key: "dead",
+      request_hash: HASH_OF_EMPTY,
+      status: "pending",
+      created_at: new Date(
+        Date.now() - IDEMPOTENCY_PENDING_RECLAIM_MS - 5_000
+      ).toISOString(),
+    });
+    let release = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const handler = vi.fn(async () => {
+      await gate;
+      return Response.json({ made: 1 }, { status: 201 });
+    });
+
+    const first = call(key_id, "dead", "{}", handler);
+    const second = call(key_id, "dead", "{}", handler);
+    const loser = await Promise.race([first, second]);
+    release();
+    const statuses = [(await first).status, (await second).status].sort();
+
+    expect(loser.status).toBe(409);
+    expect(((await loser.json()) as { code: string }).code).toBe(
+      "idempotency_in_progress"
+    );
+    expect(statuses).toEqual([201, 409]);
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  test("a pending row just inside the reclaim window is not taken over", async () => {
+    const key_id = await seed_key();
+    await t.db.insert(connector_idempotency).values({
+      key_id,
+      idem_key: "slow",
+      request_hash: HASH_OF_EMPTY,
+      status: "pending",
+      created_at: new Date(
+        Date.now() - IDEMPOTENCY_PENDING_RECLAIM_MS + 5_000
+      ).toISOString(),
+    });
+    const handler = vi.fn(async () => Response.json({ ok: true }));
+
+    const res = await call(key_id, "slow", "{}", handler);
+
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code: string }).code).toBe(
+      "idempotency_in_progress"
+    );
     expect(handler).not.toHaveBeenCalled();
   });
 
@@ -261,7 +369,7 @@ describe("with_idempotency", () => {
     expect(handler).toHaveBeenCalledTimes(2);
   });
 
-  test("a 2xx body that is not json keeps the pending row so a retry conflicts", async () => {
+  test("a 2xx body that is not json keeps the pending row, so a retry inside the window is in progress", async () => {
     const key_id = await seed_key();
     const handler = vi.fn(async () => new Response("", { status: 201 }));
 
@@ -276,10 +384,9 @@ describe("with_idempotency", () => {
     const res = await call(key_id, "empty", "{}", retry);
 
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({
-      code: "idempotency_conflict",
-      status: 409,
-    });
+    expect(((await res.json()) as { code: string }).code).toBe(
+      "idempotency_in_progress"
+    );
     expect(retry).not.toHaveBeenCalled();
     expect(handler).toHaveBeenCalledOnce();
   });

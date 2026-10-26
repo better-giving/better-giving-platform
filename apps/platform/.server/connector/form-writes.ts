@@ -1,5 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import * as v from "valibot";
+import { report_error } from "#/errors/report";
 import type { IForm } from "@/forms/interfaces";
 import { to_freq_bools, to_freqs } from "@/helpers/donation";
 import {
@@ -21,7 +22,7 @@ import { with_idempotency } from "./idempotency";
 import { AMOUNT, AMOUNT_MSG, usd_amount } from "./money";
 import { type FieldError, invalid, not_found, problem } from "./problem";
 import { type ConnectorForm, read_form, read_form_state } from "./reads";
-import { read_body, TITLE_MAX } from "./writes";
+import { read_body, same_json, TITLE_MAX } from "./writes";
 
 const WRITABLE = [
   "name",
@@ -61,12 +62,14 @@ type Patch = {
   program?: { id: string; name: string } | null;
 };
 
-/** what the body asks for, measured against the form as it stands (`null`
- * for a form not yet made) */
+/** the form as it stands, which the body is measured against (`null` for a form not yet made) */
 type Current = { form: ConnectorForm; increments: IIncrement[] } | null;
 
-const same = (a: unknown, b: unknown) =>
-  JSON.stringify(a) === JSON.stringify(b);
+const stale_form = () =>
+  problem(409, "stale_read", {
+    detail:
+      "This form changed after it was read. Read it again with get_form, then send the change against what it shows now.",
+  });
 
 function refuse_keys(
   body: Record<string, unknown>,
@@ -84,20 +87,27 @@ function refuse_keys(
   }
 }
 
+/** true when the body echoes an `updated_at` the form has moved past */
 function read_echoes(
   body: Record<string, unknown>,
   shown: ConnectorForm | null,
   issues: FieldError[]
-) {
+): boolean {
   const blank = { minimum: null, maximum: null, allowed_origins: [] };
+  let stale = false;
   for (const key of ECHOES) {
     if (!Object.hasOwn(body, key)) continue;
+    if (shown && key === "updated_at" && typeof body[key] === "string") {
+      stale = body[key] !== shown.updated_at;
+      continue;
+    }
     const ok = shown
-      ? same(body[key], shown[key])
+      ? same_json(body[key], shown[key])
       : !(ASSIGNED as readonly string[]).includes(key) &&
-        same(body[key], blank[key as keyof typeof blank]);
+        same_json(body[key], blank[key as keyof typeof blank]);
     if (!ok) issues.push({ path: key, message: NOT_SETTABLE });
   }
+  return stale;
 }
 
 function read_name(value: unknown, issues: FieldError[]): string | undefined {
@@ -281,7 +291,7 @@ async function read_fields(
       list.map((x) => usd_amount(Number(x.value)));
     if (
       increments &&
-      !same(
+      !same_json(
         amounts(increments),
         shown?.suggested_amounts.map((m) => m.amount)
       )
@@ -294,7 +304,7 @@ async function read_fields(
     const freqs = read_frequencies(body.frequencies, issues);
     if (
       freqs &&
-      !same(freqs, shown && to_freqs(to_freq_bools(shown.frequencies)))
+      !same_json(freqs, shown && to_freqs(to_freq_bools(shown.frequencies)))
     ) {
       patch.freq_opts = freqs;
       changed.push("frequencies");
@@ -308,7 +318,7 @@ async function read_fields(
       "donate method",
       issues
     );
-    if (methods && !same(methods, shown?.donate_methods)) {
+    if (methods && !same_json(methods, shown?.donate_methods)) {
       patch.donate_methods = methods;
       changed.push("donate_methods");
     }
@@ -384,22 +394,23 @@ async function insert_form(
   };
   try {
     await form_put(form);
-  } catch {
+  } catch (err) {
+    report_error(err, { where: "connector: create_form" });
     return problem(500, "write_failed", {
-      detail: "The form could not be saved.",
+      detail: "The form could not be saved. Try again.",
     });
   }
   const made = await read_form(db, npo_id, form.id);
   return made ? json(made, 201) : missing(form.id);
 }
 
-/** false when the form's status is no longer `status`: the confirm check read
- * a form that has since gone live or off */
+/** false when the form's status or stored `updated_at` is no longer what the
+ * body was measured against: it has gone live or off, or been saved since */
 async function write_patch(
   db: DbOrTx,
   npo_id: number,
   id: string,
-  status: string | null,
+  read: { status: string | null; updated_at: string | null },
   { program, ...cols }: Patch
 ): Promise<boolean> {
   const wrote = await db
@@ -416,7 +427,8 @@ async function write_patch(
       and(
         eq(forms.id, id),
         eq(forms.owner_npo_id, npo_id),
-        sql`${forms.status} IS NOT DISTINCT FROM ${status}`
+        sql`${forms.status} IS NOT DISTINCT FROM ${read.status}`,
+        sql`${forms.updated_at} IS NOT DISTINCT FROM ${read.updated_at}::timestamptz`
       )
     )
     .returning({ id: forms.id });
@@ -448,11 +460,12 @@ export async function update_form(
     shape.push({ path: "confirm", message: "is true, or left out" });
   }
 
-  // a second pass only when the status moved between the confirm check and the write
+  // a second pass only when the status moved between the confirm check and the
+  // write with no save stamping it; a save in between is a stale read
   for (let pass = 0; pass < 2; pass++) {
     const { shown } = current;
     const issues = [...shape];
-    read_echoes(body, shown, issues);
+    const stale = read_echoes(body, shown, issues);
     const { patch, changed } = await read_fields(
       body,
       npo_id,
@@ -460,6 +473,7 @@ export async function update_form(
       issues
     );
     if (issues.length > 0) return invalid(issues);
+    if (stale) return stale_form();
     if (changed.length === 0) return json(shown);
 
     const held = changed.filter((f) => DONOR_VISIBLE.includes(f));
@@ -469,12 +483,14 @@ export async function update_form(
       });
     }
 
-    if (await write_patch(db, npo_id, id, current.status, patch)) {
+    if (await write_patch(db, npo_id, id, current, patch)) {
       const after = await read_form(db, npo_id, id);
       return after ? json(after) : missing(id);
     }
+    const measured = current.updated_at;
     current = await read_form_state(db, npo_id, id);
     if (!current) return missing(id);
+    if (current.updated_at !== measured) return stale_form();
   }
   return problem(500, "write_failed", {
     detail: "The form kept changing while it was saved. Try again.",

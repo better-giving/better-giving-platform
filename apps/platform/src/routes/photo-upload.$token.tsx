@@ -1,7 +1,12 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { data } from "react-router";
 import { PhotoUploadPage, type PhotoView } from "#/components/photo-upload";
-import { photo_too_large, upload_limits } from "@/constants/upload";
+import {
+  photo_too_large,
+  photo_types,
+  photo_wrong_type,
+  upload_limits,
+} from "@/constants/upload";
 import { read_photo_page, save_photo } from "$/connector/photo-page";
 import { db } from "$/pg/db";
 import type { Route } from "./+types/photo-upload.$token";
@@ -57,22 +62,34 @@ export function meta() {
   ];
 }
 
-type PhotoInput = Pick<
-  HTMLInputElement,
-  "setCustomValidity" | "reportValidity"
-> & {
-  files: ArrayLike<{ size: number }> | null;
+type PhotoInput = Pick<HTMLInputElement, "setCustomValidity"> & {
+  files: ArrayLike<Pick<File, "size" | "type" | "name">> | null;
 };
 
-/** refuses a pick past the cap before it is sent: Vercel answers a body over
- * its 4.5 MB limit with its own error page before the action runs. true when
- * it held the pick */
-export function hold_oversized(input: PhotoInput): boolean {
+const PHOTO_TYPES: readonly string[] = photo_types;
+const PHOTO_EXTENSIONS = photo_types.flatMap((t) => upload_limits.types[t]!);
+
+/** a browser that can't name a file's type reports it as "" */
+const is_photo_type = ({ type, name }: Pick<File, "type" | "name">) =>
+  type
+    ? PHOTO_TYPES.includes(type)
+    : PHOTO_EXTENSIONS.some((ext) => name.toLowerCase().endsWith(ext));
+
+/** holds a pick or drop the server would refuse, before it is sent: Vercel
+ * answers a body over its 4.5 MB limit with its own error page before the
+ * action runs. Sets the input's validity and leaves showing it to the page.
+ * true when it held the pick */
+export function hold_unfit(input: PhotoInput): boolean {
   const file = input.files?.[0];
-  const held = !!file && file.size > upload_limits.max_bytes;
-  input.setCustomValidity(held ? photo_too_large : "");
-  if (held) input.reportValidity();
-  return held;
+  const refusal = !file
+    ? ""
+    : !is_photo_type(file)
+      ? photo_wrong_type
+      : file.size > upload_limits.max_bytes
+        ? photo_too_large
+        : "";
+  input.setCustomValidity(refusal);
+  return refusal !== "";
 }
 
 type Settled = Exclude<PhotoView, { state: "uploading" }>;
@@ -94,9 +111,10 @@ function page_of(body: string): Settled | null {
   }
 }
 
-/** the form's own post, sent so the upload's progress can be read. Anything
- * but the page back — a dropped connection, or the platform's own error page
- * for an oversized body — reads as failed */
+/** the form's own post, sent so the upload's progress can be read. A
+ * connection lost before the body finished sending reaches no action, so it
+ * reads as failed; lost after, or answered with anything but the page, the
+ * save may have landed, so it reads as unknown */
 export function send_photo(
   url: string,
   body: FormData,
@@ -105,15 +123,22 @@ export function send_photo(
 ): Promise<Settled> {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
-    const failed = () => resolve({ state: "failed", campaign });
+    let body_sent = false;
+    const unknown: Settled = { state: "unknown", campaign };
+    const lost = () =>
+      resolve(body_sent ? unknown : { state: "failed", campaign });
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) on_progress(e.loaded, e.total);
+      if (!e.lengthComputable) return;
+      if (e.loaded >= e.total) body_sent = true;
+      on_progress(e.loaded, e.total);
     };
-    xhr.onload = () =>
-      resolve(page_of(xhr.responseText) ?? { state: "failed", campaign });
-    xhr.onerror = failed;
-    xhr.onabort = failed;
-    xhr.ontimeout = failed;
+    xhr.upload.onload = () => {
+      body_sent = true;
+    };
+    xhr.onload = () => resolve(page_of(xhr.responseText) ?? unknown);
+    xhr.onerror = lost;
+    xhr.onabort = lost;
+    xhr.ontimeout = lost;
     xhr.open("POST", url);
     xhr.setRequestHeader("Accept", "application/json");
     xhr.send(body);
@@ -138,7 +163,7 @@ export default function PhotoUpload({
     const input = form.elements.namedItem("photo") as HTMLInputElement;
     // `required` keeps an empty pick from submitting at all
     const file = input.files?.[0];
-    if (!file || hold_oversized(input)) return;
+    if (!file || hold_unfit(input)) return;
     const body = new FormData(form);
     const { campaign } = view;
     set_view({
@@ -156,7 +181,7 @@ export default function PhotoUpload({
   };
 
   return (
-    <PhotoUploadPage view={view} on_submit={submit} on_pick={hold_oversized} />
+    <PhotoUploadPage view={view} on_submit={submit} on_pick={hold_unfit} />
   );
 }
 

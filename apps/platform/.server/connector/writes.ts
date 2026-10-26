@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { to_text } from "#/components/rich-text/helpers";
+import { report_error } from "#/errors/report";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { campaign_members, campaigns } from "../pg/schema/campaign";
 import { npos } from "../pg/schema/npo";
@@ -25,6 +26,33 @@ function campaign_slug(title: string, id: string): string {
 function as_record(body: unknown): Record<string, unknown> | null {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   return body as Record<string, unknown>;
+}
+
+/** equal as JSON values: arrays in order, objects whatever their key order */
+export function same_json(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((x, i) => same_json(x, b[i]))
+    );
+  }
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  return (
+    ka.length === kb.length &&
+    ka.every(
+      (k) =>
+        Object.hasOwn(b, k) &&
+        same_json(
+          (a as Record<string, unknown>)[k],
+          (b as Record<string, unknown>)[k]
+        )
+    )
+  );
 }
 
 export function unknown_keys(
@@ -141,7 +169,8 @@ async function insert_campaign(
       });
     }
     return json(detail, 201);
-  } catch {
+  } catch (err) {
+    report_error(err, { where: "connector: create_campaign" });
     return problem(500, "write_failed", {
       detail: "The campaign could not be saved.",
     });

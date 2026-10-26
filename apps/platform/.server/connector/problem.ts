@@ -5,6 +5,8 @@ export type ProblemCode =
   | "code_invalid"
   | "idempotency_key_required"
   | "idempotency_conflict"
+  | "idempotency_in_progress"
+  | "internal_error"
   | "invalid"
   | "not_found"
   | "write_failed"
@@ -23,7 +25,11 @@ export type FieldError = { path: string; message: string };
 export function problem(
   status: number,
   code: ProblemCode,
-  extra?: { detail?: string; errors?: FieldError[] }
+  extra?: {
+    detail?: string;
+    errors?: FieldError[];
+    headers?: Record<string, string>;
+  }
 ): Response {
   const body: {
     code: ProblemCode;
@@ -38,6 +44,7 @@ export function problem(
     headers: {
       "content-type": "application/problem+json",
       "cache-control": "no-store",
+      ...extra?.headers,
     },
   });
 }

@@ -24,8 +24,16 @@ import {
 import { reset_rate_limits } from "#/.server/auth/rate-limit";
 import { seed_npo, seed_user } from "#/__tests__/fixtures/funds";
 import { PhotoUploadPage } from "#/components/photo-upload";
-import { upload_limits } from "@/constants/upload";
-import { issue_photo_link } from "$/connector/photo-links";
+import {
+  photo_too_large,
+  photo_types,
+  photo_wrong_type,
+  upload_limits,
+} from "@/constants/upload";
+import {
+  issue_photo_link,
+  PHOTO_CLAIM_PENDING_MS,
+} from "$/connector/photo-links";
 import type { DbOrTx } from "$/pg/queries/helpers";
 import { user } from "$/pg/schema/auth";
 import { campaigns } from "$/pg/schema/campaign";
@@ -36,9 +44,9 @@ import * as route from "./photo-upload.$token";
 
 const MIB = 1024 * 1024;
 const DAY = 24 * 60 * 60 * 1000;
-const UNCONFIRMED_TITLE = "We couldn't confirm your photo saved.";
+const UNCONFIRMED_TITLE = "We couldn't confirm your photo was saved";
 const UNCONFIRMED_LEDE =
-  "Open this link again to check; if it's been used up, ask for a new one.";
+  "We couldn't confirm your photo was saved. Open this link again";
 
 const { put, del } = vi.hoisted(() => ({ put: vi.fn(), del: vi.fn() }));
 vi.mock("@vercel/blob", () => ({ put, del }));
@@ -298,9 +306,14 @@ describe("GET /photo-upload/:token", () => {
     const expired = await get(token);
 
     const fresh = await seed2();
+    // spent past the window in which a claim still reads as saving
     await db()
       .update(connector_photo_links)
-      .set({ used_at: new Date().toISOString() })
+      .set({
+        used_at: new Date(
+          Date.now() - PHOTO_CLAIM_PENDING_MS - 60_000
+        ).toISOString(),
+      })
       .where(eq(connector_photo_links.campaign_id, fresh.campaign_id));
     const used = await get(fresh.token);
 
@@ -355,6 +368,30 @@ describe("GET /photo-upload/:token", () => {
     const html = html_of(res.data);
     expect(html).toContain(GONE);
     expect(html).not.toContain(BLOB_URL);
+  });
+
+  test("reopened while another request's claim is still saving, the link reads as unconfirmed; claimed long ago with nothing saved, it is the generic 404", async () => {
+    const { token } = await seed();
+    const claimed_ago = (ms: number) =>
+      db()
+        .update(connector_photo_links)
+        .set({ used_at: new Date(Date.now() - ms).toISOString() });
+
+    await claimed_ago(60_000);
+    const in_flight = await get(token);
+    expect(in_flight.init.status).toBe(409);
+    expect(in_flight.data).toEqual({
+      state: "unknown",
+      campaign: "Library drive",
+    });
+    const html = html_of(in_flight.data);
+    expect(html).toContain(UNCONFIRMED_TITLE);
+    expect(html).not.toContain("<form");
+
+    await claimed_ago(PHOTO_CLAIM_PENDING_MS + 60_000);
+    const dead = await get(token);
+    expect(dead.init.status).toBe(404);
+    expect(dead.data).toEqual({ state: "gone" });
   });
 });
 
@@ -411,7 +448,9 @@ describe.each(["document", "script"] as const)(
       const html = html_of({ state: "gone" }, res.data);
       expect(html).toContain("Photo added");
       expect(html).toContain(`src="${BLOB_URL}"`);
-      expect(html).toContain("close this tab");
+      expect(html).toContain(
+        "This link is now used up. You can close this tab."
+      );
 
       const [link] = await db().select().from(connector_photo_links);
       expect(link).toMatchObject({
@@ -473,6 +512,70 @@ describe.each(["document", "script"] as const)(
       expect(await banner_of(campaign_id)).toBe("https://blob.test/u/old.png");
     });
 
+    test("two posts at once store one file: the first saves it, the other reads unconfirmed while it's still on its way", async () => {
+      const { token, campaign_id } = await seed();
+      let first_answered!: () => void;
+      const answered = new Promise<void>((r) => {
+        first_answered = r;
+      });
+      // the winner's store waits on the other post's answer, so that answer
+      // comes while the claim has recorded nothing
+      put.mockImplementation(async () => {
+        await answered;
+        return { url: BLOB_URL };
+      });
+      const post = () =>
+        submit(token, photo([PNG], "image/png", "a.png")).finally(
+          first_answered
+        );
+
+      const results = await Promise.all([post(), post()]);
+
+      const saved = results.filter((r) => r.data.state === "saved");
+      const unconfirmed = results.filter((r) => r.data.state === "unknown");
+      expect(saved).toHaveLength(1);
+      expect(saved[0]!.data).toEqual({
+        state: "saved",
+        campaign: "Library drive",
+        photo: BLOB_URL,
+      });
+      expect(unconfirmed).toHaveLength(1);
+      expect(unconfirmed[0]!.data).toEqual({
+        state: "unknown",
+        campaign: "Library drive",
+      });
+      expect(put).toHaveBeenCalledTimes(1);
+      expect(del).not.toHaveBeenCalled();
+      expect(await banner_of(campaign_id)).toBe(BLOB_URL);
+      const [link] = await db().select().from(connector_photo_links);
+      expect(link).toMatchObject({ saved_url: BLOB_URL });
+      // the unconfirmed one, opened again, shows the photo that saved
+      expect((await get(token)).data).toMatchObject({ state: "saved" });
+    });
+
+    test("a link another request claimed and is still saving reads as unconfirmed; one claimed long ago that saved nothing is the generic 404", async () => {
+      const { token } = await seed();
+      const claimed_ago = (ms: number) =>
+        db()
+          .update(connector_photo_links)
+          .set({ used_at: new Date(Date.now() - ms).toISOString() });
+
+      await claimed_ago(60_000);
+      const in_flight = await submit(token, photo([PNG], "image/png", "a.png"));
+      expect(in_flight.init.status).toBe(409);
+      expect(in_flight.data).toEqual({
+        state: "unknown",
+        campaign: "Library drive",
+      });
+      expect(html_of(null, in_flight.data)).toContain(UNCONFIRMED_TITLE);
+
+      await claimed_ago(PHOTO_CLAIM_PENDING_MS + 60_000);
+      const dead = await submit(token, photo([PNG], "image/png", "a.png"));
+      expect(dead.init.status).toBe(404);
+      expect(dead.data).toEqual({ state: "gone" });
+      expect(put).not.toHaveBeenCalled();
+    });
+
     test("unknown and malformed links are the same 404, and store nothing", async () => {
       for (const token of ["A".repeat(43), "not a token"]) {
         const res = await submit(token, photo([PNG], "image/png", "a.png"));
@@ -525,6 +628,28 @@ describe.each(["document", "script"] as const)(
         expect(await banner_of(campaign_id)).toBe(BLOB_URL);
       }
     );
+
+    test("a photo of exactly the cap is saved, and one byte more is refused as too large", async () => {
+      const at_size = (size: number) =>
+        photo([PNG, new Uint8Array(size - PNG.length)], "image/png", "a.png");
+      const { token } = await seed();
+
+      const over = await submit(token, at_size(upload_limits.max_bytes + 1));
+      expect(over.init.status).toBe(413);
+      expect(over.data).toMatchObject({
+        state: "ready",
+        error: photo_too_large,
+      });
+      expect(put).not.toHaveBeenCalled();
+
+      const cap = await submit(token, at_size(upload_limits.max_bytes));
+      expect(cap.init.status).toBe(200);
+      expect(cap.data).toMatchObject({ state: "saved" });
+      expect(put.mock.calls[0]![1]).toHaveProperty(
+        "size",
+        upload_limits.max_bytes
+      );
+    });
 
     test("a declared body past the cap is refused before it is read", async () => {
       const { token } = await seed();
@@ -623,7 +748,7 @@ describe.each(["document", "script"] as const)(
 
       expect(res.init.status).toBe(404);
       expect(res.data).toEqual({ state: "gone" });
-      // the file is stored before the campaign is checked, then removed
+      // the file is stored before the banner write rechecks the campaign, then removed
       expect(put).toHaveBeenCalledTimes(1);
       expect(del).toHaveBeenCalledWith(BLOB_URL, { token: "tok" });
     });
@@ -709,26 +834,26 @@ describe.each(["document", "script"] as const)(
 );
 
 describe("picking a photo in the browser", () => {
-  const input = (size?: number) => {
-    const state = { validity: "", reported: 0 };
+  type Pick = { size: number; type: string; name: string };
+  const PICK: Pick = { size: 1000, type: "image/png", name: "a.png" };
+  /** no reportValidity on purpose: the page's own alert shows the hold, so a
+   * call to the native bubble throws here */
+  const input = (pick?: Partial<Pick>) => {
+    const state = { validity: "" };
     return {
       state,
-      files: size === undefined ? [] : [{ size }],
+      files: pick === undefined ? [] : [{ ...PICK, ...pick }],
       setCustomValidity: (m: string) => {
         state.validity = m;
-      },
-      reportValidity: () => {
-        state.reported++;
-        return state.validity === "";
       },
     };
   };
 
-  test("a photo past the cap holds the form with the server's own 413 copy, a smaller pick clears it", async () => {
+  test("a photo past the cap is held with the server's own 413 copy, one of exactly the cap clears it", async () => {
     const { token } = await seed();
-    const big = input(upload_limits.max_bytes + 1);
+    const big = input({ size: upload_limits.max_bytes + 1 });
 
-    route.hold_oversized(big);
+    expect(route.hold_unfit(big)).toBe(true);
 
     const server = await submit(
       token,
@@ -740,12 +865,42 @@ describe("picking a photo in the browser", () => {
     );
     expect(server.init.status).toBe(413);
     expect(big.state.validity).toBe(server.data.error);
-    expect(big.state.reported).toBe(1);
 
     const fits = Object.assign(big, {
-      files: [{ size: upload_limits.max_bytes }],
+      files: [{ ...PICK, size: upload_limits.max_bytes }],
     });
-    route.hold_oversized(fits);
+    expect(route.hold_unfit(fits)).toBe(false);
+    expect(fits.state.validity).toBe("");
+  });
+
+  test.each([
+    ["a heic", { type: "image/heic", name: "IMG_1.HEIC" }],
+    ["a pdf", { type: "application/pdf", name: "flyer.pdf" }],
+    ["an svg", { type: "image/svg+xml", name: "logo.svg" }],
+    ["an untyped .heic", { type: "", name: "IMG_1.heic" }],
+    ["an untyped file with no extension", { type: "", name: "photo" }],
+  ])("%s is held as the wrong type", (_, pick) => {
+    const el = input(pick);
+
+    expect(route.hold_unfit(el)).toBe(true);
+    expect(el.state.validity).toBe(photo_wrong_type);
+  });
+
+  test.each<[string, Partial<Pick>]>([
+    ...photo_types.map((type): [string, Partial<Pick>] => [
+      type,
+      { type, name: "a" },
+    ]),
+    ["an untyped .JPG", { type: "", name: "IMG_1.JPG" }],
+    ["an untyped .jpeg", { type: "", name: "a.jpeg" }],
+    ["an untyped .png", { type: "", name: "a.png" }],
+    ["an untyped .webp", { type: "", name: "a.webp" }],
+  ])("%s passes, clearing an earlier hold", (_, pick) => {
+    const el = input({ type: "image/heic", name: "a.heic" });
+    route.hold_unfit(el);
+
+    const fits = Object.assign(el, { files: [{ ...PICK, ...pick }] });
+    expect(route.hold_unfit(fits)).toBe(false);
     expect(fits.state.validity).toBe("");
   });
 
@@ -777,13 +932,12 @@ describe("picking a photo in the browser", () => {
     expect(button).toContain('aria-disabled="true"');
     expect(button).toContain("pending");
     expect(button).not.toMatch(/\sdisabled[\s=>]/);
-    expect(html).toContain('aria-busy="true"');
   });
 
   test("clearing the pick clears the hold", () => {
-    const none = input(upload_limits.max_bytes + 1);
-    route.hold_oversized(none);
-    route.hold_oversized(Object.assign(none, { files: [] }));
+    const none = input({ size: upload_limits.max_bytes + 1 });
+    route.hold_unfit(none);
+    expect(route.hold_unfit(Object.assign(none, { files: [] }))).toBe(false);
     expect(none.state.validity).toBe("");
   });
 });
@@ -793,6 +947,7 @@ describe("the upload script", () => {
     static last: FakeXhr;
     upload = {
       onprogress: null as null | ((e: Partial<ProgressEvent>) => void),
+      onload: null as null | (() => void),
     };
     onload: null | (() => void) = null;
     onerror: null | (() => void) = null;
@@ -872,38 +1027,85 @@ describe("the upload script", () => {
     expect(html).toContain(UNCONFIRMED_LEDE);
   });
 
-  test.each([
-    ["the connection drops", (x: FakeXhr) => x.onerror!()],
-    ["the request is aborted", (x: FakeXhr) => x.onabort!()],
-    ["the request times out", (x: FakeXhr) => x.ontimeout!()],
-    [
-      "the platform answers with its own html page",
-      (x: FakeXhr) => {
-        x.responseText = "<!doctype html><h1>413 Request Entity Too Large</h1>";
-        x.onload!();
-      },
-    ],
-    [
-      "the body is json but not a page",
-      (x: FakeXhr) => {
-        x.responseText = JSON.stringify({ error: "nope" });
-        x.onload!();
-      },
-    ],
-  ] as const)(
-    "when %s the page reads failed, keeping the campaign",
-    async (_, end) => {
-      const answer = route.send_photo(
-        URL_,
-        new FormData(),
-        "Library drive",
-        () => {}
-      );
+  const send = () =>
+    route.send_photo(URL_, new FormData(), "Library drive", () => {});
 
+  const lost = {
+    "the connection drops": (x: FakeXhr) => x.onerror!(),
+    "the request is aborted": (x: FakeXhr) => x.onabort!(),
+    "the request times out": (x: FakeXhr) => x.ontimeout!(),
+  };
+  const sending = {
+    "before any of the photo is sent": (_: FakeXhr) => {},
+    "partway through the photo": (x: FakeXhr) =>
+      x.upload.onprogress!({ lengthComputable: true, loaded: 40, total: 100 }),
+  };
+  const sent = {
+    "once the photo is sent": (x: FakeXhr) => x.upload.onload!(),
+    "once progress reaches the whole body": (x: FakeXhr) =>
+      x.upload.onprogress!({ lengthComputable: true, loaded: 100, total: 100 }),
+  };
+  const cases = (phases: object, ends: object) =>
+    Object.entries(phases).flatMap(([phase, at]) =>
+      Object.entries(ends).map(
+        ([how, end]) =>
+          [how, phase, at, end] as [
+            string,
+            string,
+            (x: FakeXhr) => void,
+            (x: FakeXhr) => void,
+          ]
+      )
+    );
+
+  test.each(cases(sending, lost))(
+    "when %s %s, nothing reached the server and the page reads failed",
+    async (_, __, at, end) => {
+      const answer = send();
+
+      at(FakeXhr.last);
       end(FakeXhr.last);
 
       expect(await answer).toEqual({
         state: "failed",
+        campaign: "Library drive",
+      });
+    }
+  );
+
+  test.each(cases(sent, lost))(
+    "when %s %s, the save may have landed and the page reads unconfirmed",
+    async (_, __, at, end) => {
+      const answer = send();
+
+      at(FakeXhr.last);
+      end(FakeXhr.last);
+
+      expect(await answer).toEqual({
+        state: "unknown",
+        campaign: "Library drive",
+      });
+    }
+  );
+
+  test.each([
+    [
+      "the platform's own html page",
+      "<!doctype html><h1>504 Gateway Timeout</h1>",
+    ],
+    ["json that isn't a page", JSON.stringify({ error: "nope" })],
+  ])(
+    "an answer that is %s reads unconfirmed: the save behind it may have landed",
+    async (_, body) => {
+      const answer = send();
+
+      const xhr = FakeXhr.last;
+      xhr.upload.onload!();
+      xhr.responseText = body;
+      xhr.onload!();
+
+      expect(await answer).toEqual({
+        state: "unknown",
         campaign: "Library drive",
       });
     }
@@ -975,7 +1177,7 @@ describe("every response from this page", () => {
     no_leak(res);
   });
 
-  test("a page load asking for json is still the document, never the upload", async () => {
+  test("a live page load carries them, and asking for json still gets the document, never the upload", async () => {
     const { token } = await seed();
 
     const res = await serve(
@@ -985,6 +1187,8 @@ describe("every response from this page", () => {
     );
 
     expect(res.status).toBe(200);
+    no_leak(res);
+    expect(res.headers.has(RENDERED)).toBe(true);
     expect(await res.json()).toEqual({
       state: "ready",
       campaign: "Library drive",

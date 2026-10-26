@@ -24,7 +24,7 @@ if (dsn && stage === "production") {
     environment: stage,
     sendDefaultPii: false,
     tracesSampleRate: 0,
-    // the request url, breadcrumbs and messages can all carry a page's path
+    // the request url, breadcrumbs and messages can all carry a photo-upload token in a page's path
     beforeSend: (event) => redact(event),
     integrations: client_integrations,
   });

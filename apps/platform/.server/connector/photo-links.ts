@@ -1,14 +1,19 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt, isNull, not, sql } from "drizzle-orm";
+import { photo_link_ttl_ms } from "@/constants/upload";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { campaigns } from "../pg/schema/campaign";
 import { connector_photo_links } from "../pg/schema/connector";
 import { ended_sql } from "./reads";
 
-export const PHOTO_LINK_TTL_MS = 15 * 60 * 1000;
+export const PHOTO_LINK_TTL_MS = photo_link_ttl_ms;
 /** how long past its expiry a link stays on record: a used one shows its
- * saved photo until then, and the sweep may delete any row after it */
+ * saved photo until then, and the sweep deletes a row that saved nothing
+ * after it */
 export const PHOTO_LINK_KEEP_MS = 24 * 60 * 60 * 1000;
+/** how long after its claim a link that recorded no photo still reads as a
+ * save in flight; past it, the claiming request is taken to have died */
+export const PHOTO_CLAIM_PENDING_MS = 5 * 60 * 1000;
 
 const sha256_hex = (value: string) =>
   createHash("sha256").update(value, "utf8").digest("hex");
@@ -107,6 +112,34 @@ export async function saved_photo_link(
       )
     );
   return row?.saved_url ? { ...row, saved_url: row.saved_url } : null;
+}
+
+/** a claim still saving: used within `PHOTO_CLAIM_PENDING_MS` and no photo
+ * recorded yet. null for a link that is unknown, malformed, live, saved, or
+ * claimed longer ago */
+export async function claimed_photo_link(
+  db: DbOrTx,
+  token: string,
+  now = new Date()
+): Promise<{ npo_id: number; campaign_id: string } | null> {
+  if (!TOKEN_RE.test(token)) return null;
+  const [row] = await db
+    .select({
+      npo_id: connector_photo_links.npo_id,
+      campaign_id: connector_photo_links.campaign_id,
+    })
+    .from(connector_photo_links)
+    .where(
+      and(
+        eq(connector_photo_links.token_hash, sha256_hex(token)),
+        gt(
+          connector_photo_links.used_at,
+          new Date(now.getTime() - PHOTO_CLAIM_PENDING_MS).toISOString()
+        ),
+        isNull(connector_photo_links.saved_url)
+      )
+    );
+  return row ?? null;
 }
 
 /** keeps the stored photo on the claim that stored it */

@@ -14,6 +14,7 @@ import type { DbOrTx } from "../pg/queries/helpers";
 import { campaigns } from "../pg/schema/campaign";
 import { reserve_ip } from "./gate";
 import {
+  claimed_photo_link,
   consume_photo_link,
   peek_photo_link,
   record_saved_photo,
@@ -26,8 +27,9 @@ import { campaign_status, ended_sql } from "./reads";
  * malformed or expired link, a spent one that saved nothing, or one whose
  * campaign was deleted or has ended, so the page tells a guesser nothing. A
  * link that saved its photo shows it as `saved` until `PHOTO_LINK_KEEP_MS`
- * past its expiry. `unknown` is a save that failed and couldn't be checked:
- * it may have landed. */
+ * past its expiry. `unknown` is a save that may have landed: one that failed
+ * and couldn't be checked, or a link whose claim another request is still
+ * saving. */
 export type PhotoPage =
   | { state: "gone" }
   | { state: "limited" }
@@ -70,6 +72,18 @@ async function saved_page(
   };
 }
 
+/** what a link that isn't live shows: the photo it saved, a save another
+ * request's claim still has in flight, or the generic 404 */
+async function spent_page(db: DbOrTx, token: string): Promise<PhotoResult> {
+  const saved = await saved_page(db, token);
+  if (saved) return saved;
+  const claim = await claimed_photo_link(db, token);
+  if (!claim) return GONE;
+  const campaign = await campaign_get(claim.npo_id, claim.campaign_id);
+  if (!campaign) return GONE;
+  return { page: { state: "unknown", campaign: campaign.name }, status: 409 };
+}
+
 /** the banner write, which a campaign ended or deleted since `open_link` refuses */
 async function set_banner(
   db: DbOrTx,
@@ -97,7 +111,7 @@ export async function read_photo_page(
   token: string
 ): Promise<PhotoResult> {
   const live = await open_link(db, token);
-  if (!live) return (await saved_page(db, token)) ?? GONE;
+  if (!live) return spent_page(db, token);
   return { page: { state: "ready", campaign: live.name }, status: 200 };
 }
 
@@ -122,12 +136,15 @@ export async function save_photo(
   }
   const live = await open_link(db, token);
   // a spent link takes no second photo; one that saved shows what it saved
-  if (!live) return (await saved_page(db, token)) ?? GONE;
+  if (!live) return spent_page(db, token);
   const refuse = (status: number, error: string): PhotoResult => ({
     page: { state: "ready", campaign: live.name, error },
     status,
   });
 
+  // without js, or before hydration, a body over Vercel's 4.5 MB request cap
+  // is refused by the platform before this function runs: the limit shown
+  // beside the file input is the only defence there
   const declared = Number(request.headers.get("content-length"));
   if (declared > upload_limits.max_bytes + MULTIPART_SLACK) {
     return refuse(413, photo_too_large);
@@ -147,12 +164,12 @@ export async function save_photo(
   if ((await sniff(file)) !== type) {
     return refuse(
       415,
-      "That file isn't the kind of image its name says. Choose a JPEG, PNG or WebP photo."
+      "That file's contents don't match its type. Choose a JPEG, PNG or WebP photo."
     );
   }
 
   const claim = await consume_photo_link(db, token);
-  if (!claim) return (await saved_page(db, token)) ?? GONE;
+  if (!claim) return spent_page(db, token);
   const saved_page_of = (photo: string): PhotoResult => ({
     page: { state: "saved", campaign: live.name, photo },
     status: 200,

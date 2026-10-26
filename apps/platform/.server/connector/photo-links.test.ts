@@ -17,8 +17,10 @@ import { npos } from "../pg/schema/npo";
 import { create_test_db, type TestDb } from "../pg/test-utils/pglite";
 import { sweep } from "./keys";
 import {
+  claimed_photo_link,
   consume_photo_link,
   issue_photo_link,
+  PHOTO_CLAIM_PENDING_MS,
   PHOTO_LINK_TTL_MS,
   peek_photo_link,
   record_saved_photo,
@@ -84,7 +86,7 @@ const issue_for = async (ein: string, campaign_id: string) => {
   return { ...seeded, token: issued!.token, id: row!.id };
 };
 
-// any query through it throws, so a null from it proved no query ran
+// any query through it throws, so a null from it proves no query ran
 const untouchable = as_db(
   new Proxy(
     {},
@@ -247,6 +249,36 @@ describe("consume_photo_link", () => {
     ]);
 
     expect(results.filter((r) => r !== null)).toHaveLength(1);
+  });
+});
+
+describe("claimed_photo_link", () => {
+  test("reads a claim that hasn't recorded a photo until PHOTO_CLAIM_PENDING_MS after it, then nothing", async () => {
+    const { token, npo_id } = await issue_for("EIN-A", "c-a");
+    expect(await claimed_photo_link(as_db(t.db), token, NOW)).toBeNull();
+    await consume_photo_link(as_db(t.db), token, NOW);
+
+    const inside = at(PHOTO_CLAIM_PENDING_MS - 1_000);
+    expect(await claimed_photo_link(as_db(t.db), token, inside)).toEqual({
+      npo_id,
+      campaign_id: "c-a",
+    });
+    const past = at(PHOTO_CLAIM_PENDING_MS + 1_000);
+    expect(await claimed_photo_link(as_db(t.db), token, past)).toBeNull();
+  });
+
+  test("reads nothing once the claim has recorded its photo, or for a malformed token", async () => {
+    const { token, id } = await issue_for("EIN-A", "c-a");
+    const claim = (await consume_photo_link(as_db(t.db), token, NOW))!;
+    await record_saved_photo(
+      as_db(t.db),
+      id,
+      claim.used_at,
+      "https://blob.test/u/a.png"
+    );
+
+    expect(await claimed_photo_link(as_db(t.db), token, NOW)).toBeNull();
+    expect(await claimed_photo_link(untouchable, "not a token")).toBeNull();
   });
 });
 

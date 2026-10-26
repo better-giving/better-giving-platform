@@ -6,7 +6,23 @@ import { problem } from "./problem";
 
 /** Same window `sweep` deletes in keys.ts. A replay inside it is 200. */
 const IDEM_MS = 24 * 60 * 60 * 1000;
+/** a claim this old belongs to a request that died without releasing it */
+export const IDEMPOTENCY_PENDING_RECLAIM_MS = 60_000;
+const RETRY_AFTER_S = 5;
 const MAX_KEY_LEN = 255;
+
+const in_progress = () =>
+  problem(409, "idempotency_in_progress", {
+    detail:
+      "A request with this Idempotency-Key is still running. Retry the same request, with the same Idempotency-Key and the same body, after a few seconds.",
+    headers: { "retry-after": String(RETRY_AFTER_S) },
+  });
+
+const conflict = () =>
+  problem(409, "idempotency_conflict", {
+    detail:
+      "This Idempotency-Key was already used for a different request. Send a new key for a new request.",
+  });
 
 const sha256_hex = (value: string) =>
   createHash("sha256").update(value, "utf8").digest("hex");
@@ -15,7 +31,8 @@ const sha256_hex = (value: string) =>
  * One logical write per `(key_id, Idempotency-Key)`. The handler runs only
  * when this call owns a fresh `pending` row. A throw from the handler deletes
  * that row. Once the handler has returned a 2xx response, a later failure
- * leaves the row pending so a retry cannot repeat the write.
+ * leaves the row pending so a retry inside `IDEMPOTENCY_PENDING_RECLAIM_MS`
+ * cannot repeat the write; past it, a retry of the same body takes the claim.
  */
 export async function with_idempotency(
   db: DbOrTx,
@@ -56,10 +73,12 @@ export async function with_idempotency(
         )
       );
     if (!row) continue;
-    if (row.status === "pending") return problem(409, "idempotency_conflict");
 
     const created_ms = Date.parse(row.created_at);
-    if (Number.isNaN(created_ms) || created_ms + IDEM_MS < Date.now()) {
+    if (
+      row.status === "stored" &&
+      (Number.isNaN(created_ms) || created_ms + IDEM_MS < Date.now())
+    ) {
       await db
         .delete(connector_idempotency)
         .where(
@@ -75,8 +94,32 @@ export async function with_idempotency(
       continue;
     }
 
-    if (row.request_hash !== request_hash) {
-      return problem(409, "idempotency_conflict");
+    if (row.request_hash !== request_hash) return conflict();
+
+    if (row.status === "pending") {
+      if (created_ms + IDEMPOTENCY_PENDING_RECLAIM_MS >= Date.now()) {
+        return in_progress();
+      }
+      // guarded on the age, so of two retries only one restamps the claim
+      const reclaimed = await db
+        .update(connector_idempotency)
+        .set({ created_at: new Date().toISOString() })
+        .where(
+          and(
+            eq(connector_idempotency.key_id, key_id),
+            eq(connector_idempotency.idem_key, idem_key),
+            eq(connector_idempotency.status, "pending"),
+            lt(
+              connector_idempotency.created_at,
+              new Date(
+                Date.now() - IDEMPOTENCY_PENDING_RECLAIM_MS
+              ).toISOString()
+            )
+          )
+        )
+        .returning({ idem_key: connector_idempotency.idem_key });
+      if (reclaimed.length === 1) return finish(db, key_id, idem_key, handler);
+      continue;
     }
 
     // replay is 200 even when the row stored a 201
@@ -86,7 +129,7 @@ export async function with_idempotency(
     });
   }
 
-  return problem(409, "idempotency_conflict");
+  return in_progress();
 }
 
 const release_pending = (db: DbOrTx, key_id: string, idem_key: string) =>

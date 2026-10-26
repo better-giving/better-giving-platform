@@ -2,7 +2,7 @@ import { base_url } from "#/constants/env";
 
 export type Money = { amount: string; currency: "USD" };
 
-// past 12 whole digits a dollar amount stops holding its cents as a double
+// 12 whole digits keeps a dollar amount's cents exact as a double, with room to spare
 export const AMOUNT = /^\d{1,12}(\.\d{1,2})?$/;
 export const AMOUNT_MSG =
   'is a positive amount in US dollars, written like "2500" or "2500.50"';

@@ -381,7 +381,8 @@ function form_of(row: FormRow, npo_id: number) {
     // the form's label; `name` is the recipient donors see. the admin list's
     // fallback, so an unlabelled form reads as it does there
     name: row.tag || row.name,
-    status: row.status === "active" ? "live" : "draft",
+    // the donor page turns away only an inactive form; a null status is live
+    status: row.status === "inactive" ? "draft" : "live",
     suggested_amounts,
     // unset (and, for frequencies, empty) is what the donate form defaults
     frequencies: row.freq_opts?.length ? row.freq_opts : freqs_default,
@@ -499,6 +500,8 @@ export async function read_form_state(db: DbOrTx, npo_id: number, id: string) {
     shown: form_of(normalize_form(row), npo_id),
     status: row.status,
     increments: row.increments,
+    // as stored, for a write guarded on it: `shown.updated_at` falls back to date_created
+    updated_at: row.updated_at,
   };
 }
 

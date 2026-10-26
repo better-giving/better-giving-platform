@@ -26,7 +26,10 @@ import { programs } from "$/pg/schema/program";
 import { user_npo_memberships } from "$/pg/schema/user";
 import type { TestDb } from "$/pg/test-utils/pglite";
 import { create_test_db } from "$/pg/test-utils/pglite";
-import { action as forms_action } from "./connector.v1.forms";
+import {
+  action as forms_action,
+  loader as forms_loader,
+} from "./connector.v1.forms";
 import {
   action as form_action,
   loader as form_loader,
@@ -41,6 +44,9 @@ vi.mock("$/pg/db", () => ({
   }),
 }));
 
+const report_error = vi.hoisted(() => vi.fn());
+vi.mock("#/errors/report", () => ({ report_error }));
+
 const db = () => test_db.current!.db;
 const as_db = (x: unknown) => x as DbOrTx;
 
@@ -53,6 +59,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  report_error.mockClear();
   reset_rate_limits();
   await db().delete(forms);
   await db().delete(programs);
@@ -378,6 +385,55 @@ describe("create_form", () => {
     expect(rows[0]?.tag).toBe("One");
   });
 
+  test("a retry with the same Idempotency-Key while the first create is still saving is told to wait, and makes nothing", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    // the first create's form insert holds until the retry has been answered
+    const real = db();
+    const insert = real.insert.bind(real);
+    let reached = () => {};
+    const saving = new Promise<void>((r) => {
+      reached = r;
+    });
+    let release = () => {};
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    const spy = vi.spyOn(real, "insert").mockImplementation(((
+      table: unknown
+    ) => {
+      const builder = insert(table as typeof forms);
+      if (table !== forms) return builder;
+      const values = builder.values.bind(builder);
+      (builder as any).values = (...args: unknown[]) => {
+        const query = (values as any)(...args);
+        const execute = query.execute.bind(query);
+        query.execute = async (...rest: unknown[]) => {
+          reached();
+          await held;
+          return execute(...rest);
+        };
+        return query;
+      };
+      return builder;
+    }) as typeof real.insert);
+
+    const first = create(a.key, { name: "Once" }, "idem-flight");
+    await saving;
+    const retry = await create(a.key, { name: "Once" }, "idem-flight");
+    release();
+    const made = await first;
+    spy.mockRestore();
+
+    expect(retry.status).toBe(409);
+    expect(Number(retry.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(await retry.json()).toMatchObject({
+      code: "idempotency_in_progress",
+      status: 409,
+    });
+    expect(made.status).toBe(201);
+    expect(await db().select().from(forms)).toHaveLength(1);
+  });
+
   test("no key is 401, and a method other than POST is unknown_action", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
 
@@ -621,12 +677,35 @@ describe("update_form", () => {
       donate_methods: ["stripe"],
       status: "active",
     });
+  });
 
-    // a form with no stored status reads as draft and takes the same write
+  test("a form with no stored status is live, as the donor page serves it: get_form says so and a donor-visible change waits for confirm", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
     const unset = await seed_form(a.npo.id, { status: null });
-    const named = await update(unset, a.key, { donate_methods: ["daf"] });
-    expect(named.status).toBe(200);
-    expect((await row_of(unset)).donate_methods).toEqual(["daf"]);
+
+    const shown = (await (await read(unset, a.key)).json()) as {
+      status: string;
+    };
+    expect(shown.status).toBe("live");
+    const listed = (await (
+      await send(forms_loader as Handler, "GET", null, a.key)
+    ).json()) as { data: { id: string; status: string }[] };
+    expect(listed.data.find((f) => f.id === unset)?.status).toBe("live");
+
+    const held = await update(unset, a.key, { donate_methods: ["daf"] });
+    expect(held.status).toBe(409);
+    expect(await held.json()).toMatchObject({ code: "confirm_required" });
+    expect((await row_of(unset)).donate_methods).toBeNull();
+
+    const applied = await update(unset, a.key, {
+      donate_methods: ["daf"],
+      confirm: true,
+    });
+    expect(applied.status).toBe(200);
+    expect(await row_of(unset)).toMatchObject({
+      donate_methods: ["daf"],
+      status: null,
+    });
   });
 
   test("a draft published while an edit reads it holds the edit for confirm, and changes nothing", async () => {
@@ -689,6 +768,71 @@ describe("update_form", () => {
     expect(await row_of(id)).toEqual(before);
   });
 
+  test("an echoed updated_at that has moved is a stale read; the one get_form shows passes", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_form(a.npo.id, {
+      updated_at: "2026-02-03T04:05:06.789Z",
+    });
+
+    const stale = await update(id, a.key, {
+      name: "Renamed",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({
+      code: "stale_read",
+      status: 409,
+      detail: expect.stringContaining("get_form"),
+    });
+    expect((await row_of(id)).tag).toBe("Main form");
+
+    const fresh = await update(id, a.key, {
+      name: "Renamed",
+      updated_at: "2026-02-03T04:05:06.789Z",
+    });
+    expect(fresh.status).toBe(200);
+    expect((await row_of(id)).tag).toBe("Renamed");
+  });
+
+  test("an edit that lands between the read and a confirmed write is kept: the write is a stale read", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_form(a.npo.id, { status: "active" });
+    // the dashboard saves the form the moment the connector's edit has read it
+    const real = db();
+    const select = real.select.bind(real);
+    let armed = true;
+    const spy = vi.spyOn(real, "select").mockImplementation(((
+      fields?: Record<string, unknown>
+    ) => {
+      const builder = select(fields as any);
+      if (!armed || !fields || !("tag" in fields)) return builder;
+      armed = false;
+      const from = builder.from.bind(builder);
+      (builder as any).from = (...args: unknown[]) => {
+        const query = (from as any)(...args);
+        const execute = query.execute.bind(query);
+        query.execute = async (...rest: unknown[]) => {
+          const rows = await execute(...rest);
+          await form_update(id, { donate_methods: ["stripe"] });
+          return rows;
+        };
+        return query;
+      };
+      return builder;
+    }) as typeof real.select);
+
+    const res = await update(id, a.key, {
+      donate_methods: ["crypto"],
+      confirm: true,
+    });
+    spy.mockRestore();
+
+    expect(armed).toBe(false);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "stale_read" });
+    expect((await row_of(id)).donate_methods).toEqual(["stripe"]);
+  });
+
   test("refused fields are 422s on their paths, and nothing is written", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
     const id = await seed_form(a.npo.id, { status: "active" });
@@ -698,7 +842,7 @@ describe("update_form", () => {
       [{ owner_npo_id: 9 }, ["owner_npo_id"]],
       [{ id: "other" }, ["id"]],
       [{ campaign_id: "fund-x" }, ["campaign_id"]],
-      [{ updated_at: "2020-01-01T00:00:00.000Z" }, ["updated_at"]],
+      [{ updated_at: 20200101 }, ["updated_at"]],
       [{ maximum: { amount: "500", currency: "USD" } }, ["maximum"]],
       [{ name: "Renamed", confirm: "yes" }, ["confirm"]],
       [{ name: "" }, ["name"]],
@@ -708,6 +852,36 @@ describe("update_form", () => {
       expect(res.status, JSON.stringify(body)).toBe(422);
       expect(await errors_of(res), JSON.stringify(body)).toEqual(paths);
     }
+    expect((await row_of(id)).tag).toBe("Main form");
+  });
+
+  test("a database failure on the write is a 500 problem with no internals, and it is reported", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_form(a.npo.id);
+    const real = db();
+    const update_of = real.update.bind(real);
+    const spy = vi.spyOn(real, "update").mockImplementation(((
+      table: typeof forms
+    ) => {
+      if (table !== forms) return update_of(table);
+      throw new Error('relation "forms" is locked by pid 4242');
+    }) as typeof real.update);
+
+    const res = await update(id, a.key, { name: "Renamed" });
+    spy.mockRestore();
+
+    expect(res.status).toBe(500);
+    expect(res.headers.get("content-type")).toBe("application/problem+json");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    const text = await res.text();
+    expect(text).not.toMatch(/pid|relation|locked/);
+    expect(JSON.parse(text)).toEqual({
+      code: "internal_error",
+      status: 500,
+      detail: expect.any(String),
+    });
+    expect(report_error).toHaveBeenCalledOnce();
+    expect(report_error.mock.calls[0]![0]).toBeInstanceOf(Error);
     expect((await row_of(id)).tag).toBe("Main form");
   });
 

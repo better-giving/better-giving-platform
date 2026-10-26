@@ -118,8 +118,8 @@ export const connector_photo_links = pgTable(
     expires_at: timestamptz("expires_at").notNull(),
     used_at: timestamptz("used_at"),
     // the photo the claim stored, kept once its banner write went through: a
-    // spent link shows it, and update_campaign_blocks takes it as a hero,
-    // until the sweep deletes the row a day past expires_at
+    // spent link shows it until a day past expires_at, and update_campaign_blocks
+    // takes it as a hero for as long as the row stays, which the sweep never deletes
     saved_url: text("saved_url"),
     saved_pathname: text("saved_pathname"),
   },
@@ -128,7 +128,10 @@ export const connector_photo_links = pgTable(
       "connector_photo_links_token_hash_hex",
       sql`${t.token_hash} ~ '^[0-9a-f]{64}$'`
     ),
-    index("connector_photo_links_expires_at_idx").on(t.expires_at),
+    // the sweep's predicate exactly: saved rows are never swept, so they stay out
+    index("connector_photo_links_unsaved_expires_at_idx")
+      .on(t.expires_at)
+      .where(sql`${t.saved_pathname} is null`),
     // also the lookup a campaign's delete cascades through
     index("connector_photo_links_campaign_saved_idx").on(
       t.campaign_id,

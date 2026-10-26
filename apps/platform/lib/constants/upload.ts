@@ -40,3 +40,18 @@ export const upload_signatures: Record<string, readonly (number | null)[]> = {
   ],
   "application/pdf": [0x25, 0x50, 0x44, 0x46, 0x2d],
 };
+
+/** the types the photo-upload page takes: its picker's `accept`, and the
+ * hold on a drop or pick of anything else */
+export const photo_types = ["image/jpeg", "image/png", "image/webp"] as const;
+
+/** the refusal for a photo the page doesn't take, held before it uploads */
+export const photo_wrong_type =
+  "That file isn't a photo we can use. Choose a JPEG, PNG or WebP photo.";
+
+/** how long a photo-upload link works after it's issued */
+export const photo_link_ttl_ms = 15 * 60 * 1000;
+
+/** the per-address cap on photo uploads; the page's "too many uploads" copy
+ * names the window */
+export const photo_upload_quota = { max: 30, window_s: 60 } as const;
