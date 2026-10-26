@@ -7,7 +7,9 @@ export type ProblemCode =
   | "idempotency_conflict"
   | "invalid"
   | "not_found"
-  | "write_failed";
+  | "write_failed"
+  | "campaign_ended"
+  | "already_published";
 
 export type FieldError = { path: string; message: string };
 

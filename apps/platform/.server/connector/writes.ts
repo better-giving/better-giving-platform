@@ -8,7 +8,7 @@ import { with_idempotency } from "./idempotency";
 import { type FieldError, invalid, problem } from "./problem";
 import { read_campaign_detail } from "./reads";
 
-const TITLE_MAX = 200;
+export const TITLE_MAX = 200;
 
 type Issue = FieldError;
 
@@ -27,7 +27,7 @@ function as_record(body: unknown): Record<string, unknown> | null {
   return body as Record<string, unknown>;
 }
 
-function unknown_keys(
+export function unknown_keys(
   body: Record<string, unknown>,
   allowed: readonly string[],
   issues: Issue[]
@@ -39,8 +39,10 @@ function unknown_keys(
   }
 }
 
-async function read_body(
-  request: Request
+/** `allow_empty`: no body at all reads as `{}` */
+export async function read_body(
+  request: Request,
+  { allow_empty = false } = {}
 ): Promise<
   | { ok: true; body: Record<string, unknown> }
   | { ok: false; response: Response }
@@ -48,7 +50,8 @@ async function read_body(
   const issues: Issue[] = [];
   let parsed: unknown;
   try {
-    parsed = JSON.parse(await request.text());
+    const text = await request.text();
+    parsed = allow_empty && text.trim() === "" ? {} : JSON.parse(text);
   } catch {
     issues.push({ path: "", message: "is a JSON object" });
     return { ok: false, response: invalid(issues) };
