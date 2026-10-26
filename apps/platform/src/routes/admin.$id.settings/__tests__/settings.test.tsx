@@ -730,7 +730,7 @@ async function render_tab_history(npo_id: number, entry: string) {
 }
 
 describe("settings tabs", () => {
-  it("opens Campaigns for the previous campaign param", async () => {
+  it("opens Supporter campaigns for the previous campaign param", async () => {
     const npo = await seed_npo();
     const screen = await render_tab_history(
       npo.id,
@@ -748,6 +748,25 @@ describe("settings tabs", () => {
       .element(screen.getByTestId("url-search"))
       .toHaveTextContent("?tab=campaign");
   });
+
+  it.each(["fundraisers", "campaigns"])(
+    "opens Supporter campaigns for ?tab=%s",
+    async (tab) => {
+      const npo = await seed_npo();
+      const screen = await render_tab_history(
+        npo.id,
+        `/admin/${npo.id}/settings?tab=${tab}`
+      );
+      await expect
+        .element(
+          screen.getByRole("tab", { name: "Supporter campaigns", exact: true })
+        )
+        .toHaveAttribute("aria-selected", "true");
+      await expect
+        .element(screen.getByLabelText(/allow campaigns/i))
+        .toBeVisible();
+    }
+  );
 
   it("names the page and opens Donation when tab is missing or unknown", async () => {
     const npo = await seed_npo();

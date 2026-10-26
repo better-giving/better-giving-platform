@@ -516,9 +516,8 @@ describe("campaign list loader", () => {
     }
     expect(stale.funds.map((f) => f.id)).toEqual(["fund-supporter"]);
 
-    // "fundraisers" is this tab's previous query value; an old bookmarked or
-    // indexed link must still land on the supporters view, not fall through
-    // to the default
+    // "fundraisers" is this tab's previous query value; an old bookmarked link
+    // must still land on the supporters view, not fall through to the default
     const legacy = await list_loader({
       request: new Request("https://x/admin/list/campaigns?tab=fundraisers"),
       ...args,

@@ -791,7 +791,7 @@ describe("profile shape", () => {
     await Promise.all([d.funds, d.media]);
   });
 
-  it("keeps and counts the campaigns when the supporters' read fails, flagging the give list", async () => {
+  it("keeps and counts the campaigns when the funds' read fails, flagging the give list", async () => {
     const npo = await seed_npo();
     await seed_campaign(npo.id, "shape-funds-down-cmp");
     vi.spyOn(funds_queries, "get_funds_npo_memberof").mockRejectedValueOnce(

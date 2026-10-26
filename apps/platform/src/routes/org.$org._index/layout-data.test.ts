@@ -214,7 +214,7 @@ describe("layout lists", () => {
     expect([no_funds.give, no_funds.videos]).toEqual([[], []]);
   });
 
-  it("keeps the campaigns when the supporters' read fails, flagging the give list", () => {
+  it("keeps the campaigns when the funds' read fails, flagging the give list", () => {
     const lists = layout_lists({
       npo,
       campaigns: [campaign],
@@ -227,7 +227,7 @@ describe("layout lists", () => {
     expect(lists.failed.give).toBe(true);
   });
 
-  it("gives the campaigns first, then only the open supporters", () => {
+  it("gives the campaigns first, then only the open funds", () => {
     const { give } = layout_lists({
       npo,
       campaigns: [
