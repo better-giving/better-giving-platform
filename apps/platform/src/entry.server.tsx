@@ -22,6 +22,7 @@ import {
   type EntryContext,
   ServerRouter,
 } from "react-router";
+import { redact } from "#/errors/redact";
 import { report_error } from "#/errors/report";
 import { sentry, stage } from "$/env";
 
@@ -32,6 +33,8 @@ if (stage === "production") {
     environment: stage,
     sendDefaultPii: false,
     tracesSampleRate: 0,
+    // the request url, breadcrumbs and messages can all carry a photo-upload token in a page's path
+    beforeSend: (event) => redact(event),
   });
 }
 

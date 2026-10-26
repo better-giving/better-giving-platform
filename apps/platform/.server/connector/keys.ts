@@ -6,9 +6,11 @@ import {
   connector_codes,
   connector_idempotency,
   connector_keys,
+  connector_photo_links,
 } from "../pg/schema/connector";
 import { npos } from "../pg/schema/npo";
 import { user_npo_memberships } from "../pg/schema/user";
+import { PHOTO_LINK_KEEP_MS } from "./photo-links";
 
 class MembershipGone extends Error {
   constructor() {
@@ -256,10 +258,14 @@ export async function sweep(
   keys_revoked: number;
   codes_deleted: number;
   idempotency_deleted: number;
+  photo_links_deleted: number;
 }> {
   const now_iso = now.toISOString();
   const idle_before = new Date(now.getTime() - IDLE_MS).toISOString();
   const idem_before = new Date(now.getTime() - IDEM_MS).toISOString();
+  const photo_before = new Date(
+    now.getTime() - PHOTO_LINK_KEEP_MS
+  ).toISOString();
   const revoked = await db
     .update(connector_keys)
     .set({ revoked_at: now_iso, revoked_by: null })
@@ -278,9 +284,22 @@ export async function sweep(
     .delete(connector_idempotency)
     .where(lt(connector_idempotency.created_at, idem_before))
     .returning({ idem_key: connector_idempotency.idem_key });
+  // a link that saved a photo stays: it is the proof that photo belongs to
+  // its campaign, so a later blocks write can put it back. Its page still
+  // ends on time, since `saved_photo_link` reads it only within the window
+  const photo_links = await db
+    .delete(connector_photo_links)
+    .where(
+      and(
+        lt(connector_photo_links.expires_at, photo_before),
+        isNull(connector_photo_links.saved_pathname)
+      )
+    )
+    .returning({ id: connector_photo_links.id });
   return {
     keys_revoked: revoked.length,
     codes_deleted: codes.length,
     idempotency_deleted: idem.length,
+    photo_links_deleted: photo_links.length,
   };
 }

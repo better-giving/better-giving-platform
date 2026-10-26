@@ -12,6 +12,7 @@ import { StrictMode, startTransition } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { HydratedRouter } from "react-router/dom";
 import { client_integrations } from "#/errors/integrations";
+import { redact } from "#/errors/redact";
 import { report_error, report_unhandled } from "#/errors/report";
 
 // only report from prod — preview/dev noise drowns out real signal.
@@ -23,6 +24,8 @@ if (dsn && stage === "production") {
     environment: stage,
     sendDefaultPii: false,
     tracesSampleRate: 0,
+    // the request url, breadcrumbs and messages can all carry a photo-upload token in a page's path
+    beforeSend: (event) => redact(event),
     integrations: client_integrations,
   });
 

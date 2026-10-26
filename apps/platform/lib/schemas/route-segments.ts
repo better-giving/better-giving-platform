@@ -117,6 +117,7 @@ export const top_level_route_segments = [
   "nonprofits",
   "open-source",
   "org",
+  "photo-upload",
   "platform",
   "pricing",
   "privacy-policy",

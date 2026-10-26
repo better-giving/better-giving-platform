@@ -1,3 +1,4 @@
+import { report_error } from "#/errors/report";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { decode_list_cursor, type ListCursor } from "./cursor";
 import { require_live_key, reserve_keyed } from "./gate";
@@ -7,6 +8,29 @@ export const NO_STORE = { "cache-control": "no-store" };
 
 export function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: NO_STORE });
+}
+
+/** a connector route's loader or action: an unexpected throw is reported and
+ * answered as problem JSON, never react-router's html 500 */
+export function connector_route<A extends { request: Request }>(
+  handler: (args: A) => Response | Promise<Response>
+): (args: A) => Promise<Response> {
+  return async (args) => {
+    try {
+      return await handler(args);
+    } catch (err) {
+      const { method, url } = args.request;
+      report_error(err, {
+        where: "connector",
+        method,
+        path: new URL(url).pathname,
+      });
+      return problem(500, "internal_error", {
+        detail:
+          "Better Giving hit an error and could not complete this request.",
+      });
+    }
+  };
 }
 
 export type LiveKey = { id: string; npo_id: number; allowed_by: string };

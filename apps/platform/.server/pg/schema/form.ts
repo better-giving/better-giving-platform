@@ -26,6 +26,8 @@ export const forms = pgTable(
     recipient_npo_id: integer("recipient_npo_id").references(() => npos.id),
     recipient_fund_id: text("recipient_fund_id").references(() => funds.id),
     date_created: timestamptz("date_created"),
+    // the last edit; null on a form not edited since it was made, or since this column was added
+    updated_at: timestamptz("updated_at"),
     ltd: numeric_as_number("ltd", { precision: 38, scale: 18 }).default(0),
     ltd_count: integer("ltd_count").default(0),
     target_number: numeric_as_number("target_number", {

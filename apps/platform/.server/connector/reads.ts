@@ -1,8 +1,12 @@
 import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
+import {
+  all_method_ids,
+  freqs_default,
+} from "#/components/donation/common/constants";
 import { to_text } from "#/components/rich-text/helpers";
 import type { TCampaignStatus } from "@/campaign";
 import { fund_closes_at } from "@/campaign/is-open";
-import type { IIncrement } from "@/schemas";
+import type { DonateMethodId, IIncrement, TFrequency } from "@/schemas";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { campaigns } from "../pg/schema/campaign";
 import { pg_text_to_iso } from "../pg/schema/columns";
@@ -116,6 +120,7 @@ type CampaignRow = {
   banner: string | null;
   created_at: string;
   updated_at: string;
+  version: string;
   npo_slug: string | null;
 };
 
@@ -136,6 +141,7 @@ function summary_of(row: CampaignRow) {
 function detail_of(row: CampaignRow) {
   return {
     ...summary_of(row),
+    version: row.version,
     has_unpublished_changes: false,
     sharing: { message: null, channels: null },
     time_zone: null,
@@ -159,21 +165,31 @@ const campaign_cols = {
   banner: campaigns.banner,
   created_at: campaigns.created_at,
   updated_at: campaigns.updated_at,
+  version: version_sql().as("version"),
   npo_slug: npos.slug,
 };
 
-/** UTC date of now minus 12 hours. Same bound as `fund_is_open_sql`. */
-function close_bound() {
-  return sql`(date_trunc('day', (NOW() AT TIME ZONE 'UTC') - interval '12 hours') AT TIME ZONE 'UTC')`;
+/** a campaign's version as the detail shows it: `updated_at` in whole
+ * microseconds, which every write to the row moves */
+export function version_sql() {
+  return sql<string>`((extract(epoch from ${campaigns.updated_at}) * 1000000)::bigint)::text`;
 }
 
-function ended_sql() {
+/** UTC date of now minus 12 hours. Same bound as `fund_is_open_sql`. */
+function close_bound(now?: Date) {
+  const at = now ? sql`${now.toISOString()}::timestamptz` : sql`NOW()`;
+  return sql`(date_trunc('day', (${at} AT TIME ZONE 'UTC') - interval '12 hours') AT TIME ZONE 'UTC')`;
+}
+
+/** `campaign_status(…) === "ended"` as a predicate; `now` defaults to the
+ * database's clock */
+export function ended_sql(now?: Date) {
   return sql`(
     ${campaigns.status} = 'ended'
     OR (
       ${campaigns.status} = 'live'
       AND ${campaigns.ends_at} IS NOT NULL
-      AND ${campaigns.ends_at} < ${close_bound()}
+      AND ${campaigns.ends_at} < ${close_bound(now)}
     )
   )`;
 }
@@ -332,14 +348,24 @@ function form_stamp() {
 type FormRow = {
   id: string;
   name: string;
+  tag: string | null;
   status: string | null;
   increments: IIncrement[] | null;
+  freq_opts: TFrequency[] | null;
+  donate_methods: DonateMethodId[] | null;
   program_id: string | null;
   recipient_fund_id: string | null;
   fund_owner: number | null;
   date_created: string | null;
+  updated_at: string | null;
   stamped: string;
 };
+
+/** the last edit, or the creation for a form not edited since */
+function edited_at(row: FormRow): string {
+  const at = row.updated_at ?? row.date_created;
+  return at ? pg_text_to_iso(at) : EPOCH;
+}
 
 function form_of(row: FormRow, npo_id: number) {
   const amounts = row.increments ?? [];
@@ -352,9 +378,15 @@ function form_of(row: FormRow, npo_id: number) {
     row.recipient_fund_id !== null && row.fund_owner === npo_id;
   return {
     id: row.id,
-    name: row.name,
-    status: row.status === "active" ? "live" : "draft",
+    // the form's label; `name` is the recipient donors see. the admin list's
+    // fallback, so an unlabelled form reads as it does there
+    name: row.tag || row.name,
+    // the donor page turns away only an inactive form; a null status is live
+    status: row.status === "inactive" ? "draft" : "live",
     suggested_amounts,
+    // unset (and, for frequencies, empty) is what the donate form defaults
+    frequencies: row.freq_opts?.length ? row.freq_opts : freqs_default,
+    donate_methods: row.donate_methods ?? all_method_ids,
     minimum: null,
     maximum: null,
     allowed_origins: [] as string[],
@@ -362,7 +394,7 @@ function form_of(row: FormRow, npo_id: number) {
       ? { mode: "pinned" as const, program_id: row.program_id }
       : { mode: "none" as const, program_id: null },
     campaign_id: owned_here ? row.recipient_fund_id : null,
-    updated_at: row.date_created ? pg_text_to_iso(row.date_created) : EPOCH,
+    updated_at: edited_at(row),
   };
 }
 
@@ -373,12 +405,16 @@ function forms_for(npo_id: number) {
 const form_cols = {
   id: forms.id,
   name: forms.name,
+  tag: forms.tag,
   status: forms.status,
   increments: forms.increments,
+  freq_opts: forms.freq_opts,
+  donate_methods: forms.donate_methods,
   program_id: forms.program_id,
   recipient_fund_id: forms.recipient_fund_id,
   fund_owner: funds.npo_owner,
   date_created: forms.date_created,
+  updated_at: forms.updated_at,
   stamped:
     sql<string>`COALESCE(${forms.date_created}, ${EPOCH}::timestamptz)`.as(
       "stamped"
@@ -417,17 +453,7 @@ export async function list_forms(
   });
 }
 
-function normalize_form(row: {
-  id: string;
-  name: string;
-  status: string | null;
-  increments: IIncrement[] | null;
-  program_id: string | null;
-  recipient_fund_id: string | null;
-  fund_owner: number | null;
-  date_created: string | null;
-  stamped: string;
-}): FormRow {
+function normalize_form(row: FormRow): FormRow {
   return {
     ...row,
     date_created: row.date_created ? pg_text_to_iso(row.date_created) : null,
@@ -445,13 +471,38 @@ export async function get_form(
   stray_params(url, [], issues);
   const refused = refuse(issues);
   if (refused) return refused;
+  const form = await read_form(db, npo_id, id);
+  if (!form) return not_found(`Form ${id} does not exist for this nonprofit.`);
+  return json(form);
+}
+
+export type ConnectorForm = ReturnType<typeof form_of>;
+
+/** the get_form shape of a form this nonprofit owns, or null */
+export async function read_form(
+  db: DbOrTx,
+  npo_id: number,
+  id: string
+): Promise<ConnectorForm | null> {
+  return (await read_form_state(db, npo_id, id))?.shown ?? null;
+}
+
+/** get_form's shape and the stored status and increments behind it, from one
+ * read, so neither can be from a save the other missed */
+export async function read_form_state(db: DbOrTx, npo_id: number, id: string) {
   const [row] = await db
     .select(form_cols)
     .from(forms)
     .leftJoin(funds, eq(forms.recipient_fund_id, funds.id))
     .where(and(eq(forms.id, id), forms_for(npo_id)));
-  if (!row) return not_found(`Form ${id} does not exist for this nonprofit.`);
-  return json(form_of(normalize_form(row), npo_id));
+  if (!row) return null;
+  return {
+    shown: form_of(normalize_form(row), npo_id),
+    status: row.status,
+    increments: row.increments,
+    // as stored, for a write guarded on it: `shown.updated_at` falls back to date_created
+    updated_at: row.updated_at,
+  };
 }
 
 function tenant_gifts(npo_id: number) {

@@ -28,5 +28,9 @@ export const socials = {
 
 export const referrals_hub = `${INTERCOM_HELP}/collections/13341032-referral-program-resource-hub`;
 
+/** the app's own vercel blob store */
+export const BLOB_STORE_HOST =
+  "cnfc6hjkztdschkg.public.blob.vercel-storage.com";
+
 export const static_url = (path: string) =>
-  `https://cnfc6hjkztdschkg.public.blob.vercel-storage.com/migrated/static/${path}`;
+  `https://${BLOB_STORE_HOST}/migrated/static/${path}`;

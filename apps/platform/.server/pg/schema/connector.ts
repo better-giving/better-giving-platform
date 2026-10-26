@@ -9,6 +9,7 @@ import {
   text,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth";
+import { campaigns } from "./campaign";
 import { timestamptz, timestamptz_now } from "./columns";
 import { npos } from "./npo";
 
@@ -78,6 +79,10 @@ export const connector_idempotency = pgTable(
     response_status: integer("response_status"),
     response_body: jsonb("response_body"),
     created_at: timestamptz_now("created_at"),
+    // the id a create under this record mints; a reclaim keeps it, a replaced record gets a new one
+    resource_id: text("resource_id")
+      .notNull()
+      .default(sql`gen_random_uuid()::text`),
   },
   (t) => [
     primaryKey({ columns: [t.key_id, t.idem_key] }),
@@ -96,6 +101,45 @@ export const connector_idempotency = pgTable(
         and ${t.response_status} is not null
         and ${t.response_body} is not null
       )`
+    ),
+  ]
+);
+
+// single-use upload link that sets one campaign's banner
+export const connector_photo_links = pgTable(
+  "connector_photo_links",
+  {
+    id: text("id").primaryKey(),
+    // sha-256 hex of the raw token in the link url; the token is not a column
+    token_hash: text("token_hash").notNull().unique(),
+    npo_id: integer("npo_id")
+      .notNull()
+      .references(() => npos.id, { onDelete: "cascade" }),
+    campaign_id: text("campaign_id")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    created_at: timestamptz_now("created_at"),
+    expires_at: timestamptz("expires_at").notNull(),
+    used_at: timestamptz("used_at"),
+    // the photo the claim stored, kept once its banner write went through: a
+    // spent link shows it until a day past expires_at, and update_campaign_blocks
+    // takes it as a hero for as long as the row stays, which the sweep never deletes
+    saved_url: text("saved_url"),
+    saved_pathname: text("saved_pathname"),
+  },
+  (t) => [
+    check(
+      "connector_photo_links_token_hash_hex",
+      sql`${t.token_hash} ~ '^[0-9a-f]{64}$'`
+    ),
+    // the sweep's predicate exactly: saved rows are never swept, so they stay out
+    index("connector_photo_links_unsaved_expires_at_idx")
+      .on(t.expires_at)
+      .where(sql`${t.saved_pathname} is null`),
+    // also the lookup a campaign's delete cascades through
+    index("connector_photo_links_campaign_saved_idx").on(
+      t.campaign_id,
+      t.saved_pathname
     ),
   ]
 );

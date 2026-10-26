@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { to_text } from "#/components/rich-text/helpers";
+import { report_error } from "#/errors/report";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { campaign_members, campaigns } from "../pg/schema/campaign";
 import { npos } from "../pg/schema/npo";
@@ -8,7 +9,7 @@ import { with_idempotency } from "./idempotency";
 import { type FieldError, invalid, problem } from "./problem";
 import { read_campaign_detail } from "./reads";
 
-const TITLE_MAX = 200;
+export const TITLE_MAX = 200;
 
 type Issue = FieldError;
 
@@ -27,7 +28,34 @@ function as_record(body: unknown): Record<string, unknown> | null {
   return body as Record<string, unknown>;
 }
 
-function unknown_keys(
+/** equal as JSON values: arrays in order, objects whatever their key order */
+export function same_json(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((x, i) => same_json(x, b[i]))
+    );
+  }
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  return (
+    ka.length === kb.length &&
+    ka.every(
+      (k) =>
+        Object.hasOwn(b, k) &&
+        same_json(
+          (a as Record<string, unknown>)[k],
+          (b as Record<string, unknown>)[k]
+        )
+    )
+  );
+}
+
+export function unknown_keys(
   body: Record<string, unknown>,
   allowed: readonly string[],
   issues: Issue[]
@@ -39,8 +67,10 @@ function unknown_keys(
   }
 }
 
-async function read_body(
-  request: Request
+/** `allow_empty`: no body at all reads as `{}` */
+export async function read_body(
+  request: Request,
+  { allow_empty = false } = {}
 ): Promise<
   | { ok: true; body: Record<string, unknown> }
   | { ok: false; response: Response }
@@ -48,7 +78,8 @@ async function read_body(
   const issues: Issue[] = [];
   let parsed: unknown;
   try {
-    parsed = JSON.parse(await request.text());
+    const text = await request.text();
+    parsed = allow_empty && text.trim() === "" ? {} : JSON.parse(text);
   } catch {
     issues.push({ path: "", message: "is a JSON object" });
     return { ok: false, response: invalid(issues) };
@@ -70,17 +101,21 @@ export async function create_campaign(
   if (request.method !== "POST") return problem(404, "unknown_action");
   const live = await open_key(db, request);
   if (live instanceof Response) return live;
-  return with_idempotency(db, live.id, request, () =>
-    insert_campaign(db, live.npo_id, live.allowed_by, request)
+  return with_idempotency(db, live.id, request, (id) =>
+    insert_campaign(db, live.npo_id, live.allowed_by, request, id)
   );
 }
 
+/** `id` is the idempotency record's, so a retry after a write that landed finds that write */
 async function insert_campaign(
   db: DbOrTx,
   npo_id: number,
   allowed_by: string,
-  request: Request
+  request: Request,
+  id: string
 ): Promise<Response> {
+  const landed = await read_campaign_detail(db, npo_id, id);
+  if (landed) return json(landed, 201);
   const parsed = await read_body(request);
   if (!parsed.ok) return parsed.response;
   const issues: Issue[] = [];
@@ -100,7 +135,6 @@ async function insert_campaign(
   if (issues.length > 0) return invalid(issues);
 
   try {
-    const id = crypto.randomUUID();
     const detail = await db.transaction(async (tx) => {
       const [npo] = await tx
         .select({
@@ -113,23 +147,30 @@ async function insert_campaign(
       if (!npo) throw new Error("npo missing");
       const image = npo.logo || npo.image || npo.card_img || null;
       const description_pt = "[]";
-      await tx.insert(campaigns).values({
-        id,
-        owner_npo_id: npo_id,
-        creator_id: allowed_by,
-        name: trimmed,
-        slug: campaign_slug(trimmed, id),
-        description_pt,
-        description_v2: to_text(description_pt),
-        banner: image,
-        logo: image,
-        status: "draft",
-      });
-      await tx.insert(campaign_members).values({
-        campaign_id: id,
-        npo_id,
-        position: 0,
-      });
+      const inserted = await tx
+        .insert(campaigns)
+        .values({
+          id,
+          owner_npo_id: npo_id,
+          creator_id: allowed_by,
+          name: trimmed,
+          slug: campaign_slug(trimmed, id),
+          description_pt,
+          description_v2: to_text(description_pt),
+          banner: image,
+          logo: image,
+          status: "draft",
+        })
+        // an attempt still running past the reclaim got there first
+        .onConflictDoNothing({ target: campaigns.id })
+        .returning({ id: campaigns.id });
+      if (inserted.length === 1) {
+        await tx.insert(campaign_members).values({
+          campaign_id: id,
+          npo_id,
+          position: 0,
+        });
+      }
       return read_campaign_detail(tx, npo_id, id);
     });
     if (!detail) {
@@ -138,7 +179,8 @@ async function insert_campaign(
       });
     }
     return json(detail, 201);
-  } catch {
+  } catch (err) {
+    report_error(err, { where: "connector: create_campaign" });
     return problem(500, "write_failed", {
       detail: "The campaign could not be saved.",
     });

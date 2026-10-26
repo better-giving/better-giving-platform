@@ -7,6 +7,7 @@ import {
   isNull,
   ne,
   or,
+  type SQL,
   sql,
 } from "drizzle-orm";
 import { to_text } from "#/components/rich-text/helpers";
@@ -440,11 +441,18 @@ export async function campaign_create(input: ICampaignInput) {
   });
 }
 
+/** the next `updated_at`: now, or a millisecond past the stored one when the
+ * clock hasn't moved, so no two writes leave a campaign at the same version */
+export const next_updated_at = () =>
+  sql`GREATEST(${new Date().toISOString()}::timestamptz, ${campaigns.updated_at} + interval '1 millisecond')`;
+
+/** `guard` joins the write's WHERE; a row it turns away is "refused" */
 export async function campaign_update(
   npo_id: number,
   id: string,
-  patch: ICampaignPatch
-): Promise<"ok" | "missing" | "slug_locked"> {
+  patch: ICampaignPatch,
+  guard?: SQL
+): Promise<"ok" | "missing" | "slug_locked" | "refused"> {
   const current = await campaign_get(npo_id, id);
   if (!current) return "missing";
   // the read above can sit before a concurrent publish. the write itself
@@ -498,13 +506,14 @@ export async function campaign_update(
       ...(patch.program_name !== undefined
         ? { program_name: patch.program_name }
         : {}),
-      updated_at: new Date().toISOString(),
+      updated_at: next_updated_at(),
     })
     .where(
       and(
         eq(campaigns.id, id),
         eq(campaigns.owner_npo_id, npo_id),
-        slug_changes ? sql`${campaigns.published_at} is null` : undefined
+        slug_changes ? sql`${campaigns.published_at} is null` : undefined,
+        guard
       )
     )
     .returning({ id: campaigns.id });
@@ -512,7 +521,7 @@ export async function campaign_update(
   const still = await campaign_get(npo_id, id);
   if (!still) return "missing";
   if (slug_changes && still.published_at) return "slug_locked";
-  return "missing";
+  return guard ? "refused" : "missing";
 }
 
 /** false when the slug was locked and the caller tried to change it */
@@ -536,7 +545,7 @@ export async function campaign_publish(
     .set({
       status: "live",
       published_at: sql`COALESCE(${campaigns.published_at}, ${now})`,
-      updated_at: now,
+      updated_at: next_updated_at(),
     })
     .where(
       and(
@@ -549,16 +558,55 @@ export async function campaign_publish(
   return rows.length > 0;
 }
 
+/** sets where gifts go and publishes, in one write that only a never-published,
+ * not-ended campaign whose end date has not passed takes; false leaves the row as it was */
+export async function campaign_first_publish(
+  npo_id: number,
+  id: string,
+  program: { id: string; title: string } | null
+): Promise<boolean> {
+  const now = new Date().toISOString();
+  const rows = await db
+    .update(campaigns)
+    .set({
+      program_id: program?.id ?? null,
+      program_name: program?.title ?? null,
+      status: "live",
+      published_at: now,
+      updated_at: next_updated_at(),
+    })
+    .where(
+      and(
+        eq(campaigns.id, id),
+        eq(campaigns.owner_npo_id, npo_id),
+        sql`${campaigns.status} <> 'ended'`,
+        isNull(campaigns.published_at),
+        // an end date already past would publish it closed: the bound `fund_is_open_sql` uses
+        sql`(${campaigns.ends_at} IS NULL OR ${campaigns.ends_at} >= (date_trunc('day', (NOW() AT TIME ZONE 'UTC') - interval '12 hours') AT TIME ZONE 'UTC'))`
+      )
+    )
+    .returning({ id: campaigns.id });
+  return rows.length > 0;
+}
+
 export async function campaign_end(
   npo_id: number,
   id: string
 ): Promise<boolean> {
+  // an ended campaign is left as it is, its updated_at included
   const rows = await db
     .update(campaigns)
-    .set({ status: "ended", updated_at: new Date().toISOString() })
-    .where(and(eq(campaigns.id, id), eq(campaigns.owner_npo_id, npo_id)))
+    .set({ status: "ended", updated_at: next_updated_at() })
+    .where(
+      and(
+        eq(campaigns.id, id),
+        eq(campaigns.owner_npo_id, npo_id),
+        sql`${campaigns.status} <> 'ended'`
+      )
+    )
     .returning({ id: campaigns.id });
-  return rows.length > 0;
+  if (rows.length > 0) return true;
+  return (await campaign_get(npo_id, id)) !== undefined;
 }
 
 export async function campaign_gift_count(

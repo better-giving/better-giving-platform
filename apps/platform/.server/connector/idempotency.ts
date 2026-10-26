@@ -6,24 +6,49 @@ import { problem } from "./problem";
 
 /** Same window `sweep` deletes in keys.ts. A replay inside it is 200. */
 const IDEM_MS = 24 * 60 * 60 * 1000;
+/** a claim this old belongs to a request that died without releasing it */
+export const IDEMPOTENCY_PENDING_RECLAIM_MS = 60_000;
+const RETRY_AFTER_S = 5;
 const MAX_KEY_LEN = 255;
+
+const in_progress = () =>
+  problem(409, "idempotency_in_progress", {
+    detail:
+      "A request with this Idempotency-Key is still running. Retry the same request, with the same Idempotency-Key and the same body, after a few seconds.",
+    headers: { "retry-after": String(RETRY_AFTER_S) },
+  });
+
+const conflict = () =>
+  problem(409, "idempotency_conflict", {
+    detail:
+      "This Idempotency-Key was already used for a different request. Send a new key for a new request.",
+  });
 
 const sha256_hex = (value: string) =>
   createHash("sha256").update(value, "utf8").digest("hex");
 
+const idem_key_of = (request: Request) =>
+  request.headers.get("Idempotency-Key")?.trim() ?? "";
+
 /**
  * One logical write per `(key_id, Idempotency-Key)`. The handler runs only
- * when this call owns a fresh `pending` row. A throw from the handler deletes
- * that row. Once the handler has returned a 2xx response, a later failure
- * leaves the row pending so a retry cannot repeat the write.
+ * when this call owns a fresh `pending` row. A 4xx from the handler deletes
+ * that row, since nothing was written. A throw or a 5xx may follow a write that
+ * landed, so the row stays pending: a retry inside
+ * `IDEMPOTENCY_PENDING_RECLAIM_MS` is in progress, and past it a retry of the
+ * same body takes the claim with the same `resource_id`.
+ *
+ * The handler gets the record's `resource_id`, the id a create inserts. A
+ * reclaim keeps it, so a retry after a write that landed finds that write; a
+ * record replaced after 24h gets a new one, so a reused key makes a new resource.
  */
 export async function with_idempotency(
   db: DbOrTx,
   key_id: string,
   request: Request,
-  handler: () => Promise<Response>
+  handler: (resource_id: string) => Promise<Response>
 ): Promise<Response> {
-  const idem_key = request.headers.get("Idempotency-Key")?.trim() ?? "";
+  const idem_key = idem_key_of(request);
   if (!idem_key || idem_key.length > MAX_KEY_LEN) {
     return problem(400, "idempotency_key_required");
   }
@@ -42,9 +67,11 @@ export async function with_idempotency(
         status: "pending",
       })
       .onConflictDoNothing()
-      .returning({ idem_key: connector_idempotency.idem_key });
+      .returning({ resource_id: connector_idempotency.resource_id });
 
-    if (inserted.length === 1) return finish(db, key_id, idem_key, handler);
+    if (inserted.length === 1) {
+      return finish(db, key_id, idem_key, inserted[0].resource_id, handler);
+    }
 
     const [row] = await db
       .select()
@@ -56,10 +83,12 @@ export async function with_idempotency(
         )
       );
     if (!row) continue;
-    if (row.status === "pending") return problem(409, "idempotency_conflict");
 
     const created_ms = Date.parse(row.created_at);
-    if (Number.isNaN(created_ms) || created_ms + IDEM_MS < Date.now()) {
+    if (
+      row.status === "stored" &&
+      (Number.isNaN(created_ms) || created_ms + IDEM_MS < Date.now())
+    ) {
       await db
         .delete(connector_idempotency)
         .where(
@@ -75,8 +104,34 @@ export async function with_idempotency(
       continue;
     }
 
-    if (row.request_hash !== request_hash) {
-      return problem(409, "idempotency_conflict");
+    if (row.request_hash !== request_hash) return conflict();
+
+    if (row.status === "pending") {
+      if (created_ms + IDEMPOTENCY_PENDING_RECLAIM_MS >= Date.now()) {
+        return in_progress();
+      }
+      // guarded on the age, so of two retries only one restamps the claim
+      const reclaimed = await db
+        .update(connector_idempotency)
+        .set({ created_at: new Date().toISOString() })
+        .where(
+          and(
+            eq(connector_idempotency.key_id, key_id),
+            eq(connector_idempotency.idem_key, idem_key),
+            eq(connector_idempotency.status, "pending"),
+            lt(
+              connector_idempotency.created_at,
+              new Date(
+                Date.now() - IDEMPOTENCY_PENDING_RECLAIM_MS
+              ).toISOString()
+            )
+          )
+        )
+        .returning({ resource_id: connector_idempotency.resource_id });
+      if (reclaimed.length === 1) {
+        return finish(db, key_id, idem_key, reclaimed[0].resource_id, handler);
+      }
+      continue;
     }
 
     // replay is 200 even when the row stored a 201
@@ -86,7 +141,7 @@ export async function with_idempotency(
     });
   }
 
-  return problem(409, "idempotency_conflict");
+  return in_progress();
 }
 
 const release_pending = (db: DbOrTx, key_id: string, idem_key: string) =>
@@ -104,22 +159,18 @@ async function finish(
   db: DbOrTx,
   key_id: string,
   idem_key: string,
-  handler: () => Promise<Response>
+  resource_id: string,
+  handler: (resource_id: string) => Promise<Response>
 ): Promise<Response> {
-  let res: Response;
-  try {
-    res = await handler();
-  } catch (err) {
-    await release_pending(db, key_id, idem_key);
-    throw err;
-  }
+  // a throw keeps the claim: the write may have landed before it
+  const res = await handler(resource_id);
 
   const text = await res.text();
   const headers = new Headers(res.headers);
   headers.set("cache-control", "no-store");
-  // a non-2xx body is not a completed write; return it unchanged and free the key
+  // a refusal wrote nothing, so free the key; a 5xx keeps the claim like a throw
   if (res.status < 200 || res.status >= 300) {
-    await release_pending(db, key_id, idem_key);
+    if (res.status < 500) await release_pending(db, key_id, idem_key);
     return new Response(text, { status: res.status, headers });
   }
 

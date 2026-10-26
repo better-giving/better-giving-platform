@@ -11,6 +11,7 @@ import {
 } from "vitest";
 import { reset_rate_limits } from "#/.server/auth/rate-limit";
 import { seed_fund, seed_npo, seed_user } from "#/__tests__/fixtures/funds";
+import { IDEMPOTENCY_PENDING_RECLAIM_MS } from "$/connector/idempotency";
 import { exchange_code, issue_code } from "$/connector/keys";
 import { campaign_status } from "$/connector/reads";
 import { campaign_get } from "$/pg/queries/campaign";
@@ -53,10 +54,18 @@ import { loader as recurring_loader } from "./connector.v1.recurring";
 import { loader as results_loader } from "./connector.v1.results";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
+// the next update of this table throws once, as a dropped connection would
+const fail_update = vi.hoisted(() => ({ table: null as unknown }));
 vi.mock("$/pg/db", () => ({
   db: new Proxy({} as any, {
     get(_, prop) {
-      return (test_db.current!.db as any)[prop];
+      const real = test_db.current!.db as any;
+      if (prop !== "update" || !fail_update.table) return real[prop];
+      return (table: unknown) => {
+        if (table !== fail_update.table) return real.update(table);
+        fail_update.table = null;
+        throw new Error("lost the connection");
+      };
     },
   }),
 }));
@@ -73,6 +82,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  fail_update.table = null;
   reset_rate_limits();
   await db().delete(donation_disputes);
   await db().delete(dists);
@@ -500,7 +510,8 @@ describe("forms", () => {
         {
           id: "owned",
           owner_npo_id: a.npo.id,
-          name: "Owned",
+          name: "Alpha",
+          tag: "Owned",
           status: "active",
           increments: [{ value: "25", label: "25" }],
           program_id: "prog_1",
@@ -553,6 +564,7 @@ describe("forms", () => {
       (await list.json()) as {
         data: {
           id: string;
+          name: string;
           status: string;
           suggested_amounts: { amount: string; currency: string }[];
           minimum: unknown;
@@ -573,6 +585,7 @@ describe("forms", () => {
     expect(ids).not.toContain("theirs");
     const owned = data.find((row) => row.id === "owned");
     expect(owned).toMatchObject({
+      name: "Owned",
       status: "live",
       suggested_amounts: [{ amount: "25.00", currency: "USD" }],
       minimum: null,
@@ -580,6 +593,16 @@ describe("forms", () => {
       allowed_origins: [],
       gifts_go_to: { mode: "pinned", program_id: "prog_1" },
       campaign_id: null,
+      // unset columns read as what the donate form falls back to
+      frequencies: ["one-time", "monthly"],
+      donate_methods: [
+        "stripe",
+        "stripe_bank",
+        "daf",
+        "stocks",
+        "ira_qcd",
+        "crypto",
+      ],
     });
     expect(data.find((row) => row.id === "owned-campaign")?.campaign_id).toBe(
       "fund-a"
@@ -587,6 +610,10 @@ describe("forms", () => {
     expect(
       data.find((row) => row.id === "foreign-fund")?.campaign_id
     ).toBeNull();
+    // no label reads as the form's name, as the admin list shows it
+    expect(data.find((row) => row.id === "foreign-fund")?.name).toBe(
+      "Points away"
+    );
 
     const missing = await get(
       form_loader,
@@ -1188,6 +1215,132 @@ describe("donations, donors, results, recurring", () => {
 });
 
 describe("writes", () => {
+  test("create_campaign retried after its replay record failed to save gets the first campaign, not a second one", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const create = () =>
+      post(
+        campaigns_action,
+        "/connector/v1/campaigns",
+        a.key,
+        { title: "Library drive" },
+        "idem-lost"
+      );
+    fail_update.table = connector_idempotency;
+
+    const first = await create();
+
+    expect(first.status).toBe(500);
+    const [made] = await db().select().from(campaigns);
+    expect(made).toBeDefined();
+    const [claim] = await db().select().from(connector_idempotency);
+    expect(claim?.status).toBe("pending");
+
+    expect((await create()).status).toBe(409);
+
+    await db()
+      .update(connector_idempotency)
+      .set({
+        created_at: new Date(
+          Date.now() - IDEMPOTENCY_PENDING_RECLAIM_MS - 1_000
+        ).toISOString(),
+      });
+    const retry = await create();
+
+    expect(retry.status).toBe(201);
+    const retried = (await retry.json()) as { id: string };
+    expect(retried).toMatchObject({ id: made!.id, title: "Library drive" });
+    expect(await db().select().from(campaigns)).toHaveLength(1);
+    expect(await db().select().from(campaign_members)).toEqual([
+      { campaign_id: made!.id, npo_id: a.npo.id, position: 0 },
+    ]);
+    const again = await create();
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual(retried);
+  });
+
+  test("create_campaign retried after a failure past its commit gets the first campaign, not a second one", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const create = () =>
+      post(
+        campaigns_action,
+        "/connector/v1/campaigns",
+        a.key,
+        { title: "Library drive" },
+        "idem-commit"
+      );
+    // the transaction commits, then the reply is lost
+    const real = db();
+    const transaction = real.transaction.bind(real);
+    const spy = vi.spyOn(real, "transaction").mockImplementationOnce((async (
+      ...args: Parameters<typeof real.transaction>
+    ) => {
+      await transaction(...args);
+      throw new Error("lost the connection");
+    }) as typeof real.transaction);
+
+    const first = await create();
+    spy.mockRestore();
+
+    expect(first.status).toBe(500);
+    const [made] = await db().select().from(campaigns);
+    expect(made).toBeDefined();
+    const [claim] = await db().select().from(connector_idempotency);
+    expect(claim?.status).toBe("pending");
+    expect(claim?.resource_id).toBe(made!.id);
+
+    const early = await create();
+    expect(early.status).toBe(409);
+    expect(await early.json()).toMatchObject({
+      code: "idempotency_in_progress",
+    });
+
+    await db()
+      .update(connector_idempotency)
+      .set({
+        created_at: new Date(
+          Date.now() - IDEMPOTENCY_PENDING_RECLAIM_MS - 1_000
+        ).toISOString(),
+      });
+    const retry = await create();
+
+    expect(retry.status).toBe(201);
+    const retried = (await retry.json()) as { id: string };
+    expect(retried).toMatchObject({ id: made!.id, title: "Library drive" });
+    expect(await db().select().from(campaigns)).toHaveLength(1);
+    expect(await db().select().from(campaign_members)).toHaveLength(1);
+    const again = await create();
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual(retried);
+  });
+
+  test("create_campaign reusing a key with a new body after its record expired makes a second campaign", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const create = (title: string) =>
+      post(
+        campaigns_action,
+        "/connector/v1/campaigns",
+        a.key,
+        { title },
+        "idem-reused"
+      );
+    const first = await create("Library drive");
+    expect(first.status).toBe(201);
+    const first_id = ((await first.json()) as { id: string }).id;
+
+    await db()
+      .update(connector_idempotency)
+      .set({
+        created_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+      });
+    const second = await create("Food bank");
+
+    expect(second.status).toBe(201);
+    const made = (await second.json()) as { id: string };
+    expect(made).toMatchObject({ title: "Food bank" });
+    expect(made.id).not.toBe(first_id);
+    expect(await db().select().from(campaigns)).toHaveLength(2);
+  });
+
   test("create_campaign is a draft and replays on the same key", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
     const b = await pair("Beta", "EIN-B", "b@test.com");

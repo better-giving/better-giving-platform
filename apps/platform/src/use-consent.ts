@@ -191,6 +191,8 @@ export const useConsent = () => {
     const path = window.location.pathname;
     if (path.startsWith("/forms")) return;
     if (path.startsWith("/donate-widget")) return;
+    // the url carries a live upload token; no third-party script may read it
+    if (path.startsWith("/photo-upload")) return;
 
     // initialize dataLayer
     window.dataLayer = window.dataLayer || [];

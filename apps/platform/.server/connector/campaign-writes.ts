@@ -1,0 +1,487 @@
+import { and, eq, not, sql } from "drizzle-orm";
+import { BLOB_STORE_HOST } from "#/constants/urls";
+import { fund_closes_at } from "@/campaign/is-open";
+import { IMAGE_TYPES } from "../blob-upload";
+import {
+  campaign_end,
+  campaign_first_publish,
+  campaign_get,
+  campaign_update,
+  type ICampaignPatch,
+} from "../pg/queries/campaign";
+import type { DbOrTx } from "../pg/queries/helpers";
+import { npo_program_get } from "../pg/queries/program";
+import { connector_photo_links } from "../pg/schema/connector";
+import { json, open_key, valid_day } from "./http";
+import { AMOUNT, AMOUNT_MSG, usd_amount } from "./money";
+import {
+  campaign_ended as ended,
+  type FieldError,
+  invalid,
+  not_found,
+  problem,
+  stale_read,
+} from "./problem";
+import {
+  campaign_status,
+  ended_sql,
+  read_campaign_detail,
+  version_sql,
+} from "./reads";
+import { read_body, same_json, TITLE_MAX, unknown_keys } from "./writes";
+
+const missing = (id: string) =>
+  not_found(`Campaign ${id} does not exist for this nonprofit.`);
+
+/** the key's nonprofit, or the response that ends the request */
+async function open_action(
+  db: DbOrTx,
+  request: Request,
+  method: "POST" | "PATCH"
+): Promise<number | Response> {
+  if (request.method !== method) return problem(404, "unknown_action");
+  const live = await open_key(db, request);
+  return live instanceof Response ? live : live.npo_id;
+}
+
+/** a `Money` the detail would show, as dollars; null clears. undefined when
+ * it is malformed, with the issues pushed */
+function read_goal(
+  value: unknown,
+  path: string,
+  issues: FieldError[]
+): number | null | undefined {
+  if (value === null) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    issues.push({
+      path,
+      message: 'is {amount, currency: "USD"}, or null for no goal',
+    });
+    return undefined;
+  }
+  const money = value as Record<string, unknown>;
+  const before = issues.length;
+  for (const key of Object.keys(money)) {
+    if (key !== "amount" && key !== "currency") {
+      issues.push({
+        path: `${path}.${key}`,
+        message: "is not a field of a goal",
+      });
+    }
+  }
+  const { amount, currency } = money;
+  const dollars =
+    typeof amount === "string" && AMOUNT.test(amount) ? Number(amount) : 0;
+  if (!(dollars > 0))
+    issues.push({ path: `${path}.amount`, message: AMOUNT_MSG });
+  if (currency !== "USD") {
+    issues.push({ path: `${path}.currency`, message: "is USD" });
+  }
+  return issues.length > before ? undefined : dollars;
+}
+
+/** `campaign_update`'s target for a goal, or undefined when the goal is
+ * what the detail already shows. a smart target shows as no goal, so null
+ * leaves it be. */
+function goal_patch(
+  dollars: number | null,
+  current: { amount: string } | null
+): string | undefined {
+  if (dollars === null) return current ? "0" : undefined;
+  if (current?.amount === usd_amount(dollars)) return undefined;
+  return String(dollars);
+}
+
+const END_DATE_MSG = "is a day written YYYY-MM-DD, today or later, or null";
+
+/** a draft whose end date has passed would go live already closed */
+const end_passed = (ends_at: string | null) =>
+  !!ends_at && Date.now() >= fund_closes_at(ends_at).getTime();
+const end_date_passed = () =>
+  invalid([
+    {
+      path: "end_date",
+      message:
+        "has passed: set a later end date, or null, before the first publish",
+    },
+  ]);
+
+/** the inverse of `end_date_of`: the day's last instant, as the dashboard
+ * editor writes it */
+const ends_at_of = (day: string) => `${day}T23:59:59.999Z`;
+
+async function detail(db: DbOrTx, npo_id: number, id: string) {
+  const found = await read_campaign_detail(db, npo_id, id);
+  return found ? json(found) : missing(id);
+}
+
+const VERSION_MSG = "is the version get_campaign returned, or left out";
+
+/** the `expected_version` the body sends: undefined when left out, null
+ * when malformed, with the issue pushed */
+function read_version(
+  body: Record<string, unknown>,
+  issues: FieldError[]
+): string | null | undefined {
+  if (!Object.hasOwn(body, "expected_version")) return undefined;
+  const v = body.expected_version;
+  if (typeof v === "string" && /^\d{1,19}$/.test(v)) return v;
+  issues.push({ path: "expected_version", message: VERSION_MSG });
+  return null;
+}
+
+/** the settings or blocks write, which a campaign that ended since the read,
+ * or moved past `expected`, turns away in the same statement */
+async function write_open(
+  db: DbOrTx,
+  npo_id: number,
+  id: string,
+  patch: ICampaignPatch,
+  expected: string | undefined
+): Promise<Response> {
+  const guard = and(
+    not(ended_sql()),
+    expected === undefined ? undefined : sql`${version_sql()} = ${expected}`
+  );
+  const wrote = await campaign_update(npo_id, id, patch, guard);
+  if (wrote === "ok") return detail(db, npo_id, id);
+  const now = await read_campaign_detail(db, npo_id, id);
+  if (!now) return missing(id);
+  if (expected !== undefined && now.status !== "ended") {
+    if (now.version !== expected) return stale_read();
+  }
+  // the guard's clock is the database's; past the version, only ended is left
+  return ended();
+}
+
+export async function end_campaign(
+  db: DbOrTx,
+  request: Request,
+  id: string
+): Promise<Response> {
+  const npo_id = await open_action(db, request, "POST");
+  if (npo_id instanceof Response) return npo_id;
+  const parsed = await read_body(request, { allow_empty: true });
+  if (!parsed.ok) return parsed.response;
+  const issues: FieldError[] = [];
+  unknown_keys(parsed.body, [], issues);
+  if (issues.length > 0) return invalid(issues);
+  if (!(await campaign_end(npo_id, id))) return missing(id);
+  return detail(db, npo_id, id);
+}
+
+const GIFTS_GO_TO_REQUIRED =
+  "is required on the first publish: a program id, or null for the general fund";
+const GIFTS_GO_TO_SHAPE =
+  "is a program id of this nonprofit, or null for the general fund";
+
+const already_published = () =>
+  problem(409, "already_published", {
+    detail:
+      "This campaign is live. Change where its gifts go in the Better Giving dashboard.",
+  });
+
+export async function publish_campaign(
+  db: DbOrTx,
+  request: Request,
+  id: string
+): Promise<Response> {
+  const npo_id = await open_action(db, request, "POST");
+  if (npo_id instanceof Response) return npo_id;
+  const row = await campaign_get(npo_id, id);
+  if (!row) return missing(id);
+  const parsed = await read_body(request, { allow_empty: true });
+  if (!parsed.ok) return parsed.response;
+  const issues: FieldError[] = [];
+  unknown_keys(parsed.body, ["gifts_go_to"], issues);
+  const sent = Object.hasOwn(parsed.body, "gifts_go_to");
+  const to = parsed.body.gifts_go_to;
+  if (sent && to !== null && typeof to !== "string") {
+    issues.push({ path: "gifts_go_to", message: GIFTS_GO_TO_SHAPE });
+  }
+  if (issues.length > 0) return invalid(issues);
+  if (campaign_status(row.status, row.ends_at) === "ended") return ended();
+
+  // where a live campaign's gifts go is not re-routed from a chat
+  if (row.published_at) {
+    if (!sent || to === row.program_id) return detail(db, npo_id, id);
+    return already_published();
+  }
+
+  if (end_passed(row.ends_at)) return end_date_passed();
+  if (!sent) {
+    return invalid([{ path: "gifts_go_to", message: GIFTS_GO_TO_REQUIRED }]);
+  }
+  let program: { id: string; title: string } | null = null;
+  if (typeof to === "string") {
+    const found = await npo_program_get(to, npo_id);
+    if (!found) {
+      return invalid([{ path: "gifts_go_to", message: GIFTS_GO_TO_SHAPE }]);
+    }
+    program = found;
+  }
+  if (await campaign_first_publish(npo_id, id, program)) {
+    return detail(db, npo_id, id);
+  }
+  // published, ended or deleted since the read above
+  const current = await campaign_get(npo_id, id);
+  if (!current) return missing(id);
+  if (campaign_status(current.status, current.ends_at) === "ended") {
+    return ended();
+  }
+  if (!current.published_at && end_passed(current.ends_at)) {
+    return end_date_passed();
+  }
+  if (current.program_id === (program?.id ?? null)) {
+    return detail(db, npo_id, id);
+  }
+  return already_published();
+}
+
+const UNSUPPORTED = "is not supported on Better Giving";
+/** shown by get_campaign but never set here: sent back as read, they pass */
+const READ_ONLY = ["time_zone", "sharing"] as const;
+
+export async function update_campaign_settings(
+  db: DbOrTx,
+  request: Request,
+  id: string
+): Promise<Response> {
+  const npo_id = await open_action(db, request, "PATCH");
+  if (npo_id instanceof Response) return npo_id;
+  const current = await read_campaign_detail(db, npo_id, id);
+  if (!current) return missing(id);
+  const parsed = await read_body(request);
+  if (!parsed.ok) return parsed.response;
+  const { body } = parsed;
+  const issues: FieldError[] = [];
+  unknown_keys(
+    body,
+    ["goal", "end_date", "time_zone", "sharing", "expected_version"],
+    issues
+  );
+  const expected = read_version(body, issues);
+  for (const key of READ_ONLY) {
+    if (Object.hasOwn(body, key) && !same_json(body[key], current[key]))
+      issues.push({ path: key, message: UNSUPPORTED });
+  }
+  const patch: { target?: string; ends_at?: string | null } = {};
+  if (Object.hasOwn(body, "goal")) {
+    const dollars = read_goal(body.goal, "goal", issues);
+    if (dollars !== undefined) {
+      const target = goal_patch(dollars, current.goal);
+      if (target !== undefined) patch.target = target;
+    }
+  }
+  const end_date = body.end_date;
+  if (end_date !== undefined && end_date !== current.end_date) {
+    if (end_date === null) patch.ends_at = null;
+    else if (
+      typeof end_date === "string" &&
+      valid_day(end_date) &&
+      Date.now() < fund_closes_at(end_date).getTime()
+    ) {
+      patch.ends_at = ends_at_of(end_date);
+    } else issues.push({ path: "end_date", message: END_DATE_MSG });
+  }
+  if (issues.length > 0 || expected === null) return invalid(issues);
+  if (current.status === "ended") return ended();
+  if (expected !== undefined && expected !== current.version) {
+    return stale_read();
+  }
+  if (Object.keys(patch).length === 0) return json(current);
+  return write_open(db, npo_id, id, patch, expected);
+}
+
+const STORY_MAX = 10_000;
+const BLOCK_ORDER = ["title", "story", "hero", "goal-bar"] as const;
+type BlockType = (typeof BLOCK_ORDER)[number];
+const BLOCK_KEYS: Record<BlockType, string> = {
+  title: "text",
+  story: "text",
+  hero: "image_url",
+  "goal-bar": "goal",
+};
+const BLOCKS_MSG = `is the campaign's ${BLOCK_ORDER.length} blocks, ${BLOCK_ORDER.join(", ")}, in the order get_campaign returns them`;
+
+const is_block_type = (t: unknown): t is BlockType =>
+  BLOCK_ORDER.includes(t as BlockType);
+
+const photo_exts = Object.values(IMAGE_TYPES)
+  .flat()
+  .map((e) => e.slice(1))
+  .join("|");
+/** a name `store_upload` gives a photo: one segment under `u/`, an image
+ * extension. The store also holds the build's js and migrated files. */
+const UPLOADED_PHOTO = new RegExp(`^/u/[^/]+\\.(${photo_exts})$`, "i");
+
+const HERO_MSG =
+  "is null, or the link to a photo uploaded through create_photo_upload_link for this campaign";
+const HERO_PATH = `blocks[${BLOCK_ORDER.indexOf("hero")}].image_url`;
+
+/** true when a photo link of this campaign stored `url`: a store link that
+ * passes `own_image` may still be another campaign's, or another org's */
+async function uploaded_here(
+  db: DbOrTx,
+  npo_id: number,
+  id: string,
+  url: string
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: connector_photo_links.id })
+    .from(connector_photo_links)
+    .where(
+      and(
+        eq(connector_photo_links.campaign_id, id),
+        eq(connector_photo_links.npo_id, npo_id),
+        eq(connector_photo_links.saved_pathname, new URL(url).pathname)
+      )
+    )
+    .limit(1);
+  return !!row;
+}
+
+const own_image = (value: string) => {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      url.host === BLOB_STORE_HOST &&
+      UPLOADED_PHOTO.test(url.pathname)
+    );
+  } catch {
+    return false;
+  }
+};
+
+/** plain text as portable text: one unmarked block per paragraph, a
+ * paragraph being the text between blank lines */
+function story_pt(text: string): string {
+  const key = () => crypto.randomUUID().slice(0, 12);
+  const blocks = text
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => ({
+      _type: "block",
+      _key: key(),
+      style: "normal",
+      markDefs: [],
+      children: [{ _type: "span", _key: key(), text: p, marks: [] }],
+    }));
+  return JSON.stringify(blocks);
+}
+
+type Current = NonNullable<Awaited<ReturnType<typeof read_campaign_detail>>>;
+type BlocksPatch = {
+  name?: string;
+  description_pt?: string;
+  banner?: string | null;
+  target?: string;
+};
+
+/** the write the list asks for, leaving out every block that matches what
+ * the detail shows, so a story or image read back unchanged keeps what is
+ * stored behind it */
+function read_blocks(
+  value: unknown,
+  current: Current,
+  issues: FieldError[]
+): BlocksPatch {
+  const patch: BlocksPatch = {};
+  if (!Array.isArray(value) || value.length !== BLOCK_ORDER.length) {
+    issues.push({ path: "blocks", message: BLOCKS_MSG });
+    return patch;
+  }
+  const shown = (type: BlockType) =>
+    current.blocks.find((b) => b.type === type) as Record<string, unknown>;
+  value.forEach((raw: unknown, i) => {
+    const at = `blocks[${i}]`;
+    const want = BLOCK_ORDER[i]!;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      issues.push({ path: at, message: `is the ${want} block` });
+      return;
+    }
+    const block = raw as Record<string, unknown>;
+    if (block.type !== want) {
+      issues.push({
+        path: `${at}.type`,
+        message: is_block_type(block.type)
+          ? `is "${want}": the blocks stay in the order get_campaign returns them`
+          : `is "${want}", one of ${BLOCK_ORDER.join(", ")}`,
+      });
+      return;
+    }
+    const field = BLOCK_KEYS[want];
+    for (const key of Object.keys(block)) {
+      if (key !== "type" && key !== field) {
+        issues.push({
+          path: `${at}.${key}`,
+          message: `is not a field of a ${want} block`,
+        });
+      }
+    }
+    const v = block[field];
+    const path = `${at}.${field}`;
+    if (v === shown(want)[field] && want !== "goal-bar") return;
+    if (want === "title") {
+      const name = typeof v === "string" ? v.trim() : "";
+      if (name.length < 1 || name.length > TITLE_MAX) {
+        issues.push({
+          path,
+          message: `is the campaign's name, 1 to ${TITLE_MAX} characters`,
+        });
+      } else if (name !== current.title) patch.name = name;
+    } else if (want === "story") {
+      if (typeof v !== "string" || v.length > STORY_MAX) {
+        issues.push({
+          path,
+          message: `is plain text up to ${STORY_MAX} characters, with a blank line between paragraphs`,
+        });
+      } else patch.description_pt = story_pt(v);
+    } else if (want === "hero") {
+      if (v === null) patch.banner = null;
+      else if (typeof v === "string" && own_image(v)) patch.banner = v;
+      else {
+        issues.push({ path, message: HERO_MSG });
+      }
+    } else {
+      const dollars = read_goal(v, path, issues);
+      if (dollars !== undefined) {
+        const target = goal_patch(dollars, current.goal);
+        if (target !== undefined) patch.target = target;
+      }
+    }
+  });
+  return patch;
+}
+
+export async function update_campaign_blocks(
+  db: DbOrTx,
+  request: Request,
+  id: string
+): Promise<Response> {
+  const npo_id = await open_action(db, request, "PATCH");
+  if (npo_id instanceof Response) return npo_id;
+  const current = await read_campaign_detail(db, npo_id, id);
+  if (!current) return missing(id);
+  const parsed = await read_body(request);
+  if (!parsed.ok) return parsed.response;
+  const issues: FieldError[] = [];
+  unknown_keys(parsed.body, ["blocks", "expected_version"], issues);
+  const expected = read_version(parsed.body, issues);
+  const patch = read_blocks(parsed.body.blocks, current, issues);
+  if (
+    typeof patch.banner === "string" &&
+    !(await uploaded_here(db, npo_id, id, patch.banner))
+  ) {
+    issues.push({ path: HERO_PATH, message: HERO_MSG });
+  }
+  if (issues.length > 0 || expected === null) return invalid(issues);
+  if (current.status === "ended") return ended();
+  if (expected !== undefined && expected !== current.version) {
+    return stale_read();
+  }
+  if (Object.keys(patch).length === 0) return json(current);
+  return write_open(db, npo_id, id, patch, expected);
+}

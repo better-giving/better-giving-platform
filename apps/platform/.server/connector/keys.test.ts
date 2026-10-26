@@ -654,6 +654,7 @@ describe("sweep", () => {
       keys_revoked: 1,
       codes_deleted: 1,
       idempotency_deleted: 1,
+      photo_links_deleted: 0,
     });
 
     const keys = await t.db.select().from(connector_keys);
