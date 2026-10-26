@@ -417,6 +417,7 @@ async function write_patch(
     .update(forms)
     .set({
       ...cols,
+      updated_at: new Date().toISOString(),
       ...(program !== undefined && {
         program_id: program?.id ?? null,
         program_name: program?.name ?? null,

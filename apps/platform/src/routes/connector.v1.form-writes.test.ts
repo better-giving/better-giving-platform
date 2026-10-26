@@ -12,6 +12,7 @@ import {
 import { reset_rate_limits } from "#/.server/auth/rate-limit";
 import { seed_npo, seed_user } from "#/__tests__/fixtures/funds";
 import { exchange_code, issue_code } from "$/connector/keys";
+import { form_update } from "$/pg/queries/form";
 import type { DbOrTx } from "$/pg/queries/helpers";
 import { user } from "$/pg/schema/auth";
 import {
@@ -419,6 +420,35 @@ async function seed_form(
 }
 
 describe("update_form", () => {
+  test("an edit moves updated_at, get_form shows it, and an unchanged send leaves it", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_form(a.npo.id);
+    const updated_at = async () =>
+      ((await (await read(id, a.key)).json()) as { updated_at: string })
+        .updated_at;
+    expect(await updated_at()).toBe("2026-01-02T00:00:00.000Z");
+
+    const before = Date.now();
+    const res = await update(id, a.key, { name: "Renamed" });
+    const edited = ((await res.json()) as { updated_at: string }).updated_at;
+    expect(Date.parse(edited)).toBeGreaterThanOrEqual(before - 1);
+    expect(await updated_at()).toBe(edited);
+
+    await update(id, a.key, { name: "Renamed" });
+    expect(await updated_at()).toBe(edited);
+  });
+
+  test("the dashboard's edit moves updated_at too", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_form(a.npo.id);
+    const before = Date.now();
+    await form_update(id, { status: "inactive" });
+    const shown = (await (await read(id, a.key)).json()) as {
+      updated_at: string;
+    };
+    expect(Date.parse(shown.updated_at)).toBeGreaterThanOrEqual(before - 1);
+  });
+
   test("only the fields sent change, and an amount that stays keeps its label", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
     const id = await seed_form(a.npo.id, {

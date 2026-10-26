@@ -120,6 +120,7 @@ type CampaignRow = {
   banner: string | null;
   created_at: string;
   updated_at: string;
+  version: string;
   npo_slug: string | null;
 };
 
@@ -140,6 +141,7 @@ function summary_of(row: CampaignRow) {
 function detail_of(row: CampaignRow) {
   return {
     ...summary_of(row),
+    version: row.version,
     has_unpublished_changes: false,
     sharing: { message: null, channels: null },
     time_zone: null,
@@ -163,8 +165,15 @@ const campaign_cols = {
   banner: campaigns.banner,
   created_at: campaigns.created_at,
   updated_at: campaigns.updated_at,
+  version: version_sql().as("version"),
   npo_slug: npos.slug,
 };
+
+/** a campaign's version as the detail shows it: `updated_at` in whole
+ * microseconds, which every write to the row moves */
+export function version_sql() {
+  return sql<string>`((extract(epoch from ${campaigns.updated_at}) * 1000000)::bigint)::text`;
+}
 
 /** UTC date of now minus 12 hours. Same bound as `fund_is_open_sql`. */
 function close_bound(now?: Date) {
@@ -348,8 +357,15 @@ type FormRow = {
   recipient_fund_id: string | null;
   fund_owner: number | null;
   date_created: string | null;
+  updated_at: string | null;
   stamped: string;
 };
+
+/** the last edit, or the creation for a form not edited since */
+function edited_at(row: FormRow): string {
+  const at = row.updated_at ?? row.date_created;
+  return at ? pg_text_to_iso(at) : EPOCH;
+}
 
 function form_of(row: FormRow, npo_id: number) {
   const amounts = row.increments ?? [];
@@ -377,7 +393,7 @@ function form_of(row: FormRow, npo_id: number) {
       ? { mode: "pinned" as const, program_id: row.program_id }
       : { mode: "none" as const, program_id: null },
     campaign_id: owned_here ? row.recipient_fund_id : null,
-    updated_at: row.date_created ? pg_text_to_iso(row.date_created) : EPOCH,
+    updated_at: edited_at(row),
   };
 }
 
@@ -397,6 +413,7 @@ const form_cols = {
   recipient_fund_id: forms.recipient_fund_id,
   fund_owner: funds.npo_owner,
   date_created: forms.date_created,
+  updated_at: forms.updated_at,
   stamped:
     sql<string>`COALESCE(${forms.date_created}, ${EPOCH}::timestamptz)`.as(
       "stamped"

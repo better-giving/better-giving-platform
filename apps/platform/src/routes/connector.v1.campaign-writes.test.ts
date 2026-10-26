@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import {
@@ -19,6 +20,7 @@ import {
   connector_codes,
   connector_idempotency,
   connector_keys,
+  connector_photo_links,
 } from "$/pg/schema/connector";
 import { npos } from "$/pg/schema/npo";
 import { programs } from "$/pg/schema/program";
@@ -41,7 +43,8 @@ vi.mock("$/pg/db", () => ({
 }));
 
 // a write landing between the connector's read of the campaign and its own
-// write; one-shot, fired after the first campaign_get resolves
+// write; one-shot, fired after the first campaign_get resolves or before the
+// first campaign_update starts
 const between = vi.hoisted(() => ({
   write: null as (() => Promise<void>) | null,
 }));
@@ -55,6 +58,14 @@ vi.mock("$/pg/queries/campaign", async (load) => {
       between.write = null;
       await write?.();
       return row;
+    },
+    campaign_update: async (
+      ...args: Parameters<typeof real.campaign_update>
+    ) => {
+      const write = between.write;
+      between.write = null;
+      await write?.();
+      return real.campaign_update(...args);
     },
   };
 });
@@ -186,6 +197,22 @@ async function seed_program(npo_id: number, title: string) {
     .insert(programs)
     .values({ id, npo_id, title, description_pt: "[]" });
   return id;
+}
+
+/** a photo link of `campaign_id` whose upload stored `url` */
+async function uploaded(npo_id: number, campaign_id: string, url: string) {
+  await db()
+    .insert(connector_photo_links)
+    .values({
+      id: crypto.randomUUID(),
+      token_hash: randomBytes(32).toString("hex"),
+      npo_id,
+      campaign_id,
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+      used_at: new Date().toISOString(),
+      saved_url: url,
+      saved_pathname: new URL(url).pathname,
+    });
 }
 
 const row_of = async (id: string) => {
@@ -737,6 +764,7 @@ describe("update_campaign_blocks", () => {
     const id = await seed_campaign(a);
     const { slug } = await row_of(id);
     const image = `${BLOB}/u/hero-Xk2Lm9.webp`;
+    await uploaded(a.npo.id, id, image);
 
     const res = await patch(id, a.key, {
       blocks: [
@@ -956,11 +984,50 @@ describe("update_campaign_blocks", () => {
       "b-2.WebP",
     ]) {
       const image = `${BLOB}/u/${encodeURIComponent(name)}`;
+      await uploaded(a.npo.id, id, image);
       blocks[2] = { type: "hero", image_url: image };
       const res = await patch(id, a.key, { blocks });
       expect(res.status, name).toBe(200);
       expect((await row_of(id)).banner).toBe(image);
     }
+  });
+
+  test("a store photo not uploaded through a link of this campaign is 422 on the hero, and nothing is written", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const b = await pair("Beta", "EIN-B", "b@test.com");
+    const id = await seed_campaign(a);
+    const sibling = await seed_campaign(a);
+    const foreign = await seed_campaign(b);
+    const theirs = `${BLOB}/u/sibling-Ab1.png`;
+    const others = `${BLOB}/u/foreign-Cd2.png`;
+    const loose = `${BLOB}/u/never-linked-Ef3.png`;
+    await uploaded(a.npo.id, sibling, theirs);
+    await uploaded(b.npo.id, foreign, others);
+    const before = await row_of(id);
+
+    for (const image of [theirs, others, loose]) {
+      const blocks = await blocks_of(id, a.key);
+      blocks[2] = { type: "hero", image_url: image };
+      const res = await patch(id, a.key, { blocks });
+      expect(res.status, image).toBe(422);
+      expect(await res.json()).toMatchObject({
+        code: "invalid",
+        errors: [{ path: "blocks[2].image_url" }],
+      });
+    }
+    expect(await row_of(id)).toEqual(before);
+  });
+
+  test("the current banner sent back unchanged passes, though no link stored it", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const banner = `${BLOB}/u/from-dashboard-Gh4.png`;
+    const id = await seed_campaign(a, { banner });
+    const blocks = await blocks_of(id, a.key);
+    blocks[0] = { type: "title", text: "Renamed" };
+
+    const res = await patch(id, a.key, { blocks });
+    expect(res.status).toBe(200);
+    expect(await row_of(id)).toMatchObject({ name: "Renamed", banner });
   });
 
   test("an ended campaign is 409 campaign_ended, after the blocks are checked, and nothing is written", async () => {
@@ -1000,5 +1067,164 @@ describe("update_campaign_blocks", () => {
     expect(await foreign.json()).toMatchObject({ code: "not_found" });
     expect((await patch(id, undefined, { blocks })).status).toBe(401);
     expect((await row_of(id)).name).toBe("Library drive");
+  });
+});
+
+describe("expected_version", () => {
+  const settings = (id: string, key: string, body: unknown) =>
+    send(settings_action, "PATCH", id, "/settings", key, body);
+  const blocks = (id: string, key: string, body: unknown) =>
+    send(blocks_action, "PATCH", id, "/blocks", key, body);
+  const detail = async (id: string, key: string) =>
+    (await (await read(id, key)).json()) as {
+      version: string;
+      blocks: Record<string, unknown>[];
+    };
+  const GOAL = { amount: "500", currency: "USD" };
+
+  test("get_campaign shows a version, and every write moves it", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a);
+    const first = (await detail(id, a.key)).version;
+    expect(first).toMatch(/^\d+$/);
+
+    const res = await settings(id, a.key, { goal: GOAL });
+    const second = ((await res.json()) as { version: string }).version;
+    expect(second).not.toBe(first);
+    expect((await detail(id, a.key)).version).toBe(second);
+
+    // a stored updated_at ahead of this clock (another instance's) still
+    // moves forward, never back to now
+    await db()
+      .update(campaigns)
+      .set({ updated_at: "2099-01-01T00:00:00.000Z" })
+      .where(eq(campaigns.id, id));
+    const ahead = (await detail(id, a.key)).version;
+    const after = await settings(id, a.key, {
+      goal: { amount: "600", currency: "USD" },
+    });
+    const moved = ((await after.json()) as { version: string }).version;
+    expect(BigInt(moved)).toBeGreaterThan(BigInt(ahead));
+  });
+
+  test("the version read is written against; a stale one is 409 stale_read and writes nothing", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a);
+    const read_at = (await detail(id, a.key)).version;
+
+    const ok = await settings(id, a.key, {
+      goal: GOAL,
+      expected_version: read_at,
+    });
+    expect(ok.status).toBe(200);
+    const before = await row_of(id);
+
+    const shown = await detail(id, a.key);
+    shown.blocks[0] = { type: "title", text: "Late edit" };
+    for (const res of [
+      await settings(id, a.key, {
+        goal: { amount: "900", currency: "USD" },
+        expected_version: read_at,
+      }),
+      await blocks(id, a.key, {
+        blocks: shown.blocks,
+        expected_version: read_at,
+      }),
+    ]) {
+      expect(res.status).toBe(409);
+      expect(res.headers.get("content-type")).toBe("application/problem+json");
+      expect(await res.json()).toMatchObject({
+        code: "stale_read",
+        status: 409,
+      });
+    }
+    expect(await row_of(id)).toEqual(before);
+  });
+
+  test("a version that moves between the read and the write is 409 stale_read, and the other write stands", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a);
+    const { version } = await detail(id, a.key);
+    between.write = async () => {
+      await db()
+        .update(campaigns)
+        .set({ name: "Dashboard edit", updated_at: "2099-01-01T00:00:00.000Z" })
+        .where(eq(campaigns.id, id));
+    };
+
+    const res = await settings(id, a.key, {
+      goal: GOAL,
+      expected_version: version,
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "stale_read" });
+    expect(await row_of(id)).toMatchObject({
+      name: "Dashboard edit",
+      target_number: null,
+    });
+  });
+
+  test("without expected_version a write lands as before", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a);
+    await settings(id, a.key, { goal: GOAL });
+
+    const res = await settings(id, a.key, {
+      goal: { amount: "750", currency: "USD" },
+    });
+    expect(res.status).toBe(200);
+    expect((await row_of(id)).target_number).toBe(750);
+  });
+
+  test("a malformed expected_version is 422 on it", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a);
+    for (const expected_version of [12, "", "v1", null]) {
+      const res = await settings(id, a.key, { goal: GOAL, expected_version });
+      expect(res.status, String(expected_version)).toBe(422);
+      expect(await res.json()).toMatchObject({
+        errors: [{ path: "expected_version" }],
+      });
+    }
+    expect((await row_of(id)).target_number).toBe(null);
+  });
+
+  test("a campaign that ends between the read and the write is 409 campaign_ended, version or not", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a, {
+      status: "live",
+      published_at: "2026-01-01T00:00:00.000Z",
+    });
+    const shown = await detail(id, a.key);
+    shown.blocks[0] = { type: "title", text: "Too late" };
+    const end = async () => {
+      await db()
+        .update(campaigns)
+        .set({ status: "ended" })
+        .where(eq(campaigns.id, id));
+    };
+
+    for (const send_write of [
+      () => settings(id, a.key, { goal: GOAL }),
+      () => blocks(id, a.key, { blocks: shown.blocks }),
+      () =>
+        blocks(id, a.key, {
+          blocks: shown.blocks,
+          expected_version: shown.version,
+        }),
+    ]) {
+      await db()
+        .update(campaigns)
+        .set({ status: "live" })
+        .where(eq(campaigns.id, id));
+      between.write = end;
+      const res = await send_write();
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({ code: "campaign_ended" });
+      expect(await row_of(id)).toMatchObject({
+        name: "Library drive",
+        target_number: null,
+      });
+    }
   });
 });

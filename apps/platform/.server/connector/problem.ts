@@ -10,7 +10,8 @@ export type ProblemCode =
   | "write_failed"
   | "campaign_ended"
   | "already_published"
-  | "confirm_required";
+  | "confirm_required"
+  | "stale_read";
 
 export type FieldError = { path: string; message: string };
 
@@ -55,5 +56,12 @@ export function not_found(detail: string): Response {
 export function campaign_ended(): Response {
   return problem(409, "campaign_ended", {
     detail: "This campaign has ended, and an ended campaign stays ended.",
+  });
+}
+
+export function stale_read(): Response {
+  return problem(409, "stale_read", {
+    detail:
+      "This campaign changed after it was read. Read it again with get_campaign, then send the change against that version.",
   });
 }

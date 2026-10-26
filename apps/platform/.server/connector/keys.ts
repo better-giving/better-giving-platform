@@ -284,9 +284,16 @@ export async function sweep(
     .delete(connector_idempotency)
     .where(lt(connector_idempotency.created_at, idem_before))
     .returning({ idem_key: connector_idempotency.idem_key });
+  // a link that saved its photo is kept: it shows that photo, and vouches for
+  // it as the campaign's hero
   const photo_links = await db
     .delete(connector_photo_links)
-    .where(lt(connector_photo_links.expires_at, photo_before))
+    .where(
+      and(
+        lt(connector_photo_links.expires_at, photo_before),
+        isNull(connector_photo_links.saved_pathname)
+      )
+    )
     .returning({ id: connector_photo_links.id });
   return {
     keys_revoked: revoked.length,

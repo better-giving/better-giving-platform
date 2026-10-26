@@ -283,7 +283,7 @@ describe("GET /photo-upload/:token", () => {
     expect(html).not.toContain(token);
   });
 
-  test("unknown, malformed, expired and used links are one identical 404", async () => {
+  test("unknown, malformed, expired and spent links that saved nothing are one identical 404", async () => {
     const { token } = await seed();
     const unknown = await get("A".repeat(43));
     const malformed = await get("not a token");
@@ -294,7 +294,10 @@ describe("GET /photo-upload/:token", () => {
     const expired = await get(token);
 
     const fresh = await seed2();
-    await submit(fresh.token, photo([PNG], "image/png", "a.png"));
+    await db()
+      .update(connector_photo_links)
+      .set({ used_at: new Date().toISOString() })
+      .where(eq(connector_photo_links.campaign_id, fresh.campaign_id));
     const used = await get(fresh.token);
 
     for (const res of [unknown, malformed, expired, used]) {
@@ -303,6 +306,30 @@ describe("GET /photo-upload/:token", () => {
     }
     const html = html_of(unknown.data);
     expect(html).toContain(GONE);
+    expect(html).not.toContain("<form");
+  });
+
+  test("a link whose photo saved opens on the saved photo, past its expiry and after the campaign ends", async () => {
+    const { token, campaign_id } = await seed();
+    await submit(token, photo([PNG], "image/png", "a.png"));
+    await db()
+      .update(connector_photo_links)
+      .set({ expires_at: new Date(Date.now() - 1000).toISOString() });
+    await db()
+      .update(campaigns)
+      .set({ status: "ended" })
+      .where(eq(campaigns.id, campaign_id));
+
+    const res = await get(token);
+    expect(res.init.status).toBe(200);
+    expect(res.data).toEqual({
+      state: "saved",
+      campaign: "Library drive",
+      photo: BLOB_URL,
+    });
+    const html = html_of(res.data);
+    expect(html).toContain("Photo added");
+    expect(html).toContain(`src="${BLOB_URL}"`);
     expect(html).not.toContain("<form");
   });
 });
@@ -335,7 +362,7 @@ describe.each(["document", "script"] as const)(
   (mode) => {
     const submit = poster(mode);
 
-    test("a png becomes the banner, the link is spent, and a second post changes nothing", async () => {
+    test("a png becomes the banner, the link is spent, and a second post shows the saved photo and stores nothing", async () => {
       const { token, campaign_id } = await seed();
 
       const res = await submit(token, photo([PNG], "image/png", "../me.png"));
@@ -362,10 +389,16 @@ describe.each(["document", "script"] as const)(
       expect(html).toContain(`src="${BLOB_URL}"`);
       expect(html).toContain("close this tab");
 
+      const [link] = await db().select().from(connector_photo_links);
+      expect(link).toMatchObject({
+        saved_url: BLOB_URL,
+        saved_pathname: "/u/photo-abc.png",
+      });
+
       put.mockResolvedValue({ url: "https://blob.test/u/second.png" });
       const again = await submit(token, photo([PNG], "image/png", "b.png"));
-      expect(again.init.status).toBe(404);
-      expect(again.data).toEqual({ state: "gone" });
+      expect(again.init.status).toBe(200);
+      expect(again.data).toEqual(res.data);
       expect(put).toHaveBeenCalledTimes(1);
       expect(await banner_of(campaign_id)).toBe(BLOB_URL);
     });
@@ -584,6 +617,9 @@ describe.each(["document", "script"] as const)(
       expect(await banner_of(campaign_id)).toBe("https://blob.test/u/old.png");
       expect(del).toHaveBeenCalledWith(BLOB_URL, { token: "tok" });
       expect(await used_at_of()).toBeNull();
+      // the removed file is never offered as this campaign's hero
+      const [link] = await db().select().from(connector_photo_links);
+      expect(link).toMatchObject({ saved_url: null, saved_pathname: null });
       expect(html_of({ state: "gone" }, res.data)).toContain(GONE);
     });
 
@@ -802,7 +838,7 @@ describe("as a document request", () => {
     },
   ]);
 
-  test("a saved photo answers 200 though the rerun loader now reads the link as spent", async () => {
+  test("a saved photo answers 200, and the rerun loader reads the spent link as saved", async () => {
     const { token } = await seed();
     const form = new FormData();
     form.set("photo", photo([PNG], "image/png", "a.png"));
@@ -815,8 +851,13 @@ describe("as a document request", () => {
     );
 
     if (context instanceof Response) throw new Error("unexpected response");
-    expect(context.loaderData.photo).toEqual({ state: "gone" });
-    expect(context.actionData?.photo).toMatchObject({ state: "saved" });
+    const saved = {
+      state: "saved",
+      campaign: "Library drive",
+      photo: BLOB_URL,
+    };
+    expect(context.loaderData.photo).toEqual(saved);
+    expect(context.actionData?.photo).toEqual(saved);
     expect(context.statusCode).toBe(200);
   });
 });

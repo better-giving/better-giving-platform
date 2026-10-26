@@ -35,6 +35,8 @@ export async function issue_photo_link(
           ),
           expires_at: sql<string>`${expires_at}::timestamptz`.as("expires_at"),
           used_at: sql<null>`null::timestamptz`.as("used_at"),
+          saved_url: sql<null>`null::text`.as("saved_url"),
+          saved_pathname: sql<null>`null::text`.as("saved_pathname"),
         })
         .from(campaigns)
         .where(
@@ -75,6 +77,44 @@ export async function peek_photo_link(
     .from(connector_photo_links)
     .where(live_link(token, now));
   return row ?? null;
+}
+
+/** the photo a spent link stored, at any age: null for a link that is
+ * unknown, malformed, or saved nothing */
+export async function saved_photo_link(
+  db: DbOrTx,
+  token: string
+): Promise<{ npo_id: number; campaign_id: string; saved_url: string } | null> {
+  if (!TOKEN_RE.test(token)) return null;
+  const [row] = await db
+    .select({
+      npo_id: connector_photo_links.npo_id,
+      campaign_id: connector_photo_links.campaign_id,
+      saved_url: connector_photo_links.saved_url,
+    })
+    .from(connector_photo_links)
+    .where(eq(connector_photo_links.token_hash, sha256_hex(token)));
+  return row?.saved_url ? { ...row, saved_url: row.saved_url } : null;
+}
+
+/** keeps the stored photo on the claim that stored it */
+export async function record_saved_photo(
+  db: DbOrTx,
+  id: string,
+  used_at: string,
+  url: string
+): Promise<boolean> {
+  const rows = await db
+    .update(connector_photo_links)
+    .set({ saved_url: url, saved_pathname: new URL(url).pathname })
+    .where(
+      and(
+        eq(connector_photo_links.id, id),
+        eq(connector_photo_links.used_at, used_at)
+      )
+    )
+    .returning({ id: connector_photo_links.id });
+  return rows.length === 1;
 }
 
 /** the single atomic claim: of concurrent calls on one token, one gets the row */

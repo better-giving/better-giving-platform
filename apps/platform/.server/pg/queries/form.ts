@@ -70,7 +70,10 @@ export async function form_update(
   id: string,
   update: Partial<Omit<FormInsert, "id">>
 ) {
-  await db.update(forms).set(update).where(eq(forms.id, id));
+  await db
+    .update(forms)
+    .set({ ...update, updated_at: new Date().toISOString() })
+    .where(eq(forms.id, id));
 }
 
 /** atomically adjust ltd + ltd_count */

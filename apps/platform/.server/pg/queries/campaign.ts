@@ -7,6 +7,7 @@ import {
   isNull,
   ne,
   or,
+  type SQL,
   sql,
 } from "drizzle-orm";
 import { to_text } from "#/components/rich-text/helpers";
@@ -440,11 +441,18 @@ export async function campaign_create(input: ICampaignInput) {
   });
 }
 
+/** the next `updated_at`: now, or a millisecond past the stored one when the
+ * clock hasn't moved, so no two writes leave a campaign at the same version */
+export const next_updated_at = () =>
+  sql`GREATEST(${new Date().toISOString()}::timestamptz, ${campaigns.updated_at} + interval '1 millisecond')`;
+
+/** `guard` joins the write's WHERE; a row it turns away is "refused" */
 export async function campaign_update(
   npo_id: number,
   id: string,
-  patch: ICampaignPatch
-): Promise<"ok" | "missing" | "slug_locked"> {
+  patch: ICampaignPatch,
+  guard?: SQL
+): Promise<"ok" | "missing" | "slug_locked" | "refused"> {
   const current = await campaign_get(npo_id, id);
   if (!current) return "missing";
   // the read above can sit before a concurrent publish. the write itself
@@ -498,13 +506,14 @@ export async function campaign_update(
       ...(patch.program_name !== undefined
         ? { program_name: patch.program_name }
         : {}),
-      updated_at: new Date().toISOString(),
+      updated_at: next_updated_at(),
     })
     .where(
       and(
         eq(campaigns.id, id),
         eq(campaigns.owner_npo_id, npo_id),
-        slug_changes ? sql`${campaigns.published_at} is null` : undefined
+        slug_changes ? sql`${campaigns.published_at} is null` : undefined,
+        guard
       )
     )
     .returning({ id: campaigns.id });
@@ -512,7 +521,7 @@ export async function campaign_update(
   const still = await campaign_get(npo_id, id);
   if (!still) return "missing";
   if (slug_changes && still.published_at) return "slug_locked";
-  return "missing";
+  return guard ? "refused" : "missing";
 }
 
 /** false when the slug was locked and the caller tried to change it */
@@ -536,7 +545,7 @@ export async function campaign_publish(
     .set({
       status: "live",
       published_at: sql`COALESCE(${campaigns.published_at}, ${now})`,
-      updated_at: now,
+      updated_at: next_updated_at(),
     })
     .where(
       and(
@@ -564,7 +573,7 @@ export async function campaign_first_publish(
       program_name: program?.title ?? null,
       status: "live",
       published_at: now,
-      updated_at: now,
+      updated_at: next_updated_at(),
     })
     .where(
       and(
@@ -587,7 +596,7 @@ export async function campaign_end(
   // an ended campaign is left as it is, its updated_at included
   const rows = await db
     .update(campaigns)
-    .set({ status: "ended", updated_at: new Date().toISOString() })
+    .set({ status: "ended", updated_at: next_updated_at() })
     .where(
       and(
         eq(campaigns.id, id),

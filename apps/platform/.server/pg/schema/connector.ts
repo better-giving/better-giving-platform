@@ -117,6 +117,10 @@ export const connector_photo_links = pgTable(
     created_at: timestamptz_now("created_at"),
     expires_at: timestamptz("expires_at").notNull(),
     used_at: timestamptz("used_at"),
+    // the photo the claim stored, kept once its banner write went through: a
+    // spent link shows it, and update_campaign_blocks takes it as a hero
+    saved_url: text("saved_url"),
+    saved_pathname: text("saved_pathname"),
   },
   (t) => [
     check(
@@ -124,5 +128,10 @@ export const connector_photo_links = pgTable(
       sql`${t.token_hash} ~ '^[0-9a-f]{64}$'`
     ),
     index("connector_photo_links_expires_at_idx").on(t.expires_at),
+    // also the lookup a campaign's delete cascades through
+    index("connector_photo_links_campaign_saved_idx").on(
+      t.campaign_id,
+      t.saved_pathname
+    ),
   ]
 );

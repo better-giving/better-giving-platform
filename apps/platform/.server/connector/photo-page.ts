@@ -1,4 +1,5 @@
 import { and, eq, not } from "drizzle-orm";
+import { report_error } from "#/errors/report";
 import { photo_too_large, upload_limits } from "@/constants/upload";
 import {
   basename,
@@ -8,20 +9,23 @@ import {
   store_upload,
   type_of,
 } from "../blob-upload";
-import { campaign_get } from "../pg/queries/campaign";
+import { campaign_get, next_updated_at } from "../pg/queries/campaign";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { campaigns } from "../pg/schema/campaign";
 import { reserve_ip } from "./gate";
 import {
   consume_photo_link,
   peek_photo_link,
+  record_saved_photo,
   release_photo_link,
+  saved_photo_link,
 } from "./photo-links";
 import { campaign_status, ended_sql } from "./reads";
 
 /** what `/photo-upload/:token` shows. `gone` is one shape for an unknown,
- * malformed, expired or spent link, or one whose campaign was deleted or has
- * ended, so the page tells a guesser nothing. */
+ * malformed or expired link, a spent one that saved nothing, or one whose
+ * campaign was deleted or has ended, so the page tells a guesser nothing. A
+ * link that saved its photo shows it as `saved` for good. */
 export type PhotoPage =
   | { state: "gone" }
   | { state: "limited" }
@@ -48,6 +52,21 @@ async function open_link(db: DbOrTx, token: string) {
   return { name: campaign.name };
 }
 
+/** the saved page of a link whose photo went through, or null */
+async function saved_page(
+  db: DbOrTx,
+  token: string
+): Promise<PhotoResult | null> {
+  const link = await saved_photo_link(db, token);
+  if (!link) return null;
+  const campaign = await campaign_get(link.npo_id, link.campaign_id);
+  if (!campaign) return null;
+  return {
+    page: { state: "saved", campaign: campaign.name, photo: link.saved_url },
+    status: 200,
+  };
+}
+
 /** the banner write, which a campaign ended or deleted since `open_link` refuses */
 async function set_banner(
   db: DbOrTx,
@@ -58,7 +77,7 @@ async function set_banner(
   const now = new Date();
   const rows = await db
     .update(campaigns)
-    .set({ banner, updated_at: now.toISOString() })
+    .set({ banner, updated_at: next_updated_at() })
     .where(
       and(
         eq(campaigns.id, campaign_id),
@@ -75,7 +94,7 @@ export async function read_photo_page(
   token: string
 ): Promise<PhotoResult> {
   const live = await open_link(db, token);
-  if (!live) return GONE;
+  if (!live) return (await saved_page(db, token)) ?? GONE;
   return { page: { state: "ready", campaign: live.name }, status: 200 };
 }
 
@@ -99,7 +118,8 @@ export async function save_photo(
     return { page: { state: "limited" }, status: 429 };
   }
   const live = await open_link(db, token);
-  if (!live) return GONE;
+  // a spent link takes no second photo; one that saved shows what it saved
+  if (!live) return (await saved_page(db, token)) ?? GONE;
   const refuse = (status: number, error: string): PhotoResult => ({
     page: { state: "ready", campaign: live.name, error },
     status,
@@ -129,22 +149,40 @@ export async function save_photo(
   }
 
   const claim = await consume_photo_link(db, token);
-  if (!claim) return GONE;
+  if (!claim) return (await saved_page(db, token)) ?? GONE;
+  const saved_page_of = (photo: string): PhotoResult => ({
+    page: { state: "saved", campaign: live.name, photo },
+    status: 200,
+  });
+  let stored: string | null = null;
   try {
-    const blob = await store_upload(stored_name(file, type), file, type);
-    if (!(await set_banner(db, claim.npo_id, claim.campaign_id, blob.url))) {
+    stored = (await store_upload(stored_name(file, type), file, type)).url;
+    const url = stored;
+    // the banner and the link's record of it land together or not at all; a
+    // refused banner wrote nothing, so it returns rather than rolls back
+    const saved = await db.transaction(async (tx) => {
+      if (!(await set_banner(tx, claim.npo_id, claim.campaign_id, url))) {
+        return false;
+      }
+      if (!(await record_saved_photo(tx, claim.id, claim.used_at, url))) {
+        throw new Error("photo upload: the claim moved before it was recorded");
+      }
+      return true;
+    });
+    if (!saved) {
       // ended or deleted while the file was on its way: nothing points at it
-      await discard_upload(blob.url).catch(() => undefined);
+      await discard_upload(url).catch(() => undefined);
       await release_photo_link(db, claim.id, claim.used_at).catch(() => false);
       return GONE;
     }
-    return {
-      page: { state: "saved", campaign: live.name, photo: blob.url },
-      status: 200,
-    };
+    return saved_page_of(url);
   } catch (err) {
     // the link id, never the token: the token is the credential
-    console.error("photo upload: save failed", { link: claim.id }, err);
+    report_error(err, { where: "photo upload: save failed", link: claim.id });
+    // a commit whose reply was lost still saved: the link is the record
+    const after = await saved_photo_link(db, token).catch(() => null);
+    if (stored && after?.saved_url === stored) return saved_page_of(stored);
+    if (stored) await discard_upload(stored).catch(() => undefined);
     await release_photo_link(db, claim.id, claim.used_at).catch(() => false);
     return { page: { state: "failed", campaign: live.name }, status: 500 };
   }

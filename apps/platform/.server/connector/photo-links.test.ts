@@ -21,7 +21,9 @@ import {
   issue_photo_link,
   PHOTO_LINK_TTL_MS,
   peek_photo_link,
+  record_saved_photo,
   release_photo_link,
+  saved_photo_link,
 } from "./photo-links";
 
 // pglite's drizzle handle differs from neon's only in the result-type HKT
@@ -273,17 +275,58 @@ describe("release_photo_link", () => {
   });
 });
 
+describe("record_saved_photo and saved_photo_link", () => {
+  const URL_A = "https://blob.test/u/hero-Ab1.png";
+
+  test("the claim that stored the photo records it, and the token reads it back at any age", async () => {
+    const { token, id } = await issue_for("EIN-A", "c-a");
+    expect(await saved_photo_link(as_db(t.db), token)).toBeNull();
+    const claim = (await consume_photo_link(as_db(t.db), token, NOW))!;
+
+    expect(
+      await record_saved_photo(as_db(t.db), id, claim.used_at, URL_A)
+    ).toBe(true);
+    const [row] = await t.db.select().from(connector_photo_links);
+    expect(row).toMatchObject({
+      saved_url: URL_A,
+      saved_pathname: "/u/hero-Ab1.png",
+    });
+    expect(await saved_photo_link(as_db(t.db), token)).toMatchObject({
+      campaign_id: "c-a",
+      saved_url: URL_A,
+    });
+  });
+
+  test("another claim's used_at records nothing, and a malformed token reads nothing", async () => {
+    const { token, id } = await issue_for("EIN-A", "c-a");
+    await consume_photo_link(as_db(t.db), token, NOW);
+
+    expect(
+      await record_saved_photo(as_db(t.db), id, at(1).toISOString(), URL_A)
+    ).toBe(false);
+    expect(await saved_photo_link(as_db(t.db), token)).toBeNull();
+    expect(await saved_photo_link(untouchable, "not a token")).toBeNull();
+  });
+});
+
 describe("sweep", () => {
   test("deletes photo links expired more than 24h ago and keeps the rest", async () => {
     const { npo_id } = await seed_org_campaign("EIN-A", "c-a");
     const DAY = 24 * 60 * 60 * 1000;
-    const link = (id: string, expires_ms: number, used = false) => ({
+    const link = (
+      id: string,
+      expires_ms: number,
+      used = false,
+      saved: string | null = null
+    ) => ({
       id,
       token_hash: sha256_hex(id),
       npo_id,
       campaign_id: "c-a",
       expires_at: at(expires_ms).toISOString(),
       used_at: used ? at(expires_ms - 60_000).toISOString() : null,
+      saved_url: saved && `https://blob.test${saved}`,
+      saved_pathname: saved,
     });
     await t.db
       .insert(connector_photo_links)
@@ -292,6 +335,7 @@ describe("sweep", () => {
         link("stale-used", -2 * DAY, true),
         link("expired-today", -DAY + 1_000),
         link("live", FIFTEEN_MIN_MS),
+        link("stale-saved", -30 * DAY, true, "/u/hero-Ab1.png"),
       ]);
 
     const swept = await sweep(as_db(t.db), NOW);
@@ -300,6 +344,10 @@ describe("sweep", () => {
     const rows = await t.db
       .select({ id: connector_photo_links.id })
       .from(connector_photo_links);
-    expect(rows.map((r) => r.id).sort()).toEqual(["expired-today", "live"]);
+    expect(rows.map((r) => r.id).sort()).toEqual([
+      "expired-today",
+      "live",
+      "stale-saved",
+    ]);
   });
 });

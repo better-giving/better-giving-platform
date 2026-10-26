@@ -505,6 +505,13 @@
       "when": 1792986832124,
       "tag": "0071_connector_photo_links",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1793010165371,
+      "tag": "0072_connector_photo_saved",
+      "breakpoints": true
     }
   ]
 }

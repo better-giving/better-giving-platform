@@ -12,8 +12,9 @@ export async function loader({ params }: Route.LoaderArgs) {
   return data(page, { status });
 }
 
-// every status explicit: the loader reruns after the action and reads the
-// spent link as 404, and a 200 left implicit would let that status win
+// every status explicit: the loader reruns after the action and reads a
+// spent link that saved nothing as 404, and a 200 left implicit would let
+// that status win
 export async function action({ request, params }: Route.ActionArgs) {
   const { page, status } = await save_photo(db, request, params.token);
   return data(page, { status });
