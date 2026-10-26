@@ -54,7 +54,7 @@ const as_db = (x: unknown) => x as DbOrTx;
 
 const BLOB_URL = "https://blob.test/u/photo-abc.png";
 const GONE =
-  "Upload links work once and expire after 15 minutes. Ask whoever sent it for a new one.";
+  "Upload links work once and expire after 15 minutes. Ask whoever sent you this link for a new one.";
 
 beforeAll(async () => {
   test_db.current = await create_test_db();

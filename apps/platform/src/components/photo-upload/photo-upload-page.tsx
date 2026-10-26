@@ -46,14 +46,14 @@ export interface IPhotoUploadPage {
   view: PhotoView;
   /** JS path only: the route intercepts the submit (preventDefault) and uploads itself */
   on_submit?: (e: FormEvent<HTMLFormElement>) => void;
-  /** called with the file input after every pick or drop (the route runs its 4 MB pre-check, which calls setCustomValidity/reportValidity on it) */
+  /** called with the file input after every pick or drop, so the caller can hold an oversized pick with setCustomValidity/reportValidity */
   on_pick?: (input: HTMLInputElement) => void;
 }
 
 const ACCEPT = "image/jpeg,image/png,image/webp";
 const MIB = 1024 * 1024;
 
-/** bytes as MB to one decimal, in the same MiB the 4 MB cap is counted in */
+/** bytes as MB to one decimal, in the same MiB `upload_limits.max_bytes` is counted in */
 export function format_mb(bytes: number): string {
   return (bytes / MIB).toFixed(1);
 }
@@ -85,7 +85,7 @@ export function PhotoUploadPage({
             tone="neutral"
             Icon={Link2Off}
             title="This link can't be used"
-            lede="Upload links work once and expire after 15 minutes. Ask whoever sent it for a new one."
+            lede="Upload links work once and expire after 15 minutes. Ask whoever sent you this link for a new one."
           />
         </Shell>
       );

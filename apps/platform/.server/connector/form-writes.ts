@@ -393,8 +393,8 @@ async function insert_form(
   return made ? json(made, 201) : missing(form.id);
 }
 
-/** false when the form's status is no longer `status`: the gate read a form
- * that has since gone live or off */
+/** false when the form's status is no longer `status`: the confirm check read
+ * a form that has since gone live or off */
 async function write_patch(
   db: DbOrTx,
   npo_id: number,
@@ -448,7 +448,7 @@ export async function update_form(
     shape.push({ path: "confirm", message: "is true, or left out" });
   }
 
-  // a second pass only when the status moved between the gate and the write
+  // a second pass only when the status moved between the confirm check and the write
   for (let pass = 0; pass < 2; pass++) {
     const { shown } = current;
     const issues = [...shape];
