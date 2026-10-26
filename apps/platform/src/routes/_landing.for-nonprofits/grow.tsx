@@ -4,7 +4,7 @@ const accounts = [
   {
     name: "Current account",
     detail: "Grants paid out to your bank",
-    figure: "Monthly review",
+    figure: "Every 3 days",
     figure_classes: "",
   },
   {

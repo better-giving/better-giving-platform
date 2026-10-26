@@ -35,7 +35,7 @@ const split_steps = [
   {
     n: "3",
     title: "Watch reserves build",
-    body: "Track balances in your dashboard. Withdrawal requests are reviewed and processed on a monthly basis.",
+    body: "Track balances in your dashboard. Savings withdrawals are paid out every 3 days, and Sustainability Fund withdrawals are reviewed before payout.",
   },
 ] as const;
 
