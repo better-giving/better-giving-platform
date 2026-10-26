@@ -41,8 +41,8 @@ export function GrowFunds({ classes = "" }: IGrowFunds) {
               <div>
                 <span className="font-bold">High-yield savings</span>
                 <p className="mt-0.5 text-sm/normal text-gray-11">
-                  FDIC-insured. Withdrawal requests are reviewed and processed
-                  within 5 working days.
+                  FDIC-insured. Withdrawals are paid out every 3 days once your
+                  balance reaches your payout minimum.
                 </p>
               </div>
             </div>

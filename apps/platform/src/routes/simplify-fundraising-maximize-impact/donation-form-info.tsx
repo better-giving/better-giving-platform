@@ -63,7 +63,7 @@ export function DonationFormInfo({ classes = "" }) {
         As a 501(c)(3) public charity, Better Giving accepts donations on your
         behalf and issues tax receipts. Grants are paid out every 3 days once
         your balance reaches your payout minimum, and you can keep a share in
-        savings or the Sustainability Fund.
+        savings and the Sustainability Fund.
       </p>
     </section>
   );

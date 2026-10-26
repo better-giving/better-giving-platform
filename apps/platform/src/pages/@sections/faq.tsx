@@ -131,7 +131,7 @@ export const faqs = [
       <p key={0}>
         The Sustainability Fund can hold a share of donations for longer-term
         growth. Returns vary, and past performance isn't a guarantee. Withdrawal
-        requests are reviewed and processed on a monthly basis.
+        requests are reviewed before payout.
       </p>,
       <p key={1} className="italic">
         Turn today’s donations into long-term financial security for your

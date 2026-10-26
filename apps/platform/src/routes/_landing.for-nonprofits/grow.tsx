@@ -3,7 +3,7 @@ import { href, Link } from "react-router";
 const accounts = [
   {
     name: "Current account",
-    detail: "Grants paid out to your bank",
+    detail: "Grants paid out to your bank once you reach your payout minimum",
     figure: "Every 3 days",
     figure_classes: "",
   },
