@@ -26,10 +26,11 @@ export const CHROME_BY_SEGMENT: Record<string, Chrome> = {
 
   // minimal — transactional / browse
   //
-  // note: `funds` and `profile` are redirect-only resource routes (route.ts,
-  // no component) — they never mount the layout, so they carry no chrome entry.
+  // note: `funds`, `profile` and `fundraisers` are redirect-only resource routes
+  // (route.ts, no component) — they never mount the layout, so they carry no
+  // chrome entry.
   marketplace: "minimal",
-  fundraisers: "minimal",
+  campaigns: "minimal",
   forms: "minimal",
 
   // marketing — informational / landing

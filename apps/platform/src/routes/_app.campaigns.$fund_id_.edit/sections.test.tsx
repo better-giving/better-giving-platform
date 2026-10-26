@@ -102,16 +102,14 @@ const recording: typeof action = async (args) => {
 async function render_edit() {
   const Stub = createRoutesStub([
     {
-      path: "/fundraisers/:fund_id/edit",
+      path: "/campaigns/:fund_id/edit",
       Component: EditPage as any,
       HydrateFallback: () => null,
       loader: loader as any,
       action: recording as any,
     },
   ]);
-  return await render(
-    <Stub initialEntries={[`/fundraisers/${FUND_ID}/edit`]} />
-  );
+  return await render(<Stub initialEntries={[`/campaigns/${FUND_ID}/edit`]} />);
 }
 
 beforeAll(async () => {
@@ -140,7 +138,7 @@ beforeEach(async () => {
   });
 });
 
-describe("fundraiser edit — per-section save", () => {
+describe("campaign edit — per-section save", () => {
   it("each section's save stays disabled until that section is dirty", async () => {
     const screen = await render_edit();
     const name = screen.getByLabelText(/name/i);

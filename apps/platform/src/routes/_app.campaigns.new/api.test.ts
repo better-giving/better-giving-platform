@@ -98,11 +98,11 @@ function call(which: "loader" | "action", url: string) {
   return fn({ request, params: {} } as any) as Promise<Response>;
 }
 
-describe("/fundraisers/new", () => {
+describe("/campaigns/new", () => {
   it.each(["loader", "action"] as const)(
     "%s sends an unsigned visitor to sign-in",
     async (which) => {
-      const res = await call(which, "https://x/fundraisers/new");
+      const res = await call(which, "https://x/campaigns/new");
       expect(to_auth).toHaveBeenCalled();
       expect(res.status).toBe(401);
     }
@@ -112,7 +112,7 @@ describe("/fundraisers/new", () => {
     "%s sends a signed-in user who administers no nonprofit to the marketplace",
     async (which) => {
       session_mock.user = { id: USER_ID, role: "admin" };
-      const res = await call(which, "https://x/fundraisers/new?npo=9");
+      const res = await call(which, "https://x/campaigns/new?npo=9");
       expect(res.status).toBe(302);
       expect(res.headers.get("Location")).toBe("/marketplace");
     }
@@ -127,10 +127,7 @@ describe("/fundraisers/new", () => {
       await member(named.id);
       session_mock.user = { id: USER_ID, role: "user" };
 
-      const res = await call(
-        which,
-        `https://x/fundraisers/new?npo=${named.id}`
-      );
+      const res = await call(which, `https://x/campaigns/new?npo=${named.id}`);
 
       expect(res.status).toBe(302);
       expect(res.headers.get("Location")).toBe(
@@ -148,7 +145,7 @@ describe("/fundraisers/new", () => {
       await member(low.id);
       session_mock.user = { id: USER_ID, role: "user" };
 
-      const res = await call(which, "https://x/fundraisers/new?npo=999999");
+      const res = await call(which, "https://x/campaigns/new?npo=999999");
 
       expect(res.status).toBe(302);
       expect(res.headers.get("Location")).toBe(

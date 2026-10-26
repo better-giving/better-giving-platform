@@ -73,7 +73,7 @@ describe("fund creation", () => {
     const fd = new FormData();
     fd.append("name", JSON.stringify("Save The Whales"));
     const res = (await action({
-      request: new Request(`http://localhost/fundraisers/new?npo=${npo!.id}`, {
+      request: new Request(`http://localhost/campaigns/new?npo=${npo!.id}`, {
         method: "POST",
         body: fd,
       }),

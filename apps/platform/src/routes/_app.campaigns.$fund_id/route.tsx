@@ -56,7 +56,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
           <div className="absolute -top-8 flex items-center justify-between w-full">
             <Link
               className="flex items-center gap-x-1 active:-translate-x-1"
-              to="../fundraisers"
+              to="../campaigns"
             >
               <ArrowLeft className="icon-md" />
               <span>Campaigns</span>

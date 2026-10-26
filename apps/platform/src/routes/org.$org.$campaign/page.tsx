@@ -12,8 +12,8 @@ import { DonorMsgs, type IDonorHighlight } from "#/components/donor-msgs";
 import { DappLogo } from "#/components/image";
 import { RichText } from "#/components/rich-text";
 import { extract_youtube_id } from "#/components/youtube-player";
-import { Share } from "#/routes/_app.fundraisers.$fund_id/share";
-import { Video } from "#/routes/_app.fundraisers.$fund_id/video";
+import { Share } from "#/routes/_app.campaigns.$fund_id/share";
+import { Video } from "#/routes/_app.campaigns.$fund_id/video";
 import type { RichTextContent } from "#/types/components";
 
 const ring =

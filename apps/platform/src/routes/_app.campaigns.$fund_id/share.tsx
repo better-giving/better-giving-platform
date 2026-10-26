@@ -38,7 +38,7 @@ type ShareProps = {
   recipientName: string;
   classes?: string;
   url: string;
-  /** sentence after the invite. the fundraiser page keeps the invested line. */
+  /** sentence after the invite. the /campaigns/:fund_id page keeps the invested line. */
   line?: string;
   /**
    * omitted: the heading and the icon row.

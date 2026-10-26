@@ -17,7 +17,7 @@ export const clientLoader = createClientLoaderCache<Route.ClientLoaderArgs>();
 
 export const meta: Route.MetaFunction = () =>
   metas({
-    url: `${base_url}${href("/fundraisers")}`,
+    url: `${base_url}${href("/campaigns")}`,
     image: hero,
     title: "Campaigns",
     description:

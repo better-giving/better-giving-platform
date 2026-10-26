@@ -83,7 +83,7 @@ async function open_donate_page(
   vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
   const Stub = createRoutesStub([
     {
-      path: "/fundraisers/:fund_id/donate",
+      path: "/campaigns/:fund_id/donate",
       Component: DonatePage as any,
       loader: async (args: any) => {
         vi.setSystemTime(server);
@@ -94,10 +94,10 @@ async function open_donate_page(
       HydrateFallback: () => null,
     },
   ]);
-  return render(<Stub initialEntries={[`/fundraisers/${fund.id}/donate`]} />);
+  return render(<Stub initialEntries={[`/campaigns/${fund.id}/donate`]} />);
 }
 
-describe("fundraiser donate page", () => {
+describe("campaign donate page", () => {
   test("takes donations on its end date after that date began in UTC", async () => {
     const screen = await open_donate_page("2027-09-23T00:00:00.000Z");
     await expect.element(screen.getByTestId("donate-methods")).toBeVisible();
@@ -185,7 +185,7 @@ describe("folded fund donate redirect", () => {
 
   const load = (fund_id: string, search = "") =>
     (loader as any)({
-      request: new Request(`https://x/fundraisers/${fund_id}/donate${search}`),
+      request: new Request(`https://x/campaigns/${fund_id}/donate${search}`),
       params: { fund_id },
     });
 

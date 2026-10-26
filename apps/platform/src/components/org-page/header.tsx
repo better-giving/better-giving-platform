@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { BookmarkBtn } from "#/components/bookmark-btn";
-import { Share } from "#/routes/_app.fundraisers.$fund_id/share";
+import { Share } from "#/routes/_app.campaigns.$fund_id/share";
 import type { INpoBookmark } from "#/types/user";
 import { DonateButton } from "./donate";
 import { OrgMark } from "./org-mark";
