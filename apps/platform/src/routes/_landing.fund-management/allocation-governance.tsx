@@ -24,7 +24,7 @@ const pillars = [
   {
     icon: <ArrowLeftRight className="icon-xl" />,
     title: "Your money stays yours",
-    body: "Adjust your grant, save, or invest split anytime. Withdrawal requests are reviewed and processed on a monthly basis.",
+    body: "Adjust your grant, save, or invest split anytime. Grants and savings withdrawals are paid out every 3 days once your balance reaches your payout minimum. Sustainability Fund withdrawals are reviewed before payout.",
   },
 ];
 

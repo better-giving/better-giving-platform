@@ -52,7 +52,7 @@ const nonprofits: Benefit[] = [
     title: "Free Donation Processing",
     title2: "More for your mission",
     description:
-      "There is no platform fee while the optional donor contribution stays on. Turning that ask off is a 1.5% fee. Although third-party processing fees may apply, most donors choose to cover these fees. We handle the tax receipts and admin work for accepting all types of donations. Grants and withdrawal requests are reviewed and processed on a monthly basis.",
+      "There is no platform fee while the optional donor contribution stays on. Turning that ask off is a 1.5% fee. Although third-party processing fees may apply, most donors choose to cover these fees. We handle the tax receipts and admin work for accepting all types of donations. Grants and savings withdrawals are paid out every 3 days once your balance reaches your payout minimum.",
     img: icon7,
     cardBgClass: colors[0],
   },
@@ -60,7 +60,7 @@ const nonprofits: Benefit[] = [
     title: "High-Yield Savings Accounts",
     title2: "Secure, steady growth for your funds",
     description:
-      "Choose to grow donations in a high-yield savings account. Returns vary, and past performance isn't a guarantee. Withdrawal requests are reviewed and processed on a monthly basis.",
+      "Choose to grow donations in a high-yield savings account. Returns vary, and past performance isn't a guarantee. Savings withdrawals are paid out every 3 days once your balance reaches your payout minimum. Sustainability Fund withdrawals are reviewed before payout.",
     img: icon5,
     cardBgClass: colors[1],
   },

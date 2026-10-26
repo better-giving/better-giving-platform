@@ -48,7 +48,7 @@ export const items: Item[] = [
   {
     title: "Your Money, Your Control",
     description:
-      "Choose savings or the Sustainability Fund. Withdrawal requests are reviewed and processed on a monthly basis. Returns vary, and past performance isn't a guarantee.",
+      "Choose savings and the Sustainability Fund. Savings withdrawals are paid out every 3 days once your balance reaches your payout minimum. Sustainability Fund withdrawals are reviewed before payout. Returns vary, and past performance isn't a guarantee.",
     result: "Result: Flexibility without sacrificing growth.",
     icon: <DollarSignIcon className="text-primary-fg pictogram-sm" />,
   },

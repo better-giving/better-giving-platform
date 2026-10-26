@@ -61,9 +61,9 @@ export function DonationFormInfo({ classes = "" }) {
       </ul>
       <p className="col-span-full text-center text-xl @6xl:text-2xl leading-normal max-w-3xl justify-self-center mt-8">
         As a 501(c)(3) public charity, Better Giving accepts donations on your
-        behalf and issues tax receipts. Grants and withdrawal requests are
-        reviewed and processed on a monthly basis, or a share can sit in savings
-        and the Sustainability Fund.
+        behalf and issues tax receipts. Grants are paid out every 3 days once
+        your balance reaches your payout minimum, and you can keep a share in
+        savings and the Sustainability Fund.
       </p>
     </section>
   );

@@ -20,7 +20,7 @@ export const home_faqs = [
   home_faq(
     2,
     "How quickly can I start fundraising?",
-    "Register online. Embedding the form on your site is a copy-paste snippet. Grants and withdrawal requests are reviewed and processed within 5 working days."
+    "Register online. Embedding the form on your site is a copy-paste snippet. Grants and savings withdrawals are paid out every 3 days once your balance reaches your payout minimum."
   ),
   home_faq(
     3,

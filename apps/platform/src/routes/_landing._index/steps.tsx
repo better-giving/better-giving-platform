@@ -23,7 +23,7 @@ const steps = [
     alt: "Laira holding the number 3",
     step: "Step 3",
     title: "Grow",
-    body: "Grants and withdrawal requests are reviewed and processed within 5 working days. You can also route a share into savings and the Sustainability Fund.",
+    body: "Grants are paid out every 3 days once your balance reaches your payout minimum. You can also route a share into savings and the Sustainability Fund.",
   },
 ] as const;
 
