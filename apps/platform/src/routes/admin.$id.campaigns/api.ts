@@ -11,7 +11,10 @@ export const loader = async ({ context, request }: Route.LoaderArgs) => {
   if (!endow) throw resp.status(404);
 
   const url = new URL(request.url);
-  if (url.searchParams.get("tab") === "supporters") {
+  // "fundraisers" is this tab's previous query value; an old bookmarked or
+  // indexed link must keep landing on the supporters view
+  const tab = url.searchParams.get("tab");
+  if (tab === "supporters" || tab === "fundraisers") {
     // org-created funds list on Your campaigns; a stale ?creator= is ignored
     const funds = await get_funds_npo_memberof(id, { creator: "others" });
     return {

@@ -516,6 +516,18 @@ describe("campaign list loader", () => {
     }
     expect(stale.funds.map((f) => f.id)).toEqual(["fund-supporter"]);
 
+    // "fundraisers" is this tab's previous query value; an old bookmarked or
+    // indexed link must still land on the supporters view, not fall through
+    // to the default
+    const legacy = await list_loader({
+      request: new Request("https://x/admin/list/campaigns?tab=fundraisers"),
+      ...args,
+    } as any);
+    if (legacy.view !== "supporters") {
+      throw new Error("expected the supporters tab");
+    }
+    expect(legacy.funds.map((f) => f.id)).toEqual(["fund-supporter"]);
+
     const unknown = await list_loader({
       request: new Request("https://x/admin/list/campaigns?tab=nope"),
       ...args,
