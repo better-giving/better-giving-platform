@@ -127,10 +127,10 @@ async function seed_fund(
   });
 }
 
-function render_funds(entry = "/fundraisers") {
+function render_funds(entry = "/campaigns") {
   const Stub = createRoutesStub([
     {
-      path: "/fundraisers",
+      path: "/campaigns",
       Component: FundsPage,
       HydrateFallback: () => null,
       loader,

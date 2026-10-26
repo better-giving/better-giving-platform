@@ -453,7 +453,7 @@ describe("fund donation → settlement across 3 NPOs → DB + UI", () => {
 
     const Stub = createRoutesStub([
       {
-        path: "/fundraisers/:fund_id",
+        path: "/campaigns/:fund_id",
         Component: FundPage,
         HydrateFallback: () => null,
         loader: fund_loader as any,
@@ -462,7 +462,7 @@ describe("fund donation → settlement across 3 NPOs → DB + UI", () => {
 
     const screen = await render(
       <Stub
-        initialEntries={[`/fundraisers/${FUND_ID}`]}
+        initialEntries={[`/campaigns/${FUND_ID}`]}
         future={{ v8_middleware: true }}
       />
     );
