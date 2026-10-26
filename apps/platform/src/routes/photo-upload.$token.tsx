@@ -1,6 +1,6 @@
-import { Button, Label } from "@better-giving/ui";
-import type { FormEvent, ReactNode } from "react";
-import { data, Form, useNavigation } from "react-router";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { data } from "react-router";
+import { PhotoUploadPage, type PhotoView } from "#/components/photo-upload";
 import { photo_too_large, upload_limits } from "@/constants/upload";
 import { read_photo_page, save_photo } from "$/connector/photo-page";
 import { db } from "$/pg/db";
@@ -19,14 +19,34 @@ export async function action({ request, params }: Route.ActionArgs) {
   return data(page, { status });
 }
 
+const PRIVATE = {
+  "Cache-Control": "no-store",
+  // the token is in the url; a referer would hand it to the next host
+  "Referrer-Policy": "no-referrer",
+  "X-Robots-Tag": "noindex",
+};
+
+/** the page's own upload script asks for the page as json, so it can show
+ * progress; same function and statuses as the form's native post, which still
+ * renders through the action */
+const upload_as_json: Route.MiddlewareFunction = async (
+  { request, params },
+  next
+) => {
+  const wants_json = request.headers
+    .get("accept")
+    ?.startsWith("application/json");
+  if (request.method !== "POST" || !wants_json) return next();
+  const { page, status } = await save_photo(db, request, params.token);
+  // built here, so the `headers` export never reaches it
+  return Response.json(page, { status, headers: PRIVATE });
+};
+
+export const middleware = [upload_as_json];
+
 /** static, so a thrown error answered by this route's boundary carries them too */
 export function headers() {
-  return {
-    "Cache-Control": "no-store",
-    // the token is in the url; a referer would hand it to the next host
-    "Referrer-Policy": "no-referrer",
-    "X-Robots-Tag": "noindex",
-  };
+  return PRIVATE;
 }
 
 export function meta() {
@@ -36,9 +56,6 @@ export function meta() {
   ];
 }
 
-const ACCEPT = "image/jpeg,image/png,image/webp";
-const MAX_MB = upload_limits.max_bytes / (1024 * 1024);
-
 type PhotoInput = Pick<
   HTMLInputElement,
   "setCustomValidity" | "reportValidity"
@@ -47,66 +64,97 @@ type PhotoInput = Pick<
 };
 
 /** refuses a pick past the cap before it is sent: Vercel answers a body over
- * its 4.5 MB limit with its own error page before the action runs */
-export function hold_oversized(input: PhotoInput) {
+ * its 4.5 MB limit with its own error page before the action runs. true when
+ * it held the pick */
+export function hold_oversized(input: PhotoInput): boolean {
   const file = input.files?.[0];
-  if (file && file.size > upload_limits.max_bytes) {
-    input.setCustomValidity(photo_too_large);
-    input.reportValidity();
-  } else input.setCustomValidity("");
+  const held = !!file && file.size > upload_limits.max_bytes;
+  input.setCustomValidity(held ? photo_too_large : "");
+  if (held) input.reportValidity();
+  return held;
 }
 
-interface IUploadForm {
-  error?: string;
+type Settled = Exclude<PhotoView, { state: "uploading" }>;
+const SETTLED = new Set<string>([
+  "gone",
+  "limited",
+  "ready",
+  "failed",
+  "saved",
+] satisfies Settled["state"][]);
+
+function page_of(body: string): Settled | null {
+  try {
+    const page = JSON.parse(body);
+    return SETTLED.has(page?.state) ? page : null;
+  } catch {
+    return null;
+  }
 }
 
-function UploadForm({ error }: IUploadForm) {
-  // a second submit aborts the first only in the browser: the server still
-  // spends the link, and the second request reads it as gone
-  const busy = useNavigation().state !== "idle";
-  const hold = (e: FormEvent) => {
-    if (busy) e.preventDefault();
+/** the form's own post, sent so the upload's progress can be read. Anything
+ * but the page back — a dropped connection, or the platform's own error page
+ * for an oversized body — reads as failed */
+export function send_photo(
+  url: string,
+  body: FormData,
+  campaign: string,
+  on_progress: (loaded: number, total: number) => void
+): Promise<Settled> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    const failed = () => resolve({ state: "failed", campaign });
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) on_progress(e.loaded, e.total);
+    };
+    xhr.onload = () =>
+      resolve(page_of(xhr.responseText) ?? { state: "failed", campaign });
+    xhr.onerror = failed;
+    xhr.onabort = failed;
+    xhr.ontimeout = failed;
+    xhr.open("POST", url);
+    xhr.setRequestHeader("Accept", "application/json");
+    xhr.send(body);
+  });
+}
+
+export default function PhotoUpload({
+  loaderData,
+  actionData,
+}: Route.ComponentProps) {
+  const [view, set_view] = useState<PhotoView>(actionData ?? loaderData);
+
+  const preview = view.state === "uploading" ? view.preview_url : null;
+  useEffect(() => {
+    if (preview) return () => URL.revokeObjectURL(preview);
+  }, [preview]);
+
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (view.state !== "ready" && view.state !== "failed") return;
+    const form = e.currentTarget;
+    const input = form.elements.namedItem("photo") as HTMLInputElement;
+    // `required` keeps an empty pick from submitting at all
+    const file = input.files?.[0];
+    if (!file || hold_oversized(input)) return;
+    const body = new FormData(form);
+    const { campaign } = view;
+    set_view({
+      state: "uploading",
+      campaign,
+      file_name: file.name,
+      preview_url: URL.createObjectURL(file),
+      loaded: 0,
+      // the body's own length replaces it with the first progress event
+      total: file.size,
+    });
+    send_photo(form.action, body, campaign, (loaded, total) =>
+      set_view((v) => (v.state === "uploading" ? { ...v, loaded, total } : v))
+    ).then(set_view);
   };
+
   return (
-    <Form
-      method="post"
-      encType="multipart/form-data"
-      className="grid gap-4"
-      onSubmit={hold}
-    >
-      <div className="grid gap-2">
-        <Label htmlFor="photo" required>
-          Photo
-        </Label>
-        <input
-          id="photo"
-          type="file"
-          name="photo"
-          accept={ACCEPT}
-          required
-          onChange={(e) => hold_oversized(e.currentTarget)}
-          aria-describedby={error ? "photo-error" : undefined}
-          aria-invalid={error ? true : undefined}
-        />
-        {error && (
-          <p
-            id="photo-error"
-            role="alert"
-            className="text-destructive-subtle-fg text-sm"
-          >
-            {error}
-          </p>
-        )}
-      </div>
-      <Button
-        variant="primary"
-        type="submit"
-        classes="justify-self-start"
-        aria-disabled={busy || undefined}
-      >
-        Upload photo
-      </Button>
-    </Form>
+    <PhotoUploadPage view={view} on_submit={submit} on_pick={hold_oversized} />
   );
 }
 
@@ -124,59 +172,6 @@ function Shell({ title, children }: IShell) {
       </div>
     </main>
   );
-}
-
-export default function PhotoUpload({
-  loaderData,
-  actionData,
-}: Route.ComponentProps) {
-  const page = actionData ?? loaderData;
-  switch (page.state) {
-    case "gone":
-      return (
-        <Shell title="This link can't be used">
-          <p className="text-gray-11">
-            This upload link has expired or was already used. Ask for a new one.
-          </p>
-        </Shell>
-      );
-    case "limited":
-      return (
-        <Shell title="Too many uploads">
-          <p className="text-gray-11">
-            Wait a minute, then reload this page and try again.
-          </p>
-        </Shell>
-      );
-    case "saved":
-      return (
-        <Shell title="Photo added">
-          <img src={page.photo} alt="" className="rounded w-full" />
-          <p className="text-gray-11">
-            It's now the banner of {page.campaign}. You can close this tab.
-          </p>
-        </Shell>
-      );
-    case "failed":
-      return (
-        <Shell title="The photo couldn't be saved">
-          <p className="text-gray-11">
-            Nothing changed on {page.campaign}. Try again.
-          </p>
-          <UploadForm />
-        </Shell>
-      );
-    case "ready":
-      return (
-        <Shell title={`Add a photo to ${page.campaign}`}>
-          <p className="text-gray-11">
-            It becomes the campaign's banner. JPEG, PNG or WebP, up to {MAX_MB}{" "}
-            MB.
-          </p>
-          <UploadForm error={page.error} />
-        </Shell>
-      );
-  }
 }
 
 export function ErrorBoundary() {
