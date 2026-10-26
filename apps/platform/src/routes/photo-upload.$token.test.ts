@@ -552,6 +552,38 @@ describe.each(["document", "script"] as const)(
       expect(ok.data).toMatchObject({ state: "saved" });
     });
 
+    test("a save whose commit can't be checked keeps the stored file and the spent link", async () => {
+      const { token, campaign_id } = await seed();
+      const real = db();
+      const transaction = real.transaction.bind(real);
+      const select = vi.spyOn(real, "select");
+      // the commit lands, its reply is lost, and the read that would tell is down too
+      const tx = vi.spyOn(real, "transaction").mockImplementationOnce((async (
+        ...args: unknown[]
+      ) => {
+        await (transaction as any)(...args);
+        select.mockImplementation(() => {
+          throw new Error("db down");
+        });
+        throw new Error("connection lost");
+      }) as typeof real.transaction);
+
+      const res = await submit(token, photo([PNG], "image/png", "a.png"));
+      select.mockRestore();
+      tx.mockRestore();
+
+      expect(res.init.status).toBe(500);
+      expect(res.data).toEqual({ state: "failed", campaign: "Library drive" });
+      expect(del).not.toHaveBeenCalled();
+      expect(await banner_of(campaign_id)).toBe(BLOB_URL);
+      expect(await used_at_of()).not.toBeNull();
+      // once the read is back, the link shows the photo it saved
+      expect((await get(token)).data).toMatchObject({
+        state: "saved",
+        photo: BLOB_URL,
+      });
+    });
+
     test("a campaign deleted after the link was claimed is the generic 404", async () => {
       const { token, campaign_id } = await seed();
       put.mockImplementationOnce(async () => {

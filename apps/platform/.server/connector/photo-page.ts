@@ -179,11 +179,20 @@ export async function save_photo(
   } catch (err) {
     // the link id, never the token: the token is the credential
     report_error(err, { where: "photo upload: save failed", link: claim.id });
-    // a commit whose reply was lost still saved: the link is the record
-    const after = await saved_photo_link(db, token).catch(() => null);
-    if (stored && after?.saved_url === stored) return saved_page_of(stored);
-    if (stored) await discard_upload(stored).catch(() => undefined);
+    const failed: PhotoResult = {
+      page: { state: "failed", campaign: live.name },
+      status: 500,
+    };
+    if (stored) {
+      // a commit whose reply was lost still saved: the link is the record. A
+      // record that can't be read may point at the file, so the file and the
+      // claim stay as they are
+      const after = await saved_photo_link(db, token).catch(() => undefined);
+      if (after === undefined) return failed;
+      if (after?.saved_url === stored) return saved_page_of(stored);
+      await discard_upload(stored).catch(() => undefined);
+    }
     await release_photo_link(db, claim.id, claim.used_at).catch(() => false);
-    return { page: { state: "failed", campaign: live.name }, status: 500 };
+    return failed;
   }
 }
