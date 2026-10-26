@@ -284,11 +284,17 @@ export async function sweep(
     .delete(connector_idempotency)
     .where(lt(connector_idempotency.created_at, idem_before))
     .returning({ idem_key: connector_idempotency.idem_key });
-  // saved or not: a used link's page shows its photo only this long, so a
-  // saved row past it shows nothing
+  // a link that saved a photo stays: it is the proof that photo belongs to
+  // its campaign, so a later blocks write can put it back. Its page still
+  // ends on time, since `saved_photo_link` reads it only within the window
   const photo_links = await db
     .delete(connector_photo_links)
-    .where(lt(connector_photo_links.expires_at, photo_before))
+    .where(
+      and(
+        lt(connector_photo_links.expires_at, photo_before),
+        isNull(connector_photo_links.saved_pathname)
+      )
+    )
     .returning({ id: connector_photo_links.id });
   return {
     keys_revoked: revoked.length,

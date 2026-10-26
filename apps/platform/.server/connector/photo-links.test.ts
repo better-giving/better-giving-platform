@@ -314,7 +314,7 @@ describe("record_saved_photo and saved_photo_link", () => {
 });
 
 describe("sweep", () => {
-  test("deletes photo links expired more than 24h ago, saved or not, and keeps the rest", async () => {
+  test("deletes unsaved photo links expired more than 24h ago and keeps saved ones", async () => {
     const { npo_id } = await seed_org_campaign("EIN-A", "c-a");
     const link = (
       id: string,
@@ -344,7 +344,7 @@ describe("sweep", () => {
 
     const swept = await sweep(as_db(t.db), NOW);
 
-    expect(swept.photo_links_deleted).toBe(3);
+    expect(swept.photo_links_deleted).toBe(2);
     const rows = await t.db
       .select({ id: connector_photo_links.id })
       .from(connector_photo_links);
@@ -352,6 +352,7 @@ describe("sweep", () => {
       "expired-today",
       "live",
       "saved-today",
+      "stale-saved",
     ]);
   });
 });

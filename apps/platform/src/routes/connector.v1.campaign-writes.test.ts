@@ -12,7 +12,7 @@ import {
 } from "vitest";
 import { reset_rate_limits } from "#/.server/auth/rate-limit";
 import { seed_npo, seed_user } from "#/__tests__/fixtures/funds";
-import { exchange_code, issue_code } from "$/connector/keys";
+import { exchange_code, issue_code, sweep } from "$/connector/keys";
 import type { DbOrTx } from "$/pg/queries/helpers";
 import { user } from "$/pg/schema/auth";
 import { campaign_members, campaigns } from "$/pg/schema/campaign";
@@ -990,6 +990,20 @@ describe("update_campaign_blocks", () => {
       expect(res.status, name).toBe(200);
       expect((await row_of(id)).banner).toBe(image);
     }
+  });
+
+  test("an earlier upload can be put back as the hero after its link is long expired and swept", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a);
+    const blocks = await blocks_of(id, a.key);
+    const image = `${BLOB}/u/old-hero-Qz9.png`;
+    await uploaded(a.npo.id, id, image);
+    await sweep(as_db(db()), new Date(Date.now() + 3 * 24 * 60 * 60 * 1000));
+
+    blocks[2] = { type: "hero", image_url: image };
+    const res = await patch(id, a.key, { blocks });
+    expect(res.status).toBe(200);
+    expect((await row_of(id)).banner).toBe(image);
   });
 
   test("a store photo not uploaded through a link of this campaign is 422 on the hero, and nothing is written", async () => {
