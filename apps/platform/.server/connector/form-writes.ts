@@ -18,7 +18,7 @@ import { npo_get } from "../pg/queries/npo";
 import { npo_program_get } from "../pg/queries/program";
 import { forms } from "../pg/schema/form";
 import { json, open_key } from "./http";
-import { idem_resource_id, with_idempotency } from "./idempotency";
+import { with_idempotency } from "./idempotency";
 import { AMOUNT, AMOUNT_MSG, usd_amount } from "./money";
 import { type FieldError, invalid, not_found, problem } from "./problem";
 import { type ConnectorForm, read_form, read_form_state } from "./reads";
@@ -350,13 +350,12 @@ export async function create_form(
   if (!request.headers.has("Idempotency-Key")) {
     return insert_form(db, live.npo_id, request, null);
   }
-  const id = idem_resource_id(live.npo_id, live.id, request);
-  return with_idempotency(db, live.id, request, () =>
+  return with_idempotency(db, live.id, request, (id) =>
     insert_form(db, live.npo_id, request, id)
   );
 }
 
-/** `fixed_id`: the key's id, set when a retry may follow a write that landed */
+/** `fixed_id`: the idempotency record's id, set when a retry may follow a write that landed */
 async function insert_form(
   db: DbOrTx,
   npo_id: number,

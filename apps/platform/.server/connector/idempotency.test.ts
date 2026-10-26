@@ -21,7 +21,6 @@ import { user_npo_memberships } from "../pg/schema/user";
 import { create_test_db, type TestDb } from "../pg/test-utils/pglite";
 import {
   IDEMPOTENCY_PENDING_RECLAIM_MS,
-  idem_resource_id,
   with_idempotency,
 } from "./idempotency";
 import { exchange_code, issue_code } from "./keys";
@@ -71,7 +70,7 @@ const call = (
   key_id: string,
   idem: string | undefined,
   body: string,
-  handler: () => Promise<Response>
+  handler: (resource_id: string) => Promise<Response>
 ) => {
   const headers = new Headers({ "content-type": "application/json" });
   if (idem !== undefined) headers.set("Idempotency-Key", idem);
@@ -200,18 +199,20 @@ describe("with_idempotency", () => {
       created_at: new Date(
         Date.now() - IDEMPOTENCY_PENDING_RECLAIM_MS - 5_000
       ).toISOString(),
+      resource_id: "first-attempt-id",
     });
-    const handler = vi.fn(async () =>
+    const handler = vi.fn(async (_id: string) =>
       Response.json({ made: 1 }, { status: 201 })
     );
 
     const res = await call(key_id, "dead", "{}", handler);
 
     expect(res.status).toBe(201);
-    expect(handler).toHaveBeenCalledOnce();
+    expect(handler).toHaveBeenCalledExactlyOnceWith("first-attempt-id");
     const [row] = await t.db.select().from(connector_idempotency);
     expect(row.status).toBe("stored");
     expect(row.response_body).toEqual({ made: 1 });
+    expect(row.resource_id).toBe("first-attempt-id");
   });
 
   test("two retries of a dead pending row: only one takes it over, the other is in progress", async () => {
@@ -313,8 +314,9 @@ describe("with_idempotency", () => {
       response_status: 201,
       response_body: { stale: true },
       created_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+      resource_id: "stale-id",
     });
-    const handler = vi.fn(async () =>
+    const handler = vi.fn(async (_id: string) =>
       Response.json({ fresh: true }, { status: 201 })
     );
 
@@ -324,6 +326,8 @@ describe("with_idempotency", () => {
     expect(await res.json()).toEqual({ fresh: true });
     expect(handler).toHaveBeenCalledOnce();
     const [row] = await t.db.select().from(connector_idempotency);
+    expect(row.resource_id).not.toBe("stale-id");
+    expect(handler).toHaveBeenCalledWith(row.resource_id);
     expect(row.response_body).toEqual({ fresh: true });
     expect(row.status).toBe("stored");
     expect(Date.parse(row.created_at)).toBeGreaterThan(Date.now() - 60_000);
@@ -390,38 +394,5 @@ describe("with_idempotency", () => {
     );
     expect(retry).not.toHaveBeenCalled();
     expect(handler).toHaveBeenCalledOnce();
-  });
-});
-
-describe("idem_resource_id", () => {
-  const req = (idem?: string) =>
-    new Request("https://bg.test/connector/v1/x", {
-      method: "POST",
-      headers: idem === undefined ? {} : { "Idempotency-Key": idem },
-    });
-
-  test("is one UUID per nonprofit, key and Idempotency-Key", () => {
-    const id = idem_resource_id(1, "key-a", req("k1"));
-
-    expect(id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
-    );
-    expect(idem_resource_id(1, "key-a", req(" k1 "))).toBe(id);
-    expect(
-      new Set([
-        id,
-        idem_resource_id(2, "key-a", req("k1")),
-        idem_resource_id(1, "key-b", req("k1")),
-        idem_resource_id(1, "key-a", req("k2")),
-      ]).size
-    ).toBe(4);
-  });
-
-  test.each([
-    ["missing", undefined],
-    ["blank", "   "],
-    ["longer than 255", "k".repeat(256)],
-  ])("is null for a %s key", (_label, idem) => {
-    expect(idem_resource_id(1, "key-a", req(idem))).toBeNull();
   });
 });

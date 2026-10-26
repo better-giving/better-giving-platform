@@ -1258,6 +1258,34 @@ describe("writes", () => {
     expect(await again.json()).toEqual(retried);
   });
 
+  test("create_campaign reusing a key with a new body after its record expired makes a second campaign", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const create = (title: string) =>
+      post(
+        campaigns_action,
+        "/connector/v1/campaigns",
+        a.key,
+        { title },
+        "idem-reused"
+      );
+    const first = await create("Library drive");
+    expect(first.status).toBe(201);
+    const first_id = ((await first.json()) as { id: string }).id;
+
+    await db()
+      .update(connector_idempotency)
+      .set({
+        created_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+      });
+    const second = await create("Food bank");
+
+    expect(second.status).toBe(201);
+    const made = (await second.json()) as { id: string };
+    expect(made).toMatchObject({ title: "Food bank" });
+    expect(made.id).not.toBe(first_id);
+    expect(await db().select().from(campaigns)).toHaveLength(2);
+  });
+
   test("create_campaign is a draft and replays on the same key", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
     const b = await pair("Beta", "EIN-B", "b@test.com");

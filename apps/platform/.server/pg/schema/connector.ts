@@ -79,6 +79,10 @@ export const connector_idempotency = pgTable(
     response_status: integer("response_status"),
     response_body: jsonb("response_body"),
     created_at: timestamptz_now("created_at"),
+    // the id a create under this record mints; a reclaim keeps it, a replaced record gets a new one
+    resource_id: text("resource_id")
+      .notNull()
+      .default(sql`gen_random_uuid()::text`),
   },
   (t) => [
     primaryKey({ columns: [t.key_id, t.idem_key] }),

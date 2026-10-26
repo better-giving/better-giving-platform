@@ -249,6 +249,26 @@ describe("create_form", () => {
     expect(await again.json()).toEqual(retried);
   });
 
+  test("a key reused with a new body after its record expired makes a second form", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const first = await create(a.key, { name: "Gala" }, "idem-reused");
+    expect(first.status).toBe(201);
+    const first_id = ((await first.json()) as { id: string }).id;
+
+    await db()
+      .update(connector_idempotency)
+      .set({
+        created_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+      });
+    const second = await create(a.key, { name: "Auction" }, "idem-reused");
+
+    expect(second.status).toBe(201);
+    const made = (await second.json()) as { id: string };
+    expect(made).toMatchObject({ name: "Auction" });
+    expect(made.id).not.toBe(first_id);
+    expect(await db().select().from(forms)).toHaveLength(2);
+  });
+
   test("the same Idempotency-Key from another nonprofit's key makes that nonprofit its own form", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
     const b = await pair("Beta", "EIN-B", "b@test.com");

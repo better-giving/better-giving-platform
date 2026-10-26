@@ -31,41 +31,21 @@ const idem_key_of = (request: Request) =>
   request.headers.get("Idempotency-Key")?.trim() ?? "";
 
 /**
- * The id a create mints under this `(key_id, Idempotency-Key)`, the same on
- * every attempt. A reclaimed claim can't tell whether the first attempt's
- * write landed, so the create inserts this id and, on finding it taken,
- * answers with the row already there. A UUIDv8 from the sha256; null with no
- * usable key, where the create mints a random id.
- */
-export function idem_resource_id(
-  npo_id: number,
-  key_id: string,
-  request: Request
-): string | null {
-  const idem_key = idem_key_of(request);
-  if (!idem_key || idem_key.length > MAX_KEY_LEN) return null;
-  const b = createHash("sha256")
-    .update(`connector-create\0${npo_id}\0${key_id}\0${idem_key}`, "utf8")
-    .digest()
-    .subarray(0, 16);
-  b[6] = (b[6] & 0x0f) | 0x80;
-  b[8] = (b[8] & 0x3f) | 0x80;
-  const h = b.toString("hex");
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
-}
-
-/**
  * One logical write per `(key_id, Idempotency-Key)`. The handler runs only
  * when this call owns a fresh `pending` row. A throw from the handler deletes
  * that row. Once the handler has returned a 2xx response, a later failure
  * leaves the row pending so a retry inside `IDEMPOTENCY_PENDING_RECLAIM_MS`
  * cannot repeat the write; past it, a retry of the same body takes the claim.
+ *
+ * The handler gets the record's `resource_id`, the id a create inserts. A
+ * reclaim keeps it, so a retry after a write that landed finds that write; a
+ * record replaced after 24h gets a new one, so a reused key makes a new resource.
  */
 export async function with_idempotency(
   db: DbOrTx,
   key_id: string,
   request: Request,
-  handler: () => Promise<Response>
+  handler: (resource_id: string) => Promise<Response>
 ): Promise<Response> {
   const idem_key = idem_key_of(request);
   if (!idem_key || idem_key.length > MAX_KEY_LEN) {
@@ -86,9 +66,11 @@ export async function with_idempotency(
         status: "pending",
       })
       .onConflictDoNothing()
-      .returning({ idem_key: connector_idempotency.idem_key });
+      .returning({ resource_id: connector_idempotency.resource_id });
 
-    if (inserted.length === 1) return finish(db, key_id, idem_key, handler);
+    if (inserted.length === 1) {
+      return finish(db, key_id, idem_key, inserted[0].resource_id, handler);
+    }
 
     const [row] = await db
       .select()
@@ -144,8 +126,10 @@ export async function with_idempotency(
             )
           )
         )
-        .returning({ idem_key: connector_idempotency.idem_key });
-      if (reclaimed.length === 1) return finish(db, key_id, idem_key, handler);
+        .returning({ resource_id: connector_idempotency.resource_id });
+      if (reclaimed.length === 1) {
+        return finish(db, key_id, idem_key, reclaimed[0].resource_id, handler);
+      }
       continue;
     }
 
@@ -174,11 +158,12 @@ async function finish(
   db: DbOrTx,
   key_id: string,
   idem_key: string,
-  handler: () => Promise<Response>
+  resource_id: string,
+  handler: (resource_id: string) => Promise<Response>
 ): Promise<Response> {
   let res: Response;
   try {
-    res = await handler();
+    res = await handler(resource_id);
   } catch (err) {
     await release_pending(db, key_id, idem_key);
     throw err;

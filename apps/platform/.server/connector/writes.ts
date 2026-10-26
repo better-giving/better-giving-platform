@@ -5,7 +5,7 @@ import type { DbOrTx } from "../pg/queries/helpers";
 import { campaign_members, campaigns } from "../pg/schema/campaign";
 import { npos } from "../pg/schema/npo";
 import { json, open_key } from "./http";
-import { idem_resource_id, with_idempotency } from "./idempotency";
+import { with_idempotency } from "./idempotency";
 import { type FieldError, invalid, problem } from "./problem";
 import { read_campaign_detail } from "./reads";
 
@@ -101,15 +101,12 @@ export async function create_campaign(
   if (request.method !== "POST") return problem(404, "unknown_action");
   const live = await open_key(db, request);
   if (live instanceof Response) return live;
-  // with_idempotency refuses a request with no usable key before this runs
-  const id =
-    idem_resource_id(live.npo_id, live.id, request) ?? crypto.randomUUID();
-  return with_idempotency(db, live.id, request, () =>
+  return with_idempotency(db, live.id, request, (id) =>
     insert_campaign(db, live.npo_id, live.allowed_by, request, id)
   );
 }
 
-/** `id` is the key's, so a retry after a write that landed finds that write */
+/** `id` is the idempotency record's, so a retry after a write that landed finds that write */
 async function insert_campaign(
   db: DbOrTx,
   npo_id: number,
