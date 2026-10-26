@@ -11,6 +11,7 @@ import { problem } from "./problem";
 const IP_QUOTA = {
   hello: { max: 120, window_s: 60 },
   exchange: { max: 30, window_s: 60 },
+  photo_upload: { max: 30, window_s: 60 },
 } as const satisfies Record<string, Quota>;
 
 const KEY_QUOTA: Quota = { max: 120, window_s: 60 };

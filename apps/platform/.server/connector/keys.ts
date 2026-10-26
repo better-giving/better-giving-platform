@@ -6,6 +6,7 @@ import {
   connector_codes,
   connector_idempotency,
   connector_keys,
+  connector_photo_links,
 } from "../pg/schema/connector";
 import { npos } from "../pg/schema/npo";
 import { user_npo_memberships } from "../pg/schema/user";
@@ -27,6 +28,7 @@ const CODE_TTL_MS = 10 * 60 * 1000;
 const USED_TOUCH_MS = 60_000;
 const IDLE_MS = 90 * 24 * 60 * 60 * 1000;
 const IDEM_MS = 24 * 60 * 60 * 1000;
+const PHOTO_LINK_KEEP_MS = 24 * 60 * 60 * 1000;
 const CODE_RE = /^[A-Za-z0-9_-]{43}$/;
 const KEY_RE = /^bgc_[A-Za-z0-9_-]{43}$/;
 
@@ -256,10 +258,14 @@ export async function sweep(
   keys_revoked: number;
   codes_deleted: number;
   idempotency_deleted: number;
+  photo_links_deleted: number;
 }> {
   const now_iso = now.toISOString();
   const idle_before = new Date(now.getTime() - IDLE_MS).toISOString();
   const idem_before = new Date(now.getTime() - IDEM_MS).toISOString();
+  const photo_before = new Date(
+    now.getTime() - PHOTO_LINK_KEEP_MS
+  ).toISOString();
   const revoked = await db
     .update(connector_keys)
     .set({ revoked_at: now_iso, revoked_by: null })
@@ -278,9 +284,14 @@ export async function sweep(
     .delete(connector_idempotency)
     .where(lt(connector_idempotency.created_at, idem_before))
     .returning({ idem_key: connector_idempotency.idem_key });
+  const photo_links = await db
+    .delete(connector_photo_links)
+    .where(lt(connector_photo_links.expires_at, photo_before))
+    .returning({ id: connector_photo_links.id });
   return {
     keys_revoked: revoked.length,
     codes_deleted: codes.length,
     idempotency_deleted: idem.length,
+    photo_links_deleted: photo_links.length,
   };
 }

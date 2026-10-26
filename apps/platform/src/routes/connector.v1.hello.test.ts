@@ -55,6 +55,7 @@ describe("GET /connector/v1/hello", () => {
         "list_donors",
         "get_donor",
         "list_recurring_gifts",
+        "create_photo_upload_link",
       ],
     });
   });

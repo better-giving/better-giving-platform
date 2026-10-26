@@ -9,6 +9,7 @@ import {
   text,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth";
+import { campaigns } from "./campaign";
 import { timestamptz, timestamptz_now } from "./columns";
 import { npos } from "./npo";
 
@@ -97,5 +98,31 @@ export const connector_idempotency = pgTable(
         and ${t.response_body} is not null
       )`
     ),
+  ]
+);
+
+// single-use upload link that sets one campaign's banner
+export const connector_photo_links = pgTable(
+  "connector_photo_links",
+  {
+    id: text("id").primaryKey(),
+    // sha-256 hex of the raw token in the link url; the token is not a column
+    token_hash: text("token_hash").notNull().unique(),
+    npo_id: integer("npo_id")
+      .notNull()
+      .references(() => npos.id, { onDelete: "cascade" }),
+    campaign_id: text("campaign_id")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    created_at: timestamptz_now("created_at"),
+    expires_at: timestamptz("expires_at").notNull(),
+    used_at: timestamptz("used_at"),
+  },
+  (t) => [
+    check(
+      "connector_photo_links_token_hash_hex",
+      sql`${t.token_hash} ~ '^[0-9a-f]{64}$'`
+    ),
+    index("connector_photo_links_expires_at_idx").on(t.expires_at),
   ]
 );

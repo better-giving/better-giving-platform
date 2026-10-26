@@ -24,4 +24,5 @@ export const CONNECTOR_ACTIONS = [
   "list_donors",
   "get_donor",
   "list_recurring_gifts",
+  "create_photo_upload_link",
 ] as const;
