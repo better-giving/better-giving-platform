@@ -58,23 +58,29 @@ export function format_mb(bytes: number): string {
   return (bytes / MIB).toFixed(1);
 }
 
+const STATUS: Record<Exclude<PhotoView["state"], "uploading">, string> = {
+  ready: "",
+  failed: "The photo couldn't be saved",
+  saved: "Photo added",
+  limited: "Too many uploads",
+  gone: "This link can't be used",
+};
+
 export function PhotoUploadPage({
   view,
   on_submit,
   on_pick,
 }: IPhotoUploadPage) {
-  // the region outlives the ready → uploading → saved swaps so its text is a change it
-  // announces, not a node that arrives already holding it
+  // the region outlives every swap so each outcome is a change it announces,
+  // not a node that arrives already holding it
   const status =
     view.state === "uploading"
       ? `Uploading ${view.file_name}`
-      : view.state === "saved"
-        ? "Photo added"
-        : "";
+      : STATUS[view.state];
   switch (view.state) {
     case "gone":
       return (
-        <Shell>
+        <Shell status={status}>
           <Outcome
             tone="neutral"
             Icon={Link2Off}
@@ -85,7 +91,7 @@ export function PhotoUploadPage({
       );
     case "limited":
       return (
-        <Shell chip>
+        <Shell chip status={status}>
           <Outcome
             tone="neutral"
             Icon={Clock}
@@ -120,41 +126,30 @@ export function PhotoUploadPage({
                 className="size-full object-cover"
               />
             </figure>
-            <p
-              role="status"
-              className="flex items-start gap-2.5 rounded px-4 py-3 bg-success-subtle text-success-subtle-fg text-sm font-semibold"
-            >
+            {/* not a second status: the shell's region already announces the save */}
+            <p className="flex items-start gap-2.5 rounded px-4 py-3 bg-success-subtle text-success-subtle-fg text-sm font-semibold">
               <Check className="icon-md mt-px" aria-hidden />
-              Saved. This link is now used up — you can close this tab.
+              Saved. This link is now used up, so you can close this tab.
             </p>
           </Outcome>
         </Shell>
       );
-    case "uploading":
-      return (
-        <Shell
-          chip
-          foot="Keep this tab open until the upload finishes."
-          status={status}
-        >
-          <Uploading {...view} />
-        </Shell>
-      );
     case "ready":
     case "failed":
+    case "uploading":
+      // one form through all three, so focus and the picked file survive the
+      // swaps and "try again" needs no re-pick
       return (
         <Shell
           chip
-          foot="This link works once and expires 15 minutes after it was created. No sign-in needed."
+          foot={
+            view.state === "uploading"
+              ? "Keep this tab open until the upload finishes."
+              : "This link works once and expires 15 minutes after it was created. No sign-in needed."
+          }
           status={status}
         >
-          <UploadForm
-            campaign={view.campaign}
-            error={view.state === "ready" ? view.error : undefined}
-            failed={view.state === "failed"}
-            on_submit={on_submit}
-            on_pick={on_pick}
-          />
+          <UploadForm view={view} on_submit={on_submit} on_pick={on_pick} />
         </Shell>
       );
   }
@@ -164,8 +159,8 @@ interface IShell {
   /** the "Secure upload link" chip: shown while the link still works */
   chip?: boolean;
   foot?: string;
-  /** an upload's sr-only live region; undefined where the state has none */
-  status?: string;
+  /** the sr-only live region's text */
+  status: string;
   children: ReactNode;
 }
 
@@ -191,11 +186,9 @@ function Shell({ chip, foot, status, children }: IShell) {
             {foot}
           </p>
         )}
-        {status !== undefined && (
-          <span role="status" className="sr-only">
-            {status}
-          </span>
-        )}
+        <span role="status" className="sr-only">
+          {status}
+        </span>
       </main>
     </div>
   );
@@ -243,39 +236,53 @@ function Limits({ id }: ILimits) {
   );
 }
 
+type FormView = Extract<PhotoView, { state: "ready" | "failed" | "uploading" }>;
+
 interface IUploadForm {
-  campaign: string;
-  error?: string;
-  failed: boolean;
+  view: FormView;
   on_submit?: IPhotoUploadPage["on_submit"];
   on_pick?: IPhotoUploadPage["on_pick"];
 }
 
-function UploadForm({
-  campaign,
-  error,
-  failed,
-  on_submit,
-  on_pick,
-}: IUploadForm) {
+function UploadForm({ view, on_submit, on_pick }: IUploadForm) {
   const ids = useId();
   const title_id = `${ids}-title`;
   const input_id = `${ids}-photo`;
   const limits_id = `${ids}-limits`;
   const error_id = `${ids}-error`;
   const input = useRef<HTMLInputElement>(null);
+  const band = useRef<HTMLDivElement>(null);
   const [picked, set_picked] = useState<string | null>(null);
   const [dragging, set_dragging] = useState(false);
+
+  const uploading = view.state === "uploading";
+  const failed = view.state === "failed";
+  const server_error = view.state === "ready" ? view.error : undefined;
+
+  // a pick replaces whatever error was showing; a new server result replaces the pick's
+  const [pick_error, set_pick_error] = useState<string | null>();
+  const [seen, set_seen] = useState({ state: view.state, server_error });
+  if (seen.state !== view.state || seen.server_error !== server_error) {
+    set_seen({ state: view.state, server_error });
+    set_pick_error(undefined);
+  }
+  const error = pick_error === undefined ? server_error : pick_error;
 
   // a refusal arrives with a round trip: the field it is about takes focus,
   // which scrolls it in and reads the message it is described by
   useEffect(() => {
-    if (error) input.current?.focus();
-  }, [error]);
+    if (server_error) input.current?.focus();
+  }, [server_error]);
+
+  useEffect(() => {
+    if (failed) band.current?.focus();
+  }, [failed]);
 
   const pick = (el: HTMLInputElement) => {
     set_picked(el.files?.[0]?.name ?? null);
     on_pick?.(el);
+    // only on_pick's own hold: `required`'s message on an empty input is not a pick's error
+    set_pick_error(el.validity.customError ? el.validationMessage : null);
   };
 
   const drop = (e: DragEvent<HTMLLabelElement>) => {
@@ -296,14 +303,20 @@ function UploadForm({
       method="post"
       encType="multipart/form-data"
       aria-labelledby={title_id}
-      onSubmit={on_submit}
+      aria-busy={uploading || undefined}
+      onSubmit={(e) => {
+        // the held button stays enabled, so a second press still submits: it must not send twice
+        if (uploading) e.preventDefault();
+        else on_submit?.(e);
+      }}
       className={CARD}
     >
-      <Head campaign={campaign} title_id={title_id} />
+      <Head campaign={view.campaign} title_id={title_id} />
       {failed && (
         <div
-          role="alert"
-          className="flex items-start gap-2.5 rounded px-4 py-3 bg-destructive-subtle text-destructive-subtle-fg text-sm"
+          ref={band}
+          tabIndex={-1}
+          className="flex items-start gap-2.5 rounded px-4 py-3 bg-destructive-subtle text-destructive-subtle-fg text-sm focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2"
         >
           <CircleAlert className="icon-md mt-px" aria-hidden />
           <p>
@@ -315,8 +328,10 @@ function UploadForm({
         </div>
       )}
       <div className="grid gap-2">
+        {/* hidden, not unmounted, while uploading: the input holds the pick a failed upload retries */}
         <label
           htmlFor={input_id}
+          hidden={uploading}
           data-dragging={dragging || undefined}
           onDragOver={(e) => {
             e.preventDefault();
@@ -363,7 +378,7 @@ function UploadForm({
                 </span>
               </span>
               <span className="hidden group-has-valid:inline">
-                Photo chosen — ready to upload
+                Photo chosen. Ready to upload.
               </span>
             </span>
           )}
@@ -371,6 +386,7 @@ function UploadForm({
             Replaces the current banner, if there is one.
           </span>
         </label>
+        {uploading && <Progress {...view} />}
         {error && (
           <p
             id={error_id}
@@ -382,64 +398,68 @@ function UploadForm({
         )}
       </div>
       <Limits id={limits_id} />
-      <Button variant="primary" size="lg" type="submit" classes="w-full gap-2">
-        <ArrowUpFromLine className="icon-md" aria-hidden />
-        Upload photo
-      </Button>
+      {uploading ? (
+        // aria-disabled, not disabled: `disabled` would blur the button the press left focus on
+        <Button
+          variant="primary"
+          size="lg"
+          type="submit"
+          aria-disabled
+          classes="w-full gap-2 pending"
+        >
+          <LoaderCircle className="icon-md animate-spin" aria-hidden />
+          Uploading…
+        </Button>
+      ) : (
+        <Button
+          variant="primary"
+          size="lg"
+          type="submit"
+          classes="w-full gap-2"
+        >
+          <ArrowUpFromLine className="icon-md" aria-hidden />
+          Upload photo
+        </Button>
+      )}
     </form>
   );
 }
 
-type IUploading = Extract<PhotoView, { state: "uploading" }>;
+type IProgress = Extract<PhotoView, { state: "uploading" }>;
 
-function Uploading({
-  campaign,
-  file_name,
-  preview_url,
-  loaded,
-  total,
-}: IUploading) {
-  const title_id = `${useId()}-title`;
+function Progress({ file_name, preview_url, loaded, total }: IProgress) {
   const pct =
     total > 0
       ? Math.min(100, Math.max(0, Math.round((loaded / total) * 100)))
       : 0;
   return (
-    <section aria-labelledby={title_id} aria-busy className={CARD}>
-      <Head campaign={campaign} title_id={title_id} />
-      <div className="grid grid-cols-[auto_1fr] items-center gap-4 rounded border border-gray-7 bg-surface p-3">
-        <div className="w-18 h-12 rounded overflow-hidden bg-gray-3">
-          <img src={preview_url} alt="" className="size-full object-cover" />
-        </div>
-        <div className="grid gap-1.5 min-w-0">
-          <span className="truncate text-sm font-semibold">{file_name}</span>
+    <div className="grid grid-cols-[auto_1fr] items-center gap-4 rounded border border-gray-7 bg-surface p-3">
+      <div className="w-18 h-12 rounded overflow-hidden bg-gray-3">
+        <img src={preview_url} alt="" className="size-full object-cover" />
+      </div>
+      <div className="grid gap-1.5 min-w-0">
+        <span className="truncate text-sm font-semibold">{file_name}</span>
+        <div
+          role="progressbar"
+          aria-label="Uploading photo"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={pct}
+          className="h-2 rounded-full overflow-hidden bg-gray-3 inset-shadow-track"
+        >
           <div
-            role="progressbar"
-            aria-label="Uploading photo"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={pct}
-            className="h-2 rounded-full overflow-hidden bg-gray-3 inset-shadow-track"
-          >
-            <div
-              className="h-full rounded-full bg-primary shadow-track-fill"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-xs text-gray-11 figures">
-            <span>
-              {format_mb(loaded)} of {format_mb(total)} MB
-            </span>
-            <span>{pct}%</span>
-          </div>
+            className="h-full rounded-full bg-primary shadow-track-fill"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-xs text-gray-11 figures">
+          <span>
+            {format_mb(loaded)} of {format_mb(total)} MB
+          </span>
+          <span>{pct}%</span>
         </div>
       </div>
-      <Limits />
-      <Button variant="primary" size="lg" disabled classes="w-full gap-2">
-        <LoaderCircle className="icon-md animate-spin" aria-hidden />
-        Uploading…
-      </Button>
-    </section>
+    </div>
   );
 }
 

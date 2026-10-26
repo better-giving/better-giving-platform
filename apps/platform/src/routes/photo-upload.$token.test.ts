@@ -677,8 +677,11 @@ describe("picking a photo in the browser", () => {
     expect(html).toContain("62%");
     expect(html).toContain('src="blob:https://bg.test/1"');
     const button = /<button[^>]*>/.exec(html)?.[0] ?? "";
-    expect(button).toContain("disabled");
-    expect(html).not.toContain("<form");
+    // held without `disabled`, which would blur the button the press focused
+    expect(button).toContain('aria-disabled="true"');
+    expect(button).toContain("pending");
+    expect(button).not.toMatch(/\sdisabled[\s=>]/);
+    expect(html).toContain('aria-busy="true"');
   });
 
   test("clearing the pick clears the hold", () => {
