@@ -106,7 +106,7 @@ describe("use_table", () => {
   // the generation only moves when page1 is seen to change, and the fallback
   // heuristic reads page1's shape — two filters can return the same first row
   // and the same count. the filters themselves are the identity, which is what
-  // the marketplace and fundraiser routes pass.
+  // the marketplace and campaign routes pass.
   test("a filter change the shape heuristic cannot see still discards", async () => {
     const park = parked();
     const Stub = build(park, { keyed: true, identical: true });

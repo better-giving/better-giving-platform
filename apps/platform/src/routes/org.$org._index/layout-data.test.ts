@@ -60,7 +60,7 @@ describe("fund as a give item", () => {
     );
   });
 
-  it("links the fundraiser with its banner, else its logo, and its goal by the cards' rule", () => {
+  it("links the fund with its banner, else its logo, and its goal by the cards' rule", () => {
     expect(
       fund_give(
         fund({
@@ -75,7 +75,7 @@ describe("fund as a give item", () => {
       kind: "supporter",
       id: "f1",
       title: "Coat drive",
-      to: "/fundraisers/f1",
+      to: "/campaigns/f1",
       image: "https://img/b.png",
       raised: 40,
       goal: 100,
@@ -214,7 +214,7 @@ describe("layout lists", () => {
     expect([no_funds.give, no_funds.videos]).toEqual([[], []]);
   });
 
-  it("keeps the campaigns when the fundraisers' read fails, flagging the give list", () => {
+  it("keeps the campaigns when the funds' read fails, flagging the give list", () => {
     const lists = layout_lists({
       npo,
       campaigns: [campaign],
@@ -227,7 +227,7 @@ describe("layout lists", () => {
     expect(lists.failed.give).toBe(true);
   });
 
-  it("gives the campaigns first, then only the open fundraisers", () => {
+  it("gives the campaigns first, then only the open funds", () => {
     const { give } = layout_lists({
       npo,
       campaigns: [
@@ -315,7 +315,7 @@ describe("layout lists", () => {
     });
     expect(shape_counts(lists)).toEqual({
       campaigns: 1,
-      fundraisers: 0,
+      supporters: 0,
       programs: 1,
       videos: 1,
     });

@@ -1,6 +1,6 @@
 /**
  * BG-1943: fold org-owned legacy funds into `campaigns`, so a nonprofit's own
- * fundraisers live under one model with one editor, one public url and one way
+ * campaigns live under one model with one editor, one public url and one way
  * of computing totals. Supporter-created funds stay as `funds`.
  *
  * Idempotent and re-runnable: the unique `campaigns.legacy_fund_id` is the

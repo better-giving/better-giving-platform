@@ -65,10 +65,10 @@ function RowLinks({ edit_to, view_to, name_id }: IRowLinksProps) {
 
 /** a closed fund has no editor; the public page is the view link */
 function fund_links(f: IListedFund): IRowLinks {
-  const public_to = href("/fundraisers/:fund_id", { fund_id: f.id });
+  const public_to = href("/campaigns/:fund_id", { fund_id: f.id });
   if (!f.active) return { view_to: f.published ? public_to : undefined };
   return {
-    edit_to: href("/fundraisers/:fund_id/edit", { fund_id: f.id }),
+    edit_to: href("/campaigns/:fund_id/edit", { fund_id: f.id }),
     view_to: f.published ? public_to : undefined,
   };
 }
@@ -94,13 +94,13 @@ export default function Page({ loaderData }: Route.ComponentProps) {
         value={tab}
         onValueChange={(value) => {
           const next = new URLSearchParams(params);
-          if (value === "fundraisers") next.set("tab", "fundraisers");
+          if (value === "supporters") next.set("tab", "supporters");
           else next.delete("tab");
           setParams(next, { preventScrollReset: true });
         }}
         items={[
           { value: "campaigns", label: "Your campaigns" },
-          { value: "fundraisers", label: "Supporter campaigns" },
+          { value: "supporters", label: "Supporter campaigns" },
         ]}
       >
         {loaderData.view === "campaigns" ? (
@@ -170,7 +170,7 @@ export default function Page({ loaderData }: Route.ComponentProps) {
             )}
           </TabPanel>
         ) : (
-          <TabPanel value="fundraisers" className="grid gap-6">
+          <TabPanel value="supporters" className="grid gap-6">
             <FundsList
               funds={loaderData.funds}
               endow_id={endow.id}

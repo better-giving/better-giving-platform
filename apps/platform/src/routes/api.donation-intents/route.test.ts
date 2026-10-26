@@ -189,7 +189,7 @@ describe("api.donation-intents action", () => {
       to_id: fund_id,
     });
 
-    it("refuses an expired fund with the fundraiser 404 and creates no intent", async () => {
+    it("refuses an expired fund with the campaign 404 and creates no intent", async () => {
       fund_get_mock.mockResolvedValueOnce(
         fund_row({ active: true, expiration: "2020-01-01T00:00:00.000Z" })
       );
@@ -204,7 +204,7 @@ describe("api.donation-intents action", () => {
       expect(cookie_serialize_mock).not.toHaveBeenCalled();
     });
 
-    it("refuses an inactive fund with the fundraiser 404", async () => {
+    it("refuses an inactive fund with the campaign 404", async () => {
       fund_get_mock.mockResolvedValueOnce(
         fund_row({ active: false, expiration: null })
       );
@@ -218,7 +218,7 @@ describe("api.donation-intents action", () => {
       expect(stripe_intent_mock).not.toHaveBeenCalled();
     });
 
-    it("refuses a well-formed uuid naming no fund with the fundraiser 404", async () => {
+    it("refuses a well-formed uuid naming no fund with the campaign 404", async () => {
       fund_get_mock.mockResolvedValueOnce(undefined);
       const info = vi.spyOn(console, "info").mockImplementation(() => {});
       const res = await invoke(post(fund_body()));

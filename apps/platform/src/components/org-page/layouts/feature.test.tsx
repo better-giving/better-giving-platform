@@ -17,7 +17,6 @@ import {
 import {
   above_fold,
   EIN,
-  fundraiser,
   give,
   header_donate_in_view,
   in_view,
@@ -28,6 +27,7 @@ import {
   org_layout,
   program,
   story,
+  supporter_fund,
   TAGLINE_MAX,
   video,
 } from "#/__tests__/fixtures/org-layout";
@@ -422,8 +422,8 @@ describe("Feature", () => {
   test("the give section and its header link are named by what the list holds", async () => {
     await page.viewport(1440, 900);
     const cases = [
-      [many(fundraiser, 2), "Supporter campaigns"],
-      [[give(1), fundraiser(1)], "Campaigns"],
+      [many(supporter_fund, 2), "Supporter campaigns"],
+      [[give(1), supporter_fund(1)], "Campaigns"],
     ] as const;
     for (const [list, name] of cases) {
       const screen = await mount({ give: [...list] });

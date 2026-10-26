@@ -30,7 +30,7 @@ import { sources_of } from "./conformance/walk";
  * - **an easing or a speed with no transition to modify.** this one is a real
  *   bug rather than drift: `ease-in-out` on an element with no `transition-*`
  *   modifies nothing and renders as a snap. two sites carried it — a static
- *   grid wrapper on the fundraiser page, and the cpf toggle's track, whose twin
+ *   grid wrapper on the campaign page, and the cpf toggle's track, whose twin
  *   in `tip-field.tsx` had the `transition-colors` it was missing. neither
  *   produced an error, a warning or a visibly broken screen.
  *

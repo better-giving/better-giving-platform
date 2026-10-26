@@ -24,7 +24,7 @@ Better Giving is a 501(c)(3) public charity (EIN 87-3758939) that provides free 
 ## Marketplace & Discovery
 
 - [Nonprofit Marketplace](https://better.giving/marketplace): search nonprofits by name, cause, or geography
-- [Fundraisers](https://better.giving/fundraisers): browse peer-to-peer and organizational fundraising campaigns
+- [Campaigns](https://better.giving/campaigns): browse peer-to-peer and organizational fundraising campaigns
 
 ## Getting Started
 
@@ -58,7 +58,7 @@ Better Giving is a 501(c)(3) public charity (EIN 87-3758939) that provides free 
 ## Optional
 
 - [Nonprofit Profile Example](https://better.giving/marketplace/:id): individual nonprofit profile with programs and donation form
-- [Fundraiser Detail](https://better.giving/fundraisers/:fundId): individual fundraiser page with progress and donate button
+- [Campaign Detail](https://better.giving/campaigns/:fundId): individual campaign page with progress and donate button
 - [Donate](https://better.giving/donate/:id): donation checkout for a specific nonprofit
-- [Donate to Fundraiser](https://better.giving/fundraisers/:fundId/donate): donation checkout for a fundraiser
+- [Donate to Campaign](https://better.giving/campaigns/:fundId/donate): donation checkout for a campaign
 - [Nonprofit Category](https://better.giving/nonprofits/:slug): browse nonprofits by NTEE category

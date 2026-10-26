@@ -20,7 +20,7 @@ export const loader = ({ request, context }: Route.LoaderArgs) => {
   const creator = fund_creator(
     new URL(request.url).searchParams.get("creator")
   );
-  const q = new URLSearchParams({ tab: "fundraisers" });
+  const q = new URLSearchParams({ tab: "supporters" });
   if (creator) q.set("creator", creator);
   return redirect(`${href("/admin/:id/campaigns", { id: String(id) })}?${q}`);
 };
