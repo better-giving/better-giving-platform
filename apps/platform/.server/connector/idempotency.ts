@@ -27,6 +27,33 @@ const conflict = () =>
 const sha256_hex = (value: string) =>
   createHash("sha256").update(value, "utf8").digest("hex");
 
+const idem_key_of = (request: Request) =>
+  request.headers.get("Idempotency-Key")?.trim() ?? "";
+
+/**
+ * The id a create mints under this `(key_id, Idempotency-Key)`, the same on
+ * every attempt. A reclaimed claim can't tell whether the first attempt's
+ * write landed, so the create inserts this id and, on finding it taken,
+ * answers with the row already there. A UUIDv8 from the sha256; null with no
+ * usable key, where the create mints a random id.
+ */
+export function idem_resource_id(
+  npo_id: number,
+  key_id: string,
+  request: Request
+): string | null {
+  const idem_key = idem_key_of(request);
+  if (!idem_key || idem_key.length > MAX_KEY_LEN) return null;
+  const b = createHash("sha256")
+    .update(`connector-create\0${npo_id}\0${key_id}\0${idem_key}`, "utf8")
+    .digest()
+    .subarray(0, 16);
+  b[6] = (b[6] & 0x0f) | 0x80;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = b.toString("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 /**
  * One logical write per `(key_id, Idempotency-Key)`. The handler runs only
  * when this call owns a fresh `pending` row. A throw from the handler deletes
@@ -40,7 +67,7 @@ export async function with_idempotency(
   request: Request,
   handler: () => Promise<Response>
 ): Promise<Response> {
-  const idem_key = request.headers.get("Idempotency-Key")?.trim() ?? "";
+  const idem_key = idem_key_of(request);
   if (!idem_key || idem_key.length > MAX_KEY_LEN) {
     return problem(400, "idempotency_key_required");
   }

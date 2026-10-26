@@ -11,6 +11,7 @@ import {
 } from "vitest";
 import { reset_rate_limits } from "#/.server/auth/rate-limit";
 import { seed_npo, seed_user } from "#/__tests__/fixtures/funds";
+import { IDEMPOTENCY_PENDING_RECLAIM_MS } from "$/connector/idempotency";
 import { exchange_code, issue_code } from "$/connector/keys";
 import { form_update } from "$/pg/queries/form";
 import type { DbOrTx } from "$/pg/queries/helpers";
@@ -36,10 +37,18 @@ import {
 } from "./connector.v1.forms.$id";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
+// the next update of this table throws once, as a dropped connection would
+const fail_update = vi.hoisted(() => ({ table: null as unknown }));
 vi.mock("$/pg/db", () => ({
   db: new Proxy({} as any, {
     get(_, prop) {
-      return (test_db.current!.db as any)[prop];
+      const real = test_db.current!.db as any;
+      if (prop !== "update" || !fail_update.table) return real[prop];
+      return (table: unknown) => {
+        if (table !== fail_update.table) return real.update(table);
+        fail_update.table = null;
+        throw new Error("lost the connection");
+      };
     },
   }),
 }));
@@ -59,6 +68,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  fail_update.table = null;
   report_error.mockClear();
   reset_rate_limits();
   await db().delete(forms);
@@ -204,6 +214,54 @@ describe("create_form", () => {
     });
     expect(row.date_created).not.toBeNull();
     expect((await read(body.id, a.key)).status).toBe(200);
+  });
+
+  test("a retry after the replay record failed to save gets the first form, not a second one", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const body = { name: "Gala" };
+    fail_update.table = connector_idempotency;
+
+    const first = await create(a.key, body, "idem-lost");
+
+    expect(first.status).toBe(500);
+    const [made] = await db().select().from(forms);
+    expect(made).toBeDefined();
+    const [claim] = await db().select().from(connector_idempotency);
+    expect(claim.status).toBe("pending");
+
+    expect((await create(a.key, body, "idem-lost")).status).toBe(409);
+
+    await db()
+      .update(connector_idempotency)
+      .set({
+        created_at: new Date(
+          Date.now() - IDEMPOTENCY_PENDING_RECLAIM_MS - 1_000
+        ).toISOString(),
+      });
+    const retry = await create(a.key, body, "idem-lost");
+
+    expect(retry.status).toBe(201);
+    const retried = (await retry.json()) as { id: string };
+    expect(retried).toMatchObject({ id: made!.id, name: "Gala" });
+    expect(await db().select().from(forms)).toHaveLength(1);
+    const again = await create(a.key, body, "idem-lost");
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual(retried);
+  });
+
+  test("the same Idempotency-Key from another nonprofit's key makes that nonprofit its own form", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const b = await pair("Beta", "EIN-B", "b@test.com");
+
+    const ours = await create(a.key, { name: "Gala" }, "shared");
+    const theirs = await create(b.key, { name: "Gala" }, "shared");
+
+    expect(ours.status).toBe(201);
+    expect(theirs.status).toBe(201);
+    const ours_id = ((await ours.json()) as { id: string }).id;
+    const theirs_id = ((await theirs.json()) as { id: string }).id;
+    expect(theirs_id).not.toBe(ours_id);
+    expect((await row_of(theirs_id)).owner_npo_id).toBe(b.npo.id);
   });
 
   test("every writable field is stored, and get_form reads them back", async () => {

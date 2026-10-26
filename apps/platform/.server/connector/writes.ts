@@ -5,7 +5,7 @@ import type { DbOrTx } from "../pg/queries/helpers";
 import { campaign_members, campaigns } from "../pg/schema/campaign";
 import { npos } from "../pg/schema/npo";
 import { json, open_key } from "./http";
-import { with_idempotency } from "./idempotency";
+import { idem_resource_id, with_idempotency } from "./idempotency";
 import { type FieldError, invalid, problem } from "./problem";
 import { read_campaign_detail } from "./reads";
 
@@ -101,17 +101,24 @@ export async function create_campaign(
   if (request.method !== "POST") return problem(404, "unknown_action");
   const live = await open_key(db, request);
   if (live instanceof Response) return live;
+  // with_idempotency refuses a request with no usable key before this runs
+  const id =
+    idem_resource_id(live.npo_id, live.id, request) ?? crypto.randomUUID();
   return with_idempotency(db, live.id, request, () =>
-    insert_campaign(db, live.npo_id, live.allowed_by, request)
+    insert_campaign(db, live.npo_id, live.allowed_by, request, id)
   );
 }
 
+/** `id` is the key's, so a retry after a write that landed finds that write */
 async function insert_campaign(
   db: DbOrTx,
   npo_id: number,
   allowed_by: string,
-  request: Request
+  request: Request,
+  id: string
 ): Promise<Response> {
+  const landed = await read_campaign_detail(db, npo_id, id);
+  if (landed) return json(landed, 201);
   const parsed = await read_body(request);
   if (!parsed.ok) return parsed.response;
   const issues: Issue[] = [];
@@ -131,7 +138,6 @@ async function insert_campaign(
   if (issues.length > 0) return invalid(issues);
 
   try {
-    const id = crypto.randomUUID();
     const detail = await db.transaction(async (tx) => {
       const [npo] = await tx
         .select({
@@ -144,23 +150,30 @@ async function insert_campaign(
       if (!npo) throw new Error("npo missing");
       const image = npo.logo || npo.image || npo.card_img || null;
       const description_pt = "[]";
-      await tx.insert(campaigns).values({
-        id,
-        owner_npo_id: npo_id,
-        creator_id: allowed_by,
-        name: trimmed,
-        slug: campaign_slug(trimmed, id),
-        description_pt,
-        description_v2: to_text(description_pt),
-        banner: image,
-        logo: image,
-        status: "draft",
-      });
-      await tx.insert(campaign_members).values({
-        campaign_id: id,
-        npo_id,
-        position: 0,
-      });
+      const inserted = await tx
+        .insert(campaigns)
+        .values({
+          id,
+          owner_npo_id: npo_id,
+          creator_id: allowed_by,
+          name: trimmed,
+          slug: campaign_slug(trimmed, id),
+          description_pt,
+          description_v2: to_text(description_pt),
+          banner: image,
+          logo: image,
+          status: "draft",
+        })
+        // an attempt still running past the reclaim got there first
+        .onConflictDoNothing({ target: campaigns.id })
+        .returning({ id: campaigns.id });
+      if (inserted.length === 1) {
+        await tx.insert(campaign_members).values({
+          campaign_id: id,
+          npo_id,
+          position: 0,
+        });
+      }
       return read_campaign_detail(tx, npo_id, id);
     });
     if (!detail) {

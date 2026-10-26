@@ -11,6 +11,7 @@ import {
 } from "vitest";
 import { reset_rate_limits } from "#/.server/auth/rate-limit";
 import { seed_fund, seed_npo, seed_user } from "#/__tests__/fixtures/funds";
+import { IDEMPOTENCY_PENDING_RECLAIM_MS } from "$/connector/idempotency";
 import { exchange_code, issue_code } from "$/connector/keys";
 import { campaign_status } from "$/connector/reads";
 import { campaign_get } from "$/pg/queries/campaign";
@@ -53,10 +54,18 @@ import { loader as recurring_loader } from "./connector.v1.recurring";
 import { loader as results_loader } from "./connector.v1.results";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
+// the next update of this table throws once, as a dropped connection would
+const fail_update = vi.hoisted(() => ({ table: null as unknown }));
 vi.mock("$/pg/db", () => ({
   db: new Proxy({} as any, {
     get(_, prop) {
-      return (test_db.current!.db as any)[prop];
+      const real = test_db.current!.db as any;
+      if (prop !== "update" || !fail_update.table) return real[prop];
+      return (table: unknown) => {
+        if (table !== fail_update.table) return real.update(table);
+        fail_update.table = null;
+        throw new Error("lost the connection");
+      };
     },
   }),
 }));
@@ -73,6 +82,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  fail_update.table = null;
   reset_rate_limits();
   await db().delete(donation_disputes);
   await db().delete(dists);
@@ -1205,6 +1215,49 @@ describe("donations, donors, results, recurring", () => {
 });
 
 describe("writes", () => {
+  test("create_campaign retried after its replay record failed to save gets the first campaign, not a second one", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const create = () =>
+      post(
+        campaigns_action,
+        "/connector/v1/campaigns",
+        a.key,
+        { title: "Library drive" },
+        "idem-lost"
+      );
+    fail_update.table = connector_idempotency;
+
+    const first = await create();
+
+    expect(first.status).toBe(500);
+    const [made] = await db().select().from(campaigns);
+    expect(made).toBeDefined();
+    const [claim] = await db().select().from(connector_idempotency);
+    expect(claim?.status).toBe("pending");
+
+    expect((await create()).status).toBe(409);
+
+    await db()
+      .update(connector_idempotency)
+      .set({
+        created_at: new Date(
+          Date.now() - IDEMPOTENCY_PENDING_RECLAIM_MS - 1_000
+        ).toISOString(),
+      });
+    const retry = await create();
+
+    expect(retry.status).toBe(201);
+    const retried = (await retry.json()) as { id: string };
+    expect(retried).toMatchObject({ id: made!.id, title: "Library drive" });
+    expect(await db().select().from(campaigns)).toHaveLength(1);
+    expect(await db().select().from(campaign_members)).toEqual([
+      { campaign_id: made!.id, npo_id: a.npo.id, position: 0 },
+    ]);
+    const again = await create();
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual(retried);
+  });
+
   test("create_campaign is a draft and replays on the same key", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
     const b = await pair("Beta", "EIN-B", "b@test.com");

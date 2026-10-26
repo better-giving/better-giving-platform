@@ -18,7 +18,7 @@ import { npo_get } from "../pg/queries/npo";
 import { npo_program_get } from "../pg/queries/program";
 import { forms } from "../pg/schema/form";
 import { json, open_key } from "./http";
-import { with_idempotency } from "./idempotency";
+import { idem_resource_id, with_idempotency } from "./idempotency";
 import { AMOUNT, AMOUNT_MSG, usd_amount } from "./money";
 import { type FieldError, invalid, not_found, problem } from "./problem";
 import { type ConnectorForm, read_form, read_form_state } from "./reads";
@@ -346,17 +346,27 @@ export async function create_form(
   if (request.method !== "POST") return problem(404, "unknown_action");
   const live = await open_key(db, request);
   if (live instanceof Response) return live;
-  const insert = () => insert_form(db, live.npo_id, request);
   // the connector sends no key for this action; a direct caller may
-  if (!request.headers.has("Idempotency-Key")) return insert();
-  return with_idempotency(db, live.id, request, insert);
+  if (!request.headers.has("Idempotency-Key")) {
+    return insert_form(db, live.npo_id, request, null);
+  }
+  const id = idem_resource_id(live.npo_id, live.id, request);
+  return with_idempotency(db, live.id, request, () =>
+    insert_form(db, live.npo_id, request, id)
+  );
 }
 
+/** `fixed_id`: the key's id, set when a retry may follow a write that landed */
 async function insert_form(
   db: DbOrTx,
   npo_id: number,
-  request: Request
+  request: Request,
+  fixed_id: string | null
 ): Promise<Response> {
+  if (fixed_id) {
+    const landed = await read_form(db, npo_id, fixed_id);
+    if (landed) return json(landed, 201);
+  }
   const parsed = await read_body(request);
   if (!parsed.ok) return parsed.response;
   const { body } = parsed;
@@ -376,7 +386,7 @@ async function insert_form(
   // the admin create's form, for the org that creates it: the label is the
   // form's own, the name is the recipient donors see
   const form: IForm = {
-    id: crypto.randomUUID(),
+    id: fixed_id ?? crypto.randomUUID(),
     date_created: new Date().toISOString(),
     tag: patch.tag!,
     name: npo.name,
@@ -395,6 +405,9 @@ async function insert_form(
   try {
     await form_put(form);
   } catch (err) {
+    // an attempt still running past the reclaim got there first
+    const landed = fixed_id && (await read_form(db, npo_id, fixed_id));
+    if (landed) return json(landed, 201);
     report_error(err, { where: "connector: create_form" });
     return problem(500, "write_failed", {
       detail: "The form could not be saved. Try again.",

@@ -21,6 +21,7 @@ import { user_npo_memberships } from "../pg/schema/user";
 import { create_test_db, type TestDb } from "../pg/test-utils/pglite";
 import {
   IDEMPOTENCY_PENDING_RECLAIM_MS,
+  idem_resource_id,
   with_idempotency,
 } from "./idempotency";
 import { exchange_code, issue_code } from "./keys";
@@ -389,5 +390,38 @@ describe("with_idempotency", () => {
     );
     expect(retry).not.toHaveBeenCalled();
     expect(handler).toHaveBeenCalledOnce();
+  });
+});
+
+describe("idem_resource_id", () => {
+  const req = (idem?: string) =>
+    new Request("https://bg.test/connector/v1/x", {
+      method: "POST",
+      headers: idem === undefined ? {} : { "Idempotency-Key": idem },
+    });
+
+  test("is one UUID per nonprofit, key and Idempotency-Key", () => {
+    const id = idem_resource_id(1, "key-a", req("k1"));
+
+    expect(id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    expect(idem_resource_id(1, "key-a", req(" k1 "))).toBe(id);
+    expect(
+      new Set([
+        id,
+        idem_resource_id(2, "key-a", req("k1")),
+        idem_resource_id(1, "key-b", req("k1")),
+        idem_resource_id(1, "key-a", req("k2")),
+      ]).size
+    ).toBe(4);
+  });
+
+  test.each([
+    ["missing", undefined],
+    ["blank", "   "],
+    ["longer than 255", "k".repeat(256)],
+  ])("is null for a %s key", (_label, idem) => {
+    expect(idem_resource_id(1, "key-a", req(idem))).toBeNull();
   });
 });
