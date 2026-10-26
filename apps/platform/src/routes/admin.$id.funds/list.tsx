@@ -1,5 +1,5 @@
 import { EmptyState } from "@better-giving/ui";
-import type { IFundItem } from "@/fundraiser";
+import type { IFundItem } from "@/campaign";
 import { FundItem } from "./fund-item";
 
 interface IFundsList {

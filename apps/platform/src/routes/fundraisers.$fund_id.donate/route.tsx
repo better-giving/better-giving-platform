@@ -8,7 +8,7 @@ import { app_name, base_url } from "#/constants/env";
 import { INTERCOM_HELP, PRIVACY_POLICY } from "#/constants/urls";
 import { metas } from "#/helpers/seo";
 import { use_now } from "#/hooks/use-now";
-import { fund_closes_at, fund_is_open } from "@/fundraiser/is-open";
+import { fund_closes_at, fund_is_open } from "@/campaign/is-open";
 import type { Route } from "./+types/route";
 import FAQ from "./faq";
 import { FundCard } from "./fund-card";

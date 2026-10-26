@@ -1,5 +1,5 @@
 import { safeParse } from "valibot";
-import { fund_id } from "@/fundraiser/schema";
+import { fund_id } from "@/campaign/schema";
 import { resp, search } from "@/helpers/https";
 import { fund_delete, funds_list } from "$/pg/queries/fund";
 import type { Route } from "./+types/route";

@@ -2,7 +2,7 @@ import { href, redirect } from "react-router";
 import { safeParse } from "valibot";
 import { admin_ctx } from "#/.server/auth";
 import { dataWithError, dataWithSuccess } from "#/.server/toast";
-import { fund_id } from "@/fundraiser/schema";
+import { fund_id } from "@/campaign/schema";
 import { resp } from "@/helpers/https";
 import { msg } from "@/queue";
 import { enqueue } from "$/kit/queue";

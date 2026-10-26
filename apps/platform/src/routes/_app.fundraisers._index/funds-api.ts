@@ -1,6 +1,6 @@
 import { safeParse } from "valibot";
 import { get_funds } from "#/.server/funds";
-import { funds_search } from "@/fundraiser/schema";
+import { funds_search } from "@/campaign/schema";
 import { resp, search } from "@/helpers/https";
 import type { Route } from "./+types/route";
 

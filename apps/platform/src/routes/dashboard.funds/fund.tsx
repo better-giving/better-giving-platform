@@ -1,6 +1,6 @@
 import { Target, to_target } from "@better-giving/ui";
 import { href, Link } from "react-router";
-import { FundStatusBadge, status_fn } from "#/components/fundraiser";
+import { FundStatusBadge, status_fn } from "#/components/campaign";
 import type { IFundRow } from "$/pg/queries/fund";
 
 export const Fund = (props: IFundRow) => {

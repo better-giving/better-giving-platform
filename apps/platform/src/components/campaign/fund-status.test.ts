@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { MAX_EXPIRATION_ISO } from "@/fundraiser/schema";
+import { MAX_EXPIRATION_ISO } from "@/campaign/schema";
 import { status } from "./fund-status";
 
 describe("fund status", () => {

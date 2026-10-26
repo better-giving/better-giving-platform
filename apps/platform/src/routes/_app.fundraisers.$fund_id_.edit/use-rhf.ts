@@ -12,7 +12,7 @@ import * as v from "valibot";
 import { to_target } from "#/components/goal-selector";
 import { to_content } from "#/components/rich-text";
 import type { IFund } from "#/types/fund";
-import type { IFundUpdate } from "@/fundraiser";
+import type { IFundUpdate } from "@/campaign";
 import { type FV, schema } from "./schema";
 
 // each section's form is seeded through `values:` from its own slice of the

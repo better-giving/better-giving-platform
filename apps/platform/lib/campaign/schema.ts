@@ -31,7 +31,7 @@ export type { Environment } from "../types/list";
 
 export const fund_id = pipe($, uuid());
 /**
- * when fundraiser is created in the context of an NPO, all members of that NPO can edit the fundraiser
+ * when campaign is created in the context of an NPO, all members of that NPO can edit the campaign
  * null - none
  */
 const npo_owner = optional(pipe(number(), integer(), minValue(1)));
