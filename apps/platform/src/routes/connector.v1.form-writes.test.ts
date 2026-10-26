@@ -629,6 +629,50 @@ describe("update_form", () => {
     expect((await row_of(unset)).donate_methods).toEqual(["daf"]);
   });
 
+  test("a draft published while an edit reads it holds the edit for confirm, and changes nothing", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_form(a.npo.id);
+    // another request publishes the form the moment the edit has read it
+    const real = db();
+    const select = real.select.bind(real);
+    let armed = true;
+    const spy = vi.spyOn(real, "select").mockImplementation(((
+      fields?: Record<string, unknown>
+    ) => {
+      const builder = select(fields as any);
+      if (!armed || !fields || !("tag" in fields)) return builder;
+      armed = false;
+      const from = builder.from.bind(builder);
+      (builder as any).from = (...args: unknown[]) => {
+        const query = (from as any)(...args);
+        const execute = query.execute.bind(query);
+        query.execute = async (...rest: unknown[]) => {
+          const rows = await execute(...rest);
+          await real
+            .update(forms)
+            .set({ status: "active" })
+            .where(eq(forms.id, id));
+          return rows;
+        };
+        return query;
+      };
+      return builder;
+    }) as typeof real.select);
+
+    const res = await update(id, a.key, { donate_methods: ["stripe"] });
+    spy.mockRestore();
+
+    expect(armed).toBe(false);
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code: string }).code).toBe(
+      "confirm_required"
+    );
+    expect(await row_of(id)).toMatchObject({
+      status: "active",
+      donate_methods: null,
+    });
+  });
+
   test("a GET body sent back unchanged is a 200 no-op on a live form, without confirm", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
     const id = await seed_form(a.npo.id, {

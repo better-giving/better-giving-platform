@@ -483,12 +483,23 @@ export async function read_form(
   npo_id: number,
   id: string
 ): Promise<ConnectorForm | null> {
+  return (await read_form_state(db, npo_id, id))?.shown ?? null;
+}
+
+/** get_form's shape and the stored status and increments behind it, from one
+ * read, so neither can be from a save the other missed */
+export async function read_form_state(db: DbOrTx, npo_id: number, id: string) {
   const [row] = await db
     .select(form_cols)
     .from(forms)
     .leftJoin(funds, eq(forms.recipient_fund_id, funds.id))
     .where(and(eq(forms.id, id), forms_for(npo_id)));
-  return row ? form_of(normalize_form(row), npo_id) : null;
+  if (!row) return null;
+  return {
+    shown: form_of(normalize_form(row), npo_id),
+    status: row.status,
+    increments: row.increments,
+  };
 }
 
 function tenant_gifts(npo_id: number) {

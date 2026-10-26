@@ -20,7 +20,7 @@ import { json, open_key } from "./http";
 import { with_idempotency } from "./idempotency";
 import { AMOUNT, AMOUNT_MSG, usd_amount } from "./money";
 import { type FieldError, invalid, not_found, problem } from "./problem";
-import { type ConnectorForm, read_form } from "./reads";
+import { type ConnectorForm, read_form, read_form_state } from "./reads";
 import { read_body, TITLE_MAX } from "./writes";
 
 const WRITABLE = [
@@ -393,17 +393,6 @@ async function insert_form(
   return made ? json(made, 201) : missing(form.id);
 }
 
-/** the gate's reading of a form: what get_form shows, and the stored
- * status and increments behind it */
-async function load(db: DbOrTx, npo_id: number, id: string) {
-  const shown = await read_form(db, npo_id, id);
-  const [row] = await db
-    .select({ status: forms.status, increments: forms.increments })
-    .from(forms)
-    .where(and(eq(forms.id, id), eq(forms.owner_npo_id, npo_id)));
-  return shown && row ? { shown, ...row } : null;
-}
-
 /** false when the form's status is no longer `status`: the gate read a form
  * that has since gone live or off */
 async function write_patch(
@@ -446,7 +435,7 @@ export async function update_form(
   const live = await open_key(db, request);
   if (live instanceof Response) return live;
   const npo_id = live.npo_id;
-  let current = await load(db, npo_id, id);
+  let current = await read_form_state(db, npo_id, id);
   if (!current) return missing(id);
 
   const parsed = await read_body(request);
@@ -484,7 +473,7 @@ export async function update_form(
       const after = await read_form(db, npo_id, id);
       return after ? json(after) : missing(id);
     }
-    current = await load(db, npo_id, id);
+    current = await read_form_state(db, npo_id, id);
     if (!current) return missing(id);
   }
   return problem(500, "write_failed", {
