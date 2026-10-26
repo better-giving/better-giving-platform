@@ -23,13 +23,14 @@ import {
 import { DappLogo } from "#/components/image";
 import { upload_limits } from "@/constants/upload";
 
-/** `gone | limited | ready | failed | saved` mirror the server's `PhotoPage`,
+/** `gone | limited | ready | failed | unknown | saved` mirror the server's `PhotoPage`,
  * so the route passes a server page straight through */
 export type PhotoView =
   | { state: "gone" }
   | { state: "limited" }
   | { state: "ready"; campaign: string; error?: string }
   | { state: "failed"; campaign: string }
+  | { state: "unknown"; campaign: string }
   | {
       state: "uploading";
       campaign: string;
@@ -61,6 +62,8 @@ export function format_mb(bytes: number): string {
 const STATUS: Record<Exclude<PhotoView["state"], "uploading">, string> = {
   ready: "",
   failed: "The photo couldn't be saved",
+  unknown:
+    "We couldn't confirm your photo saved. Open this link again to check; if it's been used up, ask for a new one.",
   saved: "Photo added",
   limited: "Too many uploads",
   gone: "This link can't be used",
@@ -103,6 +106,17 @@ export function PhotoUploadPage({
               Try again
             </Button>
           </Outcome>
+        </Shell>
+      );
+    case "unknown":
+      return (
+        <Shell status={status}>
+          <Outcome
+            tone="neutral"
+            Icon={CircleAlert}
+            title="We couldn't confirm your photo saved."
+            lede="Open this link again to check; if it's been used up, ask for a new one."
+          />
         </Shell>
       );
     case "saved":

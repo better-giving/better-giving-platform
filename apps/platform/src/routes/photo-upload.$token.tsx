@@ -81,6 +81,7 @@ const SETTLED = new Set<string>([
   "limited",
   "ready",
   "failed",
+  "unknown",
   "saved",
 ] satisfies Settled["state"][]);
 

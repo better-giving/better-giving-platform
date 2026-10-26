@@ -10,6 +10,7 @@ import {
 } from "../pg/schema/connector";
 import { npos } from "../pg/schema/npo";
 import { user_npo_memberships } from "../pg/schema/user";
+import { PHOTO_LINK_KEEP_MS } from "./photo-links";
 
 class MembershipGone extends Error {
   constructor() {
@@ -28,7 +29,6 @@ const CODE_TTL_MS = 10 * 60 * 1000;
 const USED_TOUCH_MS = 60_000;
 const IDLE_MS = 90 * 24 * 60 * 60 * 1000;
 const IDEM_MS = 24 * 60 * 60 * 1000;
-const PHOTO_LINK_KEEP_MS = 24 * 60 * 60 * 1000;
 const CODE_RE = /^[A-Za-z0-9_-]{43}$/;
 const KEY_RE = /^bgc_[A-Za-z0-9_-]{43}$/;
 
@@ -284,16 +284,11 @@ export async function sweep(
     .delete(connector_idempotency)
     .where(lt(connector_idempotency.created_at, idem_before))
     .returning({ idem_key: connector_idempotency.idem_key });
-  // a link that saved its photo is kept: it shows that photo, and vouches for
-  // it as the campaign's hero
+  // saved or not: a used link's page shows its photo only this long, so a
+  // saved row past it shows nothing
   const photo_links = await db
     .delete(connector_photo_links)
-    .where(
-      and(
-        lt(connector_photo_links.expires_at, photo_before),
-        isNull(connector_photo_links.saved_pathname)
-      )
-    )
+    .where(lt(connector_photo_links.expires_at, photo_before))
     .returning({ id: connector_photo_links.id });
   return {
     keys_revoked: revoked.length,

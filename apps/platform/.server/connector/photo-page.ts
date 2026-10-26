@@ -25,13 +25,16 @@ import { campaign_status, ended_sql } from "./reads";
 /** what `/photo-upload/:token` shows. `gone` is one shape for an unknown,
  * malformed or expired link, a spent one that saved nothing, or one whose
  * campaign was deleted or has ended, so the page tells a guesser nothing. A
- * link that saved its photo shows it as `saved` for good. */
+ * link that saved its photo shows it as `saved` until `PHOTO_LINK_KEEP_MS`
+ * past its expiry. `unknown` is a save that failed and couldn't be checked:
+ * it may have landed. */
 export type PhotoPage =
   | { state: "gone" }
   | { state: "limited" }
   | { state: "ready"; campaign: string; error?: string }
   | { state: "saved"; campaign: string; photo: string }
-  | { state: "failed"; campaign: string };
+  | { state: "failed"; campaign: string }
+  | { state: "unknown"; campaign: string };
 
 export type PhotoResult = { page: PhotoPage; status: number };
 
@@ -188,7 +191,9 @@ export async function save_photo(
       // record that can't be read may point at the file, so the file and the
       // claim stay as they are
       const after = await saved_photo_link(db, token).catch(() => undefined);
-      if (after === undefined) return failed;
+      if (after === undefined) {
+        return { page: { state: "unknown", campaign: live.name }, status: 500 };
+      }
       if (after?.saved_url === stored) return saved_page_of(stored);
       await discard_upload(stored).catch(() => undefined);
     }

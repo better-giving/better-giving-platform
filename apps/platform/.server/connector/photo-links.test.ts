@@ -34,6 +34,7 @@ const sha256_hex = (value: string) =>
 
 const NOW = new Date("2026-10-17T15:00:00.000Z");
 const FIFTEEN_MIN_MS = 15 * 60 * 1000;
+const DAY = 24 * 60 * 60 * 1000;
 
 let t: TestDb;
 
@@ -278,9 +279,9 @@ describe("release_photo_link", () => {
 describe("record_saved_photo and saved_photo_link", () => {
   const URL_A = "https://blob.test/u/hero-Ab1.png";
 
-  test("the claim that stored the photo records it, and the token reads it back at any age", async () => {
+  test("the claim that stored the photo records it, and the token reads it back until a day past its expiry", async () => {
     const { token, id } = await issue_for("EIN-A", "c-a");
-    expect(await saved_photo_link(as_db(t.db), token)).toBeNull();
+    expect(await saved_photo_link(as_db(t.db), token, NOW)).toBeNull();
     const claim = (await consume_photo_link(as_db(t.db), token, NOW))!;
 
     expect(
@@ -291,10 +292,13 @@ describe("record_saved_photo and saved_photo_link", () => {
       saved_url: URL_A,
       saved_pathname: "/u/hero-Ab1.png",
     });
-    expect(await saved_photo_link(as_db(t.db), token)).toMatchObject({
+    const last = at(FIFTEEN_MIN_MS + DAY - 1_000);
+    expect(await saved_photo_link(as_db(t.db), token, last)).toMatchObject({
       campaign_id: "c-a",
       saved_url: URL_A,
     });
+    const past = at(FIFTEEN_MIN_MS + DAY + 1_000);
+    expect(await saved_photo_link(as_db(t.db), token, past)).toBeNull();
   });
 
   test("another claim's used_at records nothing, and a malformed token reads nothing", async () => {
@@ -304,15 +308,14 @@ describe("record_saved_photo and saved_photo_link", () => {
     expect(
       await record_saved_photo(as_db(t.db), id, at(1).toISOString(), URL_A)
     ).toBe(false);
-    expect(await saved_photo_link(as_db(t.db), token)).toBeNull();
+    expect(await saved_photo_link(as_db(t.db), token, NOW)).toBeNull();
     expect(await saved_photo_link(untouchable, "not a token")).toBeNull();
   });
 });
 
 describe("sweep", () => {
-  test("deletes photo links expired more than 24h ago and keeps the rest", async () => {
+  test("deletes photo links expired more than 24h ago, saved or not, and keeps the rest", async () => {
     const { npo_id } = await seed_org_campaign("EIN-A", "c-a");
-    const DAY = 24 * 60 * 60 * 1000;
     const link = (
       id: string,
       expires_ms: number,
@@ -335,19 +338,20 @@ describe("sweep", () => {
         link("stale-used", -2 * DAY, true),
         link("expired-today", -DAY + 1_000),
         link("live", FIFTEEN_MIN_MS),
-        link("stale-saved", -30 * DAY, true, "/u/hero-Ab1.png"),
+        link("stale-saved", -DAY - 1_000, true, "/u/hero-Ab1.png"),
+        link("saved-today", -DAY + 1_000, true, "/u/hero-Cd2.png"),
       ]);
 
     const swept = await sweep(as_db(t.db), NOW);
 
-    expect(swept.photo_links_deleted).toBe(2);
+    expect(swept.photo_links_deleted).toBe(3);
     const rows = await t.db
       .select({ id: connector_photo_links.id })
       .from(connector_photo_links);
     expect(rows.map((r) => r.id).sort()).toEqual([
       "expired-today",
       "live",
-      "stale-saved",
+      "saved-today",
     ]);
   });
 });

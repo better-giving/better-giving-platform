@@ -142,6 +142,42 @@ describe("photo upload, scripted", () => {
     expect(document.activeElement).toBe(band);
   });
 
+  test("an upload whose save couldn't be confirmed says so, sends back to the link, and offers no retry", async () => {
+    const screen = await render(
+      page({
+        view: {
+          state: "uploading",
+          campaign: CAMPAIGN,
+          file_name: "well-opening.jpg",
+          preview_url: "",
+          loaded: 2,
+          total: 2,
+        },
+      })
+    );
+    const status = screen.getByRole("status").element();
+
+    await screen.rerender(
+      page({ view: { state: "unknown", campaign: CAMPAIGN } })
+    );
+    expect(screen.getByRole("status").element()).toBe(status);
+    expect(status.textContent).toBe(
+      "We couldn't confirm your photo saved. Open this link again to check; if it's been used up, ask for a new one."
+    );
+    await expect
+      .element(screen.getByRole("heading", { level: 1 }))
+      .toHaveTextContent("We couldn't confirm your photo saved.");
+    await expect
+      .element(
+        screen.getByText(
+          "Open this link again to check; if it's been used up, ask for a new one.",
+          { exact: true }
+        )
+      )
+      .toBeVisible();
+    expect(document.querySelector("form")).toBeNull();
+  });
+
   test("a press while uploading does not submit again", async () => {
     const on_submit = vi.fn((e: { preventDefault(): void }) =>
       e.preventDefault()

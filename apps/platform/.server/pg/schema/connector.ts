@@ -118,7 +118,8 @@ export const connector_photo_links = pgTable(
     expires_at: timestamptz("expires_at").notNull(),
     used_at: timestamptz("used_at"),
     // the photo the claim stored, kept once its banner write went through: a
-    // spent link shows it, and update_campaign_blocks takes it as a hero
+    // spent link shows it, and update_campaign_blocks takes it as a hero,
+    // until the sweep deletes the row a day past expires_at
     saved_url: text("saved_url"),
     saved_pathname: text("saved_pathname"),
   },

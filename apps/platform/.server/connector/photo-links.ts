@@ -6,6 +6,9 @@ import { connector_photo_links } from "../pg/schema/connector";
 import { ended_sql } from "./reads";
 
 export const PHOTO_LINK_TTL_MS = 15 * 60 * 1000;
+/** how long past its expiry a link stays on record: a used one shows its
+ * saved photo until then, and the sweep may delete any row after it */
+export const PHOTO_LINK_KEEP_MS = 24 * 60 * 60 * 1000;
 
 const sha256_hex = (value: string) =>
   createHash("sha256").update(value, "utf8").digest("hex");
@@ -79,11 +82,12 @@ export async function peek_photo_link(
   return row ?? null;
 }
 
-/** the photo a spent link stored, at any age: null for a link that is
- * unknown, malformed, or saved nothing */
+/** the photo a spent link stored, until `PHOTO_LINK_KEEP_MS` past its
+ * expiry: null for a link that is unknown, malformed, saved nothing, or older */
 export async function saved_photo_link(
   db: DbOrTx,
-  token: string
+  token: string,
+  now = new Date()
 ): Promise<{ npo_id: number; campaign_id: string; saved_url: string } | null> {
   if (!TOKEN_RE.test(token)) return null;
   const [row] = await db
@@ -93,7 +97,15 @@ export async function saved_photo_link(
       saved_url: connector_photo_links.saved_url,
     })
     .from(connector_photo_links)
-    .where(eq(connector_photo_links.token_hash, sha256_hex(token)));
+    .where(
+      and(
+        eq(connector_photo_links.token_hash, sha256_hex(token)),
+        gt(
+          connector_photo_links.expires_at,
+          new Date(now.getTime() - PHOTO_LINK_KEEP_MS).toISOString()
+        )
+      )
+    );
   return row?.saved_url ? { ...row, saved_url: row.saved_url } : null;
 }
 

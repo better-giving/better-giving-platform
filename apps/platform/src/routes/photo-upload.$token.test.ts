@@ -35,6 +35,10 @@ import { create_test_db, type TestDb } from "$/pg/test-utils/pglite";
 import * as route from "./photo-upload.$token";
 
 const MIB = 1024 * 1024;
+const DAY = 24 * 60 * 60 * 1000;
+const UNCONFIRMED_TITLE = "We couldn't confirm your photo saved.";
+const UNCONFIRMED_LEDE =
+  "Open this link again to check; if it's been used up, ask for a new one.";
 
 const { put, del } = vi.hoisted(() => ({ put: vi.fn(), del: vi.fn() }));
 vi.mock("@vercel/blob", () => ({ put, del }));
@@ -332,6 +336,26 @@ describe("GET /photo-upload/:token", () => {
     expect(html).toContain(`src="${BLOB_URL}"`);
     expect(html).not.toContain("<form");
   });
+
+  test("a saved link's photo shows until a day past its expiry, then the link is the generic 404", async () => {
+    const { token } = await seed();
+    await submit(token, photo([PNG], "image/png", "a.png"));
+    const expire_ago = (ms: number) =>
+      db()
+        .update(connector_photo_links)
+        .set({ expires_at: new Date(Date.now() - ms).toISOString() });
+
+    await expire_ago(DAY - 60_000);
+    expect((await get(token)).data).toMatchObject({ state: "saved" });
+
+    await expire_ago(DAY + 60_000);
+    const res = await get(token);
+    expect(res.init.status).toBe(404);
+    expect(res.data).toEqual({ state: "gone" });
+    const html = html_of(res.data);
+    expect(html).toContain(GONE);
+    expect(html).not.toContain(BLOB_URL);
+  });
 });
 
 /** a second org and campaign, so one test can hold two links */
@@ -573,7 +597,11 @@ describe.each(["document", "script"] as const)(
       tx.mockRestore();
 
       expect(res.init.status).toBe(500);
-      expect(res.data).toEqual({ state: "failed", campaign: "Library drive" });
+      expect(res.data).toEqual({ state: "unknown", campaign: "Library drive" });
+      const html = html_of(null, res.data);
+      expect(html).toContain(UNCONFIRMED_TITLE);
+      expect(html).toContain(UNCONFIRMED_LEDE);
+      expect(html).not.toContain("<form");
       expect(del).not.toHaveBeenCalled();
       expect(await banner_of(campaign_id)).toBe(BLOB_URL);
       expect(await used_at_of()).not.toBeNull();
@@ -820,6 +848,28 @@ describe("the upload script", () => {
       campaign: "Library drive",
       error: "Choose a JPEG, PNG or WebP photo.",
     });
+  });
+
+  test("a save the server couldn't confirm reads as unconfirmed, not as a failure to retry", async () => {
+    const answer = route.send_photo(
+      URL_,
+      new FormData(),
+      "Library drive",
+      () => {}
+    );
+
+    const xhr = FakeXhr.last;
+    xhr.responseText = JSON.stringify({
+      state: "unknown",
+      campaign: "Library drive",
+    });
+    xhr.onload!();
+
+    const page = await answer;
+    expect(page).toEqual({ state: "unknown", campaign: "Library drive" });
+    const html = html_of({ state: "ready", campaign: "Library drive" }, page);
+    expect(html).toContain(UNCONFIRMED_TITLE);
+    expect(html).toContain(UNCONFIRMED_LEDE);
   });
 
   test.each([
