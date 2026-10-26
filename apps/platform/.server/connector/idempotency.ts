@@ -32,10 +32,11 @@ const idem_key_of = (request: Request) =>
 
 /**
  * One logical write per `(key_id, Idempotency-Key)`. The handler runs only
- * when this call owns a fresh `pending` row. A throw from the handler deletes
- * that row. Once the handler has returned a 2xx response, a later failure
- * leaves the row pending so a retry inside `IDEMPOTENCY_PENDING_RECLAIM_MS`
- * cannot repeat the write; past it, a retry of the same body takes the claim.
+ * when this call owns a fresh `pending` row. A 4xx from the handler deletes
+ * that row, since nothing was written. A throw or a 5xx may follow a write that
+ * landed, so the row stays pending: a retry inside
+ * `IDEMPOTENCY_PENDING_RECLAIM_MS` is in progress, and past it a retry of the
+ * same body takes the claim with the same `resource_id`.
  *
  * The handler gets the record's `resource_id`, the id a create inserts. A
  * reclaim keeps it, so a retry after a write that landed finds that write; a
@@ -161,20 +162,15 @@ async function finish(
   resource_id: string,
   handler: (resource_id: string) => Promise<Response>
 ): Promise<Response> {
-  let res: Response;
-  try {
-    res = await handler(resource_id);
-  } catch (err) {
-    await release_pending(db, key_id, idem_key);
-    throw err;
-  }
+  // a throw keeps the claim: the write may have landed before it
+  const res = await handler(resource_id);
 
   const text = await res.text();
   const headers = new Headers(res.headers);
   headers.set("cache-control", "no-store");
-  // a non-2xx body is not a completed write; return it unchanged and free the key
+  // a refusal wrote nothing, so free the key; a 5xx keeps the claim like a throw
   if (res.status < 200 || res.status >= 300) {
-    await release_pending(db, key_id, idem_key);
+    if (res.status < 500) await release_pending(db, key_id, idem_key);
     return new Response(text, { status: res.status, headers });
   }
 

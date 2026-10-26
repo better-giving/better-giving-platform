@@ -1258,6 +1258,61 @@ describe("writes", () => {
     expect(await again.json()).toEqual(retried);
   });
 
+  test("create_campaign retried after a failure past its commit gets the first campaign, not a second one", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const create = () =>
+      post(
+        campaigns_action,
+        "/connector/v1/campaigns",
+        a.key,
+        { title: "Library drive" },
+        "idem-commit"
+      );
+    // the transaction commits, then the reply is lost
+    const real = db();
+    const transaction = real.transaction.bind(real);
+    const spy = vi.spyOn(real, "transaction").mockImplementationOnce((async (
+      ...args: Parameters<typeof real.transaction>
+    ) => {
+      await transaction(...args);
+      throw new Error("lost the connection");
+    }) as typeof real.transaction);
+
+    const first = await create();
+    spy.mockRestore();
+
+    expect(first.status).toBe(500);
+    const [made] = await db().select().from(campaigns);
+    expect(made).toBeDefined();
+    const [claim] = await db().select().from(connector_idempotency);
+    expect(claim?.status).toBe("pending");
+    expect(claim?.resource_id).toBe(made!.id);
+
+    const early = await create();
+    expect(early.status).toBe(409);
+    expect(await early.json()).toMatchObject({
+      code: "idempotency_in_progress",
+    });
+
+    await db()
+      .update(connector_idempotency)
+      .set({
+        created_at: new Date(
+          Date.now() - IDEMPOTENCY_PENDING_RECLAIM_MS - 1_000
+        ).toISOString(),
+      });
+    const retry = await create();
+
+    expect(retry.status).toBe(201);
+    const retried = (await retry.json()) as { id: string };
+    expect(retried).toMatchObject({ id: made!.id, title: "Library drive" });
+    expect(await db().select().from(campaigns)).toHaveLength(1);
+    expect(await db().select().from(campaign_members)).toHaveLength(1);
+    const again = await create();
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual(retried);
+  });
+
   test("create_campaign reusing a key with a new body after its record expired makes a second campaign", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
     const create = (title: string) =>

@@ -333,25 +333,77 @@ describe("with_idempotency", () => {
     expect(Date.parse(row.created_at)).toBeGreaterThan(Date.now() - 60_000);
   });
 
-  test("a handler throw deletes the pending row so the key can be used", async () => {
+  const age_claim = () =>
+    t.db.update(connector_idempotency).set({
+      created_at: new Date(
+        Date.now() - IDEMPOTENCY_PENDING_RECLAIM_MS - 1_000
+      ).toISOString(),
+    });
+
+  test("a handler throw keeps the pending row: a retry inside the window is in progress, past it the retry gets the same resource id", async () => {
     const key_id = await seed_key();
-    const boom = vi.fn(async (): Promise<Response> => {
+    const boom = vi.fn(async (_id: string): Promise<Response> => {
       throw new Error("nope");
     });
 
     await expect(call(key_id, "once", "{}", boom)).rejects.toThrow("nope");
-    expect(await t.db.select().from(connector_idempotency)).toHaveLength(0);
+    const [claim] = await t.db.select().from(connector_idempotency);
+    expect(claim.status).toBe("pending");
+    expect(boom).toHaveBeenCalledExactlyOnceWith(claim.resource_id);
 
-    const handler = vi.fn(async () =>
+    const handler = vi.fn(async (_id: string) =>
       Response.json({ ok: true }, { status: 201 })
     );
+    const early = await call(key_id, "once", "{}", handler);
+    expect(early.status).toBe(409);
+    expect(((await early.json()) as { code: string }).code).toBe(
+      "idempotency_in_progress"
+    );
+    expect(handler).not.toHaveBeenCalled();
+
+    await age_claim();
     const res = await call(key_id, "once", "{}", handler);
 
     expect(res.status).toBe(201);
-    expect(handler).toHaveBeenCalledOnce();
+    expect(handler).toHaveBeenCalledExactlyOnceWith(claim.resource_id);
+    const [row] = await t.db.select().from(connector_idempotency);
+    expect(row.status).toBe("stored");
+    expect(row.resource_id).toBe(claim.resource_id);
   });
 
-  test("a non-2xx response is returned unchanged and the key can be used again", async () => {
+  test("a 5xx is returned unchanged and keeps the pending row, so the reclaim reruns with the same resource id", async () => {
+    const key_id = await seed_key();
+    const failed = vi.fn(
+      async (_id: string) =>
+        new Response(JSON.stringify({ code: "write_failed", status: 500 }), {
+          status: 500,
+          headers: { "content-type": "application/problem+json" },
+        })
+    );
+
+    const res = await call(key_id, "lost", "{}", failed);
+
+    expect(res.status).toBe(500);
+    expect(res.headers.get("content-type")).toBe("application/problem+json");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(await res.json()).toEqual({ code: "write_failed", status: 500 });
+    const [claim] = await t.db.select().from(connector_idempotency);
+    expect(claim.status).toBe("pending");
+    expect(claim.response_status).toBeNull();
+
+    const handler = vi.fn(async (_id: string) =>
+      Response.json({ ok: true }, { status: 201 })
+    );
+    expect((await call(key_id, "lost", "{}", handler)).status).toBe(409);
+    expect(handler).not.toHaveBeenCalled();
+
+    await age_claim();
+    expect((await call(key_id, "lost", "{}", handler)).status).toBe(201);
+    expect(failed).toHaveBeenCalledExactlyOnceWith(claim.resource_id);
+    expect(handler).toHaveBeenCalledExactlyOnceWith(claim.resource_id);
+  });
+
+  test("a 4xx is returned unchanged and frees the key at once", async () => {
     const key_id = await seed_key();
     const handler = vi.fn(
       async () =>

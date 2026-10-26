@@ -53,6 +53,33 @@ vi.mock("$/pg/db", () => ({
   }),
 }));
 
+// once armed, the read of a form right after it is saved throws once
+const fail_read_after_put = vi.hoisted(() => ({ armed: false, fire: false }));
+vi.mock("$/pg/queries/form", async (load) => {
+  const real = await load<typeof import("$/pg/queries/form")>();
+  return {
+    ...real,
+    form_put: async (...args: Parameters<typeof real.form_put>) => {
+      await real.form_put(...args);
+      fail_read_after_put.fire = fail_read_after_put.armed;
+      fail_read_after_put.armed = false;
+    },
+  };
+});
+vi.mock("$/connector/reads", async (load) => {
+  const real = await load<typeof import("$/connector/reads")>();
+  return {
+    ...real,
+    read_form: async (...args: Parameters<typeof real.read_form>) => {
+      if (fail_read_after_put.fire) {
+        fail_read_after_put.fire = false;
+        throw new Error("lost the connection");
+      }
+      return real.read_form(...args);
+    },
+  };
+});
+
 const report_error = vi.hoisted(() => vi.fn());
 vi.mock("#/errors/report", () => ({ report_error }));
 
@@ -69,6 +96,8 @@ afterAll(async () => {
 
 beforeEach(async () => {
   fail_update.table = null;
+  fail_read_after_put.armed = false;
+  fail_read_after_put.fire = false;
   report_error.mockClear();
   reset_rate_limits();
   await db().delete(forms);
@@ -247,6 +276,58 @@ describe("create_form", () => {
     const again = await create(a.key, body, "idem-lost");
     expect(again.status).toBe(200);
     expect(await again.json()).toEqual(retried);
+  });
+
+  test("a retry after the read that follows the save failed gets the first form, not a second one", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const body = { name: "Gala" };
+    fail_read_after_put.armed = true;
+
+    const first = await create(a.key, body, "idem-read");
+
+    expect(first.status).toBe(500);
+    const [made] = await db().select().from(forms);
+    expect(made).toBeDefined();
+    const [claim] = await db().select().from(connector_idempotency);
+    expect(claim.status).toBe("pending");
+    expect(claim.resource_id).toBe(made!.id);
+
+    const early = await create(a.key, body, "idem-read");
+    expect(early.status).toBe(409);
+    expect(await early.json()).toMatchObject({
+      code: "idempotency_in_progress",
+    });
+
+    await db()
+      .update(connector_idempotency)
+      .set({
+        created_at: new Date(
+          Date.now() - IDEMPOTENCY_PENDING_RECLAIM_MS - 1_000
+        ).toISOString(),
+      });
+    const retry = await create(a.key, body, "idem-read");
+
+    expect(retry.status).toBe(201);
+    const retried = (await retry.json()) as { id: string };
+    expect(retried).toMatchObject({ id: made!.id, name: "Gala" });
+    expect(await db().select().from(forms)).toHaveLength(1);
+    const again = await create(a.key, body, "idem-read");
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual(retried);
+  });
+
+  test("a refused create frees its Idempotency-Key, so a corrected body can use it at once", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+
+    const bad = await create(a.key, { name: "" }, "idem-fix");
+    expect(bad.status).toBe(422);
+    expect(await db().select().from(connector_idempotency)).toHaveLength(0);
+
+    const fixed = await create(a.key, { name: "Gala" }, "idem-fix");
+
+    expect(fixed.status).toBe(201);
+    expect(await fixed.json()).toMatchObject({ name: "Gala" });
+    expect(await db().select().from(forms)).toHaveLength(1);
   });
 
   test("a key reused with a new body after its record expired makes a second form", async () => {
