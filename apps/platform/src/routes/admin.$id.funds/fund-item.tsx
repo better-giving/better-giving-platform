@@ -9,13 +9,13 @@ import {
   useLocation,
   useParams,
 } from "react-router";
-import { FundCreator } from "#/components/fundraiser";
+import { FundCreator } from "#/components/campaign";
 import {
   fund_row_status,
   STATUS_WORD,
 } from "#/routes/admin.$id.campaigns/copy";
 import { fund_end, Row } from "#/routes/admin.$id.campaigns/row";
-import type { IFundItem } from "@/fundraiser";
+import type { IFundItem } from "@/campaign";
 
 interface Props extends IFundItem {
   isSelf: boolean;
@@ -74,7 +74,7 @@ export const FundItem = (props: Props) => {
         <>
           {props.published && (
             <Link
-              to={href("/fundraisers/:fund_id", { fund_id: props.id })}
+              to={href("/campaigns/:fund_id", { fund_id: props.id })}
               target="_blank"
               rel="noopener noreferrer"
               className="link text-sm"
@@ -87,7 +87,7 @@ export const FundItem = (props: Props) => {
             <NavLink
               aria-disabled={!editable}
               className="btn btn-secondary"
-              to={href("/fundraisers/:fund_id/edit", { fund_id: props.id })}
+              to={href("/campaigns/:fund_id/edit", { fund_id: props.id })}
               aria-labelledby={`${edit_label_id} ${name_id}`}
             >
               <span id={edit_label_id}>Edit</span>

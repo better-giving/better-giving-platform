@@ -9,7 +9,7 @@ import { api_key_put } from "$/pg/queries/api-key";
 // link (SameSite=Lax still sends the cookie on a top-level GET) can't trigger it
 export async function action({ params, request }: ActionFunctionArgs) {
   const { user } = await get_session(request);
-  if (!user || user.role !== "admin") {
+  if (user?.role !== "admin") {
     return new Response(null, { status: 401 });
   }
 

@@ -1,4 +1,4 @@
-import { Video } from "#/routes/_app.fundraisers.$fund_id/video";
+import { Video } from "#/routes/_app.campaigns.$fund_id/video";
 import type { IVideoItem } from "./items";
 
 export interface IVideoSet {

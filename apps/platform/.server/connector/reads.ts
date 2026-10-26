@@ -5,7 +5,7 @@ import {
 } from "#/components/donation/common/constants";
 import { to_text } from "#/components/rich-text/helpers";
 import type { TCampaignStatus } from "@/campaign";
-import { fund_closes_at } from "@/fundraiser/is-open";
+import { fund_closes_at } from "@/campaign/is-open";
 import type { DonateMethodId, IIncrement, TFrequency } from "@/schemas";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { campaigns } from "../pg/schema/campaign";

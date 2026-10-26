@@ -1,6 +1,6 @@
 import { and, eq, not, sql } from "drizzle-orm";
 import { BLOB_STORE_HOST } from "#/constants/urls";
-import { fund_closes_at } from "@/fundraiser/is-open";
+import { fund_closes_at } from "@/campaign/is-open";
 import { IMAGE_TYPES } from "../blob-upload";
 import {
   campaign_end,

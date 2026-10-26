@@ -73,7 +73,7 @@ import {
 import { loader as campaigns_loader } from "#/routes/admin.$id.campaigns/api";
 import CampaignsPage from "#/routes/admin.$id.campaigns/route";
 import { loader as profile_loader } from "#/routes/org.$org._index/api";
-import type { IFundItem } from "@/fundraiser";
+import type { IFundItem } from "@/campaign";
 import { admin_ctx, user_ctx } from "$/auth/test-utils";
 import { enqueue } from "$/kit/queue";
 import { create_test_db } from "$/pg/test-utils/pglite";
@@ -174,15 +174,15 @@ async function render_funds(
       middleware: mdlwr,
     },
     {
-      path: "/fundraisers/:fund_id/edit",
+      path: "/campaigns/:fund_id/edit",
       Component: () => <div data-testid="edit-page" />,
     },
     {
-      path: "/fundraisers/new",
+      path: "/campaigns/new",
       Component: () => <div data-testid="new-fund-page" />,
     },
     {
-      path: "/fundraisers/:fund_id",
+      path: "/campaigns/:fund_id",
       Component: () => <div data-testid="fund-page" />,
     },
   ]);
@@ -236,20 +236,20 @@ describe("funds — filter and display", () => {
     const ours = await call("?creator=ours");
     expect(ours.status).toBe(302);
     expect(ours.headers.get("Location")).toBe(
-      "/admin/7/campaigns?tab=fundraisers&creator=ours"
+      "/admin/7/campaigns?tab=supporters&creator=ours"
     );
     const others = await call("?creator=others");
     expect(others.headers.get("Location")).toBe(
-      "/admin/7/campaigns?tab=fundraisers&creator=others"
+      "/admin/7/campaigns?tab=supporters&creator=others"
     );
     expect((await call("?creator=all")).headers.get("Location")).toBe(
-      "/admin/7/campaigns?tab=fundraisers"
+      "/admin/7/campaigns?tab=supporters"
     );
     expect((await call("")).headers.get("Location")).toBe(
-      "/admin/7/campaigns?tab=fundraisers"
+      "/admin/7/campaigns?tab=supporters"
     );
     expect((await call("?creator=nope")).headers.get("Location")).toBe(
-      "/admin/7/campaigns?tab=fundraisers"
+      "/admin/7/campaigns?tab=supporters"
     );
   });
 
@@ -305,7 +305,7 @@ describe("funds — filter and display", () => {
     ).toBeNull();
     await vi.waitFor(() => {
       expect(screen.getByTestId("url-search").element().textContent).toBe(
-        "?tab=fundraisers"
+        "?tab=supporters"
       );
     });
     await expect
@@ -714,7 +714,7 @@ describe("funds — edit visibility", () => {
     });
     await expect.element(view).toBeVisible();
     expect(view.element().getAttribute("href")).toBe(
-      `/fundraisers/${supporter_fund_id}`
+      `/campaigns/${supporter_fund_id}`
     );
     await expect
       .element(screen.getByRole("link", { name: /^edit/i }))

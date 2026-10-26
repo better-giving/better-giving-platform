@@ -27,7 +27,7 @@ vi.mock("../db", () => ({
 }));
 
 import { seed_npo, seed_user } from "#/__tests__/fixtures/funds";
-import { fund_closes_at, fund_is_open } from "@/fundraiser/is-open";
+import { fund_closes_at, fund_is_open } from "@/campaign/is-open";
 import { fund_members, funds } from "../schema/fund";
 import { npos } from "../schema/npo";
 import { create_test_db } from "../test-utils/pglite";

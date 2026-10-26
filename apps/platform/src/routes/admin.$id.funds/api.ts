@@ -2,7 +2,7 @@ import { href, redirect } from "react-router";
 import { safeParse } from "valibot";
 import { admin_ctx } from "#/.server/auth";
 import { dataWithError, dataWithSuccess } from "#/.server/toast";
-import { fund_id } from "@/fundraiser/schema";
+import { fund_id } from "@/campaign/schema";
 import { resp } from "@/helpers/https";
 import { msg } from "@/queue";
 import { enqueue } from "$/kit/queue";
@@ -20,7 +20,7 @@ export const loader = ({ request, context }: Route.LoaderArgs) => {
   const creator = fund_creator(
     new URL(request.url).searchParams.get("creator")
   );
-  const q = new URLSearchParams({ tab: "fundraisers" });
+  const q = new URLSearchParams({ tab: "supporters" });
   if (creator) q.set("creator", creator);
   return redirect(`${href("/admin/:id/campaigns", { id: String(id) })}?${q}`);
 };

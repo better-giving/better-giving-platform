@@ -100,7 +100,7 @@ export function Table({
                       </Link>
                     ) : (
                       <Link
-                        to={href("/fundraisers/:fund_id", {
+                        to={href("/campaigns/:fund_id", {
                           fund_id: row.recipient_id,
                         })}
                         className="flex items-center justify-between gap-1 link"

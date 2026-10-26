@@ -2,10 +2,10 @@ import type { MetaDescriptor } from "react-router";
 import { describe, expect, test } from "vitest";
 import { base_url } from "#/constants/env";
 import { meta as about } from "#/routes/_app.about-us/route";
+import { meta as campaigns_index } from "#/routes/_app.campaigns._index/route";
 import { meta as calculator } from "#/routes/_app.donation-calculator/route";
 import { meta as donor } from "#/routes/_app.donor/route";
 import { meta as form_edit } from "#/routes/_app.forms.$id.edit/route";
-import { meta as fundraisers } from "#/routes/_app.fundraisers._index/route";
 import { meta as login } from "#/routes/_app.login/route";
 import { meta as reset } from "#/routes/_app.login_.reset/route";
 import { meta as marketplace } from "#/routes/_app.marketplace/route";
@@ -26,7 +26,7 @@ import { meta as fund_mgmt } from "#/routes/_landing.fund-management/route";
 import { meta as tuesday } from "#/routes/_landing.giving-tuesday/route";
 import { meta as oss } from "#/routes/_landing.open-source/route";
 import { meta as pricing } from "#/routes/_landing.pricing/route";
-import { meta as donate } from "#/routes/fundraisers.$fund_id.donate/route";
+import { meta as donate } from "#/routes/campaigns.$fund_id.donate/route";
 import { meta as nonprofit } from "#/routes/nonprofits.$slug/route";
 import { meta as referral } from "#/routes/referral-program/route";
 import { meta as simplify } from "#/routes/simplify-fundraising-maximize-impact/route";
@@ -49,7 +49,7 @@ const pages = [
   ["/pricing", pricing],
   ["/donation-calculator", calculator],
   ["/donor", donor],
-  ["/fundraisers", fundraisers],
+  ["/campaigns", campaigns_index],
   ["/marketplace", marketplace],
   ["/resources", resources],
   ["/wp-plugin", wp],
@@ -118,11 +118,11 @@ describe("page canonicals", () => {
     });
   });
 
-  test("fundraiser donate canonicalizes to the request path", () => {
-    const url = `${base_url}/fundraisers/library-drive/donate`;
+  test("campaign donate canonicalizes to the request path", () => {
+    const url = `${base_url}/campaigns/library-drive/donate`;
     const ds = donate({
       loaderData: { fund: { name: "Library drive" } },
-      location: { pathname: "/fundraisers/library-drive/donate" },
+      location: { pathname: "/campaigns/library-drive/donate" },
     } as never) as (MetaDescriptor & Record<string, unknown>)[];
     expect(urls_of(ds)).toEqual({
       canonical: url,

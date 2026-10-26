@@ -3,7 +3,7 @@ import type {
   IFundItemsPage,
   IFundsNpoMemberOfSearchObj,
   IFundsSearchObj,
-} from "@/fundraiser";
+} from "@/campaign";
 import { fund_npo_memberof, fund_search } from "$/pg/queries/fund";
 
 export const get_funds = (params: IFundsSearchObj): Promise<IFundItemsPage> =>

@@ -19,7 +19,6 @@ import {
 import {
   above_fold,
   EIN,
-  fundraiser,
   give,
   header_donate_in_view,
   in_view,
@@ -32,6 +31,7 @@ import {
   program,
   prose,
   story,
+  supporter_fund,
   TAGLINE_MAX,
   video,
 } from "#/__tests__/fixtures/org-layout";
@@ -395,8 +395,8 @@ describe("Hub", () => {
   test("the give tab is named by what it holds", async () => {
     const cases = [
       [many(give, 3), "Campaigns 3"],
-      [many(fundraiser, 3), "Supporter campaigns 3"],
-      [[give(1), ...many(fundraiser, 2)], "Campaigns 3"],
+      [many(supporter_fund, 3), "Supporter campaigns 3"],
+      [[give(1), ...many(supporter_fund, 2)], "Campaigns 3"],
     ] as const;
     for (const [list, name] of cases) {
       const screen = await mount(
@@ -408,7 +408,7 @@ describe("Hub", () => {
     }
 
     // a lone kind's heading takes the same name
-    const lone = await mount(org_layout({ give: many(fundraiser, 4) }));
+    const lone = await mount(org_layout({ give: many(supporter_fund, 4) }));
     await expect
       .element(
         lone.getByRole("heading", { name: "Supporter campaigns", level: 2 })

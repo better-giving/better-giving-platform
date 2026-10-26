@@ -10,9 +10,9 @@ import { to_excerpt } from "#/components/rich-text/helpers";
 import { extract_youtube_id } from "#/components/youtube-player";
 import { program_href } from "#/helpers/org-href";
 import { goal_amount } from "#/routes/org.$org.$campaign/format";
-import type { IFundItem } from "@/fundraiser";
-import { fund_closes_at, fund_item_is_open } from "@/fundraiser/is-open";
-import { MAX_EXPIRATION_ISO } from "@/fundraiser/schema";
+import type { IFundItem } from "@/campaign";
+import { fund_closes_at, fund_item_is_open } from "@/campaign/is-open";
+import { MAX_EXPIRATION_ISO } from "@/campaign/schema";
 import type { IMedia, IProgramDb } from "@/npo";
 import type { IOrgShape } from "@/org-shape";
 
@@ -49,13 +49,13 @@ export function campaign_give(c: ICampaignIn): IGiveItem {
   };
 }
 
-/** an open fundraiser; one the org owns is its own, so it carries no byline */
+/** an open fund; one the org owns is its own, so it carries no byline */
 export function fund_give(f: IFundItem, npo_id: number): IGiveItem {
   return {
     kind: "supporter",
     id: f.id,
     title: f.name,
-    to: href("/fundraisers/:fund_id", { fund_id: f.id }),
+    to: href("/campaigns/:fund_id", { fund_id: f.id }),
     image: f.banner || f.logo || null,
     raised: f.donation_total_usd,
     goal: goal_amount(f.target, f.donation_total_usd),
@@ -110,7 +110,7 @@ export function layout_lists({
   const read = <T>(r: PromiseSettledResult<T[]>) =>
     r.status === "fulfilled" ? r.value : [];
   return {
-    // campaigns are their own read: a failed fundraiser read flags the list but keeps them
+    // campaigns are their own read: a failed fund read flags the list but keeps them
     give: [
       ...campaigns.map(campaign_give),
       ...read(funds)
@@ -157,10 +157,10 @@ export const shape_counts = ({
   videos,
 }: TLists): Pick<
   IOrgShape,
-  "campaigns" | "fundraisers" | "programs" | "videos"
+  "campaigns" | "supporters" | "programs" | "videos"
 > => ({
   campaigns: give.filter((g) => g.kind === "campaign").length,
-  fundraisers: give.filter((g) => g.kind !== "campaign").length,
+  supporters: give.filter((g) => g.kind !== "campaign").length,
   programs: programs.length,
   videos: videos.length,
 });

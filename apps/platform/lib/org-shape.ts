@@ -9,7 +9,7 @@ export interface IOrgShape {
   has_banner: boolean;
   has_logo: boolean;
   campaigns: number;
-  fundraisers: number;
+  supporters: number;
   programs: number;
   videos: number;
 }
@@ -24,7 +24,7 @@ export const NAME_DISPLAY_MAX = 28;
 export const STORY_CLAMP = 1200;
 
 export const items_total = (s: IOrgShape): number =>
-  s.campaigns + s.fundraisers + s.programs + s.videos;
+  s.campaigns + s.supporters + s.programs + s.videos;
 
 /** the layout the size rules give, without Jev */
 export function threshold_layout(s: IOrgShape): TOrgLayout {

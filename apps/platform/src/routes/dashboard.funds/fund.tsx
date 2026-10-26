@@ -1,6 +1,6 @@
 import { Target, to_target } from "@better-giving/ui";
 import { href, Link } from "react-router";
-import { FundStatusBadge, status_fn } from "#/components/fundraiser";
+import { FundStatusBadge, status_fn } from "#/components/campaign";
 import type { IFundRow } from "$/pg/queries/fund";
 
 export const Fund = (props: IFundRow) => {
@@ -23,7 +23,7 @@ export const Fund = (props: IFundRow) => {
       </div>
 
       <Link
-        to={href("/fundraisers/:fund_id", { fund_id: props.id })}
+        to={href("/campaigns/:fund_id", { fund_id: props.id })}
         className="mt-4 font-semibold link"
       >
         {props.name}
@@ -38,7 +38,7 @@ export const Fund = (props: IFundRow) => {
       <Link
         aria-disabled={!status.active}
         className="btn btn-primary justify-self-end mt-6"
-        to={href("/fundraisers/:fund_id/edit", { fund_id: props.id })}
+        to={href("/campaigns/:fund_id/edit", { fund_id: props.id })}
       >
         Edit
       </Link>

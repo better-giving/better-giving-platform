@@ -1,4 +1,4 @@
-import { fund_is_open } from "@/fundraiser/is-open";
+import { fund_is_open } from "@/campaign/is-open";
 
 export const STATUS_WORD = {
   draft: "Draft",

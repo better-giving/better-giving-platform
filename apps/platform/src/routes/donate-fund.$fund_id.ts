@@ -1,8 +1,12 @@
-import { type LoaderFunction, redirect } from "react-router";
+import { href } from "react-router";
+import { moved } from "#/helpers/moved";
+import type { Route } from "./+types/donate-fund.$fund_id";
 
-// redirect donate-fund/{id} to fundraisers/{id}/donate
-export const loader: LoaderFunction = async ({ params, request }) => {
-  const from = new URL(request.url);
-  from.pathname = `fundraisers/${params.fund_id}/donate`;
-  return redirect(from.toString(), { status: 301 });
+/** donate-fund/:fund_id moved to /campaigns/:fund_id/donate; shared publicly,
+ * so old links and indexed urls must keep working */
+export const loader = ({ params, request }: Route.LoaderArgs) => {
+  const { search } = new URL(request.url);
+  return moved(
+    `${href("/campaigns/:fund_id/donate", { fund_id: params.fund_id })}${search}`
+  );
 };
