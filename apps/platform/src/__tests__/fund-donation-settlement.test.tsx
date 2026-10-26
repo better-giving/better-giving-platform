@@ -92,9 +92,9 @@ vi.mock("swr/immutable", () => ({
 
 import { eq } from "drizzle-orm";
 import { createRoutesStub } from "react-router";
-import { loader as fund_loader } from "#/routes/_app.fundraisers.$fund_id/api";
+import { loader as fund_loader } from "#/routes/_app.campaigns.$fund_id/api";
 // fund page — for fund Target directly
-import FundPage from "#/routes/_app.fundraisers.$fund_id/route";
+import FundPage from "#/routes/_app.campaigns.$fund_id/route";
 import { loader as user_forms_loader } from "#/routes/dashboard.forms/api";
 // user-dashboard forms — for form ltd verification
 import UserFormsPage from "#/routes/dashboard.forms/route";

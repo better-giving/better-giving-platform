@@ -50,7 +50,7 @@ import { action, loader } from "./api";
 const db = () => test_db.current!.db;
 
 const FUND_ID = "7f1c3b1e-6a55-4c1e-9d7e-3f2a1b0c9d8e";
-const url = `https://app.test/fundraisers/${FUND_ID}/edit`;
+const url = `https://app.test/campaigns/${FUND_ID}/edit`;
 
 const call_action = (body: object) =>
   (action as any)({
@@ -114,7 +114,7 @@ beforeEach(async () => {
   await db().delete(user);
 });
 
-describe("fundraiser edit authorization", () => {
+describe("campaign edit authorization", () => {
   it("the loader refuses a signed-in user with no membership", async () => {
     const { stranger } = await seed();
     as(stranger);

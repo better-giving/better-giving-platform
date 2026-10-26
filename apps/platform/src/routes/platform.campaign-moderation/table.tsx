@@ -30,7 +30,7 @@ export function Table({
             <td>{row.created_at ? toPP(row.created_at) : "--"}</td>
             <td>
               <NavLink
-                to={href("/fundraisers/:fund_id", { fund_id: row.id })}
+                to={href("/campaigns/:fund_id", { fund_id: row.id })}
                 className="link [.pending]:text-gray-11 [.pending]:pointer-events-none"
               >
                 {row.name}

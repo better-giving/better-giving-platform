@@ -2,7 +2,7 @@ import { valibotSchema } from "@ai-sdk/valibot";
 import { generateText, Output } from "ai";
 import * as v from "valibot";
 
-interface IFundraiser {
+interface ICampaign {
   name: string;
   description: string;
 }
@@ -58,7 +58,7 @@ Commercial intent means selling a product or service, which is distinct from ask
 
 const format = Output.object({ schema: valibotSchema(evaluation_schema) });
 
-export const evaluate = async (campaign: IFundraiser): Promise<IEvaluation> => {
+export const evaluate = async (campaign: ICampaign): Promise<IEvaluation> => {
   const { output } = await generateText({
     model: "anthropic/claude-haiku-4.5",
     output: format,

@@ -116,7 +116,7 @@ async function open_fund_page(
   vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
   const Stub = createRoutesStub([
     {
-      path: "/fundraisers/:fund_id",
+      path: "/campaigns/:fund_id",
       Component: FundPage as any,
       loader: async (args: any) => {
         vi.setSystemTime(server);
@@ -127,10 +127,10 @@ async function open_fund_page(
       HydrateFallback: () => null,
     },
   ]);
-  return render(<Stub initialEntries={[`/fundraisers/${fund.id}`]} />);
+  return render(<Stub initialEntries={[`/campaigns/${fund.id}`]} />);
 }
 
-describe("fundraiser page", () => {
+describe("campaign page", () => {
   test("shows a fund closed by the server's clock when the browser's runs behind", async () => {
     const screen = await open_fund_page("2027-09-22T00:00:00.000Z", {
       server: NOW,

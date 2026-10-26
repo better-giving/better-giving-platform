@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { href, Link } from "react-router";
 
 const get_link = (slug: string, base_url: string) =>
-  `${base_url}${href("/fundraisers/:fund_id", { fund_id: slug })}`;
+  `${base_url}${href("/campaigns/:fund_id", { fund_id: slug })}`;
 
 interface Props {
   slug_init?: string;

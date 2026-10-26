@@ -39,7 +39,7 @@ vi.mock("remix-client-cache", () => ({
 // --- imports (after mocks hoisted) ---
 
 import { seed_fund as insert_fund } from "#/__tests__/fixtures/funds";
-import FundsPage, { loader } from "#/routes/_app.fundraisers._index/route";
+import FundsPage, { loader } from "#/routes/_app.campaigns._index/route";
 import { create_test_db } from "$/pg/test-utils/pglite";
 
 // --- setup ---

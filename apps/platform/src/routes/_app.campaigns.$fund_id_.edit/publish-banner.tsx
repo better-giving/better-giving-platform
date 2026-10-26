@@ -39,7 +39,7 @@ export function PublishBanner(props: Props) {
         </button>
         <Link
           target="_blank"
-          to={href("/fundraisers/:fund_id", { fund_id: props.fundId })}
+          to={href("/campaigns/:fund_id", { fund_id: props.fundId })}
           className="link text-sm flex items-center gap-1"
         >
           View

@@ -5,7 +5,7 @@ import { segment } from "#/api/schema/segment";
 import {
   campaign_moved,
   folded_campaign_public,
-} from "#/routes/_app.fundraisers.$fund_id/api";
+} from "#/routes/_app.campaigns.$fund_id/api";
 import type { AuthUser } from "#/types/auth";
 import type { IFund } from "#/types/fund";
 import { fund_id } from "@/campaign/schema";

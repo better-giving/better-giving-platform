@@ -22,7 +22,7 @@ export function FundCard({ classes = "", ...props }: Props) {
           className="size-14 border rounded object-cover bg-panel row-span-2"
         />
         <Link
-          to={href("/fundraisers/:fund_id", { fund_id: props.id })}
+          to={href("/campaigns/:fund_id", { fund_id: props.id })}
           className="link text-ellipsis overflow-hidden text-nowrap @xl/fund-card:text-balance col-start-2 w-full"
         >
           {props.name}
