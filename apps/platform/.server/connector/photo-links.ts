@@ -1,15 +1,17 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, not, sql } from "drizzle-orm";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { campaigns } from "../pg/schema/campaign";
 import { connector_photo_links } from "../pg/schema/connector";
+import { ended_sql } from "./reads";
 
 export const PHOTO_LINK_TTL_MS = 15 * 60 * 1000;
 
 const sha256_hex = (value: string) =>
   createHash("sha256").update(value, "utf8").digest("hex");
 
-/** issues a link bound to `campaign_id`; null when that campaign isn't `npo_id`'s */
+/** issues a link bound to `campaign_id`; null when that campaign isn't
+ * `npo_id`'s or has ended */
 export async function issue_photo_link(
   db: DbOrTx,
   npo_id: number,
@@ -36,7 +38,11 @@ export async function issue_photo_link(
         })
         .from(campaigns)
         .where(
-          and(eq(campaigns.id, campaign_id), eq(campaigns.owner_npo_id, npo_id))
+          and(
+            eq(campaigns.id, campaign_id),
+            eq(campaigns.owner_npo_id, npo_id),
+            not(ended_sql(now))
+          )
         )
     )
     .returning({ id: connector_photo_links.id });

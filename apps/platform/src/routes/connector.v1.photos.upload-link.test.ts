@@ -99,10 +99,10 @@ async function pair(name: string, ein: string, email: string) {
   return { npo, owner, key: exchanged.key };
 }
 
-async function seed_campaign(o: {
-  npo: { id: number };
-  owner: { id: string };
-}) {
+async function seed_campaign(
+  o: { npo: { id: number }; owner: { id: string } },
+  extra: { status?: "draft" | "live" | "ended"; ends_at?: string } = {}
+) {
   const id = crypto.randomUUID();
   await db()
     .insert(campaigns)
@@ -114,6 +114,7 @@ async function seed_campaign(o: {
       slug: `library-drive-${id.slice(0, 8)}`,
       description_pt: "[]",
       status: "draft",
+      ...extra,
     });
   return id;
 }
@@ -226,6 +227,49 @@ describe("create_photo_upload_link", () => {
     expect(res.status).toBe(404);
     expect(await res.json()).toMatchObject({ code: "not_found" });
     expect(await links()).toHaveLength(0);
+  });
+
+  // NOW is 2026-10-26 12:00 UTC: an end date of the 25th closed at this
+  // instant, one of the 26th is open until noon tomorrow
+  test.each([
+    ["an ended campaign", { status: "ended" as const }],
+    [
+      "a live campaign past its end date",
+      { status: "live" as const, ends_at: "2026-10-25T00:00:00.000Z" },
+    ],
+  ])("%s is 409 campaign_ended and issues no link", async (_, extra) => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a, extra);
+
+    const res = await post(a.key, { target: { kind: "campaign", id } });
+
+    expect(res.status).toBe(409);
+    expect(res.headers.get("content-type")).toBe("application/problem+json");
+    expect(await res.json()).toEqual({
+      code: "campaign_ended",
+      status: 409,
+      detail: "This campaign has ended, and an ended campaign stays ended.",
+    });
+    expect(await links()).toHaveLength(0);
+  });
+
+  test.each([
+    [
+      "a live campaign on its end date",
+      { status: "live" as const, ends_at: "2026-10-26T00:00:00.000Z" },
+    ],
+    [
+      "a draft whose end date has passed",
+      { status: "draft" as const, ends_at: "2026-10-01T00:00:00.000Z" },
+    ],
+  ])("%s still gets a link", async (_, extra) => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a, extra);
+
+    const res = await post(a.key, { target: { kind: "campaign", id } });
+
+    expect(res.status).toBe(201);
+    expect(await links()).toHaveLength(1);
   });
 
   test("an unknown campaign is 404", async () => {

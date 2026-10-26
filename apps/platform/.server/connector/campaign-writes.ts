@@ -10,14 +10,15 @@ import type { DbOrTx } from "../pg/queries/helpers";
 import { npo_program_get } from "../pg/queries/program";
 import { json, open_key, valid_day } from "./http";
 import { AMOUNT, AMOUNT_MSG, usd_amount } from "./money";
-import { type FieldError, invalid, not_found, problem } from "./problem";
+import {
+  campaign_ended as ended,
+  type FieldError,
+  invalid,
+  not_found,
+  problem,
+} from "./problem";
 import { campaign_status, read_campaign_detail } from "./reads";
 import { read_body, TITLE_MAX, unknown_keys } from "./writes";
-
-const ended = () =>
-  problem(409, "campaign_ended", {
-    detail: "This campaign has ended, and an ended campaign stays ended.",
-  });
 
 const missing = (id: string) =>
   not_found(`Campaign ${id} does not exist for this nonprofit.`);

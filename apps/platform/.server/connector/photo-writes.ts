@@ -1,8 +1,16 @@
+import { campaign_get } from "../pg/queries/campaign";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { json, open_key } from "./http";
 import { absolute } from "./money";
 import { issue_photo_link } from "./photo-links";
-import { type FieldError, invalid, not_found, problem } from "./problem";
+import {
+  campaign_ended,
+  type FieldError,
+  invalid,
+  not_found,
+  problem,
+} from "./problem";
+import { campaign_status } from "./reads";
 import { read_body, unknown_keys } from "./writes";
 
 const TARGET_MSG = 'is {kind: "campaign", id}';
@@ -60,8 +68,16 @@ export async function create_photo_upload_link(
   }
   if (issues.length > 0 || campaign_id === undefined) return invalid(issues);
 
-  const issued = await issue_photo_link(db, live.npo_id, campaign_id);
+  const now = new Date();
+  const issued = await issue_photo_link(db, live.npo_id, campaign_id, now);
   if (!issued) {
+    const row = await campaign_get(live.npo_id, campaign_id);
+    if (
+      row &&
+      campaign_status(row.status, row.ends_at, now.getTime()) === "ended"
+    ) {
+      return campaign_ended();
+    }
     return not_found(
       `Campaign ${campaign_id} does not exist for this nonprofit.`
     );

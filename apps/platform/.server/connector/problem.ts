@@ -51,3 +51,9 @@ export function invalid(
 export function not_found(detail: string): Response {
   return problem(404, "not_found", { detail });
 }
+
+export function campaign_ended(): Response {
+  return problem(409, "campaign_ended", {
+    detail: "This campaign has ended, and an ended campaign stays ended.",
+  });
+}

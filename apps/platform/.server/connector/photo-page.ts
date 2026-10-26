@@ -1,23 +1,27 @@
+import { and, eq, not } from "drizzle-orm";
 import { photo_too_large, upload_limits } from "@/constants/upload";
 import {
   basename,
+  discard_upload,
   IMAGE_TYPES,
   sniff,
   store_upload,
   type_of,
 } from "../blob-upload";
-import { campaign_get, campaign_update } from "../pg/queries/campaign";
+import { campaign_get } from "../pg/queries/campaign";
 import type { DbOrTx } from "../pg/queries/helpers";
+import { campaigns } from "../pg/schema/campaign";
 import { reserve_ip } from "./gate";
 import {
   consume_photo_link,
   peek_photo_link,
   release_photo_link,
 } from "./photo-links";
+import { campaign_status, ended_sql } from "./reads";
 
 /** what `/photo-upload/:token` shows. `gone` is one shape for an unknown,
- * malformed, expired or spent link, or one whose campaign was deleted, so the
- * page tells a guesser nothing. */
+ * malformed, expired or spent link, or one whose campaign was deleted or has
+ * ended, so the page tells a guesser nothing. */
 export type PhotoPage =
   | { state: "gone" }
   | { state: "limited" }
@@ -32,12 +36,38 @@ const GONE: PhotoResult = { page: { state: "gone" }, status: 404 };
 /** a multipart body's framing beside the file itself */
 const MULTIPART_SLACK = 64 * 1024;
 
-/** the live link and its campaign's name, or null */
+/** the live link and its campaign's name, or null when the campaign is gone or ended */
 async function open_link(db: DbOrTx, token: string) {
   const link = await peek_photo_link(db, token);
   if (!link) return null;
   const campaign = await campaign_get(link.npo_id, link.campaign_id);
-  return campaign ? { name: campaign.name } : null;
+  if (!campaign) return null;
+  if (campaign_status(campaign.status, campaign.ends_at) === "ended") {
+    return null;
+  }
+  return { name: campaign.name };
+}
+
+/** the banner write, which a campaign ended or deleted since `open_link` refuses */
+async function set_banner(
+  db: DbOrTx,
+  npo_id: number,
+  campaign_id: string,
+  banner: string
+): Promise<boolean> {
+  const now = new Date();
+  const rows = await db
+    .update(campaigns)
+    .set({ banner, updated_at: now.toISOString() })
+    .where(
+      and(
+        eq(campaigns.id, campaign_id),
+        eq(campaigns.owner_npo_id, npo_id),
+        not(ended_sql(now))
+      )
+    )
+    .returning({ id: campaigns.id });
+  return rows.length === 1;
 }
 
 export async function read_photo_page(
@@ -102,10 +132,12 @@ export async function save_photo(
   if (!claim) return GONE;
   try {
     const blob = await store_upload(stored_name(file, type), file, type);
-    const wrote = await campaign_update(claim.npo_id, claim.campaign_id, {
-      banner: blob.url,
-    });
-    if (wrote !== "ok") return GONE;
+    if (!(await set_banner(db, claim.npo_id, claim.campaign_id, blob.url))) {
+      // ended or deleted while the file was on its way: nothing points at it
+      await discard_upload(blob.url).catch(() => undefined);
+      await release_photo_link(db, claim.id, claim.used_at).catch(() => false);
+      return GONE;
+    }
     return {
       page: { state: "saved", campaign: live.name, photo: blob.url },
       status: 200,

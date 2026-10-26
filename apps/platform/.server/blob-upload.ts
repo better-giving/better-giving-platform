@@ -1,4 +1,4 @@
-import { put } from "@vercel/blob";
+import { del, put } from "@vercel/blob";
 import { upload_limits, upload_signatures } from "@/constants/upload";
 import { blob as blob_env } from "./env";
 
@@ -94,3 +94,7 @@ export const store_upload = (name: string, file: Blob, type: string) =>
     allowOverwrite: false,
     token: blob_env.read_write_token,
   });
+
+/** removes a stored upload nothing ended up pointing at */
+export const discard_upload = (url: string) =>
+  del(url, { token: blob_env.read_write_token });

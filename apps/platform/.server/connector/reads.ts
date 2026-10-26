@@ -167,17 +167,20 @@ const campaign_cols = {
 };
 
 /** UTC date of now minus 12 hours. Same bound as `fund_is_open_sql`. */
-function close_bound() {
-  return sql`(date_trunc('day', (NOW() AT TIME ZONE 'UTC') - interval '12 hours') AT TIME ZONE 'UTC')`;
+function close_bound(now?: Date) {
+  const at = now ? sql`${now.toISOString()}::timestamptz` : sql`NOW()`;
+  return sql`(date_trunc('day', (${at} AT TIME ZONE 'UTC') - interval '12 hours') AT TIME ZONE 'UTC')`;
 }
 
-function ended_sql() {
+/** `campaign_status(…) === "ended"` as a predicate; `now` defaults to the
+ * database's clock */
+export function ended_sql(now?: Date) {
   return sql`(
     ${campaigns.status} = 'ended'
     OR (
       ${campaigns.status} = 'live'
       AND ${campaigns.ends_at} IS NOT NULL
-      AND ${campaigns.ends_at} < ${close_bound()}
+      AND ${campaigns.ends_at} < ${close_bound(now)}
     )
   )`;
 }

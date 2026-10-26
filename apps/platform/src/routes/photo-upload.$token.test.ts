@@ -31,8 +31,8 @@ import { npos } from "$/pg/schema/npo";
 import { create_test_db, type TestDb } from "$/pg/test-utils/pglite";
 import * as route from "./photo-upload.$token";
 
-const put = vi.hoisted(() => vi.fn());
-vi.mock("@vercel/blob", () => ({ put }));
+const { put, del } = vi.hoisted(() => ({ put: vi.fn(), del: vi.fn() }));
+vi.mock("@vercel/blob", () => ({ put, del }));
 vi.mock("$/env", () => ({ blob: { read_write_token: "tok" } }));
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
@@ -63,6 +63,8 @@ beforeEach(async () => {
   reset_rate_limits();
   put.mockReset();
   put.mockResolvedValue({ url: BLOB_URL });
+  del.mockReset();
+  del.mockResolvedValue(undefined);
   await db().delete(connector_photo_links);
   await db().delete(campaigns);
   await db().delete(npos);
@@ -432,8 +434,59 @@ describe("POST /photo-upload/:token", () => {
 
     expect(res.init.status).toBe(404);
     expect(res.data).toEqual({ state: "gone" });
-    // the file is stored before the campaign is checked
+    // the file is stored before the campaign is checked, then removed
     expect(put).toHaveBeenCalledTimes(1);
+    expect(del).toHaveBeenCalledWith(BLOB_URL, { token: "tok" });
+  });
+
+  const ended_after_link = {
+    "ended from the dashboard": { status: "ended" as const },
+    "past its end date": {
+      ends_at: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+    },
+  };
+
+  test.each(Object.entries(ended_after_link))(
+    "a campaign %s after the link was made is the generic 404, before anything is stored",
+    async (_, set) => {
+      const { token, campaign_id } = await seed();
+      await db()
+        .update(campaigns)
+        .set(set)
+        .where(eq(campaigns.id, campaign_id));
+
+      const page = await get(token);
+      const res = await submit(token, photo([PNG], "image/png", "a.png"));
+
+      for (const r of [page, res]) {
+        expect(r.init.status).toBe(404);
+        expect(r.data).toEqual({ state: "gone" });
+      }
+      expect(html_of(page.data)).toContain(GONE);
+      expect(put).not.toHaveBeenCalled();
+      expect(await used_at_of()).toBeNull();
+      expect(await banner_of(campaign_id)).toBe("https://blob.test/u/old.png");
+    }
+  );
+
+  test("a campaign that ends while the photo is uploading keeps its banner, and the stored file is removed", async () => {
+    const { token, campaign_id } = await seed();
+    put.mockImplementationOnce(async () => {
+      await db()
+        .update(campaigns)
+        .set({ status: "ended" })
+        .where(eq(campaigns.id, campaign_id));
+      return { url: BLOB_URL };
+    });
+
+    const res = await submit(token, photo([PNG], "image/png", "a.png"));
+
+    expect(res.init.status).toBe(404);
+    expect(res.data).toEqual({ state: "gone" });
+    expect(await banner_of(campaign_id)).toBe("https://blob.test/u/old.png");
+    expect(del).toHaveBeenCalledWith(BLOB_URL, { token: "tok" });
+    expect(await used_at_of()).toBeNull();
+    expect(html_of({ state: "gone" }, res.data)).toContain(GONE);
   });
 
   test("the 31st post in a minute from one address is 429, another address still passes", async () => {
