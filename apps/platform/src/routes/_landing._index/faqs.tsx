@@ -20,7 +20,7 @@ export const home_faqs = [
   home_faq(
     2,
     "How quickly can I start fundraising?",
-    "Register online. Embedding the form on your site is a copy-paste snippet. Grants and withdrawal requests are reviewed and processed on a monthly basis."
+    "Register online. Embedding the form on your site is a copy-paste snippet. Grants and withdrawal requests are reviewed and processed within 5 working days."
   ),
   home_faq(
     3,

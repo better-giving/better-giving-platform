@@ -42,7 +42,7 @@ export function GrowFunds({ classes = "" }: IGrowFunds) {
                 <span className="font-bold">High-yield savings</span>
                 <p className="mt-0.5 text-sm/normal text-gray-11">
                   FDIC-insured. Withdrawal requests are reviewed and processed
-                  on a monthly basis.
+                  within 5 working days.
                 </p>
               </div>
             </div>
