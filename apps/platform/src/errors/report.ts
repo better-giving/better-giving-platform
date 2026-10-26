@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/react-router";
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import { HttpError } from "@/helpers/https";
+import { redact } from "./redact";
 
 // user errors (4xx Responses, thrown data() with 4xx status, a refused
 // HttpError) are expected and must not page the team. everything else reaches
@@ -135,15 +136,23 @@ function scrub(error: unknown, seen = new Set<unknown>()): unknown {
     Object.getOwnPropertyDescriptors(error)
   );
   copy.cause = cause;
+  // the copied stack accessor reads the original's internals and comes back
+  // undefined on v8, so the copy carries the string itself
+  Object.defineProperty(copy, "stack", {
+    value: error.stack,
+    writable: true,
+    configurable: true,
+  });
   return copy;
 }
 
 function capture(
   raw: unknown,
   level: "error" | "warning",
-  context?: Record<string, unknown>
+  raw_context?: Record<string, unknown>
 ): void {
-  const error = scrub(raw);
+  const error = redact(scrub(raw));
+  const context = redact(raw_context);
   if (level === "error") console.error(error, context);
   else console.warn(error, context);
   if (is_user_error(error)) return;

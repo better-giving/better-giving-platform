@@ -231,6 +231,7 @@ describe("report_error with a failed query", () => {
     const cause = sent.cause as Error & { code: unknown };
     expect(cause.message).toContain(query);
     expect(cause.code).toBe("23505");
+    expect(sent.stack).toMatch(/^Error: settle failed\n\s+at /);
   });
 
   test("reports any other error as thrown", () => {
@@ -238,5 +239,45 @@ describe("report_error with a failed query", () => {
     report_error(err);
     expect(console_error.mock.calls[0]![0]).toBe(err);
     expect(capture_exception.mock.calls[0]![0]).toBe(err);
+  });
+});
+
+describe("a photo upload token", () => {
+  const TOKEN = "Zq3vY8pR2mK7tW1xN5bH9cJ4dF6gL0sA-_eUoIiPyQr";
+
+  beforeEach(() => {
+    capture_exception.mockClear();
+    console_error = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  test("never reaches the console or sentry, in the context or the error", () => {
+    const url = `https://bg.test/photo-upload/${TOKEN}?x=1`;
+    report_error(new Error(`loader failed at ${url}`), {
+      method: "POST",
+      url,
+    });
+
+    const logged = JSON.stringify(console_error.mock.calls[0], (_, v) =>
+      v instanceof Error ? { message: v.message, stack: v.stack } : v
+    );
+    const [sent, opts] = capture_exception.mock.calls[0]!;
+    for (const text of [
+      logged,
+      (sent as Error).message,
+      String((sent as Error).stack),
+      JSON.stringify(opts),
+    ]) {
+      expect(text).not.toContain(TOKEN);
+    }
+    expect((sent as Error).message).toBe(
+      "loader failed at https://bg.test/photo-upload/[redacted]?x=1"
+    );
+    expect((sent as Error).stack).toMatch(
+      /^Error: loader failed at https:\/\/bg\.test\/photo-upload\/\[redacted\]\?x=1\n\s+at /
+    );
+    expect(opts.extra).toEqual({
+      method: "POST",
+      url: "https://bg.test/photo-upload/[redacted]?x=1",
+    });
   });
 });
