@@ -60,7 +60,7 @@ const nonprofits: Benefit[] = [
     title: "High-Yield Savings Accounts",
     title2: "Secure, steady growth for your funds",
     description:
-      "Choose to grow donations in a high-yield savings account. Returns vary, and past performance isn't a guarantee. Savings withdrawals are paid out every 3 days, and Sustainability Fund withdrawals are reviewed before payout.",
+      "Choose to grow donations in a high-yield savings account. Returns vary, and past performance isn't a guarantee. Savings withdrawals are paid out every 3 days once your balance reaches your payout minimum, and Sustainability Fund withdrawals are reviewed before payout.",
     img: icon5,
     cardBgClass: colors[1],
   },

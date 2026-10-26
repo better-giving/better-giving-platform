@@ -22,7 +22,8 @@ export function GrowPlaces({ classes = "" }: IGrowPlaces) {
             <h3 className="text-2xl font-bold">High-yield savings</h3>
             <p className="text-sm/relaxed text-gray-11">
               FDIC-insured. A reliable way to build reserves while funds stay
-              safe and liquid. Withdrawals are paid out every 3 days.
+              safe and liquid. Withdrawals are paid out every 3 days once your
+              balance reaches your payout minimum.
             </p>
           </div>
           <div className="surface-primary rounded p-9 grid gap-3.5 content-start">

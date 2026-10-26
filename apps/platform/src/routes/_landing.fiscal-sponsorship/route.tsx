@@ -49,7 +49,7 @@ const steps = [
   },
   {
     title: "We grant funds to you",
-    body: "Grants are paid out every 3 days, and you can keep a share in savings or the Sustainability Fund.",
+    body: "Grants are paid out every 3 days once your balance reaches your payout minimum, and you can keep a share in savings or the Sustainability Fund.",
   },
 ] as const;
 
