@@ -4,7 +4,7 @@ import flying_character from "#/assets/images/flying-character.webp";
 import { to_text } from "#/components/rich-text";
 import { ShareButton } from "#/components/share-btn";
 import { base_url } from "#/constants/env";
-import type { IFundItem } from "@/fundraiser";
+import type { IFundItem } from "@/campaign";
 
 export function Card({
   name,

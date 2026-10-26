@@ -7,7 +7,7 @@ import { dataWithError, dataWithSuccess } from "#/.server/toast";
 import { moved } from "#/helpers/moved";
 import { slug_taken_message } from "#/routes/admin.$id.campaigns/copy";
 import type { IFund } from "#/types/fund";
-import { fund_id, fund_update } from "@/fundraiser/schema";
+import { fund_id, fund_update } from "@/campaign/schema";
 import { resp } from "@/helpers/https";
 import { db } from "$/pg/db";
 import { campaign_by_legacy_fund } from "$/pg/queries/campaign";

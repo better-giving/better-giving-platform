@@ -6,7 +6,7 @@ import {
 } from "@better-giving/ui";
 import { to_usd } from "@better-giving/ui/helpers";
 import { type ReactNode, useId } from "react";
-import { MAX_EXPIRATION_ISO } from "@/fundraiser/schema";
+import { MAX_EXPIRATION_ISO } from "@/campaign/schema";
 import type { STATUS_WORD } from "./copy";
 
 export type TRowStatus =

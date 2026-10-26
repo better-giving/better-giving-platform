@@ -2,7 +2,7 @@ import type { LoaderFunction } from "react-router";
 import * as v from "valibot";
 import { can_preview } from "#/.server/can-preview";
 import { npo_donors } from "#/.server/npo-donors";
-import { fund_id } from "@/fundraiser/schema";
+import { fund_id } from "@/campaign/schema";
 import { resp, search } from "@/helpers/https";
 import { $int_gte1 } from "@/schemas";
 import { npo_get } from "$/pg/queries/npo";

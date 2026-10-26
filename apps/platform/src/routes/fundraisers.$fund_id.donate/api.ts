@@ -8,7 +8,7 @@ import {
 } from "#/routes/_app.fundraisers.$fund_id/api";
 import type { AuthUser } from "#/types/auth";
 import type { IFund } from "#/types/fund";
-import { fund_id } from "@/fundraiser/schema";
+import { fund_id } from "@/campaign/schema";
 import { resp } from "@/helpers/https";
 import { campaign_by_legacy_fund } from "$/pg/queries/campaign";
 import type { Route } from "./+types/route";

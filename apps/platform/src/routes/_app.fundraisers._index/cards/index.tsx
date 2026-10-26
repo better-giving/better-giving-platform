@@ -1,5 +1,5 @@
 import type { IPaginator } from "#/types/components";
-import type { IFundItem } from "@/fundraiser";
+import type { IFundItem } from "@/campaign";
 import { Card } from "./card";
 
 interface Props extends IPaginator<IFundItem> {
