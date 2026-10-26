@@ -1072,7 +1072,7 @@ describe("Integration — loader", () => {
     expect(result.match_arrived).toBeUndefined();
   });
 
-  it("fund: returns donate-fund and fundraisers URLs", async () => {
+  it("fund: returns donate-fund and campaigns URLs", async () => {
     const fund_id = globalThis.crypto.randomUUID();
     const don_id = "don-fund-001";
     const date = new Date().toISOString();
@@ -1123,7 +1123,7 @@ describe("Integration — loader", () => {
     const result = await loader(action_args(request, don_id) as any);
 
     expect(result.donate_url).toContain("/donate-fund/");
-    expect(result.profile_url).toContain("/fundraisers/");
+    expect(result.profile_url).toContain("/campaigns/");
   });
 
   it("throws 404 for missing donation", async () => {

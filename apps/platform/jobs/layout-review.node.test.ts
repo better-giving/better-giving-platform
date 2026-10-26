@@ -198,7 +198,7 @@ describe("layout review rows", () => {
         has_banner: true,
         has_logo: false,
         campaigns: 2,
-        fundraisers: 1,
+        supporters: 1,
         programs: 1,
         videos: 2,
         items_total: 6,
@@ -317,7 +317,7 @@ describe("layout review csv", () => {
     has_banner: false,
     has_logo: true,
     campaigns: 1,
-    fundraisers: 0,
+    supporters: 0,
     programs: 2,
     videos: 0,
     items_total: 3,
@@ -335,7 +335,7 @@ describe("layout review csv", () => {
 
     expect(csv).toBe(
       [
-        "id,name,link,story_chars,tagline_chars,name_chars,has_banner,has_logo,campaigns,fundraisers,programs,videos,items_total,threshold,jev,agree,error",
+        "id,name,link,story_chars,tagline_chars,name_chars,has_banner,has_logo,campaigns,supporters,programs,videos,items_total,threshold,jev,agree,error",
         `7,"Wells, ""Water"" & Co",${ORIGIN}/org/wells,400,0,19,false,true,1,0,2,0,3,letter,poster,false,`,
         // a spreadsheet would run a name that opens like a formula
         `8,'=HYPERLINK(1),${ORIGIN}/org/wells,400,0,19,false,true,1,0,2,0,3,letter,,,`,
@@ -373,7 +373,7 @@ describe("layout review summary", () => {
       has_banner: false,
       has_logo: false,
       campaigns: 0,
-      fundraisers: 0,
+      supporters: 0,
       programs: 0,
       videos: 0,
       items_total: 0,

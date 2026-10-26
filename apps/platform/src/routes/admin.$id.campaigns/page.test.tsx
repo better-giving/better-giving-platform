@@ -149,9 +149,9 @@ describe("campaign list", () => {
         ),
         loader: ({ request }) => {
           const tab = new URL(request.url).searchParams.get("tab");
-          if (tab === "fundraisers") {
+          if (tab === "supporters") {
             return {
-              view: "fundraisers" as const,
+              view: "supporters" as const,
               endow,
               funds: [],
               user: { role: null },
@@ -206,7 +206,7 @@ describe("campaign list", () => {
     ).toBeNull();
   });
 
-  it("opens supporter fundraisers on the other tab and treats an unknown tab as yours", async () => {
+  it("opens supporter campaigns on the other tab and treats an unknown tab as yours", async () => {
     const screen = await render_list([], "?tab=nope");
     await expect
       .element(screen.getByRole("tab", { name: "Your campaigns", exact: true }))
@@ -228,7 +228,7 @@ describe("campaign list", () => {
       .toHaveAttribute("aria-selected", "true");
     await vi.waitFor(() => {
       expect(screen.getByTestId("url-search").element().textContent).toBe(
-        "?tab=fundraisers"
+        "?tab=supporters"
       );
     });
     await expect
@@ -453,7 +453,7 @@ describe("campaign list", () => {
     const fund_row = (
       screen.getByText("Legacy drive", { exact: true }).element() as HTMLElement
     ).closest("li");
-    // an active published fund keeps its own fundraiser editor + public view
+    // an active published fund keeps its own campaign editor + public view
     expect(
       (
         page
@@ -461,7 +461,7 @@ describe("campaign list", () => {
           .getByRole("link", { name: "Edit Legacy drive", exact: true })
           .element() as HTMLAnchorElement
       ).getAttribute("href")
-    ).toBe("/fundraisers/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/edit");
+    ).toBe("/campaigns/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/edit");
   });
 });
 

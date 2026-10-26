@@ -497,24 +497,36 @@ describe("campaign list loader", () => {
     ]);
 
     const tab = await list_loader({
-      request: new Request("https://x/admin/list/campaigns?tab=fundraisers"),
+      request: new Request("https://x/admin/list/campaigns?tab=supporters"),
       ...args,
     } as any);
-    if (tab.view !== "fundraisers")
-      throw new Error("expected the fundraisers tab");
+    if (tab.view !== "supporters")
+      throw new Error("expected the supporters tab");
     expect(tab.funds.map((f) => f.id)).toEqual(["fund-supporter"]);
 
     // the tab is others-only; a stale ?creator= from an old link is ignored
     const stale = await list_loader({
       request: new Request(
-        "https://x/admin/list/campaigns?tab=fundraisers&creator=ours"
+        "https://x/admin/list/campaigns?tab=supporters&creator=ours"
       ),
       ...args,
     } as any);
-    if (stale.view !== "fundraisers") {
-      throw new Error("expected the fundraisers tab");
+    if (stale.view !== "supporters") {
+      throw new Error("expected the supporters tab");
     }
     expect(stale.funds.map((f) => f.id)).toEqual(["fund-supporter"]);
+
+    // "fundraisers" is this tab's previous query value; an old bookmarked or
+    // indexed link must still land on the supporters view, not fall through
+    // to the default
+    const legacy = await list_loader({
+      request: new Request("https://x/admin/list/campaigns?tab=fundraisers"),
+      ...args,
+    } as any);
+    if (legacy.view !== "supporters") {
+      throw new Error("expected the supporters tab");
+    }
+    expect(legacy.funds.map((f) => f.id)).toEqual(["fund-supporter"]);
 
     const unknown = await list_loader({
       request: new Request("https://x/admin/list/campaigns?tab=nope"),

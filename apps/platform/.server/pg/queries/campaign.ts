@@ -329,7 +329,7 @@ export async function campaign_by_id(
 }
 
 /** the campaign an org fund was folded into, if any, with its owner's slug for
- * the public url and the owner's publication state; the 301s off `/fundraisers/*`
+ * the public url and the owner's publication state; the 301s off `/campaigns/*`
  * read this */
 export interface IFoldedCampaign {
   id: string;

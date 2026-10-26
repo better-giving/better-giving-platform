@@ -74,7 +74,7 @@ export const FundItem = (props: Props) => {
         <>
           {props.published && (
             <Link
-              to={href("/fundraisers/:fund_id", { fund_id: props.id })}
+              to={href("/campaigns/:fund_id", { fund_id: props.id })}
               target="_blank"
               rel="noopener noreferrer"
               className="link text-sm"
@@ -87,7 +87,7 @@ export const FundItem = (props: Props) => {
             <NavLink
               aria-disabled={!editable}
               className="btn btn-secondary"
-              to={href("/fundraisers/:fund_id/edit", { fund_id: props.id })}
+              to={href("/campaigns/:fund_id/edit", { fund_id: props.id })}
               aria-labelledby={`${edit_label_id} ${name_id}`}
             >
               <span id={edit_label_id}>Edit</span>

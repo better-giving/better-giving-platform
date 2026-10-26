@@ -20,7 +20,7 @@ import type { TestDb } from "$/pg/test-utils/pglite";
 // --- mocks ---
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
-// set to make the fundraisers query fail the way an unreachable neon does
+// set to make the funds query fail the way an unreachable neon does
 const funds_failure = vi.hoisted(() => ({ current: null as Error | null }));
 const report_error_mock = vi.hoisted(() => vi.fn());
 
@@ -135,8 +135,8 @@ async function render_profile(npo_id: number) {
 
 // --- tests ---
 
-describe("npo profile — fundraisers section", () => {
-  it("says the fundraisers couldn't be loaded when the query fails, and still shows the profile", async () => {
+describe("npo profile — funds section", () => {
+  it("says the funds couldn't be loaded when the query fails, and still shows the profile", async () => {
     const npo = await seed_npo(db(), {
       registration_number: "EIN-PROFILE-FUNDS",
       name: "Unreachable Funds Org",
@@ -165,7 +165,7 @@ describe("npo profile — fundraisers section", () => {
     expect(report_error_mock).toHaveBeenCalledWith(err, { endow_id: npo.id });
   });
 
-  it("lists a live fundraiser among the ways to help, by its creator, linking to its own page", async () => {
+  it("lists a live fund among the ways to help, by its creator, linking to its own page", async () => {
     const npo = await seed_npo(db(), {
       registration_number: "EIN-PROFILE-LIVEFUND",
       name: "Live Fund Org",
@@ -197,13 +197,13 @@ describe("npo profile — fundraisers section", () => {
       .element(card.getByText("Supporter campaign"))
       .not.toBeInTheDocument();
     await expect.element(card.getByText("by Maya Lin")).toBeVisible();
-    // the card's one link: the fundraiser's page carries its donation form
+    // the card's one link: the fund's page carries its donation form
     await expect
       .element(card.getByRole("link", { name: "Spring Drive" }))
-      .toHaveAttribute("href", "/fundraisers/fund-live");
+      .toHaveAttribute("href", "/campaigns/fund-live");
   });
 
-  it("shows nothing for a nonprofit with no fundraisers", async () => {
+  it("shows nothing for a nonprofit with no funds", async () => {
     const npo = await seed_npo(db(), {
       registration_number: "EIN-PROFILE-NOFUNDS",
       name: "No Funds Org",
@@ -215,7 +215,7 @@ describe("npo profile — fundraisers section", () => {
     await expect
       .element(screen.getByRole("contentinfo").getByText("1 Quiet St"))
       .toBeVisible();
-    // the section renders nothing both while the fundraisers load and after
+    // the section renders nothing both while the funds load and after
     // they come back empty, so wait for the deferred read and the render it
     // triggers before asserting absence
     await vi.waitFor(() => expect(loaded).not.toBeNull());

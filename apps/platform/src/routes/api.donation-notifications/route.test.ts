@@ -120,7 +120,7 @@ describe("api.donation-notifications recipient identity", () => {
     await invoke(post(notif("AAPL", FUND_ID)));
 
     const d = template_mock.mock.calls[0]![0] as any;
-    expect(d.recipient_url).toBe(`https://bg.test/fundraisers/${FUND_ID}`);
+    expect(d.recipient_url).toBe(`https://bg.test/campaigns/${FUND_ID}`);
   });
 
   it("mails nobody when the id names no live recipient", async () => {

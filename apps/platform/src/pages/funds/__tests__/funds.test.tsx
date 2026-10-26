@@ -118,7 +118,7 @@ async function seed_fund(
   return insert_fund(test_db.current!.db, {
     id: crypto.randomUUID(),
     name: `Fund ${counter}`,
-    description_pt: "A test fundraiser",
+    description_pt: "A test campaign",
     npo_owner: npo_id,
     creator_id: TEST_USER.id,
     members: [npo_id],

@@ -15,7 +15,7 @@ interface Props {
   fund_opt_in: boolean;
 }
 
-export function FundraiserTab({ fund_opt_in }: Props) {
+export function CampaignTab({ fund_opt_in }: Props) {
   const fetcher = useFetcher();
 
   const {

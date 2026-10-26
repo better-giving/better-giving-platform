@@ -117,7 +117,7 @@ async function org_shape(
     has_banner: !!npo.image,
     has_logo: !!npo.logo,
     campaigns: campaigns.length,
-    fundraisers: funds.filter((f) => fund_item_is_open(f, now)).length,
+    supporters: funds.filter((f) => fund_item_is_open(f, now)).length,
     programs: programs.length,
     // the page plays YouTube links only, so it counts only those
     videos: media.items.filter((m) => extract_youtube_id(m.url)).length,
@@ -221,7 +221,7 @@ const COLUMNS = [
   "has_banner",
   "has_logo",
   "campaigns",
-  "fundraisers",
+  "supporters",
   "programs",
   "videos",
   "items_total",

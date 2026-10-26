@@ -31,7 +31,7 @@ const platform = [
   { label: "Open Source", to: href("/open-source") },
   { label: "Pricing", to: href("/pricing") },
   { label: "Marketplace", to: href("/marketplace") },
-  { label: "Campaigns", to: href("/fundraisers") },
+  { label: "Campaigns", to: href("/campaigns") },
   { label: "Referral Program", to: href("/referral-program") },
 ] as const;
 
