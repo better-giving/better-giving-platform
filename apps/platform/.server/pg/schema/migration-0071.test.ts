@@ -66,7 +66,12 @@ test("token_hash must be 64 lowercase hex chars, so a raw token cannot be stored
     t.db
       .insert(connector_photo_links)
       .values({ ...link("raw"), token_hash: "A".repeat(43) })
-  ).rejects.toThrow();
+  ).rejects.toMatchObject({
+    cause: {
+      code: "23514",
+      constraint: "connector_photo_links_token_hash_hex",
+    },
+  });
   await t.db.insert(connector_photo_links).values(link("hashed"));
   expect(await t.db.select().from(connector_photo_links)).toHaveLength(1);
 });
@@ -77,7 +82,12 @@ test("token_hash is unique", async () => {
     t.db
       .insert(connector_photo_links)
       .values({ ...link("two"), token_hash: sha256_hex("one") })
-  ).rejects.toThrow();
+  ).rejects.toMatchObject({
+    cause: {
+      code: "23505",
+      constraint: "connector_photo_links_token_hash_unique",
+    },
+  });
 });
 
 test("deleting a campaign deletes only its links", async () => {

@@ -550,7 +550,7 @@ export async function campaign_publish(
 }
 
 /** sets where gifts go and publishes, in one write that only a never-published,
- * not-ended campaign takes; false leaves the row as it was */
+ * not-ended campaign whose end date has not passed takes; false leaves the row as it was */
 export async function campaign_first_publish(
   npo_id: number,
   id: string,
@@ -571,7 +571,9 @@ export async function campaign_first_publish(
         eq(campaigns.id, id),
         eq(campaigns.owner_npo_id, npo_id),
         sql`${campaigns.status} <> 'ended'`,
-        isNull(campaigns.published_at)
+        isNull(campaigns.published_at),
+        // an end date already past would publish it closed: the bound `fund_is_open_sql` uses
+        sql`(${campaigns.ends_at} IS NULL OR ${campaigns.ends_at} >= (date_trunc('day', (NOW() AT TIME ZONE 'UTC') - interval '12 hours') AT TIME ZONE 'UTC'))`
       )
     )
     .returning({ id: campaigns.id });

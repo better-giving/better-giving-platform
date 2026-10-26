@@ -1,4 +1,5 @@
 import { BLOB_STORE_HOST } from "#/constants/urls";
+import { fund_closes_at } from "@/fundraiser/is-open";
 import { IMAGE_TYPES } from "../blob-upload";
 import {
   campaign_end,
@@ -84,6 +85,18 @@ function goal_patch(
 
 const END_DATE_MSG = "is a day written YYYY-MM-DD, today or later, or null";
 
+/** a draft whose end date has passed would go live already closed */
+const end_passed = (ends_at: string | null) =>
+  !!ends_at && Date.now() >= fund_closes_at(ends_at).getTime();
+const end_date_passed = () =>
+  invalid([
+    {
+      path: "end_date",
+      message:
+        "has passed: set a later end date, or null, before the first publish",
+    },
+  ]);
+
 /** the inverse of `end_date_of`: the day's last instant, as the dashboard
  * editor writes it */
 const ends_at_of = (day: string) => `${day}T23:59:59.999Z`;
@@ -147,6 +160,7 @@ export async function publish_campaign(
     return already_published();
   }
 
+  if (end_passed(row.ends_at)) return end_date_passed();
   if (!sent) {
     return invalid([{ path: "gifts_go_to", message: GIFTS_GO_TO_REQUIRED }]);
   }
@@ -166,6 +180,9 @@ export async function publish_campaign(
   if (!current) return missing(id);
   if (campaign_status(current.status, current.ends_at) === "ended") {
     return ended();
+  }
+  if (!current.published_at && end_passed(current.ends_at)) {
+    return end_date_passed();
   }
   if (current.program_id === (program?.id ?? null)) {
     return detail(db, npo_id, id);

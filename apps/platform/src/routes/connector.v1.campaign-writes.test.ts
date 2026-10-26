@@ -340,6 +340,21 @@ describe("publish_campaign", () => {
     });
   });
 
+  test("a draft whose end date has passed is 422 on end_date and stays a draft", async () => {
+    const a = await pair("Alpha", "EIN-A", "a@test.com");
+    const id = await seed_campaign(a, { ends_at: "2026-01-31T23:59:59.999Z" });
+    const res = await publish(id, a.key, { gifts_go_to: null });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({
+      code: "invalid",
+      errors: [{ path: "end_date" }],
+    });
+    expect(await row_of(id)).toMatchObject({
+      status: "draft",
+      published_at: null,
+    });
+  });
+
   test("already published: absent or the same destination is 200 and writes nothing, another is 409", async () => {
     const a = await pair("Alpha", "EIN-A", "a@test.com");
     const program = await seed_program(a.npo.id, "Literacy");
