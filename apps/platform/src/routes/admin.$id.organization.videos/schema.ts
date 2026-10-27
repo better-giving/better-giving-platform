@@ -1,4 +1,15 @@
-import { check, type InferOutput, object, pipe, url } from "valibot";
+import {
+  check,
+  type InferOutput,
+  isoTimestamp,
+  literal,
+  object,
+  pipe,
+  string,
+  transform,
+  union,
+  url,
+} from "valibot";
 import { youtube_link_id } from "#/components/youtube-player";
 import { $req } from "@/schemas";
 
@@ -13,3 +24,13 @@ export const schema = object({
   ),
 });
 export interface ISchema extends InferOutput<typeof schema> {}
+
+/** a deleted row's `date_created` sent back with its restore; "" for a row
+ * stored without one */
+export const restored_date = union([
+  pipe(
+    literal(""),
+    transform(() => null)
+  ),
+  pipe(string(), isoTimestamp("invalid date")),
+]);

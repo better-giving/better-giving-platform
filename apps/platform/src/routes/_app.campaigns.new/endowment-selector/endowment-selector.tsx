@@ -39,7 +39,7 @@ export async function fetch_endows(
   return data.items.map((o) => ({
     id: o.id,
     name: o.name,
-    logo: o.logo ?? o.card_img ?? undefined,
+    logo: o.logo || o.card_img || undefined,
   }));
 }
 

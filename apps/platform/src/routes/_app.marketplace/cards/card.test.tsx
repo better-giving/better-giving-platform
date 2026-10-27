@@ -97,6 +97,21 @@ describe("marketplace card body and actions", () => {
       { bookmarks: [] }
     );
 
+    // a cleared logo is stored as "", which the card shows as no logo
+    for (const [o, saved] of [
+      [{ logo: "" }, org.card_img],
+      [{ logo: "", card_img: "" }, undefined],
+    ] as const) {
+      await cleanup();
+      toggle_mock.mockClear();
+      const s = await card(o);
+      await s.getByRole("button", { name: "Add to favorites" }).click();
+      expect(toggle_mock).toHaveBeenCalledWith(
+        { id: 7, name: org.name, logo: saved },
+        { bookmarks: [] }
+      );
+    }
+
     await cleanup();
     toggle_mock.mockClear();
     const with_logo = await card();

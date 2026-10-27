@@ -1,14 +1,26 @@
-import { matchPath } from "react-router";
+import { data, matchPath, redirect } from "react-router";
 import { createFormData } from "remix-hook-form";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const forwarded = vi.hoisted(() => ({ fields: [] as [string, string][] }));
+const forwarded = vi.hoisted(() => ({
+  fields: [] as [string, string][],
+  answer: { ok: true } as unknown,
+}));
 vi.mock("#/routes/admin.$id.organization.videos/api", () => ({
   videos_action: vi.fn(async (x: { request: Request }) => {
     forwarded.fields = [...(await x.request.formData())] as [string, string][];
-    return { ok: true };
+    return forwarded.answer;
   }),
 }));
+vi.mock("#/.server/toast", () => ({
+  redirectWithSuccess: vi.fn((url: string, message: string) =>
+    redirect(url, { headers: { "x-toast": message } })
+  ),
+}));
+
+beforeEach(() => {
+  forwarded.answer = { ok: true };
+});
 
 import { action, loader } from "./route";
 
@@ -46,6 +58,29 @@ describe("retired Media page", () => {
       ["mediaId", "m1"],
       ["intent", "feature"],
     ]);
+  });
+
+  it("an old dialog's save leaves for the Videos group with its toast; a refusal stays its answer", async () => {
+    const url = "https://youtu.be/dQw4w9WgXcQ";
+    forwarded.answer = { ok: true, id: "m2" };
+    const added = await old_post("/admin/7/media/new", createFormData({ url }));
+    expect(added).toBeInstanceOf(Response);
+    expect(added.headers.get("location")).toBe(VIDEOS);
+    expect(added.headers.get("x-toast")).toBe("Video added");
+
+    forwarded.answer = { ok: true };
+    const edited = await old_post("/admin/7/media/m1", createFormData({ url }));
+    expect(edited.headers.get("location")).toBe(VIDEOS);
+    expect(edited.headers.get("x-toast")).toBe("Video updated");
+
+    const refusal = data(
+      { errors: { url: "only YouTube links are supported" } },
+      { status: 400 }
+    );
+    forwarded.answer = refusal;
+    expect(await old_post("/admin/7/media/new", createFormData({ url }))).toBe(
+      refusal
+    );
   });
 
   it("forwards an old add and edit dialog's save as the add and edit intents", async () => {

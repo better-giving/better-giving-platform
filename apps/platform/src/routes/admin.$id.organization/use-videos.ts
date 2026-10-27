@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { href, useFetcher, useRevalidator } from "react-router";
 import { safeParse } from "valibot";
+import type { action } from "#/routes/admin.$id.organization.videos/route";
 import { schema } from "#/routes/admin.$id.organization.videos/schema";
-
-/** the videos action's answers, as a fetcher reads them */
-type Answer =
-  | { ok: true; id?: string }
-  | { error: string }
-  | { errors: { url: string } };
+import type { IMedia } from "@/npo";
 
 type VideoFields = Record<string, string>;
 
@@ -18,10 +14,11 @@ const videos_url = (npo_id: number) =>
 export const url_issue = (url: string) =>
   safeParse(schema, { url: url.trim() }).issues?.[0].message;
 
-/** one video's writes. keyed by the video, so its spot on the page and its
- * row in the list read the same request */
-export function use_video(npo_id: number, mid: string) {
-  const f = useFetcher<Answer>({ key: `video-${mid}` });
+/** one control site's writes to a video. its spot on the page and its row in
+ * the list hold separate requests, so a press on one never answers the
+ * other's open link editor */
+export function use_video(npo_id: number, mid: string, at: "spot" | "row") {
+  const f = useFetcher<typeof action>({ key: `video-${at}-${mid}` });
   const { revalidate } = useRevalidator();
   const [refusal, set_refusal] = useState<string>();
 
@@ -75,7 +72,7 @@ export function use_link_input(init = "") {
 
 /** the inline add */
 export function use_add_video(npo_id: number) {
-  const f = useFetcher<Answer>({ key: "video-add" });
+  const f = useFetcher<typeof action>({ key: "video-add" });
   const input = use_link_input();
   const { reset } = input;
 
@@ -102,15 +99,12 @@ export function use_add_video(npo_id: number) {
   };
 }
 
-export interface IRemoved {
-  id: string;
-  url: string;
-  featured: boolean;
-}
+export interface IRemoved
+  extends Pick<IMedia, "id" | "url" | "featured" | "date_created"> {}
 
 /** a deleted link sent back as it was */
 export function use_restore(npo_id: number, removed: IRemoved) {
-  const f = useFetcher<Answer>({ key: `video-restore-${removed.id}` });
+  const f = useFetcher<typeof action>({ key: `video-restore-${removed.id}` });
   const restore = () => {
     if (f.state !== "idle") return;
     f.submit(
@@ -118,6 +112,8 @@ export function use_restore(npo_id: number, removed: IRemoved) {
         intent: "restore",
         url: removed.url,
         featured: removed.featured ? "1" : "0",
+        // a row stored without one sends ""
+        date_created: removed.date_created ?? "",
       },
       { method: "POST", action: videos_url(npo_id) }
     );

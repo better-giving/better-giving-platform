@@ -139,6 +139,24 @@ describe("feature", () => {
     expect(shown.body).toEqual({ ok: true });
     expect((await featured_of(npo.id)).map((v) => v.id)).toContain(fifth.id);
   });
+
+  it("two presses racing for the last spot: one lands, the other is refused", async () => {
+    const npo = await seed_npo();
+    for (let i = 0; i < 3; i++) await seed_video(npo.id, true);
+    const a = await seed_video(npo.id, false);
+    const b = await seed_video(npo.id, false);
+
+    const answers = await Promise.all(
+      [a, b].map((v) =>
+        post(npo.id, { intent: "feature", mediaId: v.id, featured: "0" })
+      )
+    );
+    expect(answers.map((x) => x.status).sort()).toEqual([200, 409]);
+    expect(answers.find((x) => x.status === 409)?.body).toEqual({
+      error: CAP,
+    });
+    expect(await featured_of(npo.id)).toHaveLength(4);
+  });
 });
 
 describe("add", () => {
@@ -244,11 +262,27 @@ describe("delete, then undo", () => {
         intent: "restore",
         url,
         featured: featured ? "1" : "0",
+        date_created: v.date_created!,
       });
       expect(undo.body).toMatchObject({ ok: true });
-      expect(await videos_of(npo.id)).toMatchObject([{ url, featured }]);
+      expect(await videos_of(npo.id)).toMatchObject([
+        { url, featured, date_created: v.date_created },
+      ]);
     }
   );
+
+  it("refuses a restore whose date isn't a timestamp, writing nothing", async () => {
+    const npo = await seed_npo();
+    // only a hand-built post sends one, so it's thrown like a bad media id
+    const undo = post(npo.id, {
+      intent: "restore",
+      url: YOUTUBE,
+      featured: "0",
+      date_created: "yesterday",
+    });
+    await expect(undo).rejects.toMatchObject({ status: 400 });
+    expect(await videos_of(npo.id)).toHaveLength(0);
+  });
 
   it("restores off the page when the page filled up meanwhile", async () => {
     const npo = await seed_npo();
@@ -256,8 +290,9 @@ describe("delete, then undo", () => {
 
     const undo = await post(npo.id, {
       intent: "restore",
-      url: YOUTUBE,
+      url: "https://youtu.be/9bZkp7q19f0",
       featured: "1",
+      date_created: "2025-06-01T00:00:00.000Z",
     });
     expect(undo.body).toMatchObject({ ok: true });
     expect(await featured_of(npo.id)).toHaveLength(4);

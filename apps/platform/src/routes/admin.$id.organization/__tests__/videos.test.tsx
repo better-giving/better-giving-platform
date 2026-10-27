@@ -36,14 +36,10 @@ vi.mock("#/.server/toast", () => ({
   dataWithSuccess: vi.fn((d: unknown) => d),
   dataWithError: vi.fn((d: unknown) => d),
 }));
-vi.mock("remix-client-cache", () => ({
-  CacheRoute: (Component: any) => Component,
-  createClientLoaderCache: () => undefined,
-}));
 
 import { videos_action } from "#/routes/admin.$id.organization.videos/api";
 import { action, loader } from "../api";
-import OrganizationPage from "../route";
+import * as org_route from "../route";
 
 const db = () => test_db.current!.db;
 const CAP = "Your page shows up to 4 videos. Take one off first.";
@@ -97,7 +93,37 @@ async function seed_video(npo_id: number, id: string, featured: boolean) {
     });
 }
 
-async function render_org(npo_id: number) {
+/** once armed, holds the server reads until `open()`, as a slow network would */
+function gate() {
+  const g = {
+    reads: 0,
+    held: Promise.resolve(),
+    open: () => {},
+    arm() {
+      g.reads = 0;
+      g.held = new Promise<void>((r) => {
+        g.open = r;
+      });
+    },
+  };
+  return g;
+}
+
+async function render_org(npo_id: number, hold?: ReturnType<typeof gate>) {
+  const server_loader = async (args: any) => {
+    if (hold) {
+      hold.reads++;
+      await hold.held;
+    }
+    return loader(args);
+  };
+  // the stub runs the module's clientLoader the way framework mode does, so a
+  // client cache on this route is what the user would see
+  const client_loader = (org_route as Record<string, any>).clientLoader;
+  const route_loader = client_loader
+    ? (args: any) =>
+        client_loader({ ...args, serverLoader: () => server_loader(args) })
+    : server_loader;
   const as_admin = async (
     { context }: { context: { set: (k: any, v: number) => void } },
     next: () => Promise<unknown>
@@ -108,9 +134,9 @@ async function render_org(npo_id: number) {
   const Stub = createRoutesStub([
     {
       path: "/admin/:id/organization",
-      Component: OrganizationPage,
+      Component: org_route.default,
       HydrateFallback: () => null,
-      loader: loader as any,
+      loader: route_loader as any,
       action: action as any,
       middleware: [as_admin as any],
       children: [{ path: "videos", action: videos_action as any }],
@@ -238,6 +264,167 @@ describe("organization — videos", () => {
     await expect.element(link).toBeVisible();
     await expect.element(screen.getByText("On page · spot 1")).toBeVisible();
     await expect.element(undo).not.toBeInTheDocument();
+  });
+
+  it("a delete holds its row until the read without it lands", async () => {
+    const npo = await seed_npo();
+    await seed_video(npo.id, yt(6), true);
+    const hold = gate();
+    const screen = await render_org(npo.id, hold);
+    await expect.element(screen.getByText("1 of 4 spots used")).toBeVisible();
+    hold.arm();
+
+    const trash = screen.getByRole("button", {
+      name: `Remove youtu.be/${yt(6)}`,
+    });
+    await trash.click();
+    await vi.waitFor(() => expect(hold.reads).toBeGreaterThan(0));
+    // listed while the read is out, and held: a second press can't land
+    await expect.element(trash).toHaveAttribute("aria-disabled", "true");
+    await new Promise((r) => setTimeout(r, 300));
+    expect(trash.element().getAttribute("aria-disabled")).toBe("true");
+
+    hold.open();
+    await expect
+      .element(
+        screen.getByRole("button", { name: `Undo removing youtu.be/${yt(6)}` })
+      )
+      .toBeVisible();
+    await expect.element(trash).not.toBeInTheDocument();
+    await expect.element(screen.getByText("0 of 4 spots used")).toBeVisible();
+  });
+
+  it("Undo stays until the restored row is listed, then hands it the focus", async () => {
+    const npo = await seed_npo();
+    await seed_video(npo.id, yt(2), false);
+    const hold = gate();
+    const screen = await render_org(npo.id, hold);
+    const link = screen.getByRole("link", { name: `youtu.be/${yt(2)}` });
+    await expect.element(link).toBeVisible();
+
+    await screen
+      .getByRole("button", { name: `Remove youtu.be/${yt(2)}` })
+      .click();
+    const undo = screen.getByRole("button", {
+      name: `Undo removing youtu.be/${yt(2)}`,
+    });
+    await expect.element(undo).toHaveFocus();
+
+    hold.arm();
+    await undo.click();
+    await vi.waitFor(() => expect(hold.reads).toBeGreaterThan(0));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(undo.query()).not.toBeNull();
+    expect(screen.getByText("No videos yet").query()).toBeNull();
+
+    hold.open();
+    await expect.element(link).toHaveFocus();
+    await expect.element(undo).not.toBeInTheDocument();
+  });
+
+  it("Undo takes the focus only from a removed row, not from where the user moved on", async () => {
+    const npo = await seed_npo();
+    await seed_video(npo.id, yt(3), false);
+    const hold = gate();
+    const screen = await render_org(npo.id, hold);
+    await expect
+      .element(screen.getByRole("link", { name: `youtu.be/${yt(3)}` }))
+      .toBeVisible();
+
+    hold.arm();
+    await screen
+      .getByRole("button", { name: `Remove youtu.be/${yt(3)}` })
+      .click();
+    const field = screen.getByLabelText("Add a video");
+    await field.click();
+    hold.open();
+
+    await expect
+      .element(
+        screen.getByRole("button", { name: `Undo removing youtu.be/${yt(3)}` })
+      )
+      .toBeVisible();
+    await expect.element(field).toHaveFocus();
+  });
+
+  it("a second trash press before the first lands leaves one Undo", async () => {
+    const npo = await seed_npo();
+    await seed_video(npo.id, yt(4), false);
+    const screen = await render_org(npo.id);
+    const trash = screen.getByRole("button", {
+      name: `Remove youtu.be/${yt(4)}`,
+    });
+    await expect.element(trash).toBeVisible();
+
+    const el = trash.element() as HTMLElement;
+    el.click();
+    el.click();
+    await expect
+      .element(
+        screen.getByRole("button", { name: `Undo removing youtu.be/${yt(4)}` })
+      )
+      .toBeVisible();
+    expect(
+      screen.getByRole("button", { name: /^Undo removing/ }).elements()
+    ).toHaveLength(1);
+  });
+
+  it("Show on page and Take off hand the focus on as their control leaves", async () => {
+    const npo = await seed_npo();
+    await seed_video(npo.id, yt(1), false);
+    const screen = await render_org(npo.id);
+
+    await screen
+      .getByRole("button", { name: `Show youtu.be/${yt(1)} on page` })
+      .click();
+    await expect.element(screen.getByText("On page · spot 1")).toBeVisible();
+    await expect
+      .element(screen.getByRole("link", { name: `youtu.be/${yt(1)}` }))
+      .toHaveFocus();
+
+    await screen
+      .getByRole("button", { name: `Take youtu.be/${yt(1)} off your page` })
+      .click();
+    const status = screen.getByText("0 of 4 spots used");
+    await expect.element(status).toBeVisible();
+    await expect.element(status).toHaveFocus();
+  });
+
+  it("a featured video past the four spots can be taken off from its row", async () => {
+    const npo = await seed_npo();
+    // seeded first, so the oldest: featured, with no spot
+    await seed_video(npo.id, yt(5), true);
+    for (const n of [1, 2, 3, 4]) await seed_video(npo.id, yt(n), true);
+    const screen = await render_org(npo.id);
+
+    const off = screen.getByRole("button", {
+      name: `Take youtu.be/${yt(5)} off your page`,
+    });
+    await expect.element(off).toBeVisible();
+    await off.click();
+    const show = screen.getByRole("button", {
+      name: `Show youtu.be/${yt(5)} on page`,
+    });
+    await expect.element(show).toBeVisible();
+    // the same control, now offering the way back
+    await expect.element(show).toHaveFocus();
+  });
+
+  it("a press on a video's spot leaves its open link editor and the typing in it", async () => {
+    const npo = await seed_npo();
+    await seed_video(npo.id, yt(6), true);
+    const screen = await render_org(npo.id);
+
+    await screen
+      .getByRole("button", { name: `Edit link for youtu.be/${yt(6)}` })
+      .click();
+    const input = screen.getByLabelText(`Link for youtu.be/${yt(6)}`);
+    await input.fill(`https://youtu.be/${yt(7)}`);
+    await screen
+      .getByRole("button", { name: `Take youtu.be/${yt(6)} off your page` })
+      .click();
+    await expect.element(screen.getByText("0 of 4 spots used")).toBeVisible();
+    await expect.element(input).toHaveValue(`https://youtu.be/${yt(7)}`);
   });
 
   it("edits a link in its row; a non-YouTube link is refused there", async () => {

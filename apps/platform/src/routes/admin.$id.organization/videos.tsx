@@ -28,6 +28,10 @@ const unless = (held: boolean, run: () => void) => () => {
   if (!held) run();
 };
 
+/** a swap unmounted the focused control; a user who moved on keeps their place */
+const focus_dropped = () =>
+  !document.activeElement || document.activeElement === document.body;
+
 const on_enter = (run: () => void, esc?: () => void) => (e: KeyboardEvent) => {
   if (e.key === "Enter") {
     // the page is one form; Enter here must not reach it
@@ -42,24 +46,56 @@ interface IVideosGroup {
   videos: IVideos;
 }
 
+interface IRemovedRow extends IRemoved {
+  /** the restored row's id, once the restore answered */
+  restored?: string;
+}
+
 export function VideosGroup({ npo_id, videos }: IVideosGroup) {
   const { featured, items, max } = videos;
   const note_id = useId();
   const full_id = useId();
   const full = featured.length >= max;
-  const [removed, set_removed] = useState<IRemoved[]>([]);
+  const [removed, set_removed] = useState<IRemovedRow[]>([]);
   const [focus_id, set_focus_id] = useState<string>();
+  const status_ref = useRef<HTMLParagraphElement>(null);
+  const took_off = useRef<string>(undefined);
 
+  const listed = (id?: string) => !!id && items.some((v) => v.id === id);
   // a delete press is recorded at the press; its Undo shows once the read no
-  // longer has the row, so a refused delete never offers one
-  const undoable = removed.filter((r) => !items.some((v) => v.id === r.id));
+  // longer has the row, so a refused delete never offers one, and stays until
+  // the read has the restored row
+  const undoable = removed.filter((r) => !listed(r.id) && !listed(r.restored));
   const on_remove = useCallback(
-    (r: IRemoved) => set_removed((prev) => [...prev, r]),
+    (r: IRemoved) =>
+      set_removed((prev) =>
+        prev.some((x) => x.id === r.id) ? prev : [...prev, r]
+      ),
     []
   );
-  const on_restored = useCallback((old_id: string, new_id?: string) => {
-    set_removed((prev) => prev.filter((r) => r.id !== old_id));
+  const on_restored = useCallback((old_id: string, new_id: string) => {
+    set_removed((prev) =>
+      prev.map((r) => (r.id === old_id ? { ...r, restored: new_id } : r))
+    );
     set_focus_id(new_id);
+  }, []);
+  // a restored row deleted again starts a new Undo of its own
+  useEffect(() => {
+    set_removed((prev) => {
+      const next = prev.filter((r) => !items.some((v) => v.id === r.restored));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [items]);
+
+  // a spot taken off is replaced by an open one; the count says what changed
+  useEffect(() => {
+    const id = took_off.current;
+    if (!id || featured.some((f) => f.id === id)) return;
+    took_off.current = undefined;
+    if (focus_dropped()) status_ref.current?.focus();
+  }, [featured]);
+  const on_take_off = useCallback((id: string) => {
+    took_off.current = id;
   }, []);
 
   return (
@@ -78,7 +114,7 @@ export function VideosGroup({ npo_id, videos }: IVideosGroup) {
       <div className="mt-6 grid gap-2">
         <div className="flex items-baseline justify-between gap-3 text-sm">
           <p className="font-semibold">On your page</p>
-          <p className="text-gray-11">
+          <p ref={status_ref} tabIndex={-1} className="text-gray-11">
             <b className="font-semibold text-gray-12">{featured.length}</b> of{" "}
             {max} spots used
           </p>
@@ -88,7 +124,12 @@ export function VideosGroup({ npo_id, videos }: IVideosGroup) {
             const v = featured.at(i);
             return v ? (
               <li key={v.id} className="min-w-0">
-                <Spot npo_id={npo_id} video={v} n={i + 1} />
+                <Spot
+                  npo_id={npo_id}
+                  video={v}
+                  n={i + 1}
+                  on_take_off={on_take_off}
+                />
               </li>
             ) : (
               <li key={`open-${i}`} className="min-w-0">
@@ -146,10 +187,11 @@ interface ISpot {
   npo_id: number;
   video: IMedia;
   n: number;
+  on_take_off: (id: string) => void;
 }
 
-function Spot({ npo_id, video, n }: ISpot) {
-  const v = use_video(npo_id, video.id);
+function Spot({ npo_id, video, n, on_take_off }: ISpot) {
+  const v = use_video(npo_id, video.id, "spot");
   const url = disp(video.url);
   return (
     <div className="grid gap-1.5">
@@ -171,9 +213,10 @@ function Spot({ npo_id, video, n }: ISpot) {
           aria-label={`Take ${url} off your page`}
           aria-disabled={v.pending}
           aria-busy={v.pending}
-          onClick={unless(v.pending, () =>
-            v.submit({ intent: "feature", featured: "1" })
-          )}
+          onClick={unless(v.pending, () => {
+            on_take_off(video.id);
+            v.submit({ intent: "feature", featured: "1" });
+          })}
           className="btn btn-ghost btn-sm shrink-0"
         >
           Take off
@@ -252,17 +295,30 @@ interface IRow {
 }
 
 function Row({ npo_id, video, spot, full, full_id, focus, on_remove }: IRow) {
-  const v = use_video(npo_id, video.id);
+  const v = use_video(npo_id, video.id, "row");
   const url = disp(video.url);
   const err_id = useId();
   const link_ref = useRef<HTMLAnchorElement>(null);
   const edit_ref = useRef<HTMLButtonElement>(null);
   const [editing, set_editing] = useState(false);
   const closed = useRef(false);
+  /** `featured` as it was at this row's own feature press */
+  const pressed_at = useRef<boolean>(undefined);
 
   useEffect(() => {
-    if (focus) link_ref.current?.focus();
+    if (focus && focus_dropped()) link_ref.current?.focus();
   }, [focus]);
+  // the pressed control is swapped for its opposite; the row's link is the
+  // nearest thing that stays
+  useEffect(() => {
+    if (pressed_at.current === undefined) return;
+    if (pressed_at.current === video.featured) return;
+    pressed_at.current = undefined;
+    if (focus_dropped()) link_ref.current?.focus();
+  }, [video.featured]);
+  useEffect(() => {
+    if (v.refusal) pressed_at.current = undefined;
+  }, [v.refusal]);
   // the edit box replaced its own trigger; closing hands focus back to it
   useEffect(() => {
     if (editing || !closed.current) return;
@@ -278,6 +334,12 @@ function Row({ npo_id, video, spot, full, full_id, focus, on_remove }: IRow) {
   // off answers it
   const refusal = full ? v.refusal : undefined;
   const show_held = full || v.pending;
+  /** `sent` is the featured state this row shows */
+  const feature = (sent: boolean) =>
+    unless(sent ? v.pending : show_held, () => {
+      pressed_at.current = sent;
+      v.submit({ intent: "feature", featured: sent ? "1" : "0" });
+    });
 
   return (
     <li aria-busy={v.pending} className="grid gap-2 px-3 py-2.5">
@@ -310,11 +372,24 @@ function Row({ npo_id, video, spot, full, full_id, focus, on_remove }: IRow) {
             </a>
           </div>
           <div className="flex items-center gap-2">
-            {video.featured ? (
+            {video.featured && spot ? (
               <span className="flex items-center gap-1.5 text-sm font-semibold text-success-subtle-fg">
                 <Check aria-hidden className="icon-md" />
-                On page{spot ? ` · spot ${spot}` : ""}
+                On page · spot {spot}
               </span>
+            ) : video.featured ? (
+              // featured past the page's spots (an org that held more before
+              // the cap), so the public page doesn't show it
+              <button
+                type="button"
+                aria-label={`Take ${url} off your page`}
+                aria-disabled={v.pending}
+                aria-busy={v.pending}
+                onClick={feature(true)}
+                className="btn btn-ghost btn-sm"
+              >
+                Take off
+              </button>
             ) : (
               <button
                 type="button"
@@ -322,9 +397,7 @@ function Row({ npo_id, video, spot, full, full_id, focus, on_remove }: IRow) {
                 aria-disabled={show_held}
                 aria-busy={v.pending}
                 aria-describedby={refusal ? err_id : full ? full_id : undefined}
-                onClick={unless(show_held, () =>
-                  v.submit({ intent: "feature", featured: "0" })
-                )}
+                onClick={feature(false)}
                 className="btn btn-secondary btn-sm"
               >
                 Show on page
@@ -349,6 +422,7 @@ function Row({ npo_id, video, spot, full, full_id, focus, on_remove }: IRow) {
                   id: video.id,
                   url: video.url,
                   featured: video.featured,
+                  date_created: video.date_created,
                 });
                 v.submit({ intent: "delete" });
               })}
@@ -442,7 +516,7 @@ function EditLink({ url, name, pending, answer, save, close }: IEditLink) {
 interface IUndoRow {
   npo_id: number;
   removed: IRemoved;
-  on_restored: (old_id: string, new_id?: string) => void;
+  on_restored: (old_id: string, new_id: string) => void;
 }
 
 function UndoRow({ npo_id, removed, on_restored }: IUndoRow) {
@@ -450,12 +524,14 @@ function UndoRow({ npo_id, removed, on_restored }: IUndoRow) {
   const ref = useRef<HTMLButtonElement>(null);
   const url = disp(removed.url);
 
-  // the row's own controls went with it; the way back takes the focus
+  // the row's own controls went with it; the way back takes the focus they
+  // dropped
   useEffect(() => {
-    ref.current?.focus();
+    if (focus_dropped()) ref.current?.focus();
   }, []);
   useEffect(() => {
-    if (r.answer && "ok" in r.answer) on_restored(removed.id, r.answer.id);
+    const id = r.answer && "id" in r.answer ? r.answer.id : undefined;
+    if (id) on_restored(removed.id, id);
   }, [r.answer, removed.id, on_restored]);
 
   return (

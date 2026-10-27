@@ -7,13 +7,14 @@ import type { IMedia } from "@/npo";
 import { media_id } from "@/npo/schema";
 import {
   npo_media_delete,
+  npo_media_feature,
   npo_media_get,
-  npo_media_list,
   npo_media_put,
+  npo_media_restore,
   npo_media_update,
 } from "$/pg/queries/npo-media";
 import type { Route } from "./+types/route";
-import { schema } from "./schema";
+import { restored_date, schema } from "./schema";
 
 type IMediaRow = IMedia & { npo_id: number };
 
@@ -27,23 +28,7 @@ const get_own = async (npo_id: number, mid: string) => {
   return m?.npo_id === npo_id ? m : undefined;
 };
 
-/** the public page reads only the newest `MAX_VIDEOS` featured ones */
-const page_full = async (npo_id: number) => {
-  const page = await npo_media_list(npo_id, {
-    type: "video",
-    featured: true,
-    limit: MAX_VIDEOS,
-  });
-  return page.items.length >= MAX_VIDEOS;
-};
-
 const not_found = () => data({ error: "Video not found" }, { status: 404 });
-
-/** past the cap the video lands in the list only */
-const put = async (npo_id: number, url: string, featured: boolean) => {
-  const m = await npo_media_put(npo_id, { url, featured }, MAX_VIDEOS);
-  return m.id;
-};
 
 const parse_url = (fv: FormData) => {
   const p = safeParse(schema, { url: fv.get("url") ?? "" });
@@ -62,13 +47,34 @@ export const videos_action = async (x: Args) => {
   const fv = await x.request.formData();
   const intent = fv.get("intent");
 
-  // a restore is the link a delete removed, sent back as it was
-  if (intent === "add" || intent === "restore") {
+  // past the cap the video lands in the list only
+  if (intent === "add") {
     const p = parse_url(fv);
     if (p.error) return p.error;
-    const featured = intent === "add" || fv.get("featured") === "1";
-    const mid = await put(id, p.url, featured);
-    return { ok: true, id: mid };
+    const m = await npo_media_put(
+      id,
+      { url: p.url, featured: true },
+      MAX_VIDEOS
+    );
+    return { ok: true, id: m.id };
+  }
+
+  // the link a delete removed, sent back as it was, so it keeps its place
+  if (intent === "restore") {
+    const p = parse_url(fv);
+    if (p.error) return p.error;
+    const d = safeParse(restored_date, fv.get("date_created") ?? "");
+    if (d.issues) throw resp.status(400, d.issues[0].message);
+    const m = await npo_media_restore(
+      id,
+      {
+        url: p.url,
+        featured: fv.get("featured") === "1",
+        date_created: d.output,
+      },
+      MAX_VIDEOS
+    );
+    return { ok: true, id: m.id };
   }
 
   const p_mid = safeParse(media_id, fv.get("mediaId"));
@@ -79,11 +85,13 @@ export const videos_action = async (x: Args) => {
   if (intent === "feature") {
     // `featured` is the state the sender saw, so a repeated press lands on the
     // same value rather than flipping it back
-    const next = fv.get("featured") !== "1";
-    if (next && !prev.featured && (await page_full(id))) {
+    if (fv.get("featured") === "1") {
+      await npo_media_update(id, prev.id, { featured: false });
+      return { ok: true };
+    }
+    if (!(await npo_media_feature(id, prev.id, MAX_VIDEOS))) {
       return data({ error: cap_error(MAX_VIDEOS) }, { status: 409 });
     }
-    await npo_media_update(id, prev.id, { featured: next });
     return { ok: true };
   }
 

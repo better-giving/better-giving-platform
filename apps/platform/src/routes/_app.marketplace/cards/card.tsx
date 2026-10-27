@@ -69,7 +69,7 @@ export function Card({
           Donate
         </NavLink>
         <BookmarkBtn
-          npo={{ name, id, logo: logo ?? card_img ?? undefined }}
+          npo={{ name, id, logo: logo || card_img || undefined }}
           classes="justify-self-end size-9"
         />
       </div>

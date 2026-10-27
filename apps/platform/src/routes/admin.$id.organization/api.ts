@@ -8,7 +8,7 @@ import type { INpo } from "$/pg/queries/npo";
 import { npo_get } from "$/pg/queries/npo";
 import { npo_media_list } from "$/pg/queries/npo-media";
 import type { Route } from "./+types/route";
-import { VIDEOS_PAGE, videos_shown } from "./videos-page";
+import { MAX_SHOWN, VIDEOS_PAGE, videos_shown } from "./videos-page";
 
 export interface IVideos {
   /** the ones the public page shows, newest first */
@@ -45,7 +45,8 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
     videos: {
       featured: featured.items,
       items: all.items,
-      has_more: !!all.next,
+      // past the clamp a wider param reads the same rows
+      has_more: !!all.next && limit < MAX_SHOWN,
       max: MAX_VIDEOS,
       limit,
     },

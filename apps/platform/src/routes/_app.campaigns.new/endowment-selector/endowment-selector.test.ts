@@ -17,6 +17,8 @@ describe("fund member search", () => {
           { id: 1, name: "Has logo", logo: "l.png", card_img: "c.png" },
           { id: 2, name: "Card only", logo: null, card_img: "c2.png" },
           { id: 3, name: "Neither", logo: null, card_img: null },
+          { id: 4, name: "Empty logo", logo: "", card_img: "c4.png" },
+          { id: 5, name: "Empty both", logo: "", card_img: "" },
         ],
       })
     );
@@ -33,6 +35,8 @@ describe("fund member search", () => {
       { id: 1, name: "Has logo", logo: "l.png" },
       { id: 2, name: "Card only", logo: "c2.png" },
       { id: 3, name: "Neither", logo: undefined },
+      { id: 4, name: "Empty logo", logo: "c4.png" },
+      { id: 5, name: "Empty both", logo: undefined },
     ]);
   });
 });

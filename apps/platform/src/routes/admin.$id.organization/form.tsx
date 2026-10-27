@@ -296,9 +296,9 @@ export function Form({ init, profile, id, base_url, videos }: IProps) {
         aria-labelledby={donate_title_id}
         className="card flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
       >
-        <h2 id={donate_title_id} className="font-semibold">
+        <h3 id={donate_title_id} className="font-semibold">
           Donate link
-        </h2>
+        </h3>
         <CopyLink url={donate_url} label="Copy donate link" />
       </section>
 
