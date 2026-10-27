@@ -10,10 +10,11 @@ import { Steps } from "#/components/donation";
 import { ErrorElement } from "#/components/error/error-element";
 import { DappLogo } from "#/components/image";
 import { richtext_styles } from "#/components/rich-text";
-import { to_text } from "#/components/rich-text/helpers";
-import { app_name } from "#/constants/env";
+import { to_excerpt, to_text } from "#/components/rich-text/helpers";
+import { app_name, base_url } from "#/constants/env";
 import { metas } from "#/helpers/seo";
 import { use_now } from "#/hooks/use-now";
+import { agents_link, campaign_jsonld } from "@/structured-data/schema-org";
 import type { Route } from "./+types/route";
 import { headers, loader } from "./api";
 import {
@@ -43,15 +44,34 @@ export const meta: Route.MetaFunction = ({ loaderData, params, error }) => {
     });
   }
   if (!loaderData) return [];
-  const { campaign, canonical } = loaderData;
+  const { campaign, canonical, npo } = loaderData;
   const story = to_text(campaign.description_pt);
-  return metas({
+  const shared = {
     title: `${campaign.name} - ${app_name}`,
     description: story.slice(0, 140),
     name: campaign.name,
     image: campaign.hero,
     url: canonical ?? `/org/${params.org}/${params.campaign}`,
+  };
+  // a preview of an unpublished owner stays out of every index
+  if (campaign.owner_published === false) return metas(shared);
+  const project = campaign_jsonld({
+    base_url,
+    url: canonical,
+    name: campaign.name,
+    description: to_excerpt(campaign.description_pt),
+    image: campaign.hero,
+    raised: campaign.raised,
+    goal: goal_amount(campaign.target, campaign.raised),
+    org: {
+      url: `${base_url}/org/${params.org}`,
+      name: campaign.owner_name,
+      logo: campaign.mark,
+      ein: npo.ein,
+      website: npo.url,
+    },
   });
+  return [...metas({ ...shared, jsonld: project }), agents_link(base_url)];
 };
 
 export function ErrorBoundary() {

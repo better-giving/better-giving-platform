@@ -33,6 +33,8 @@ const { funds } = await import("$/pg/schema/fund");
 const { npos } = await import("$/pg/schema/npo");
 const { create_test_db } = await import("$/pg/test-utils/pglite");
 const { loader } = await import("./api");
+const { meta } = await import("./route");
+const { base_url } = await import("#/constants/env");
 
 let npo_id: number;
 let creator_id: string;
@@ -274,4 +276,93 @@ describe("folded fund redirects", () => {
     expect(res.status).toBe(301);
     expect(res.headers.get("location")).toBe(`/org/${slugless.id}/winter`);
   });
+});
+
+describe("fund page structured data", () => {
+  type Descriptor = Record<string, any>;
+  async function meta_of(fund_id: string) {
+    const loaderData = await load(fund_id);
+    return (meta as any)({
+      loaderData,
+      location: { pathname: `/campaigns/${fund_id}` },
+    }) as Descriptor[];
+  }
+  const lds_of = (ds: Descriptor[]) =>
+    ds.filter((d) => "script:ld+json" in d).map((d) => d["script:ld+json"]);
+  const describedby_of = (ds: Descriptor[]) =>
+    ds.filter((d) => d.rel === "describedby");
+
+  it("describes a live single-beneficiary fund as a project of that org", async () => {
+    const fund = await seed_fund(db(), {
+      id: crypto.randomUUID(),
+      name: "Flood relief",
+      npo_owner: null,
+      creator_id,
+      members: [npo_id],
+      published: true,
+      target_number: 1000,
+    });
+    const page = `${base_url}/campaigns/${fund.id}`;
+    const org = `${base_url}/org/${npo_id}`;
+
+    const [ld, ...rest] = lds_of(await meta_of(fund.id));
+
+    expect(rest).toEqual([]);
+    expect(ld).toMatchObject({
+      "@type": "WebPage",
+      url: page,
+      name: "Flood relief",
+      about: {
+        "@type": "Project",
+        "@id": `${page}#campaign`,
+        image: "https://img.co/banner.png",
+        parentOrganization: {
+          "@type": "NGO",
+          "@id": `${org}#org`,
+          name: "Fund Test NPO",
+          url: org,
+        },
+        additionalProperty: [
+          { name: "Fundraising goal", value: { value: 1000 } },
+          { name: "Amount raised", value: { value: 0 } },
+        ],
+        potentialAction: {
+          "@type": "DonateAction",
+          recipient: { "@id": `${org}#org` },
+          target: [
+            {
+              "@type": "EntryPoint",
+              urlTemplate: `${base_url}/donate-fund/${fund.id}`,
+            },
+            { urlTemplate: `${base_url}/agents/mcp` },
+          ],
+        },
+      },
+    });
+    expect(ld.about).not.toHaveProperty("member");
+    expect(describedby_of(await meta_of(fund.id))).toHaveLength(1);
+  });
+
+  it.each([
+    { case: "unpublished", published: false, active: true },
+    { case: "inactive", published: true, active: false },
+  ])(
+    "gives an $case fund no structured data",
+    async ({ published, active }) => {
+      const fund = await seed_fund(db(), {
+        id: crypto.randomUUID(),
+        name: "Quiet fund",
+        npo_owner: null,
+        creator_id,
+        members: [npo_id],
+        published,
+        active,
+      });
+      const ds = await meta_of(fund.id);
+
+      expect(ds[0]).toEqual({ title: "Quiet fund - Better Giving" });
+      expect(lds_of(ds)).toEqual([]);
+      expect(describedby_of(ds)).toEqual([]);
+    }
+  );
 });
