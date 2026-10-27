@@ -45,6 +45,7 @@ import * as org_route from "../route";
 const db = () => test_db.current!.db;
 const CAP = "Your page shows up to 4 videos. Take one off first.";
 const FULL = "All 4 spots are in use. Take a video off to show another.";
+const HELP = "Add a YouTube link. You can show up to 4 on your page.";
 
 beforeAll(async () => {
   test_db.current = await create_test_db();
@@ -180,10 +181,31 @@ describe("organization — videos", () => {
 
     const group = screen.getByRole("group", { name: "Videos" });
     await expect.element(group).toBeVisible();
+    // one level under the page group's h2, its parts one under it
     await expect
-      .element(screen.getByText("0 of 4 spots used"))
-      .toBeInTheDocument();
-    await expect.element(screen.getByText("No videos yet")).toBeVisible();
+      .element(
+        screen.getByRole("heading", { name: "Videos", exact: true, level: 3 })
+      )
+      .toBeVisible();
+    // the list's heading waits for a list, like the spots row
+    expect(
+      screen.getByRole("heading", { name: "All videos" }).query()
+    ).toBeNull();
+    // the page fields' Save sits above the section, not after it
+    const save = screen
+      .getByRole("button", { name: "Save Better Giving Page" })
+      .element();
+    expect(
+      save.compareDocumentPosition(group.element()) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    // nothing to choose yet: no open spots, no count, one line of help
+    await expect.element(screen.getByText(HELP)).toBeVisible();
+    expect(screen.getByText("Open spot").query()).toBeNull();
+    expect(screen.getByText("spots used").query()).toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "On your page" }).query()
+    ).toBeNull();
 
     const field = screen.getByLabelText("Add a video");
     const add = screen.getByRole("button", { name: "Add video" });
@@ -206,6 +228,14 @@ describe("organization — videos", () => {
     await expect
       .element(screen.getByText("1 of 4 spots used"))
       .toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("heading", { name: "On your page", level: 4 }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByRole("heading", { name: "All videos", level: 4 }))
+      .toBeVisible();
+    expect(screen.getByText("Open spot").elements()).toHaveLength(3);
+    await expect.element(screen.getByText(HELP)).not.toBeInTheDocument();
     await expect.element(field).toHaveValue("");
     await expect.element(field).not.toHaveAttribute("aria-invalid", "true");
   });
@@ -463,7 +493,7 @@ describe("organization — videos", () => {
     await vi.waitFor(() => expect(hold.reads).toBeGreaterThan(0));
     await new Promise((r) => setTimeout(r, 50));
     expect(undo.query()).not.toBeNull();
-    expect(screen.getByText("No videos yet").query()).toBeNull();
+    expect(screen.getByText(HELP).query()).toBeNull();
 
     hold.open();
     await expect.element(link).toHaveFocus();

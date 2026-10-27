@@ -282,7 +282,6 @@ export function Form({ init, profile, id, base_url, videos }: IProps) {
             {page.errors.overview?.message}
           </p>
         </Fieldset>
-        <VideosGroup npo_id={id} videos={videos} />
         <Fieldset disabled={page.busy} className="contents">
           <SaveButton
             group={page}
@@ -290,6 +289,11 @@ export function Form({ init, profile, id, base_url, videos }: IProps) {
             blocked={page_uploading}
           />
         </Fieldset>
+        {/* below the Save: videos apply right away, so they aren't what it
+            saves. a rule on the fieldset itself would run through its legend */}
+        <div className="mt-2 border-t pt-6">
+          <VideosGroup npo_id={id} videos={videos} />
+        </div>
       </section>
 
       <section
