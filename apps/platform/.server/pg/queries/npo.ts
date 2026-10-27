@@ -501,6 +501,8 @@ export async function npo_search(
       id: npos.id,
       name: npos.name,
       card_img: npos.card_img,
+      logo: npos.logo,
+      image: npos.image,
       tagline: npos.tagline,
       hq_country: npos.hq_country,
       sdgs: npos.sdgs,
