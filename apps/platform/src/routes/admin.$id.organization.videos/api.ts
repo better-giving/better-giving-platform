@@ -39,15 +39,10 @@ const page_full = async (npo_id: number) => {
 
 const not_found = () => data({ error: "Video not found" }, { status: 404 });
 
-/** `npo_media_put` features what it writes; past the cap the video lands in
- * the list only */
+/** past the cap the video lands in the list only */
 const put = async (npo_id: number, url: string, featured: boolean) => {
-  const full = await page_full(npo_id);
-  const mid = await npo_media_put(npo_id, url);
-  if (!featured || full) {
-    await npo_media_update(npo_id, mid, { featured: false });
-  }
-  return mid;
+  const m = await npo_media_put(npo_id, { url, featured }, MAX_VIDEOS);
+  return m.id;
 };
 
 const parse_url = (fv: FormData) => {
