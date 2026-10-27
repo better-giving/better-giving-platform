@@ -187,9 +187,10 @@ describe("organization — videos", () => {
         screen.getByRole("heading", { name: "Videos", exact: true, level: 3 })
       )
       .toBeVisible();
-    await expect
-      .element(screen.getByRole("heading", { name: "All videos", level: 4 }))
-      .toBeVisible();
+    // the list's heading waits for a list, like the spots row
+    expect(
+      screen.getByRole("heading", { name: "All videos" }).query()
+    ).toBeNull();
     // the page fields' Save sits above the section, not after it
     const save = screen
       .getByRole("button", { name: "Save Better Giving Page" })
@@ -229,6 +230,9 @@ describe("organization — videos", () => {
       .toBeInTheDocument();
     await expect
       .element(screen.getByRole("heading", { name: "On your page", level: 4 }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByRole("heading", { name: "All videos", level: 4 }))
       .toBeVisible();
     expect(screen.getByText("Open spot").elements()).toHaveLength(3);
     await expect.element(screen.getByText(HELP)).not.toBeInTheDocument();

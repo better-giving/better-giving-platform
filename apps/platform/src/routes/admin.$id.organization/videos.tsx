@@ -139,7 +139,7 @@ export function VideosGroup({ npo_id, videos }: IVideosGroup) {
     >
       {/* the fieldset's first child, or it names nothing */}
       <legend>
-        <h3 className="text-lg font-semibold">Videos</h3>
+        <h3 className="text-xl">Videos</h3>
       </legend>
       <p id={note_id} className="mt-0.5 text-sm text-gray-11">
         Changes here apply right away.
@@ -183,7 +183,7 @@ export function VideosGroup({ npo_id, videos }: IVideosGroup) {
       )}
 
       <div className="mt-6 grid gap-2">
-        <h4 className="text-sm font-semibold">All videos</h4>
+        {!empty && <h4 className="text-sm font-semibold">All videos</h4>}
         <AddVideo
           npo_id={npo_id}
           help={
