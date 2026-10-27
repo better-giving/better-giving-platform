@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { href, useFetcher, useRevalidator } from "react-router";
 import { safeParse } from "valibot";
 import type { action } from "#/routes/admin.$id.organization.videos/route";
@@ -124,12 +124,11 @@ export function use_restore(npo_id: number, removed: IRemoved) {
   // idle only once the read after the write landed, so a restored row that
   // fits the loaded page is listed by then
   const d = f.state === "idle" ? f.data : undefined;
-  const settled: Restored | undefined = !d
-    ? undefined
-    : "ok" in d
-      ? "restored"
-      : "errors" in d
-        ? { refusal: d.errors.url }
-        : { refusal: d.error };
+  // one object per answer: a consumer's effect keys on it
+  const settled = useMemo((): Restored | undefined => {
+    if (!d) return;
+    if ("ok" in d) return "restored";
+    return { refusal: "errors" in d ? d.errors.url : d.error };
+  }, [d]);
   return { pending: f.state !== "idle", settled, restore };
 }

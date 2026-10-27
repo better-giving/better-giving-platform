@@ -1,6 +1,7 @@
 import { Check, Trash2 } from "lucide-react";
 import {
   type KeyboardEvent,
+  type Ref,
   useCallback,
   useEffect,
   useId,
@@ -50,6 +51,8 @@ interface IVideosGroup {
 interface IRemovedRow extends IRemoved {
   /** why its restore was refused */
   refusal?: string;
+  /** a read has come back without it */
+  gone?: boolean;
 }
 
 export function VideosGroup({ npo_id, videos }: IVideosGroup) {
@@ -61,6 +64,11 @@ export function VideosGroup({ npo_id, videos }: IVideosGroup) {
   const [focus_id, set_focus_id] = useState<string>();
   const status_ref = useRef<HTMLParagraphElement>(null);
   const took_off = useRef<string>(undefined);
+  const more_ref = useRef<HTMLButtonElement>(null);
+  /** a restored video that sorts past the loaded page */
+  const [back_off_page, set_back_off_page] = useState<IRemoved>();
+  const listed = useRef(items);
+  listed.current = items;
 
   // a delete press is recorded at the press; its Undo shows once the read no
   // longer has the row, so a refused delete never offers one, and stays until
@@ -68,21 +76,46 @@ export function VideosGroup({ npo_id, videos }: IVideosGroup) {
   const undoable = removed.filter((r) => !items.some((v) => v.id === r.id));
   // a second press, or the restored row removed again, replaces the entry: the
   // link may have been edited since
-  const on_remove = useCallback(
-    (r: IRemoved) =>
-      set_removed((prev) => [...prev.filter((x) => x.id !== r.id), r]),
-    []
-  );
-  const on_settled = useCallback((id: string, out: Restored) => {
+  const on_remove = useCallback((r: IRemoved) => {
+    set_back_off_page(undefined);
+    set_removed((prev) => [...prev.filter((x) => x.id !== r.id), r]);
+  }, []);
+  const on_settled = useCallback((r: IRemoved, out: Restored) => {
+    const { id } = r;
     if (out !== "restored") {
       const { refusal } = out;
       set_removed((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, refusal } : r))
+        prev.some((x) => x.id === id && x.refusal !== refusal)
+          ? prev.map((x) => (x.id === id ? { ...x, refusal } : x))
+          : prev
       );
       return;
     }
-    set_removed((prev) => prev.filter((r) => r.id !== id));
+    if (!listed.current.some((v) => v.id === id)) set_back_off_page(r);
+    set_removed((prev) => prev.filter((x) => x.id !== id));
   }, []);
+  // an entry ends once its row is listed again, so a later delete from
+  // elsewhere offers no Undo here for a link that may have changed since; a
+  // restored row loaded in ends its notice
+  useEffect(() => {
+    set_removed((prev) => {
+      const is_listed = (r: IRemovedRow) => items.some((v) => v.id === r.id);
+      const next = prev
+        .filter((r) => !(r.gone && is_listed(r)))
+        .map((r) => (r.gone || is_listed(r) ? r : { ...r, gone: true }));
+      const same =
+        next.length === prev.length && next.every((r, i) => r === prev[i]);
+      return same ? prev : next;
+    });
+    set_back_off_page((b) =>
+      b && items.some((v) => v.id === b.id) ? undefined : b
+    );
+  }, [items]);
+  // the Undo that held the focus is gone and the row it brought back isn't
+  // listed; the way to it is
+  useEffect(() => {
+    if (back_off_page && focus_dropped()) more_ref.current?.focus();
+  }, [back_off_page]);
 
   // a spot taken off is replaced by an open one; the count says what changed
   useEffect(() => {
@@ -177,7 +210,11 @@ export function VideosGroup({ npo_id, videos }: IVideosGroup) {
             ))}
           </ul>
         )}
-        {videos.has_more && <LoadMore limit={videos.limit} />}
+        <p role="status" className="text-sm text-gray-11 empty:hidden">
+          {back_off_page &&
+            `${disp(back_off_page.url)} is back, further down the list.`}
+        </p>
+        {videos.has_more && <LoadMore ref={more_ref} limit={videos.limit} />}
       </div>
     </fieldset>
   );
@@ -272,7 +309,10 @@ function AddVideo({ npo_id }: IAddVideo) {
           aria-busy={add.pending}
           className="btn btn-secondary btn-field shrink-0"
         >
-          Add<span className="@max-lg:sr-only"> video</span>
+          {/* one flex item, so the space before "video" isn't trimmed */}
+          <span>
+            Add<span className="@max-lg:sr-only"> video</span>
+          </span>
         </button>
       </div>
       <p id={err_id} className="field-err empty:hidden">
@@ -517,7 +557,7 @@ interface IUndoRow {
   npo_id: number;
   removed: IRemovedRow;
   on_restore: (id: string) => void;
-  on_settled: (id: string, out: Restored) => void;
+  on_settled: (r: IRemoved, out: Restored) => void;
 }
 
 function UndoRow({ npo_id, removed, on_restore, on_settled }: IUndoRow) {
@@ -533,8 +573,8 @@ function UndoRow({ npo_id, removed, on_restore, on_settled }: IUndoRow) {
     if (focus_dropped()) ref.current?.focus();
   }, []);
   useEffect(() => {
-    if (settled) on_settled(removed.id, settled);
-  }, [settled, removed.id, on_settled]);
+    if (settled) on_settled(removed, settled);
+  }, [settled, removed, on_settled]);
   // the refusal replaced the pressed Undo
   useEffect(() => {
     if (removed.refusal && focus_dropped()) refusal_ref.current?.focus();
@@ -572,16 +612,18 @@ function UndoRow({ npo_id, removed, on_restore, on_settled }: IUndoRow) {
 }
 
 interface ILoadMore {
+  ref: Ref<HTMLButtonElement>;
   limit: number;
 }
 
-function LoadMore({ limit }: ILoadMore) {
+function LoadMore({ ref, limit }: ILoadMore) {
   const [, set_search] = useSearchParams();
   const nav = useNavigation();
   const loading =
     nav.state !== "idle" && !!nav.location?.search.includes(VIDEOS_PAGE);
   return (
     <button
+      ref={ref}
       type="button"
       aria-disabled={loading}
       aria-busy={loading}

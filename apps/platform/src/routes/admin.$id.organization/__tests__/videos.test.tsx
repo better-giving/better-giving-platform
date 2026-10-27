@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { createRoutesStub } from "react-router";
 import {
   afterAll,
@@ -185,8 +186,12 @@ describe("organization — videos", () => {
     await expect.element(screen.getByText("No videos yet")).toBeVisible();
 
     const field = screen.getByLabelText("Add a video");
+    const add = screen.getByRole("button", { name: "Add video" });
+    await expect.element(add).toHaveAccessibleName("Add video");
+    // the label as painted: the button lays its children out as flex items
+    expect((add.element() as HTMLElement).innerText).toBe("Add video");
     await field.fill("https://vimeo.com/123456");
-    await screen.getByRole("button", { name: "Add video" }).click();
+    await add.click();
     await expect
       .element(screen.getByText("only YouTube links are supported"))
       .toBeVisible();
@@ -322,12 +327,17 @@ describe("organization — videos", () => {
       .element(screen.getByRole("link", { name: `youtu.be/${yt(11)}` }))
       .toBeVisible();
     await expect.element(undo).not.toBeInTheDocument();
+    const more = screen.getByRole("button", { name: "Load more videos" });
+    await expect.element(more).toHaveFocus();
     await expect
-      .element(screen.getByRole("button", { name: "Load more videos" }))
-      .toBeVisible();
+      .element(
+        screen.getByRole("group", { name: "Videos" }).getByRole("status")
+      )
+      .toHaveTextContent(`youtu.be/${yt(1)} is back, further down the list.`);
   });
 
   it("a refused Undo shows its reason where the Undo was", async () => {
+    const errors = vi.spyOn(console, "error");
     const npo = await seed_npo();
     // stored before links had to be YouTube's
     await seed_video(npo.id, "old", false, "https://vimeo.com/123456");
@@ -344,6 +354,39 @@ describe("organization — videos", () => {
       .element(screen.getByText("only YouTube links are supported"))
       .toBeVisible();
     await expect.element(undo).not.toBeInTheDocument();
+    // a settled refusal stores once; a re-store per render never stops
+    await new Promise((r) => setTimeout(r, 300));
+    expect(
+      errors.mock.calls.filter((c) => /Maximum update depth/.test(String(c[0])))
+    ).toEqual([]);
+    errors.mockRestore();
+  });
+
+  it("a restored video deleted later in another tab offers no Undo here", async () => {
+    const npo = await seed_npo();
+    const row = await seed_video(npo.id, yt(7), false);
+    await seed_video(npo.id, yt(8), false);
+    const screen = await render_org(npo.id);
+    const link = screen.getByRole("link", { name: `youtu.be/${yt(7)}` });
+
+    await screen
+      .getByRole("button", { name: `Remove youtu.be/${yt(7)}` })
+      .click();
+    const undo = screen.getByRole("button", {
+      name: `Undo removing youtu.be/${yt(7)}`,
+    });
+    await undo.click();
+    await expect.element(link).toBeVisible();
+    await expect.element(undo).not.toBeInTheDocument();
+
+    // another tab deletes it; a write here brings the read without it
+    await db().delete(npo_media).where(eq(npo_media.id, row));
+    await screen
+      .getByRole("button", { name: `Show youtu.be/${yt(8)} on page` })
+      .click();
+    await expect.element(screen.getByText("On page · spot 1")).toBeVisible();
+    await expect.element(link).not.toBeInTheDocument();
+    expect(undo.query()).toBeNull();
   });
 
   it("a delete holds its row until the read without it lands", async () => {

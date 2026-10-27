@@ -53,8 +53,7 @@ const featured_count = async () =>
   ).length;
 
 /** pglite runs one transaction at a time, so these tests pass with or without
- * the lock; the race it closes was reproduced on a Postgres 16 cluster. What
- * they can prove is that each write takes it */
+ * the lock. What they can prove is that each write takes it */
 async function advisory_locks(run: () => Promise<unknown>) {
   const spy = vi.spyOn(PgDialect.prototype, "sqlToQuery");
   try {
