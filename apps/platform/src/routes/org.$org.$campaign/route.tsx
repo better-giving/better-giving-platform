@@ -66,8 +66,11 @@ export const meta: Route.MetaFunction = ({ loaderData, params, error }) => {
     org: {
       url: `${base_url}/org/${params.org}`,
       name: campaign.owner_name,
-      logo: campaign.mark,
+      // the org's own logo: `mark` prefers the campaign's
+      logo: campaign.owner_logo,
       ein: npo.ein,
+      registration_number: npo.registration_number,
+      country: npo.hq_country,
       website: npo.url,
     },
   });

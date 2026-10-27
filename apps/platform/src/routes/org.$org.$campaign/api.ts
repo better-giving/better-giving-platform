@@ -134,6 +134,9 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
         hide_bg_tip: npo.hide_bg_tip,
         url: npo.url,
         ein: registration?.ein ?? null,
+        // what the profile labels "EIN" when no approved 501(c)(3) ein backs it
+        registration_number: npo.registration_number,
+        hq_country: npo.hq_country,
       },
       closed: !campaign_accepts(campaign, now),
       now: now.toISOString(),
