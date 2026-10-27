@@ -142,7 +142,7 @@ export function Form({ init, profile, id, base_url, videos }: IProps) {
       />
 
       <Fieldset disabled={social_media.busy} className="contents">
-        <Group title="Social Media">
+        <Group title="Social Media" heading_level={2}>
           <UrlInput
             {...social_media.register("social_media_urls.facebook")}
             label="Facebook"
@@ -358,7 +358,7 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
         </div>
       </Modal>
       <Fieldset disabled={form.busy} className="contents">
-        <Group title="Organization">
+        <Group title="Organization" heading_level={2}>
           <label htmlFor="npo-logo" className="label -mb-4" data-required>
             Logo of your organization
           </label>
