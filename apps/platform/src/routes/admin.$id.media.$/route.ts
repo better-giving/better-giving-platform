@@ -42,7 +42,7 @@ export const action = async (x: Route.ActionArgs) => {
   if (rest !== "new") fv.set("mediaId", rest);
   const request = new Request(x.request.url, { method: "POST", body: fv });
   const answer = await videos_action({ ...x, request });
-  // the dialog closes only on a redirect; left open, its Save adds a duplicate
+  // the dialog closes only on a redirect, so only a refusal answers with data
   if (!("ok" in answer)) return as_field_error(answer);
   return redirectWithSuccess(
     videos_group(x.params.id),
