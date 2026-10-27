@@ -74,6 +74,8 @@ export function VideosGroup({ npo_id, videos }: IVideosGroup) {
   // longer has the row, so a refused delete never offers one, and stays until
   // its restore settles: a restored row past the loaded page is never listed
   const undoable = removed.filter((r) => !items.some((v) => v.id === r.id));
+  // an Undo still pending keeps the spots, so the row it restores lands in place
+  const empty = items.length + undoable.length === 0;
   // a second press, or the restored row removed again, replaces the entry: the
   // link may have been edited since
   const on_remove = useCallback((r: IRemoved) => {
@@ -136,51 +138,61 @@ export function VideosGroup({ npo_id, videos }: IVideosGroup) {
       className="min-w-0 scroll-mt-20"
     >
       {/* the fieldset's first child, or it names nothing */}
-      <legend className="label">Videos</legend>
+      <legend>
+        <h3 className="text-lg font-semibold">Videos</h3>
+      </legend>
       <p id={note_id} className="mt-0.5 text-sm text-gray-11">
         Changes here apply right away.
       </p>
 
-      <div className="mt-6 grid gap-2">
-        <div className="flex items-baseline justify-between gap-3 text-sm">
-          <p className="font-semibold">On your page</p>
-          <p ref={status_ref} tabIndex={-1} className="text-gray-11">
-            <b className="font-semibold text-gray-12">{featured.length}</b> of{" "}
-            {max} spots used
-          </p>
+      {/* with nothing to choose, open spots are noise; the add field leads */}
+      {!empty && (
+        <div className="mt-6 grid gap-2">
+          <div className="flex items-baseline justify-between gap-3 text-sm">
+            <h4 className="text-sm font-semibold">On your page</h4>
+            <p ref={status_ref} tabIndex={-1} className="text-gray-11">
+              <b className="font-semibold text-gray-12">{featured.length}</b> of{" "}
+              {max} spots used
+            </p>
+          </div>
+          <ol className="grid grid-cols-2 @lg:grid-cols-4 gap-3">
+            {Array.from({ length: max }, (_, i) => {
+              const v = featured.at(i);
+              return v ? (
+                <li key={v.id} className="min-w-0">
+                  <Spot
+                    npo_id={npo_id}
+                    video={v}
+                    n={i + 1}
+                    on_take_off={on_take_off}
+                  />
+                </li>
+              ) : (
+                <li key={`open-${i}`} className="min-w-0">
+                  <OpenSpot />
+                </li>
+              );
+            })}
+          </ol>
+          {full && (
+            <p id={full_id} className="text-sm text-gray-11">
+              All {max} spots are in use. Take a video off to show another.
+            </p>
+          )}
         </div>
-        <ol className="grid grid-cols-2 @lg:grid-cols-4 gap-3">
-          {Array.from({ length: max }, (_, i) => {
-            const v = featured.at(i);
-            return v ? (
-              <li key={v.id} className="min-w-0">
-                <Spot
-                  npo_id={npo_id}
-                  video={v}
-                  n={i + 1}
-                  on_take_off={on_take_off}
-                />
-              </li>
-            ) : (
-              <li key={`open-${i}`} className="min-w-0">
-                <OpenSpot />
-              </li>
-            );
-          })}
-        </ol>
-        {full && (
-          <p id={full_id} className="text-sm text-gray-11">
-            All {max} spots are in use. Take a video off to show another.
-          </p>
-        )}
-      </div>
+      )}
 
       <div className="mt-6 grid gap-2">
-        <p className="text-sm font-semibold">All videos</p>
-        <AddVideo npo_id={npo_id} />
-        {items.length + undoable.length === 0 ? (
-          <p className="text-sm text-gray-11">No videos yet</p>
-        ) : (
+        <h4 className="text-sm font-semibold">All videos</h4>
+        <AddVideo
+          npo_id={npo_id}
+          help={
+            empty
+              ? `Add a YouTube link. You can show up to ${max} on your page.`
+              : undefined
+          }
+        />
+        {!empty && (
           <ul className="mt-2 divide-y border rounded bg-surface">
             {items.map((v) => {
               const spot = featured.findIndex((f) => f.id === v.id) + 1;
@@ -274,15 +286,21 @@ function OpenSpot() {
 
 interface IAddVideo {
   npo_id: number;
+  help?: string;
 }
 
-function AddVideo({ npo_id }: IAddVideo) {
+function AddVideo({ npo_id, help }: IAddVideo) {
   const add = use_add_video(npo_id);
   const id = useId();
   const err_id = useId();
+  const help_id = useId();
+  const described =
+    [add.error && err_id, help && help_id].filter(Boolean).join(" ") ||
+    undefined;
   return (
     <div className="grid gap-1">
-      <label htmlFor={id} className="label">
+      {/* the section's "All videos", the placeholder and the button say it */}
+      <label htmlFor={id} className="sr-only">
         Add a video
       </label>
       <div className="flex items-center gap-2">
@@ -299,7 +317,7 @@ function AddVideo({ npo_id }: IAddVideo) {
           onChange={(e) => add.set_value(e.target.value)}
           onKeyDown={on_enter(add.add)}
           aria-invalid={!!add.error}
-          aria-describedby={add.error ? err_id : undefined}
+          aria-describedby={described}
           className="field-input flex-1 min-w-0"
         />
         <button
@@ -318,6 +336,11 @@ function AddVideo({ npo_id }: IAddVideo) {
       <p id={err_id} className="field-err empty:hidden">
         {add.error}
       </p>
+      {help && (
+        <p id={help_id} className="text-sm text-gray-11">
+          {help}
+        </p>
+      )}
     </div>
   );
 }
