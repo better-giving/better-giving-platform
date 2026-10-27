@@ -84,8 +84,7 @@ interface BappCursor {
  *
  * carried as `<iso>|<id>` through the same base64url pair the date cursor uses
  * — neither field can contain a pipe, and a decoded value without both halves
- * reads as no cursor (the first page). `encode_cursor`'s json form is
- * `Buffer`-based and unavailable in the browser test env. */
+ * reads as no cursor (the first page). */
 function encode_bapp_cursor(c: BappCursor) {
   return encode_date_cursor(`${c.ts}|${c.id}`);
 }
