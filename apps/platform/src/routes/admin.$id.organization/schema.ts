@@ -26,11 +26,6 @@ export const logoSpec: ImgSpec = {
   aspect: [1, 1],
   max_size: 4e6,
 };
-export const cardImgSpec: ImgSpec = {
-  type: VALID_MIME_TYPES,
-  aspect: [2, 1],
-  max_size: 4e6,
-};
 export const bannerSpec: ImgSpec = {
   type: VALID_MIME_TYPES,
   aspect: [4, 1],
@@ -57,11 +52,11 @@ export const schema = v.object({
 
 export type FV = v.InferInput<typeof schema>;
 
-/** in the order the form renders them — `trigger`'s focus-on-error walks
- * this order, not the order they register in */
+/** the controls, in the order the form renders them — `trigger`'s
+ * focus-on-error walks this order, not the order they register in. the legal
+ * name is text, not a control */
 export const fields = [
   "logo",
-  "name",
   "registration_number",
   "endow_designation",
   "hq_country",
@@ -71,12 +66,11 @@ export const fields = [
   "active_in_countries",
 ] as const satisfies (keyof FV)[];
 
-/** the Better Giving Page section, the socials and the publish bar */
+/** the Better Giving Page section, the socials and the publish switch */
 export const profile_schema = v.object({
   overview: richtext_content({ maxChars: MAX_CHARS, required: true }),
   tagline: v.pipe($req, v.maxLength(140, "max length is 140 chars")),
   image: img_output({ required: true }),
-  card_img: img_output({ required: true }),
   social_media_urls: social_media_urls,
   published: v.boolean(),
 });

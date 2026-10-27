@@ -9,7 +9,6 @@ export const routes = {
   settings: "settings",
   organization: "organization",
   members: "members",
-  media: "media",
   funds: "funds",
   integrations: "integrations",
   referrals: "referrals",

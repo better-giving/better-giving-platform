@@ -5,7 +5,6 @@ import {
   CircleDollarSign,
   HandshakeIcon,
   Heart,
-  Image,
   LayoutDashboard,
   ListCheck,
   MegaphoneIcon,
@@ -115,14 +114,6 @@ const group3: LinkGroup = {
       icon: {
         fn: ListCheck,
         size: 22,
-      },
-    },
-    {
-      title: "Media",
-      to: sidebar_routes.media,
-      icon: {
-        fn: Image,
-        size: 20,
       },
     },
     {

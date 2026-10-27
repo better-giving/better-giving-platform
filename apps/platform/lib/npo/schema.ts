@@ -233,6 +233,7 @@ const bool_csv = v.pipe(
 const npo_item_field = v.picklist([
   "id",
   "name",
+  "logo",
   "card_img",
   "tagline",
   "hq_country",

@@ -84,8 +84,7 @@ const NPO_SEED: Omit<typeof npos.$inferInsert, "id"> = {
   url: "https://example.org",
 };
 
-const note =
-  "Your profile link can't change, so links you've already shared, including your campaign links, keep working.";
+const note = "Can't change once set, so links you've shared keep working.";
 
 beforeAll(async () => {
   test_db.current = await create_test_db();
@@ -172,6 +171,26 @@ async function render_marketplace() {
   ]);
 
   return await render(<Stub initialEntries={["/marketplace"]} />);
+}
+
+type Screen = Awaited<ReturnType<typeof render_org>>;
+
+/** a set link reads as text with a copy button, and its field is gone */
+async function expect_locked(screen: Screen, slug: string) {
+  await expect
+    .element(screen.getByRole("link", { name: new RegExp(`/org/${slug}$`) }))
+    .toBeVisible();
+  await expect
+    .element(screen.getByRole("button", { name: "Copy page link" }))
+    .toBeVisible();
+  await expect.element(screen.getByText(note)).toBeVisible();
+  expect(screen.getByLabelText("Profile link").query()).toBeNull();
+  await expect
+    .element(screen.getByRole("link", { name: new RegExp(`/donate/${slug}$`) }))
+    .toBeVisible();
+  await expect
+    .element(screen.getByRole("button", { name: "Copy donate link" }))
+    .toBeVisible();
 }
 
 function free_slug() {
@@ -261,14 +280,7 @@ describe("organization — slug unset", () => {
     await vi.waitFor(async () =>
       expect((await npo_get(npo.id))?.slug).toBe("acme-org")
     );
-    await expect.element(screen.getByLabelText("Profile link")).toBeDisabled();
-    await expect.element(screen.getByText(note)).toBeVisible();
-    await expect
-      .element(screen.getByRole("link", { name: /\/org\/acme-org$/ }))
-      .toBeVisible();
-    await expect
-      .element(screen.getByRole("link", { name: /\/donate\/acme-org$/ }))
-      .toBeVisible();
+    await expect_locked(screen, "acme-org");
   });
 
   it("previews the profile link as the slug is typed", async () => {
@@ -358,20 +370,10 @@ describe("organization — slug unset", () => {
 });
 
 describe("organization — slug set", () => {
-  it("is read-only and lists the profile and donate urls", async () => {
+  it("shows the profile and donate links as text with copy buttons, no field", async () => {
     const npo = await seed_npo({ slug: "already-set" });
     const screen = await render_org(npo.id);
-    const slug = screen.getByLabelText("Profile link");
-    await expect.element(slug).toBeVisible();
-    await expect.element(slug).toBeDisabled();
-    await expect.element(slug).toHaveDisplayValue("already-set");
-    await expect.element(screen.getByText(note)).toBeVisible();
-    await expect
-      .element(screen.getByRole("link", { name: /\/org\/already-set$/ }))
-      .toBeVisible();
-    await expect
-      .element(screen.getByRole("link", { name: /\/donate\/already-set$/ }))
-      .toBeVisible();
+    await expect_locked(screen, "already-set");
 
     await screen.getByLabelText(/ein.*registration/i).fill("NEW999");
     await screen.getByRole("button", { name: "Save organization" }).click();
@@ -386,10 +388,7 @@ describe("organization — stored route slug", () => {
   it("saves other fields and leaves the slug", async () => {
     const npo = await seed_npo({ slug: "donate" });
     const screen = await render_org(npo.id);
-    await expect.element(screen.getByLabelText("Profile link")).toBeDisabled();
-    await expect
-      .element(screen.getByLabelText("Profile link"))
-      .toHaveDisplayValue("donate");
+    await expect_locked(screen, "donate");
 
     await screen.getByLabelText(/ein.*registration/i).fill("NEW999");
     await screen.getByRole("button", { name: "Save organization" }).click();
@@ -555,6 +554,16 @@ describe("organization — renders pre-filled", () => {
     await expect
       .element(screen.getByLabelText(/tagline/i))
       .toHaveDisplayValue("Helping the world");
+    // visually hidden, but the page's one h1
+    await expect
+      .element(
+        screen.getByRole("heading", {
+          level: 1,
+          name: "Organization",
+          exact: true,
+        })
+      )
+      .toBeInTheDocument();
 
     const page_link = screen.getByRole("link", {
       name: "Your Better Giving Page",
@@ -607,7 +616,6 @@ describe("organization — renders pre-filled", () => {
       screen.getByLabelText("Logo of your organization"),
       screen.getByLabelText(/ein.*registration/i),
       screen.getByPlaceholder("Select a country"),
-      screen.getByLabelText("Profile link"),
       screen.getByLabelText(/website/i),
       screen.getByLabelText(/address/i),
       screen.getByRole("combobox", { name: "Active countries" }),
@@ -616,7 +624,6 @@ describe("organization — renders pre-filled", () => {
     const outline = [
       screen.getByLabelText(/tagline/i),
       screen.getByLabelText("Banner"),
-      screen.getByLabelText("Card image"),
       screen.getByText("Content", { exact: true }),
     ].map((l) => pos(l.element()));
 
@@ -624,9 +631,24 @@ describe("organization — renders pre-filled", () => {
     expect(outline).toEqual([...outline].sort((a, b) => a - b));
     expect(Math.max(...org_facts)).toBeLessThan(pos(page_section));
     for (const el of outline) expect(el).toBeGreaterThan(pos(page_section));
-    expect(
-      pos(screen.getByRole("checkbox", { name: /publish profile/i }).element())
-    ).toBeGreaterThan(Math.max(...outline));
+    // the switch sits on the profile link's row, at the top of the section
+    const published = pos(
+      screen.getByRole("checkbox", { name: "Published" }).element()
+    );
+    expect(published).toBeGreaterThan(pos(page_section));
+    expect(published).toBeLessThan(Math.min(...outline));
+
+    // a card under the page's h1 is one level below it
+    for (const name of [
+      "Organization",
+      "Social Media",
+      "Your Better Giving Page",
+      "Donate link",
+    ]) {
+      await expect
+        .element(screen.getByRole("heading", { name, exact: true, level: 2 }))
+        .toBeInTheDocument();
+    }
   });
 
   it("a first slug's save keeps an unsaved page edit", async () => {
@@ -647,7 +669,7 @@ describe("organization — renders pre-filled", () => {
     await vi.waitFor(async () =>
       expect((await npo_get(npo.id))?.slug).toBe("acme-org")
     );
-    await expect.element(screen.getByLabelText("Profile link")).toBeDisabled();
+    await expect_locked(screen, "acme-org");
     await expect.element(tagline).toHaveDisplayValue("Unsaved tagline");
     await expect
       .element(screen.getByRole("button", { name: "Save Better Giving Page" }))
@@ -882,7 +904,7 @@ describe("organization — published toggle", () => {
 
     // initially unpublished
     await expect
-      .element(screen.getByText(/not visible in the marketplace/i))
+      .element(screen.getByText("Hidden from the marketplace"))
       .toBeVisible();
 
     const tagline = screen.getByLabelText(/tagline/i);
@@ -891,7 +913,7 @@ describe("organization — published toggle", () => {
     // click toggle — dispatch via JS (element below fold, not visible to Playwright)
     (
       screen
-        .getByRole("checkbox", { name: /publish profile/i })
+        .getByRole("checkbox", { name: "Published" })
         .element() as HTMLElement
     ).click();
 
@@ -906,7 +928,7 @@ describe("organization — published toggle", () => {
       .element(screen.getByRole("button", { name: "Save Better Giving Page" }))
       .toBeEnabled();
     await expect
-      .element(screen.getByText(/your profile is visible in the marketplace/i))
+      .element(screen.getByText("Visible in the marketplace"))
       .toBeInTheDocument();
 
     // verify NPO appears on marketplace (filters by published)
@@ -928,13 +950,13 @@ describe("organization — published toggle", () => {
     const tagline = screen.getByLabelText(/tagline/i);
     await expect.element(tagline).toBeVisible();
 
-    const toggle = screen.getByRole("checkbox", { name: /publish profile/i });
+    const toggle = screen.getByRole("checkbox", { name: "Published" });
     (toggle.element() as HTMLElement).click();
     await vi.waitFor(() => expect(calls).toBe(1));
     await expect.element(toggle).toBeEnabled();
     await expect.element(toggle).not.toBeChecked();
     await expect
-      .element(screen.getByText(/profile is not visible/i))
+      .element(screen.getByText("Hidden from the marketplace"))
       .toBeVisible();
 
     await tagline.fill("New tagline");
@@ -952,7 +974,7 @@ describe("organization — published toggle", () => {
     expect((await npo_get(npo.id))?.published).toBe(false);
     await expect.element(toggle).not.toBeChecked();
     await expect
-      .element(screen.getByText(/profile is not visible/i))
+      .element(screen.getByText("Hidden from the marketplace"))
       .toBeVisible();
   });
 });
@@ -1224,7 +1246,7 @@ describe("organization — back-to-back saves", () => {
     const general = screen.getByRole("button", {
       name: "Save Better Giving Page",
     });
-    press(general, screen.getByRole("checkbox", { name: /publish profile/i }));
+    press(general, screen.getByRole("checkbox", { name: "Published" }));
 
     await vi.waitFor(async () => {
       const row = await npo_get(npo.id);
@@ -1234,7 +1256,7 @@ describe("organization — back-to-back saves", () => {
     await expect.element(tagline).toBeEnabled();
     await expect.element(general).toBeDisabled();
     await expect
-      .element(screen.getByText(/your profile is visible in the marketplace/i))
+      .element(screen.getByText("Visible in the marketplace"))
       .toBeInTheDocument();
   });
 
@@ -1414,29 +1436,33 @@ describe("organization — focus on error", () => {
       );
     });
   });
+});
 
-  it("all three images missing → the banner wins, not the card image", async () => {
-    // focus on error follows the page group's field list passed to
-    // `trigger` — which has to match DOM order or the user is sent to the card
-    // image at the bottom of the group. the logo is in the org-facts group.
-    const npo = await seed_npo({ image: "", logo: "", card_img: "" });
-    const screen = await render_org(npo.id);
-
-    await expect.element(screen.getByLabelText(/tagline/i)).toBeVisible();
+describe("organization — card image", () => {
+  it("has no control, and a page save neither sends nor clears it", async () => {
+    const npo = await seed_npo();
+    const sent: Record<string, unknown>[] = [];
+    const spy: typeof action = async (args) => {
+      sent.push(await args.request.clone().json());
+      return action(args);
+    };
+    const screen = await render_org(npo.id, spy);
 
     const tagline = screen.getByLabelText(/tagline/i);
-    await tagline.clear();
-    await tagline.fill("Still helping the world");
+    await expect.element(tagline).toBeVisible();
+    expect(screen.getByLabelText("Card image").query()).toBeNull();
 
+    await tagline.fill("New tagline");
     await screen
       .getByRole("button", { name: "Save Better Giving Page" })
       .click();
-
-    await vi.waitFor(() => {
-      expect(document.activeElement).toBe(
-        screen.getByLabelText("Banner").element()
-      );
-    });
+    await vi.waitFor(async () =>
+      expect((await npo_get(npo.id))?.tagline).toBe("New tagline")
+    );
+    expect(sent).toEqual([{ tagline: "New tagline" }]);
+    expect((await npo_get(npo.id))?.card_img).toBe(
+      "https://example.com/card.jpg"
+    );
   });
 });
 
@@ -1445,7 +1471,7 @@ describe("organization — image fields", () => {
     const npo = await seed_npo({ image: "", logo: "", card_img: "" });
     const screen = await render_org(npo.id);
 
-    const captions = ["Banner", "Card image"];
+    const captions = ["Banner"];
     const inputs = captions.map((c) => screen.getByLabelText(c));
     for (const [i, input] of inputs.entries()) {
       await expect.element(input).toHaveAccessibleName(captions[i]);
@@ -1623,12 +1649,24 @@ describe("organization — every caption names something", () => {
     expect(orphaned).toEqual([]);
   });
 
-  it("describes the locked slug input by its set-once note", async () => {
-    const npo = await seed_npo({ slug: "kept-slug" });
+  it("shows the legal name as text, with the address that changes it", async () => {
+    const npo = await seed_npo();
     const screen = await render_org(npo.id);
 
+    await expect.element(screen.getByLabelText(/tagline/i)).toBeVisible();
+    expect(
+      screen
+        .getByRole("textbox", { name: /name of your organization/i })
+        .query()
+    ).toBeNull();
     await expect
-      .element(screen.getByLabelText("Profile link"))
-      .toHaveAccessibleDescription(/links you've already shared/);
+      .element(screen.getByText("Test Charity", { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText(/your legal name from your application/i))
+      .toBeVisible();
+    await expect
+      .element(screen.getByRole("link", { name: "hi@better.giving" }))
+      .toHaveAttribute("href", "mailto:hi@better.giving");
   });
 });

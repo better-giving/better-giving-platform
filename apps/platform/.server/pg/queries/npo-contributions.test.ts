@@ -19,6 +19,7 @@ vi.mock("../db", () => ({
 }));
 
 import { types } from "@electric-sql/pglite";
+import { eq } from "drizzle-orm";
 import { dists } from "../schema/dist";
 import { donations } from "../schema/donation";
 import { npos } from "../schema/npo";
@@ -105,5 +106,24 @@ test("npo_search items read settled contributions as numbers", async () => {
   const page = await npo_search({});
   expect(page.items).toMatchObject([
     { id: npo_id, contributions_total: 14.78, contributions_count: 2 },
+  ]);
+});
+
+test("npo_search items carry the npo's logo and banner", async () => {
+  const { db } = test_db.current!;
+  await db
+    .update(npos)
+    .set({
+      logo: "https://x.test/logo.png",
+      image: "https://x.test/banner.png",
+    })
+    .where(eq(npos.id, npo_id));
+  const page = await npo_search({});
+  expect(page.items).toMatchObject([
+    {
+      id: npo_id,
+      logo: "https://x.test/logo.png",
+      image: "https://x.test/banner.png",
+    },
   ]);
 });

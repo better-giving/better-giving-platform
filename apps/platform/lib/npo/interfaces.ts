@@ -13,6 +13,9 @@ export interface INpoItem {
   id: number;
   name: string;
   card_img: string | null;
+  logo: string | null;
+  /** banner */
+  image: string | null;
   tagline: string | null;
   hq_country: string;
   sdgs: UnSdgNum[];

@@ -88,8 +88,8 @@ describe("page modules throw refusals, never return them", () => {
   const files = [...page_graph()].filter((f) => !EXEMPT.has(f)).sort();
 
   test("the walk reaches the page modules and the pages/** modules they import", () => {
-    expect(files).toContain(`${P}routes/admin.$id.media/api.ts`);
-    expect(files).toContain(`${P}pages/admin/media/api.ts`);
+    expect(files).toContain(`${P}routes/admin.$id.organization/api.ts`);
+    expect(files).toContain(`${P}pages/admin/endow-update-action.ts`);
     expect(files).not.toContain(`${P}routes/api.paypal-webhook/route.ts`);
   });
 
