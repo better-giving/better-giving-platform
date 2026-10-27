@@ -1,12 +1,21 @@
 ---
-name: to-review
-description: Take the current branch from finished work to merged — look-back and fix (`kru:reflect`), text pass (`kru:text-fix`), open the PR, then loop on Greptile's review until it scores 5/5 and CI is green, and merge.
+name: ship
+description: Take the current branch from finished work to landed — look-back and fix (`kru:reflect`), text pass (`kru:text-fix`), then by verb `pr` (default; Greptile to 5/5 + green CI, then squash-merge), `main` (squash straight onto `main`), or `branch` (push the branch, stop).
+argument-hint: "[pr|main|branch]"
 disable-model-invocation: true
 ---
 
-# to-review
+# ship
 
-Runs on the branch checked out now, against `main`. Invoking this skill is the approval for every outward step below: pushing the branch, opening the PR, posting `@greptileai`, and merging on a 5/5 with green CI. Nothing else is approved — a step that needs more (a migration, a force-push, a product call a finding raises) stops and asks.
+Runs on the branch checked out now, against `main`. The first argument is the verb; none means `pr`. Words after the verb are the user's notes for this run.
+
+| verb | lands where | after steps 1–2 |
+| --- | --- | --- |
+| `pr` | `main`, through a reviewed PR | steps 3–5 |
+| `main` | `main`, directly | step M |
+| `branch` | the branch only | push the branch, report, stop |
+
+Invoking this skill is the approval for every outward step its verb names: pushing the branch; for `pr`, opening the PR, posting `@greptileai`, and merging on a 5/5 with green CI; for `main`, pushing the squashed commit to `main`. Nothing else is approved — a step that needs more (a migration, a force-push, a product call a finding raises) stops and asks.
 
 ## 1. Look back
 
@@ -18,7 +27,16 @@ If that round landed any commit, run `kru:reflect` again over just those commits
 
 Run `kru:text-fix` on the branch. Commit what it changes.
 
-## 3. Open the PR
+## M. Straight to `main` (verb `main`)
+
+`main` takes direct pushes (root `AGENTS.md` → Git), so no CI gates this before it lands — the local run is the gate:
+
+1. Run `pnpm lint`, `pnpm typecheck`, and the changed files' tests plus any conformance sweep the change's classes reach (`apps/platform/CLAUDE.md` → UI). All green, or fix and rerun.
+2. Fetch `main`, then on a local `main` at `origin/main`: `git merge --squash <branch>`, one commit whose message says what changes for someone using the product, and `git push origin main`. A rejected push means `main` moved: fetch, redo the squash on the new tip, rerun step 1 for what changed. Never force.
+3. Push the branch too, so it carries the work.
+4. `ci.yml` runs on the push to `main`, and its `gate` is what promotes production. Read `checks`, `test` and `gate` on that sha. Red is a fix-forward on `main` the same way, never a revert without asking.
+
+## 3. Open the PR (verb `pr`)
 
 Push the branch, then open the PR against `main`. The body says what changes for someone using the product, with the design artifact link when there is one; the record (seats, findings, test counts) stays out. Subscribe to its activity (`subscribe_pr_activity`).
 

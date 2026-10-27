@@ -299,7 +299,7 @@ function AddVideo({ npo_id, help }: IAddVideo) {
     undefined;
   return (
     <div className="grid gap-1">
-      {/* the section's "All videos", the placeholder and the button say it */}
+      {/* the placeholder and the button say it */}
       <label htmlFor={id} className="sr-only">
         Add a video
       </label>
