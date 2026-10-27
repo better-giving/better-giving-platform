@@ -2,18 +2,45 @@
 
 > Nonprofit fundraising and fund management platform — by a nonprofit, for nonprofits. Accept donations via card, crypto, stocks, DAF, and more. Grow funds with savings and investment options. Free for nonprofits.
 
-Agents can find a nonprofit, quote a one-time USD donation, receive a
-Stripe-hosted checkout link, and check settlement status through the MCP
-endpoint at https://better.giving/agents.
-
-The same URL serves the agent guide over GET.
-
 Better Giving is a 501(c)(3) public charity (EIN 87-3758939) that provides free donation processing, embeddable fundraising forms, fund management (high-yield savings and investment portfolio), and fiscal sponsorship for international NGOs. 195+ countries, 100+ cryptocurrencies, zero platform fees.
+
+## Agent donations (MCP)
+
+AI agents can give on a donor's behalf. The donor pays on a Stripe-hosted checkout page; Better Giving and the agent never handle card data.
+
+- Endpoint: https://better.giving/agents/mcp (MCP, JSON-RPC 2.0 over HTTP POST)
+- [Agent guide](https://better.giving/agents): step-by-step donation flow, as markdown
+- [Agent skill](https://better.giving/agents/skill.md): the guide plus every tool's arguments and the endpoint
+- [Server card](https://better.giving/.well-known/mcp.json): name, protocol version, endpoint, and tool schemas as JSON
+
+Tools:
+
+- `find_nonprofit`: find a nonprofit on Better Giving by name or 9-digit US EIN; IRS-listed charities not yet on Better Giving come back with an onboarding link instead
+- `quote_donation`: price a one-time USD gift with an optional 10%, 15%, or 20% Better Giving tip and optional card-fee coverage; returns a signed quote token
+- `donate`: open (or reopen) the Stripe-hosted checkout for an unchanged quote token and the donor's name and email
+- `donation_status`: read a donation's status and amounts, without donor details
+
+Authentication: optional. Send `Authorization: Bearer <agent token>` if Better Giving issued you one; anonymous calls are allowed.
+
+Limits:
+
+- One-time donations in USD only, minimum 2 USD, at most two decimal places
+- Quotes expire one hour after they are issued; request a new quote after that
+- 5 new donations per rolling hour per agent token (per client address for anonymous calls), and 5 per hour per donor email; calling `donate` again with the same quote reuses its donation and does not count again
+- IRS directory lookups by `find_nonprofit` are capped at 20 per 10 minutes per token or client address
+
+Example donor prompts:
+
+- "Donate $25 to Doctors Without Borders on Better Giving and send me the checkout link."
+- "Give $100 through Better Giving to the nonprofit with EIN 12-3456789."
+- "Donate $50 to my local food bank on Better Giving, cover the card fee, and skip the tip."
+
+Nonprofit profile pages and campaign pages carry schema.org JSON-LD: each nonprofit is an NGO with a DonateAction, and each campaign is a Project.
 
 ## Product Pages
 
 - [Home](https://better.giving/): main landing page
-- [For Nonprofits](https://better.giving/nonprofit): features, pricing, FAQ for nonprofit organizations
+- [For Nonprofits](https://better.giving/product): features, pricing, FAQ for nonprofit organizations
 - [For Donors](https://better.giving/donor): donor benefits, giving methods, tax receipts
 - [Donation Forms](https://better.giving/donation-forms): customizable, embeddable donation form product page
 - [Fund Management](https://better.giving/fund-management): sustainability fund — savings and investment options
@@ -57,8 +84,9 @@ Better Giving is a 501(c)(3) public charity (EIN 87-3758939) that provides free 
 
 ## Optional
 
-- [Nonprofit Profile Example](https://better.giving/marketplace/:id): individual nonprofit profile with programs and donation form
-- [Campaign Detail](https://better.giving/campaigns/:fundId): individual campaign page with progress and donate button
+- [Nonprofit Profile](https://better.giving/org/:org): individual nonprofit profile with programs and donation form (`:org` is the nonprofit's slug or id)
+- [Nonprofit Campaign](https://better.giving/org/:org/:campaign): a nonprofit's campaign page with progress and donate button
+- [Fund Campaign](https://better.giving/campaigns/:fundId): legacy fund campaign page
 - [Donate](https://better.giving/donate/:id): donation checkout for a specific nonprofit
 - [Donate to Campaign](https://better.giving/campaigns/:fundId/donate): donation checkout for a campaign
 - [Nonprofit Category](https://better.giving/nonprofits/:slug): browse nonprofits by NTEE category
