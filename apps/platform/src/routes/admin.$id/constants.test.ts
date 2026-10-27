@@ -1,5 +1,6 @@
 import { HandshakeIcon, MegaphoneIcon } from "lucide-react";
 import { describe, expect, it } from "vitest";
+import { linkGroups as page_link_groups } from "#/pages/admin/constants";
 import { routes } from "#/pages/admin/routes";
 import { linkGroups } from "./constants";
 
@@ -41,5 +42,15 @@ describe("admin sidebar", () => {
     // videos live in Organization's Better Giving Page group
     expect(link("Media")).toBeUndefined();
     expect(Object.values(routes)).not.toContain("media");
+    expect(Object.keys(routes)).not.toContain("media");
+    // the page-level sidebar (src/pages/admin) carries no Media link either
+    const page_titles = page_link_groups.flatMap((g) =>
+      g.links.map((l) => l.title)
+    );
+    expect(page_titles).not.toContain("Media");
+    expect(page_titles).toContain("Programs");
+    expect(
+      page_link_groups.flatMap((g) => g.links.map((l) => l.to))
+    ).not.toContain("media");
   });
 });

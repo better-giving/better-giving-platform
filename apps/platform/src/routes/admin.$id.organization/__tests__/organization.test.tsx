@@ -554,6 +554,16 @@ describe("organization — renders pre-filled", () => {
     await expect
       .element(screen.getByLabelText(/tagline/i))
       .toHaveDisplayValue("Helping the world");
+    // visually hidden, but the page's one h1
+    await expect
+      .element(
+        screen.getByRole("heading", {
+          level: 1,
+          name: "Organization",
+          exact: true,
+        })
+      )
+      .toBeInTheDocument();
 
     const page_link = screen.getByRole("link", {
       name: "Your Better Giving Page",

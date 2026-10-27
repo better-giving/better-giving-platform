@@ -1,4 +1,5 @@
-import { data, matchPath, redirect } from "react-router";
+import { resolve } from "node:path";
+import { data, matchPath, matchRoutes, redirect } from "react-router";
 import { createFormData } from "remix-hook-form";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -98,5 +99,25 @@ describe("retired Media page", () => {
       ["url", url],
       ["mediaId", "m1"],
     ]);
+  });
+});
+
+describe("the real route table", () => {
+  it.each([
+    "/admin/7/media",
+    "/admin/7/media/new",
+    "/admin/7/media/0b6f7c1e-0000-4000-8000-000000000000",
+  ])("%s is answered by this splat route", async (path) => {
+    // what `react-router dev` sets before it loads src/routes.ts
+    (globalThis as any).__reactRouterAppDirectory = resolve(
+      import.meta.dirname,
+      "../.."
+    );
+    const table = await (await import("../../routes.ts")).default;
+
+    const matches = matchRoutes(table as never, path);
+    expect(matches?.at(-1)?.route).toMatchObject({
+      file: "routes/admin.$id.media.$/route.ts",
+    });
   });
 });

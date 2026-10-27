@@ -58,6 +58,22 @@ describe("marketplace card banner", () => {
   });
 });
 
+describe("marketplace card figures", () => {
+  it("shows no progress bar or raised/goal figure, even when the item carries them", async () => {
+    const screen = await card({
+      contributions_total: 4321,
+      target: 8000,
+    } as Partial<EndowmentCard>);
+    await expect.element(screen.getByText(org.name)).toBeVisible();
+
+    expect(
+      screen.container.querySelector("[role=progressbar], progress")
+    ).toBeNull();
+    const text = screen.container.textContent ?? "";
+    expect(text).not.toMatch(/4,?321|8,?000|raised|goal/i);
+  });
+});
+
 describe("marketplace card body and actions", () => {
   it("shows the org's logo, or the placeholder in the same frame", async () => {
     let screen = await card();

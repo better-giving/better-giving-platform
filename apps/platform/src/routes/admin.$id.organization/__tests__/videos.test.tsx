@@ -109,7 +109,11 @@ function gate() {
   return g;
 }
 
-async function render_org(npo_id: number, hold?: ReturnType<typeof gate>) {
+async function render_org(
+  npo_id: number,
+  hold?: ReturnType<typeof gate>,
+  on_video_post?: () => void
+) {
   const server_loader = async (args: any) => {
     if (hold) {
       hold.reads++;
@@ -139,7 +143,15 @@ async function render_org(npo_id: number, hold?: ReturnType<typeof gate>) {
       loader: route_loader as any,
       action: action as any,
       middleware: [as_admin as any],
-      children: [{ path: "videos", action: videos_action as any }],
+      children: [
+        {
+          path: "videos",
+          action: ((args: any) => {
+            on_video_post?.();
+            return videos_action(args);
+          }) as any,
+        },
+      ],
     },
   ]);
   return render(
@@ -190,7 +202,8 @@ describe("organization — videos", () => {
     const npo = await seed_npo();
     await seed_video(npo.id, yt(5), false);
     for (const n of [1, 2, 3, 4]) await seed_video(npo.id, yt(n), true);
-    const screen = await render_org(npo.id);
+    const posts = vi.fn();
+    const screen = await render_org(npo.id, undefined, posts);
 
     await expect
       .element(screen.getByText("4 of 4 spots used"))
@@ -204,6 +217,9 @@ describe("organization — videos", () => {
     // playwright won't press an aria-disabled control; a person can
     (show.element() as HTMLElement).click();
     await expect.element(screen.getByText("4 of 4 spots used")).toBeVisible();
+    // the held press never reached the action
+    await new Promise((r) => setTimeout(r, 300));
+    expect(posts).not.toHaveBeenCalled();
 
     // newest first: yt(4) was seeded last, so it holds spot 1
     await screen
@@ -214,6 +230,8 @@ describe("organization — videos", () => {
 
     await show.click();
     await expect.element(screen.getByText("4 of 4 spots used")).toBeVisible();
+    // the spy is live: the same press, once a spot is free, does post
+    expect(posts.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(
       screen
         .getByRole("button", { name: `Take youtu.be/${yt(5)} off your page` })

@@ -159,6 +159,58 @@ describe("feature", () => {
   });
 });
 
+describe("feature — the state the sender saw", () => {
+  it("a Show press sent twice leaves the video featured, not flipped back", async () => {
+    const npo = await seed_npo();
+    const v = await seed_video(npo.id, false);
+    const press = () =>
+      post(npo.id, { intent: "feature", mediaId: v.id, featured: "0" });
+
+    expect((await press()).body).toEqual({ ok: true });
+    expect((await featured_of(npo.id)).map((x) => x.id)).toEqual([v.id]);
+    expect((await press()).body).toEqual({ ok: true });
+    expect((await featured_of(npo.id)).map((x) => x.id)).toEqual([v.id]);
+  });
+
+  it("a Show on an already-featured video succeeds while four are featured", async () => {
+    const npo = await seed_npo();
+    const four = [];
+    for (let i = 0; i < 4; i++) four.push(await seed_video(npo.id, true));
+
+    const again = await post(npo.id, {
+      intent: "feature",
+      mediaId: four[0]!.id,
+      featured: "0",
+    });
+    expect(again.status).toBe(200);
+    expect(again.body).toEqual({ ok: true });
+    expect(await featured_of(npo.id)).toHaveLength(4);
+  });
+});
+
+describe("refused posts", () => {
+  it.each([
+    ["missing", {}],
+    ["empty", { mediaId: "" }],
+  ])("a %s mediaId is a 400, writing nothing", async (_, extra) => {
+    const npo = await seed_npo();
+    await seed_video(npo.id, true);
+    const res = post(npo.id, { intent: "delete", ...extra });
+    await expect(res).rejects.toMatchObject({ status: 400 });
+    expect(await videos_of(npo.id)).toHaveLength(1);
+  });
+
+  it("an unknown intent on an own video is a 400, leaving it as it was", async () => {
+    const npo = await seed_npo();
+    const v = await seed_video(npo.id, true);
+    const res = post(npo.id, { intent: "explode", mediaId: v.id });
+    await expect(res).rejects.toMatchObject({ status: 400 });
+    expect(await videos_of(npo.id)).toMatchObject([
+      { id: v.id, url: YOUTUBE, featured: true },
+    ]);
+  });
+});
+
 describe("add", () => {
   it("adds a YouTube link onto the page, and refuses another site's with a field error", async () => {
     const npo = await seed_npo();

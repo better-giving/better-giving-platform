@@ -26,7 +26,10 @@ describe("fund member search", () => {
     const opts = await fetch_endows("", new AbortController().signal);
 
     const url = new URL(String(fetch_spy.mock.calls[0][0]), "http://x");
-    expect(url.searchParams.get("fields")?.split(",")).toContain("logo");
+    // the logo fallback reads `card_img`, so the request must ask for it
+    expect(url.searchParams.get("fields")?.split(",")).toEqual(
+      expect.arrayContaining(["logo", "card_img"])
+    );
     // /api/npos answers a field outside its picklist with a 400
     expect(
       safeParse(npos_search, Object.fromEntries(url.searchParams)).issues
