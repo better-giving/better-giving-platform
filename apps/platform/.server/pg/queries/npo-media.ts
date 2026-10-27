@@ -102,47 +102,11 @@ async function featured_videos(tx: Tx, npo_id: number): Promise<number> {
   return row?.n ?? 0;
 }
 
-async function insert_video(
-  tx: Tx,
-  npo_id: number,
-  put: IMediaPut,
-  cap: number,
-  date_created: string | null
-): Promise<IMediaPutResult> {
-  const featured = put.featured && (await featured_videos(tx, npo_id)) < cap;
-  const id = crypto.randomUUID();
-  await tx.insert(npo_media).values({
-    id,
-    npo_id,
-    featured,
-    url: put.url,
-    type: "video",
-    date_created,
-  });
-  return { id, featured };
-}
-
+/** a link this npo already has answers with its row, featured state as it
+ * stands: a repeated add is a retry after a lost response, never a second copy */
 export async function npo_media_put(
   npo_id: number,
   put: IMediaPut,
-  cap: number
-): Promise<IMediaPutResult> {
-  return db.transaction(async (tx) => {
-    await lock_npo_media(tx, npo_id);
-    return insert_video(tx, npo_id, put, cap, new Date().toISOString());
-  });
-}
-
-export interface IMediaRestore extends IMediaPut {
-  /** the removed row's, so the video returns to its spot in the list */
-  date_created: string | null;
-}
-
-/** undo of a delete: a video already at this url is the one a previous
- * restore wrote (its response was lost), and is answered instead of copied */
-export async function npo_media_restore(
-  npo_id: number,
-  restore: IMediaRestore,
   cap: number
 ): Promise<IMediaPutResult> {
   return db.transaction(async (tx) => {
@@ -154,12 +118,66 @@ export async function npo_media_restore(
         and(
           eq(npo_media.npo_id, npo_id),
           eq(npo_media.type, "video"),
-          eq(npo_media.url, restore.url)
+          eq(npo_media.url, put.url)
         )
       )
       .limit(1);
     if (existing) return existing;
-    return insert_video(tx, npo_id, restore, cap, restore.date_created);
+    const featured = put.featured && (await featured_videos(tx, npo_id)) < cap;
+    const id = crypto.randomUUID();
+    await tx.insert(npo_media).values({
+      id,
+      npo_id,
+      featured,
+      url: put.url,
+      type: "video",
+      date_created: new Date().toISOString(),
+    });
+    return { id, featured };
+  });
+}
+
+export interface IMediaRestore extends IMediaPut {
+  /** the removed row's, so the undo brings back that video and no twin of it */
+  id: string;
+  /** the removed row's, so the video returns to its spot in the list */
+  date_created: string | null;
+}
+
+/** undo of a delete, by the removed row's id: a repeat (its response was lost)
+ * finds the row the first one wrote and answers with it. `undefined` when the
+ * id is another npo's row, which is left untouched */
+export async function npo_media_restore(
+  npo_id: number,
+  restore: IMediaRestore,
+  cap: number
+): Promise<IMediaPutResult | undefined> {
+  return db.transaction(async (tx) => {
+    await lock_npo_media(tx, npo_id);
+    const featured =
+      restore.featured && (await featured_videos(tx, npo_id)) < cap;
+    await tx
+      .insert(npo_media)
+      .values({
+        id: restore.id,
+        npo_id,
+        featured,
+        url: restore.url,
+        type: "video",
+        date_created: restore.date_created,
+      })
+      .onConflictDoNothing({ target: npo_media.id });
+    const [row] = await tx
+      .select({ id: npo_media.id, featured: npo_media.featured })
+      .from(npo_media)
+      .where(
+        and(
+          eq(npo_media.id, restore.id),
+          eq(npo_media.npo_id, npo_id),
+          eq(npo_media.type, "video")
+        )
+      );
+    return row;
   });
 }
 

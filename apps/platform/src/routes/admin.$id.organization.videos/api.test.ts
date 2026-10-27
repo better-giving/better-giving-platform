@@ -238,7 +238,9 @@ describe("add", () => {
 
   it("lands in the list only once the page's spots are full", async () => {
     const npo = await seed_npo();
-    for (let i = 0; i < 4; i++) await seed_video(npo.id, true);
+    for (let i = 0; i < 4; i++) {
+      await seed_video(npo.id, true, `https://youtu.be/seed${i}`);
+    }
 
     const added = await post(npo.id, { intent: "add", url: YOUTUBE });
     expect(added.body).toMatchObject({ ok: true });

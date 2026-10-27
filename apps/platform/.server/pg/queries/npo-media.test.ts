@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import {
   afterAll,
   beforeAll,
@@ -50,6 +51,22 @@ const featured_count = async () =>
       .from(npo_media)
       .where(and(eq(npo_media.npo_id, npo_id), eq(npo_media.featured, true)))
   ).length;
+
+/** pglite runs one transaction at a time, so these tests pass with or without
+ * the lock; the race it closes was reproduced on a Postgres 16 cluster. What
+ * they can prove is that each write takes it */
+async function advisory_locks(run: () => Promise<unknown>) {
+  const spy = vi.spyOn(PgDialect.prototype, "sqlToQuery");
+  try {
+    await run();
+    return spy.mock.results.filter(
+      (r) =>
+        r.type === "return" && r.value.sql.includes("pg_advisory_xact_lock")
+    ).length;
+  } finally {
+    spy.mockRestore();
+  }
+}
 
 beforeAll(async () => {
   test_db.current = await create_test_db();
@@ -109,6 +126,21 @@ describe("npo_media_put", () => {
     ]);
     expect(await featured_count()).toBe(CAP);
   });
+
+  it("answers a repeated add of a link with the video already there", async () => {
+    const link = { url: "https://youtu.be/again", featured: false };
+    const first = await npo_media_put(npo_id, link, CAP);
+
+    let second: Awaited<ReturnType<typeof npo_media_put>> | undefined;
+    const locks = await advisory_locks(async () => {
+      second = await npo_media_put(npo_id, { ...link, featured: true }, CAP);
+    });
+
+    expect(locks).toBe(1);
+
+    expect(second).toEqual({ id: first.id, featured: false });
+    expect(await rows()).toHaveLength(1);
+  });
 });
 
 /** `featured` rows plus one unfeatured, returned last */
@@ -150,11 +182,15 @@ describe("npo_media_feature", () => {
       CAP
     );
 
-    const applied = await Promise.all([
-      npo_media_feature(npo_id, a.id, CAP),
-      npo_media_feature(npo_id, b.id, CAP),
-    ]);
+    let applied: boolean[] = [];
+    const locks = await advisory_locks(async () => {
+      applied = await Promise.all([
+        npo_media_feature(npo_id, a.id, CAP),
+        npo_media_feature(npo_id, b.id, CAP),
+      ]);
+    });
 
+    expect(locks).toBe(2);
     expect(applied.filter(Boolean)).toHaveLength(1);
     expect(await featured_count()).toBe(4);
   });
@@ -199,6 +235,7 @@ describe("npo_media_restore", () => {
     const put = await npo_media_restore(
       npo_id,
       {
+        id: "v3",
         url: "https://youtu.be/v3",
         featured: true,
         date_created: "2026-01-01T00:00:00.000Z",
@@ -206,7 +243,7 @@ describe("npo_media_restore", () => {
       CAP
     );
 
-    expect(put.featured).toBe(true);
+    expect(put).toEqual({ id: "v3", featured: true });
     expect(await featured_urls()).toEqual([
       "https://youtu.be/v1",
       "https://youtu.be/v2",
@@ -218,18 +255,100 @@ describe("npo_media_restore", () => {
     await three();
     await test_db.current!.db.delete(npo_media).where(eq(npo_media.id, "v3"));
     const v3 = {
+      id: "v3",
       url: "https://youtu.be/v3",
       featured: true,
       date_created: "2026-01-01T00:00:00.000Z",
     };
 
-    const [first, second] = await Promise.all([
-      npo_media_restore(npo_id, v3, CAP),
-      npo_media_restore(npo_id, v3, CAP),
-    ]);
+    let restored: Awaited<ReturnType<typeof npo_media_restore>>[] = [];
+    const locks = await advisory_locks(async () => {
+      restored = await Promise.all([
+        npo_media_restore(npo_id, v3, CAP),
+        npo_media_restore(npo_id, v3, CAP),
+      ]);
+    });
 
-    expect(second).toEqual(first);
+    expect(locks).toBe(2);
+    expect(restored[1]).toEqual(restored[0]);
     expect(await rows()).toHaveLength(3);
+  });
+
+  it("brings back the deleted one of two videos sharing a link", async () => {
+    const db = test_db.current!.db;
+    const twin = {
+      npo_id,
+      url: "https://youtu.be/same",
+      type: "video" as const,
+    };
+    await db.insert(npo_media).values([
+      { ...twin, id: "kept", featured: false, date_created: null },
+      {
+        ...twin,
+        id: "gone",
+        featured: true,
+        date_created: "2026-01-05T00:00:00.000Z",
+      },
+    ]);
+    await db.delete(npo_media).where(eq(npo_media.id, "gone"));
+
+    const put = await npo_media_restore(
+      npo_id,
+      {
+        id: "gone",
+        url: twin.url,
+        featured: true,
+        date_created: "2026-01-05T00:00:00.000Z",
+      },
+      CAP
+    );
+
+    expect(put).toEqual({ id: "gone", featured: true });
+    expect(await rows()).toHaveLength(2);
+  });
+
+  it("leaves another npo's row alone and answers nothing", async () => {
+    const db = test_db.current!.db;
+    const [other] = await db
+      .insert(npos)
+      .values({
+        registration_number: "EIN-MEDIA-OTHER",
+        name: "Other NPO",
+        endow_designation: "Charity",
+        overview_pt: "[]",
+        hq_country: "United States",
+      })
+      .returning({ id: npos.id });
+    await db.insert(npo_media).values({
+      id: "theirs",
+      npo_id: other!.id,
+      url: "https://youtu.be/theirs",
+      type: "video",
+      featured: false,
+    });
+
+    const put = await npo_media_restore(
+      npo_id,
+      {
+        id: "theirs",
+        url: "https://youtu.be/mine",
+        featured: true,
+        date_created: null,
+      },
+      CAP
+    );
+
+    expect(put).toBeUndefined();
+    expect(await rows()).toHaveLength(0);
+    const [theirs] = await db
+      .select()
+      .from(npo_media)
+      .where(eq(npo_media.id, "theirs"));
+    expect(theirs).toMatchObject({
+      npo_id: other!.id,
+      url: "https://youtu.be/theirs",
+      featured: false,
+    });
   });
 
   it("restores unfeatured when the page filled meanwhile", async () => {
@@ -237,11 +356,16 @@ describe("npo_media_restore", () => {
 
     const put = await npo_media_restore(
       npo_id,
-      { url: "https://youtu.be/gone", featured: true, date_created: null },
+      {
+        id: "gone",
+        url: "https://youtu.be/gone",
+        featured: true,
+        date_created: null,
+      },
       CAP
     );
 
-    expect(put.featured).toBe(false);
+    expect(put).toEqual({ id: "gone", featured: false });
     expect(await featured_count()).toBe(4);
   });
 });
