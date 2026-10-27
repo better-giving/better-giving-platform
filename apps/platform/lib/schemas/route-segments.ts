@@ -80,6 +80,7 @@ export const reserved_words = [
 // First URL segment of every route under `src/routes`. The unit test
 // re-derives this from the tree and fails when a route is added or removed.
 export const top_level_route_segments = [
+  ".well-known",
   "about-us",
   "admin",
   "agents",
