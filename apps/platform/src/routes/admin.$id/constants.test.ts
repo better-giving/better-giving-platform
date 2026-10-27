@@ -29,16 +29,17 @@ describe("admin sidebar", () => {
     expect(link("Referrals")?.icon.fn).toBe(HandshakeIcon);
   });
 
-  it("has no Public Profile group; Manage opens with Organization, Programs, Media", () => {
+  it("has no Public Profile group or Media; Manage opens with Organization, Programs", () => {
     expect(linkGroups.map((g) => g.title)).not.toContain("Public Profile");
     expect(link("Edit Profile")).toBeUndefined();
     const manage = linkGroups.find((g) => g.title === "Manage");
-    expect(manage?.links.slice(0, 3).map((l) => l.title)).toEqual([
+    expect(manage?.links.slice(0, 2).map((l) => l.title)).toEqual([
       "Organization",
       "Programs",
-      "Media",
     ]);
     expect(link("Programs")?.to).toBe(routes.programs);
-    expect(link("Media")?.to).toBe(routes.media);
+    // videos live in Organization's Better Giving Page group
+    expect(link("Media")).toBeUndefined();
+    expect(Object.values(routes)).not.toContain("media");
   });
 });

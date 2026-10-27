@@ -41,7 +41,6 @@ function Page({ loaderData: endow }: Route.ComponentProps) {
     },
     tagline: endow.tagline ?? "",
     image: endow.image ?? "",
-    card_img: endow.card_img ?? "",
     overview: to_content(endow.overview_pt),
   };
 
@@ -53,6 +52,7 @@ function Page({ loaderData: endow }: Route.ComponentProps) {
       profile={profile}
       id={endow.id}
       base_url={endow.base_url}
+      videos={endow.videos}
     />
   );
 }

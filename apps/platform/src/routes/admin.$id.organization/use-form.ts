@@ -27,7 +27,6 @@ type SetPrompt = (p: IPrompt) => void;
 const page_fields = [
   "tagline",
   "image",
-  "card_img",
   "overview",
 ] as const satisfies (keyof ProfileFV)[];
 
@@ -150,7 +149,6 @@ export function use_organization_form(
           }
           update.slug = fv.slug;
         }
-        if (dirty("name")) update.name = fv.name;
         if (dirty("registration_number")) {
           update.registration_number = fv.registration_number;
         }
@@ -195,7 +193,6 @@ export function use_page(init: ProfileFV, set_prompt: SetPrompt) {
     defaultValues: {
       tagline: init.tagline,
       image: init.image,
-      card_img: init.card_img,
       overview: init.overview,
     },
     resolver: valibotResolver(page_schema),
@@ -207,7 +204,6 @@ export function use_page(init: ProfileFV, set_prompt: SetPrompt) {
   const dirty = (name: keyof BgPage) => is_marked(dirtyFields[name]);
 
   const { field: banner } = useController({ control, name: "image" });
-  const { field: card_img } = useController({ control, name: "card_img" });
   const { field: overview } = useController({ control, name: "overview" });
 
   const save = () =>
@@ -216,7 +212,6 @@ export function use_page(init: ProfileFV, set_prompt: SetPrompt) {
       const update: Update = {};
       if (dirty("tagline")) update.tagline = fv.tagline;
       if (dirty("image")) update.image = fv.image;
-      if (dirty("card_img")) update.card_img = fv.card_img;
       if (dirty("overview")) {
         update.overview_pt = fv.overview.value;
         update.overview_v2 = to_text(fv.overview.value);
@@ -231,7 +226,6 @@ export function use_page(init: ProfileFV, set_prompt: SetPrompt) {
     busy,
     save,
     banner,
-    card_img,
     overview,
   };
 }

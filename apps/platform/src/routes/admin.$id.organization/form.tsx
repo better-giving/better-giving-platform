@@ -1,5 +1,6 @@
 import {
   Confirmed,
+  Copier,
   ExtLink,
   Form as F,
   Field,
@@ -16,7 +17,7 @@ import {
 } from "@better-giving/ui";
 import { SquareArrowOutUpRight } from "lucide-react";
 import { useId, useRef, useState } from "react";
-import { href, Link, Outlet } from "react-router";
+import { href, Outlet } from "react-router";
 import { CountryCombo } from "#/components/country-combo";
 import { ImgEditor } from "#/components/img-editor";
 import { RichText } from "#/components/rich-text";
@@ -24,22 +25,19 @@ import { SLUG_HELP } from "#/routes/admin.$id.campaigns/copy";
 import { PublicLinkField } from "#/routes/admin.$id.campaigns/link-field";
 import { emails } from "@/constants/common";
 import { country_names } from "@/constants/countries";
+import { sans_https } from "@/helpers/https";
 import type { EndowDesignation } from "@/npo";
 import type { OrgDesignation } from "@/schemas";
+import type { IVideos } from "./api";
 import type { FV, ProfileFV } from "./schema";
-import {
-  bannerSpec,
-  cardImgSpec,
-  logoSpec,
-  MAX_CHARS,
-  suggest_slug,
-} from "./schema";
+import { bannerSpec, logoSpec, MAX_CHARS, suggest_slug } from "./schema";
 import {
   use_organization_form,
   use_page,
   use_publish,
   use_social_media,
 } from "./use-form";
+import { VideosGroup } from "./videos";
 
 const endow_designations: EndowDesignation[] = [
   "Charity",
@@ -49,9 +47,8 @@ const endow_designations: EndowDesignation[] = [
   "Other",
 ];
 
-const note_id = "org_slug_note";
 const set_once_note =
-  "Your profile link can't change, so links you've already shared, including your campaign links, keep working.";
+  "Can't change once set, so links you've shared keep working.";
 
 type SetPrompt = (p: IPrompt) => void;
 
@@ -83,14 +80,33 @@ function SaveButton({ group, label, blocked = false, onClick }: ISaveButton) {
   );
 }
 
+interface ICopyLink {
+  /** absolute */
+  url: string;
+  label: string;
+}
+
+/** a link shown as text, with a copy button beside it */
+function CopyLink({ url, label }: ICopyLink) {
+  return (
+    <span className="flex items-center gap-1 min-w-0">
+      <ExtLink href={url} className="link break-all">
+        {sans_https(url)}
+      </ExtLink>
+      <Copier text={url} label={label} classes="shrink-0" />
+    </span>
+  );
+}
+
 interface IProps {
   init: FV;
   profile: ProfileFV;
   id: number;
   base_url: string;
+  videos: IVideos;
 }
 
-export function Form({ init, profile, id, base_url }: IProps) {
+export function Form({ init, profile, id, base_url, videos }: IProps) {
   const [prompt, set_prompt] = useState<IPrompt>();
   const page = use_page(profile, set_prompt);
   const social_media = use_social_media(profile, set_prompt);
@@ -99,11 +115,12 @@ export function Form({ init, profile, id, base_url }: IProps) {
     publish,
     busy: publishing,
   } = use_publish(profile, set_prompt);
-  const page_uploading = [page.card_img.value, page.banner.value].some(
-    (v) => v === "loading"
-  );
-  const profile_url = href("/org/:org", { org: init.slug || String(id) });
+  const page_uploading = page.banner.value === "loading";
+  const org = init.slug || String(id);
+  const profile_url = href("/org/:org", { org });
+  const donate_url = `${base_url}${href("/donate/:id", { id: org })}`;
   const page_title_id = useId();
+  const donate_title_id = useId();
 
   return (
     <F
@@ -113,8 +130,8 @@ export function Form({ init, profile, id, base_url }: IProps) {
       className="px-6 py-4 md:px-10 md:py-8 w-full max-w-[1112px] grid grid-cols-1 content-start gap-6"
     >
       {prompt && <Prompt {...prompt} onClose={() => set_prompt(undefined)} />}
-      <h1 className="text-3xl font-bold">Organization</h1>
-      {/* a slug that lands in the loader remounts this group into the locked
+      <h1 className="sr-only">Organization</h1>
+      {/* a slug that lands in the loader remounts this group without its link
           field; the groups below keep their unsaved edits */}
       <OrgGroup
         key={init.slug}
@@ -172,22 +189,50 @@ export function Form({ init, profile, id, base_url }: IProps) {
         </Group>
       </Fieldset>
 
-      <Fieldset disabled={page.busy} className="contents">
-        <section
-          id="page"
-          aria-labelledby={page_title_id}
-          // scroll-mt clears the sticky app header on a #page landing
-          className="card grid grid-cols-1 w-full gap-6 scroll-mt-20"
-        >
-          <h3 id={page_title_id} className="text-2xl">
-            <ExtLink
-              href={profile_url}
-              className="link inline-flex items-center gap-2"
+      <section
+        id="page"
+        aria-labelledby={page_title_id}
+        // scroll-mt clears the sticky app header on a #page landing
+        className="card grid grid-cols-1 w-full gap-6 scroll-mt-20"
+      >
+        <h3 id={page_title_id} className="text-2xl">
+          <ExtLink
+            href={profile_url}
+            className="link inline-flex items-center gap-2"
+          >
+            Your Better Giving Page
+            <SquareArrowOutUpRight aria-hidden className="icon-md" />
+          </ExtLink>
+        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 text-sm">
+          <div className="grid gap-0.5 min-w-0">
+            <CopyLink
+              url={`${base_url}${profile_url}`}
+              label="Copy page link"
+            />
+            {init.slug && (
+              <p className="text-xs text-gray-11">{set_once_note}</p>
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-4 max-sm:w-full">
+            {published ? (
+              <Confirmed>Visible in the marketplace</Confirmed>
+            ) : (
+              <Info classes="text-warning-subtle-fg">
+                Hidden from the marketplace
+              </Info>
+            )}
+            <Toggle
+              value={published}
+              onChange={publish}
+              disabled={publishing}
+              classes={{ container: "text-sm" }}
             >
-              Your Better Giving Page
-              <SquareArrowOutUpRight aria-hidden className="icon-md" />
-            </ExtLink>
-          </h3>
+              Published
+            </Toggle>
+          </div>
+        </div>
+        <Fieldset disabled={page.busy} className="contents">
           <Field
             {...page.register("tagline")}
             name="tagline"
@@ -215,28 +260,6 @@ export function Form({ init, profile, id, base_url }: IProps) {
             classes={{ container: "mb-4", dropzone: "w-full aspect-4/1" }}
             error={page.errors.image?.message}
           />
-          <label htmlFor="npo-card-img" className="label -mb-4">
-            Card image
-          </label>
-          <ImgEditor
-            id="npo-card-img"
-            ref={page.card_img.ref}
-            value={page.card_img.value}
-            on_change={(val) => {
-              page.card_img.onChange(val);
-              page.trigger("card_img");
-            }}
-            on_undo={(e) => {
-              e.stopPropagation();
-              page.resetField("card_img");
-            }}
-            spec={cardImgSpec}
-            classes={{
-              container: "mb-4",
-              dropzone: "w-full sm:w-96 aspect-2/1",
-            }}
-            error={page.errors.card_img?.message}
-          />
           <p className="label -mb-4">Content</p>
           <RichText
             ref={page.overview.ref}
@@ -258,47 +281,26 @@ export function Form({ init, profile, id, base_url }: IProps) {
           <p className="static field-error -mt-4 empty:hidden">
             {page.errors.overview?.message}
           </p>
+        </Fieldset>
+        <VideosGroup npo_id={id} videos={videos} />
+        <Fieldset disabled={page.busy} className="contents">
           <SaveButton
             group={page}
             label="Save Better Giving Page"
             blocked={page_uploading}
           />
-        </section>
-      </Fieldset>
+        </Fieldset>
+      </section>
 
-      <div
-        className={`flex flex-wrap justify-between items-center border rounded p-6 gap-4 ${
-          published
-            ? "bg-success-subtle border-success"
-            : "bg-warning-subtle border-warning"
-        }`}
+      <section
+        aria-labelledby={donate_title_id}
+        className="card flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
       >
-        {published ? (
-          <Confirmed>Your profile is visible in the marketplace</Confirmed>
-        ) : (
-          <Info classes="text-warning-subtle-fg">
-            Your profile is not visible in the marketplace
-          </Info>
-        )}
-        <div className="flex items-center gap-x-2">
-          <Toggle
-            value={published}
-            onChange={publish}
-            disabled={publishing}
-            classes={{ container: "ml-auto text-sm" }}
-          >
-            Publish profile
-          </Toggle>
-
-          <Link
-            target="_blank"
-            to={profile_url}
-            className="link text-sm flex items-center gap-1"
-          >
-            View Profile
-          </Link>
-        </div>
-      </div>
+        <h2 id={donate_title_id} className="font-semibold">
+          Donate link
+        </h2>
+        <CopyLink url={donate_url} label="Copy donate link" />
+      </section>
 
       {/** success prompts */}
       <Outlet />
@@ -321,7 +323,6 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
   const profile_base = `${base_url}/org/`;
   const id_url = `${base_url}${href("/org/:org", { org: String(id) })}`;
   const campaigns_note = `Your campaign links start with it too (…${href("/org/:org", { org: form.slug.trim() || "your-link" })}/…).`;
-  const donate = `${base_url}${href("/donate/:id", { id: init.slug })}`;
   const setting_slug = !form.locked && form.slug !== "";
 
   return (
@@ -380,14 +381,17 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
             }}
             error={form.errors.logo?.message}
           />
-          <Field
-            {...form.register("name")}
-            label="Name of your organization"
-            disabled
-            tooltip={`The name field reflects your organization's legal name as provided on your initial application. If you need to change your name please contact ${emails.hi} and provide documentation supporting the legal name change or D.B.A. records.`}
-            error={form.errors.name?.message}
-            required
-          />
+          <div className="grid gap-1">
+            <p className="label">Name of your organization</p>
+            <p>{form.name}</p>
+            <p className="text-sm text-gray-11">
+              Your legal name from your application. To change it, email{" "}
+              <a href={`mailto:${emails.hi}`} className="link">
+                {emails.hi}
+              </a>{" "}
+              with your name-change or D.B.A. records.
+            </p>
+          </div>
           <Field
             {...form.register("registration_number")}
             name="registration_number"
@@ -416,34 +420,22 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
             error={form.errors.hq_country?.message}
             ref={form.hq_country.ref}
           />
-          <PublicLinkField
-            reg={form.register("slug")}
-            value={form.slug}
-            base={profile_base}
-            locked={form.locked}
-            label="Profile link"
-            help={
-              form.locked ? campaigns_note : `${campaigns_note} ${SLUG_HELP}.`
-            }
-            subject="your profile"
-            placeholder={form.locked ? undefined : suggest_slug(form.name)}
-            empty_url={id_url}
-            empty_suffix=" until you set a link"
-            describedby={form.locked ? note_id : undefined}
-            error={form.errors.slug?.message}
-          />
-          {form.locked && (
-            <div className="-mt-4 grid gap-2">
-              <p id={note_id} className="text-sm text-gray-11">
-                {set_once_note}
-              </p>
-              <p className="text-sm break-all">
-                Donate:{" "}
-                <Link to={donate} className="link">
-                  {donate}
-                </Link>
-              </p>
-            </div>
+          {/* once set, the link is read-only text atop the Better Giving
+              Page section */}
+          {!form.locked && (
+            <PublicLinkField
+              reg={form.register("slug")}
+              value={form.slug}
+              base={profile_base}
+              locked={false}
+              label="Profile link"
+              help={`${campaigns_note} ${SLUG_HELP}.`}
+              subject="your profile"
+              placeholder={suggest_slug(form.name)}
+              empty_url={id_url}
+              empty_suffix=" until you set a link"
+              error={form.errors.slug?.message}
+            />
           )}
           <UrlInput
             {...form.register("url")}
