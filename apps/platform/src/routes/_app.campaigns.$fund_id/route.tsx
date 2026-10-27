@@ -6,13 +6,20 @@ import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import flying_character from "#/assets/images/flying-character.webp";
 import { FundCreator, FundStatus, status_fn } from "#/components/campaign";
 import { DonorMsgs } from "#/components/donor-msgs";
-import { RichText, richtext_styles, to_text } from "#/components/rich-text";
+import {
+  RichText,
+  richtext_styles,
+  to_excerpt,
+  to_text,
+} from "#/components/rich-text";
 import { app_name, base_url } from "#/constants/env";
 import { metas } from "#/helpers/seo";
 import { use_now } from "#/hooks/use-now";
+import { goal_amount } from "#/routes/org.$org.$campaign/format";
 import type { IFund } from "#/types/fund";
 import { fund_closes_at } from "@/campaign/is-open";
 import { MAX_EXPIRATION_ISO } from "@/campaign/schema";
+import { agents_link, fund_jsonld } from "@/structured-data/schema-org";
 import type { Route } from "./+types/route";
 import { Share } from "./share";
 import { Video } from "./video";
@@ -24,13 +31,28 @@ export const links: Route.LinksFunction = () => [...richtext_styles];
 
 export const meta: Route.MetaFunction = ({ loaderData: d, location: l }) => {
   if (!d) return [];
-  return metas({
+  const url = `${base_url}${l.pathname}`;
+  const shared = {
     title: `${d.name} - ${app_name}`,
     description: to_text(d.description_pt).slice(0, 140),
     name: d.name,
     image: d.banner || flying_character,
-    url: `${base_url}${l.pathname}`,
+    url,
+  };
+  // a hidden or closed fund stays out of every index
+  if (!(d.published && d.active)) return metas(shared);
+  const project = fund_jsonld({
+    base_url,
+    url,
+    donate_url: `${base_url}${href("/donate-fund/:fund_id", { fund_id: d.id })}`,
+    name: d.name,
+    description: to_excerpt(d.description_pt),
+    image: d.banner,
+    raised: d.donation_total_usd,
+    goal: goal_amount(d.target, d.donation_total_usd),
+    members: d.members,
   });
+  return [...metas({ ...shared, jsonld: project }), agents_link(base_url)];
 };
 export { ErrorBoundary } from "#/components/error";
 export default CacheRoute(Fund);
