@@ -102,7 +102,9 @@ export function use_add_video(npo_id: number) {
 export interface IRemoved
   extends Pick<IMedia, "id" | "url" | "featured" | "date_created"> {}
 
-/** a deleted link sent back as it was */
+export type Restored = "restored" | { refusal: string };
+
+/** a deleted link sent back as it was, under its own id */
 export function use_restore(npo_id: number, removed: IRemoved) {
   const f = useFetcher<typeof action>({ key: `video-restore-${removed.id}` });
   const restore = () => {
@@ -110,6 +112,7 @@ export function use_restore(npo_id: number, removed: IRemoved) {
     f.submit(
       {
         intent: "restore",
+        mediaId: removed.id,
         url: removed.url,
         featured: removed.featured ? "1" : "0",
         // a row stored without one sends ""
@@ -118,5 +121,15 @@ export function use_restore(npo_id: number, removed: IRemoved) {
       { method: "POST", action: videos_url(npo_id) }
     );
   };
-  return { pending: f.state !== "idle", answer: f.data, restore };
+  // idle only once the read after the write landed, so a restored row that
+  // fits the loaded page is listed by then
+  const d = f.state === "idle" ? f.data : undefined;
+  const settled: Restored | undefined = !d
+    ? undefined
+    : "ok" in d
+      ? "restored"
+      : "errors" in d
+        ? { refusal: d.errors.url }
+        : { refusal: d.error };
+  return { pending: f.state !== "idle", settled, restore };
 }

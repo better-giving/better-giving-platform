@@ -195,7 +195,7 @@ export function Form({ init, profile, id, base_url, videos }: IProps) {
         // scroll-mt clears the sticky app header on a #page landing
         className="card grid grid-cols-1 w-full gap-6 scroll-mt-20"
       >
-        <h3 id={page_title_id} className="text-2xl">
+        <h2 id={page_title_id} className="text-2xl">
           <ExtLink
             href={profile_url}
             className="link inline-flex items-center gap-2"
@@ -203,7 +203,7 @@ export function Form({ init, profile, id, base_url, videos }: IProps) {
             Your Better Giving Page
             <SquareArrowOutUpRight aria-hidden className="icon-md" />
           </ExtLink>
-        </h3>
+        </h2>
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 text-sm">
           <div className="grid gap-0.5 min-w-0">
             <CopyLink
@@ -296,9 +296,9 @@ export function Form({ init, profile, id, base_url, videos }: IProps) {
         aria-labelledby={donate_title_id}
         className="card flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
       >
-        <h3 id={donate_title_id} className="font-semibold">
+        <h2 id={donate_title_id} className="font-semibold">
           Donate link
-        </h3>
+        </h2>
         <CopyLink url={donate_url} label="Copy donate link" />
       </section>
 

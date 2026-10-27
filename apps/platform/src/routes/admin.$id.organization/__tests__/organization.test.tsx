@@ -638,15 +638,10 @@ describe("organization — renders pre-filled", () => {
     expect(published).toBeGreaterThan(pos(page_section));
     expect(published).toBeLessThan(Math.min(...outline));
 
-    // every card under the page's heading is one level below it
-    for (const name of [
-      "Organization",
-      "Social Media",
-      "Your Better Giving Page",
-      "Donate link",
-    ]) {
+    // a card under the page's h1 is one level below it
+    for (const name of ["Your Better Giving Page", "Donate link"]) {
       await expect
-        .element(screen.getByRole("heading", { name, exact: true, level: 3 }))
+        .element(screen.getByRole("heading", { name, exact: true, level: 2 }))
         .toBeInTheDocument();
     }
   });

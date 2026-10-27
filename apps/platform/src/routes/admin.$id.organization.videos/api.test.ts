@@ -325,6 +325,39 @@ describe("delete, then undo", () => {
     }
   );
 
+  it("reinserts the removed row under its own id when the press sends it", async () => {
+    const npo = await seed_npo();
+    const v = await seed_video(npo.id, true);
+    await post(npo.id, { intent: "delete", mediaId: v.id });
+
+    const undo = await post(npo.id, {
+      intent: "restore",
+      mediaId: v.id,
+      url: v.url,
+      featured: "1",
+      date_created: v.date_created!,
+    });
+    expect(undo.body).toEqual({ ok: true, id: v.id });
+    expect(await videos_of(npo.id)).toMatchObject([{ id: v.id }]);
+  });
+
+  it("a tab that predates the date field restores at now; one stored without a date stays without", async () => {
+    const npo = await seed_npo();
+    const before = Date.now();
+    await post(npo.id, { intent: "restore", url: YOUTUBE, featured: "0" });
+    const [old_tab] = await videos_of(npo.id);
+    expect(Date.parse(old_tab!.date_created!)).toBeGreaterThanOrEqual(before);
+
+    await db().delete(npo_media);
+    await post(npo.id, {
+      intent: "restore",
+      url: YOUTUBE,
+      featured: "0",
+      date_created: "",
+    });
+    expect(await videos_of(npo.id)).toMatchObject([{ date_created: null }]);
+  });
+
   it("refuses a restore whose date isn't a timestamp, writing nothing", async () => {
     const npo = await seed_npo();
     // only a hand-built post sends one, so it's thrown like a bad media id

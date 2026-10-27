@@ -61,7 +61,7 @@ describe("retired Media page", () => {
     ]);
   });
 
-  it("an old dialog's save leaves for the Videos group with its toast; a refusal stays its answer", async () => {
+  it("an old dialog's save leaves for the Videos group with its toast", async () => {
     const url = "https://youtu.be/dQw4w9WgXcQ";
     forwarded.answer = { ok: true, id: "m2" };
     const added = await old_post("/admin/7/media/new", createFormData({ url }));
@@ -73,16 +73,35 @@ describe("retired Media page", () => {
     const edited = await old_post("/admin/7/media/m1", createFormData({ url }));
     expect(edited.headers.get("location")).toBe(VIDEOS);
     expect(edited.headers.get("x-toast")).toBe("Video updated");
-
-    const refusal = data(
-      { errors: { url: "only YouTube links are supported" } },
-      { status: 400 }
-    );
-    forwarded.answer = refusal;
-    expect(await old_post("/admin/7/media/new", createFormData({ url }))).toBe(
-      refusal
-    );
   });
+
+  /** the dialog's `useRemixForm` reads `errors` as react-hook-form field errors */
+  it.each([
+    [
+      data(
+        { errors: { url: "only YouTube links are supported" } },
+        { status: 400 }
+      ),
+      "only YouTube links are supported",
+      400,
+    ],
+    [
+      data({ error: "Video not found" }, { status: 404 }),
+      "Video not found",
+      404,
+    ],
+  ])(
+    "an old dialog's refused save comes back under its link field (%#)",
+    async (answer, message, status) => {
+      forwarded.answer = answer;
+      const url = "https://youtu.be/dQw4w9WgXcQ";
+      const res = await old_post("/admin/7/media/m1", createFormData({ url }));
+      expect(res.data).toEqual({
+        errors: { url: { message, type: "custom" } },
+      });
+      expect(res.init.status).toBe(status);
+    }
+  );
 
   it("forwards an old add and edit dialog's save as the add and edit intents", async () => {
     const url = "https://youtu.be/dQw4w9WgXcQ";

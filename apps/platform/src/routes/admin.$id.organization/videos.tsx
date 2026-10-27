@@ -14,6 +14,7 @@ import type { IMedia } from "@/npo";
 import type { IVideos } from "./api";
 import {
   type IRemoved,
+  type Restored,
   use_add_video,
   use_link_input,
   use_restore,
@@ -47,8 +48,8 @@ interface IVideosGroup {
 }
 
 interface IRemovedRow extends IRemoved {
-  /** the restored row's id, once the restore answered */
-  restored?: string;
+  /** why its restore was refused */
+  refusal?: string;
 }
 
 export function VideosGroup({ npo_id, videos }: IVideosGroup) {
@@ -61,31 +62,27 @@ export function VideosGroup({ npo_id, videos }: IVideosGroup) {
   const status_ref = useRef<HTMLParagraphElement>(null);
   const took_off = useRef<string>(undefined);
 
-  const listed = (id?: string) => !!id && items.some((v) => v.id === id);
   // a delete press is recorded at the press; its Undo shows once the read no
   // longer has the row, so a refused delete never offers one, and stays until
-  // the read has the restored row
-  const undoable = removed.filter((r) => !listed(r.id) && !listed(r.restored));
+  // its restore settles: a restored row past the loaded page is never listed
+  const undoable = removed.filter((r) => !items.some((v) => v.id === r.id));
+  // a second press, or the restored row removed again, replaces the entry: the
+  // link may have been edited since
   const on_remove = useCallback(
     (r: IRemoved) =>
-      set_removed((prev) =>
-        prev.some((x) => x.id === r.id) ? prev : [...prev, r]
-      ),
+      set_removed((prev) => [...prev.filter((x) => x.id !== r.id), r]),
     []
   );
-  const on_restored = useCallback((old_id: string, new_id: string) => {
-    set_removed((prev) =>
-      prev.map((r) => (r.id === old_id ? { ...r, restored: new_id } : r))
-    );
-    set_focus_id(new_id);
+  const on_settled = useCallback((id: string, out: Restored) => {
+    if (out !== "restored") {
+      const { refusal } = out;
+      set_removed((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, refusal } : r))
+      );
+      return;
+    }
+    set_removed((prev) => prev.filter((r) => r.id !== id));
   }, []);
-  // a restored row deleted again starts a new Undo of its own
-  useEffect(() => {
-    set_removed((prev) => {
-      const next = prev.filter((r) => !items.some((v) => v.id === r.restored));
-      return next.length === prev.length ? prev : next;
-    });
-  }, [items]);
 
   // a spot taken off is replaced by an open one; the count says what changed
   useEffect(() => {
@@ -172,7 +169,10 @@ export function VideosGroup({ npo_id, videos }: IVideosGroup) {
                 key={r.id}
                 npo_id={npo_id}
                 removed={r}
-                on_restored={on_restored}
+                // the row comes back under its own id, and its listing
+                // unmounts this one in the same render
+                on_restore={set_focus_id}
+                on_settled={on_settled}
               />
             ))}
           </ul>
@@ -515,14 +515,17 @@ function EditLink({ url, name, pending, answer, save, close }: IEditLink) {
 
 interface IUndoRow {
   npo_id: number;
-  removed: IRemoved;
-  on_restored: (old_id: string, new_id: string) => void;
+  removed: IRemovedRow;
+  on_restore: (id: string) => void;
+  on_settled: (id: string, out: Restored) => void;
 }
 
-function UndoRow({ npo_id, removed, on_restored }: IUndoRow) {
+function UndoRow({ npo_id, removed, on_restore, on_settled }: IUndoRow) {
   const r = use_restore(npo_id, removed);
   const ref = useRef<HTMLButtonElement>(null);
+  const refusal_ref = useRef<HTMLParagraphElement>(null);
   const url = disp(removed.url);
+  const { settled } = r;
 
   // the row's own controls went with it; the way back takes the focus they
   // dropped
@@ -530,24 +533,40 @@ function UndoRow({ npo_id, removed, on_restored }: IUndoRow) {
     if (focus_dropped()) ref.current?.focus();
   }, []);
   useEffect(() => {
-    const id = r.answer && "id" in r.answer ? r.answer.id : undefined;
-    if (id) on_restored(removed.id, id);
-  }, [r.answer, removed.id, on_restored]);
+    if (settled) on_settled(removed.id, settled);
+  }, [settled, removed.id, on_settled]);
+  // the refusal replaced the pressed Undo
+  useEffect(() => {
+    if (removed.refusal && focus_dropped()) refusal_ref.current?.focus();
+  }, [removed.refusal]);
 
   return (
-    <li className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-3">
+    <li className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-sm bg-gray-3">
       <span className="flex-1 min-w-0 break-all">Removed {url}</span>
-      <button
-        ref={ref}
-        type="button"
-        aria-label={`Undo removing ${url}`}
-        aria-disabled={r.pending}
-        aria-busy={r.pending}
-        onClick={r.restore}
-        className="btn btn-ghost btn-sm"
-      >
-        Undo
-      </button>
+      {removed.refusal ? (
+        <p
+          ref={refusal_ref}
+          tabIndex={-1}
+          className="basis-full text-destructive-subtle-fg"
+        >
+          {removed.refusal}
+        </p>
+      ) : (
+        <button
+          ref={ref}
+          type="button"
+          aria-label={`Undo removing ${url}`}
+          aria-disabled={r.pending}
+          aria-busy={r.pending}
+          onClick={unless(r.pending, () => {
+            on_restore(removed.id);
+            r.restore();
+          })}
+          className="btn btn-ghost btn-sm"
+        >
+          Undo
+        </button>
+      )}
     </li>
   );
 }

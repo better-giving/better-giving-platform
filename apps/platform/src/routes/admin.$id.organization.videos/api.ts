@@ -63,16 +63,20 @@ export const videos_action = async (x: Args) => {
   if (intent === "restore") {
     const p = parse_url(fv);
     if (p.error) return p.error;
-    const d = safeParse(restored_date, fv.get("date_created") ?? "");
+    // a tab that predates sending the date restores the link as new
+    const sent_date = fv.get("date_created") ?? new Date().toISOString();
+    const d = safeParse(restored_date, sent_date);
     if (d.issues) throw resp.status(400, d.issues[0].message);
     // a client that predates sending the removed row's id restores a new copy
     const sent_mid = fv.get("mediaId");
-    const p_mid = sent_mid === null ? undefined : safeParse(media_id, sent_mid);
-    if (p_mid?.issues) throw resp.status(400, p_mid.issues[0].message);
+    const p_sent_mid =
+      sent_mid === null ? undefined : safeParse(media_id, sent_mid);
+    if (p_sent_mid?.issues)
+      throw resp.status(400, p_sent_mid.issues[0].message);
     const m = await npo_media_restore(
       id,
       {
-        id: p_mid?.output ?? crypto.randomUUID(),
+        id: p_sent_mid?.output ?? crypto.randomUUID(),
         url: p.url,
         featured: fv.get("featured") === "1",
         date_created: d.output,

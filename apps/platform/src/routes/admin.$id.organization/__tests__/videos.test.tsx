@@ -80,17 +80,24 @@ async function seed_npo() {
 
 let tick = 0;
 /** each seed is newer than the last, so the last seeded is spot 1 */
-async function seed_video(npo_id: number, id: string, featured: boolean) {
+async function seed_video(
+  npo_id: number,
+  id: string,
+  featured: boolean,
+  url = `https://youtu.be/${id}`
+) {
+  const row = crypto.randomUUID();
   await db()
     .insert(npo_media)
     .values({
-      id: crypto.randomUUID(),
+      id: row,
       npo_id,
-      url: `https://youtu.be/${id}`,
+      url,
       type: "video",
       featured,
       date_created: new Date(Date.UTC(2026, 0, 1, 0, 0, ++tick)).toISOString(),
     });
+  return row;
 }
 
 /** once armed, holds the server reads until `open()`, as a slow network would */
@@ -257,9 +264,9 @@ describe("organization — videos", () => {
     await expect.element(screen.getByText(CAP)).toBeVisible();
   });
 
-  it("delete offers Undo, which brings the link back onto the page", async () => {
+  it("delete offers Undo, which brings the link back onto the page as the same video", async () => {
     const npo = await seed_npo();
-    await seed_video(npo.id, yt(7), true);
+    const row = await seed_video(npo.id, yt(7), true);
     const screen = await render_org(npo.id);
 
     const link = screen.getByRole("link", { name: `youtu.be/${yt(7)}` });
@@ -281,6 +288,61 @@ describe("organization — videos", () => {
     await undo.click();
     await expect.element(link).toBeVisible();
     await expect.element(screen.getByText("On page · spot 1")).toBeVisible();
+    await expect.element(undo).not.toBeInTheDocument();
+    // the id is what a donation page's links and any other tab hold
+    expect(await db().select({ id: npo_media.id }).from(npo_media)).toEqual([
+      { id: row },
+    ]);
+
+    // the restored video removed again offers its own Undo
+    await screen
+      .getByRole("button", { name: `Remove youtu.be/${yt(7)}` })
+      .click();
+    await expect.element(undo).toBeVisible();
+    await expect.element(link).not.toBeInTheDocument();
+  });
+
+  it("Undo ends once its restore lands, though the video sorts past the loaded page", async () => {
+    const npo = await seed_npo();
+    for (let n = 1; n <= 10; n++) await seed_video(npo.id, yt(n), false);
+    const screen = await render_org(npo.id);
+    // the oldest shown, so tenth of ten
+    await screen
+      .getByRole("button", { name: `Remove youtu.be/${yt(1)}` })
+      .click();
+    const undo = screen.getByRole("button", {
+      name: `Undo removing youtu.be/${yt(1)}`,
+    });
+    await expect.element(undo).toBeVisible();
+
+    // another tab adds one meanwhile, so the restored video is eleventh
+    await seed_video(npo.id, yt(11), false);
+    await undo.click();
+    await expect
+      .element(screen.getByRole("link", { name: `youtu.be/${yt(11)}` }))
+      .toBeVisible();
+    await expect.element(undo).not.toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("button", { name: "Load more videos" }))
+      .toBeVisible();
+  });
+
+  it("a refused Undo shows its reason where the Undo was", async () => {
+    const npo = await seed_npo();
+    // stored before links had to be YouTube's
+    await seed_video(npo.id, "old", false, "https://vimeo.com/123456");
+    const screen = await render_org(npo.id);
+    await screen
+      .getByRole("button", { name: "Remove vimeo.com/123456" })
+      .click();
+    const undo = screen.getByRole("button", {
+      name: "Undo removing vimeo.com/123456",
+    });
+    await undo.click();
+
+    await expect
+      .element(screen.getByText("only YouTube links are supported"))
+      .toBeVisible();
     await expect.element(undo).not.toBeInTheDocument();
   });
 
