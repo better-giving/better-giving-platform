@@ -1165,6 +1165,10 @@ describe("campaign page structured data", () => {
 
   it("describes a public campaign as a project of its 501(c)(3) owner", async () => {
     const npo = await org(true, "https://acme.example");
+    await test_db
+      .current!.db.update(npos)
+      .set({ logo: "https://cdn.example/org-logo.png" })
+      .where(eq(npos.id, npo.id));
     await campaign(npo.id);
     await test_db
       .current!.db.update(campaigns)
@@ -1216,7 +1220,11 @@ describe("campaign page structured data", () => {
             "@id": `${org_url}#org`,
             name: "Acme",
             url: org_url,
-            logo: "https://cdn.example/mark.png",
+            logo: "https://cdn.example/org-logo.png",
+            address: {
+              "@type": "PostalAddress",
+              addressCountry: "United States",
+            },
             sameAs: ["https://acme.example"],
             taxID: "22-2222222",
             nonprofitStatus: "Nonprofit501c3",
@@ -1274,6 +1282,17 @@ describe("campaign page structured data", () => {
         href: `${base_url}/llms.txt`,
       },
     ]);
+  });
+
+  it("names a us owner's registration number as its tax id when no approved 501(c)(3) backs it", async () => {
+    const npo = await org();
+    await campaign(npo.id);
+
+    const ds = await meta_of("https://x/org/acme/winter");
+    const [page] = lds_of(ds);
+
+    expect(page.about.parentOrganization.taxID).toBe("EIN-PUBLIC");
+    expect(page.about.parentOrganization).not.toHaveProperty("nonprofitStatus");
   });
 
   it("gives a preview of an unpublished owner's campaign no structured data", async () => {
