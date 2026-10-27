@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { href, useFetcher, useRevalidator } from "react-router";
 import { safeParse } from "valibot";
 import type { action } from "#/routes/admin.$id.organization.videos/route";
@@ -74,16 +81,21 @@ export function use_link_input(init = "") {
 export function use_add_video(npo_id: number) {
   const f = useFetcher<typeof action>({ key: "video-add" });
   const input = use_link_input();
-  const { reset } = input;
+  const sent = useRef<string>(undefined);
 
+  // the field stays open while the add is out: a link typed meanwhile is kept
+  const on_added = useEffectEvent(() => {
+    if (input.value.trim() === sent.current) input.reset();
+  });
   useEffect(() => {
-    if (f.data && "ok" in f.data) reset();
-  }, [f.data, reset]);
+    if (f.data && "ok" in f.data) on_added();
+  }, [f.data]);
 
   const add = () => {
     if (f.state !== "idle") return;
     const url = input.take();
     if (!url) return;
+    sent.current = url;
     f.submit(
       { intent: "add", url },
       { method: "POST", action: videos_url(npo_id) }

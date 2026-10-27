@@ -120,7 +120,7 @@ function gate() {
 async function render_org(
   npo_id: number,
   hold?: ReturnType<typeof gate>,
-  on_video_post?: () => void
+  on_video_post?: () => void | Promise<void>
 ) {
   const server_loader = async (args: any) => {
     if (hold) {
@@ -154,8 +154,8 @@ async function render_org(
       children: [
         {
           path: "videos",
-          action: ((args: any) => {
-            on_video_post?.();
+          action: (async (args: any) => {
+            await on_video_post?.();
             return videos_action(args);
           }) as any,
         },
@@ -208,6 +208,31 @@ describe("organization — videos", () => {
       .toBeInTheDocument();
     await expect.element(field).toHaveValue("");
     await expect.element(field).not.toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("a link typed while the last add is out survives that add landing", async () => {
+    const npo = await seed_npo();
+    let posted = 0;
+    let land = () => {};
+    const held = new Promise<void>((r) => {
+      land = r;
+    });
+    const screen = await render_org(npo.id, undefined, () => {
+      posted++;
+      return held;
+    });
+
+    const field = screen.getByLabelText("Add a video");
+    await field.fill(`https://youtu.be/${yt(1)}`);
+    await screen.getByRole("button", { name: "Add video" }).click();
+    await vi.waitFor(() => expect(posted).toBe(1));
+    await field.fill(`https://youtu.be/${yt(2)}`);
+
+    land();
+    await expect
+      .element(screen.getByRole("link", { name: `youtu.be/${yt(1)}` }))
+      .toBeVisible();
+    await expect.element(field).toHaveValue(`https://youtu.be/${yt(2)}`);
   });
 
   it("a full page holds Show on page with its reason; taking one off frees a spot", async () => {
