@@ -440,6 +440,85 @@ export async function npo_all_liq(): Promise<{ id: number; liq: number }[]> {
   return rows.map((r) => ({ id: r.id, liq: r.liq ?? 0 }));
 }
 
+export type TNameMatch = "exact" | "close";
+
+export interface INpoNameHit {
+  id: number;
+  name: string;
+  registration_number: string;
+  hq_country: string;
+  tagline: string | null;
+  active: boolean;
+  match: TNameMatch;
+}
+
+/**
+ * the trigram similarity at which a listed name counts as the one queried,
+ * when the query's words don't all appear in it. against "American Red
+ * Cross": "American Cancer Society" 0.31, "Red Cross of Kenya" 0.36, the
+ * "amercan red cross" typo 0.76, "American National Red Cross" 0.68.
+ * word_similarity is no use here: it scores the first pair 0.53.
+ */
+export const NAME_MATCH_MIN = 0.4;
+const NAME_HITS = 10;
+
+const name_norm = (x: string) =>
+  x
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/** listed npos the query names: exact, then a whole-word prefix, then every
+ * query word in the name, then by similarity. unlike `npo_search`, a row
+ * sharing one trigram-heavy word ("American", "Cross") is not a hit */
+export async function npo_name_search(query: string): Promise<INpoNameHit[]> {
+  const q = name_norm(query);
+  if (!q) return [];
+  // alphanumerics and spaces only, so nothing in a LIKE pattern is a wildcard
+  const words = q.split(" ").filter((w) => w.length > 1);
+  const norm = sql`btrim(regexp_replace(lower(${npos.name}), '[^[:alnum:]]+', ' ', 'g'))`;
+  const exact = sql`${norm} = ${q}`;
+  const prefix = sql`${norm} LIKE ${`${q} %`}`;
+  const all_words = words.length
+    ? sql`(${sql.join(
+        words.map((w) => sql`${norm} LIKE ${`%${w}%`}`),
+        sql` AND `
+      )})`
+    : sql`false`;
+  const sim = sql`similarity(${npos.name}, ${query})`;
+
+  const rows = await db
+    .select({
+      id: npos.id,
+      name: npos.name,
+      registration_number: npos.registration_number,
+      hq_country: npos.hq_country,
+      tagline: npos.tagline,
+      active: npos.active,
+      exact: sql<boolean>`${exact}`,
+    })
+    .from(npos)
+    .where(
+      and(
+        eq(npos.active, true),
+        or(exact, all_words, sql`${sim} >= ${NAME_MATCH_MIN}`)
+      )
+    )
+    .orderBy(
+      desc(exact),
+      desc(prefix),
+      desc(all_words),
+      desc(sim),
+      asc(npos.name)
+    )
+    .limit(NAME_HITS);
+
+  return rows.map(({ exact, ...r }) => ({
+    ...r,
+    match: exact ? "exact" : "close",
+  }));
+}
+
 const HITS_PER_PAGE = 20;
 
 // pg_trgm fuzzy search
