@@ -124,3 +124,23 @@ test('one-character words still count, so "4-H" finds a longer name', async () =
   await list(["4-H Youth Development"]);
   expect(await names("4-H")).toEqual(["4-H Youth Development"]);
 });
+
+test("a hit carries the npo's stored increments, null when unset", async () => {
+  const increments = [{ value: "25", label: "Feed a child" }];
+  await test_db.current!.db.insert(npos).values({
+    registration_number: "inc-1",
+    name: "Increment Charity",
+    endow_designation: "Charity",
+    overview_pt: "[]",
+    hq_country: "United States",
+    increments,
+  });
+  await list(["Increment Charity Two"]);
+
+  const hits = await npo_name_search("increment charity");
+
+  expect(hits.map((hit) => [hit.name, hit.increments])).toEqual([
+    ["Increment Charity", increments],
+    ["Increment Charity Two", null],
+  ]);
+});

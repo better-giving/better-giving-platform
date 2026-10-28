@@ -50,6 +50,26 @@ const expect_ok = (cond, msg) => {
   if (!cond) throw new Error(msg);
 };
 
+/** a JSON-RPC `tools/call` on the agent MCP endpoint, recorded as a direct load */
+const agents_rpc = (page, entry) => async (id, name, args) => {
+  const response = await page.request.post(`${BASE}/agents/mcp`, {
+    timeout: 120_000,
+    headers: { "content-type": "application/json" },
+    data: {
+      jsonrpc: "2.0",
+      id,
+      method: "tools/call",
+      params: { name, arguments: args },
+    },
+  });
+  entry.loaded.push(`POST /agents/mcp tools/call ${name}`);
+  expect_ok(
+    response.status() === 200,
+    `POST /agents/mcp ${name} → ${response.status()}`
+  );
+  return response.json();
+};
+
 // A cold `react-router dev` full-reloads the first time the footer scrolls
 // into view, because that prefetches `/donate/1` and Vite optimizes new
 // dependencies. The reload cancels the click and leaves the browser on `/`.
@@ -617,24 +637,7 @@ const FLOWS = {
   "agents-find": {
     desc: "MCP find_nonprofit returns the seeded nonprofit and a flagged off-marketplace EIN; quote_donation refuses that EIN",
     async run({ page, entry }) {
-      const rpc = async (id, name, args) => {
-        const response = await page.request.post(`${BASE}/agents/mcp`, {
-          timeout: 120_000,
-          headers: { "content-type": "application/json" },
-          data: {
-            jsonrpc: "2.0",
-            id,
-            method: "tools/call",
-            params: { name, arguments: args },
-          },
-        });
-        entry.loaded.push(`POST /agents/mcp tools/call ${name}`);
-        expect_ok(
-          response.status() === 200,
-          `POST /agents/mcp ${name} → ${response.status()}`
-        );
-        return response.json();
-      };
+      const rpc = agents_rpc(page, entry);
 
       const found = await rpc(1, "find_nonprofit", {
         query: "Verify Test Nonprofit",
@@ -645,6 +648,13 @@ const FLOWS = {
       expect_ok(
         names.includes("Verify Test Nonprofit"),
         `items missing the seeded nonprofit: ${JSON.stringify(names)}`
+      );
+      const seeded = body.items.find(
+        (item) => item.name === "Verify Test Nonprofit"
+      );
+      expect_ok(
+        Array.isArray(seeded.increments) && seeded.increments.length === 0,
+        `seeded nonprofit increments ${JSON.stringify(seeded.increments)}`
       );
       const flagged = (body.not_on_better_giving ?? []).find(
         (row) => row.ein === "990000001"
@@ -691,11 +701,60 @@ const FLOWS = {
         "nonprofits stub did not see a search"
       );
       return [
-        "POST /agents/mcp find_nonprofit query → Verify Test Nonprofit in items",
+        "POST /agents/mcp find_nonprofit query → Verify Test Nonprofit in items, increments []",
         "990000001 in not_on_better_giving, donatable false, onboarding_url ends /register, no id",
         "revoked EIN 990000002 absent",
         "POST /agents/mcp quote_donation 990000001 → invalid_input",
         "nonprofits stub logged /v1/search",
+      ];
+    },
+  },
+  "agents-quote": {
+    desc: "MCP find_nonprofit lists a nonprofit's own increments; quote_donation labels an amount that is one of them",
+    async run({ page, entry }) {
+      const rpc = agents_rpc(page, entry);
+      const found = await rpc(1, "find_nonprofit", {
+        query: "Verify Campaign Nonprofit",
+      });
+      const npo = (found.result?.structuredContent?.items ?? []).find(
+        (item) => item.name === "Verify Campaign Nonprofit"
+      );
+      expect_ok(npo, "items missing Verify Campaign Nonprofit");
+      const want = [
+        { amount: 25, label: "Fixture: feed a child" },
+        { amount: 100, label: "Fixture: plant a grove" },
+      ];
+      expect_ok(
+        JSON.stringify(npo.increments) === JSON.stringify(want),
+        `increments ${JSON.stringify(npo.increments)}`
+      );
+
+      const label_of = async (id, amount) => {
+        const quoted = await rpc(id, "quote_donation", {
+          recipient_id: npo.id,
+          amount,
+        });
+        const body = quoted.result?.structuredContent;
+        expect_ok(
+          quoted.result?.isError !== true && body?.quote_token,
+          `quote ${amount} refused: ${JSON.stringify(body)}`
+        );
+        return body.increment_label;
+      };
+      const on_increment = await label_of(2, 25);
+      expect_ok(
+        on_increment === "Fixture: feed a child",
+        `quote 25 increment_label ${JSON.stringify(on_increment)}`
+      );
+      const off_increment = await label_of(3, 30);
+      expect_ok(
+        off_increment === null,
+        `quote 30 increment_label ${JSON.stringify(off_increment)}`
+      );
+      return [
+        "POST /agents/mcp find_nonprofit Verify Campaign Nonprofit → increments 25, 100 (stored 100, 25, abc)",
+        "POST /agents/mcp quote_donation 25 → increment_label Fixture: feed a child",
+        "POST /agents/mcp quote_donation 30 → increment_label null",
       ];
     },
   },

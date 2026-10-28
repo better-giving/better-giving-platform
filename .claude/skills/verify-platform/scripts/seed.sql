@@ -60,6 +60,10 @@ select 'VERIFY0003', 'Verify Campaign Nonprofit', 'Charity', 'United States',
        'Fixture nonprofit used by the campaign drives',
        true, true, 'verify-campaign', '/logo.png', '/logo.png'
 where not exists (select 1 from npos where registration_number = 'VERIFY0003');
+-- the agents-quote drive's increments: stored out of order with one bad value.
+-- no browser drive renders this nonprofit's own donate form.
+update npos set increments = '[{"value":"100","label":"Fixture: plant a grove"},{"value":"25","label":"Fixture: feed a child"},{"value":"abc","label":"Fixture: not a number"}]'::jsonb
+where registration_number = 'VERIFY0003' and increments is null;
 
 -- campaign npo admin. same account fixture-accounts.mjs exports as ADMIN, so
 -- seed-member.mjs hashes the same password and does not replace this one.

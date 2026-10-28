@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm";
 import type { INposPage, INpoWithRegNum } from "@/npo/interfaces";
 import type { INposSearchObj } from "@/npo/schema";
+import type { IIncrement } from "@/schemas";
 import type { IBalanceDeltas } from "@/types/donation";
 import { db } from "../db";
 import { finite } from "../schema/columns";
@@ -265,13 +266,18 @@ const regnum_cols = {
   name: npos.name,
   hq_country: npos.hq_country,
   registration_number: npos.registration_number,
+  increments: npos.increments,
 };
+
+export interface INpoRegNumHit extends INpoWithRegNum {
+  increments: IIncrement[] | null;
+}
 
 /** US npos whose registration number has the same digits as one of `eins`.
  * stored values keep their dashes; `12-3456789` and `123456789` are one EIN. */
 export async function npos_by_regnums(
   eins: string[]
-): Promise<INpoWithRegNum[]> {
+): Promise<INpoRegNumHit[]> {
   const digits = [
     ...new Set(eins.map((ein) => ein.replace(/\D/g, "")).filter(Boolean)),
   ];
@@ -449,6 +455,7 @@ export interface INpoNameHit {
   hq_country: string;
   tagline: string | null;
   active: boolean;
+  increments: IIncrement[] | null;
   match: TNameMatch;
 }
 
@@ -497,6 +504,7 @@ export async function npo_name_search(query: string): Promise<INpoNameHit[]> {
       hq_country: npos.hq_country,
       tagline: npos.tagline,
       active: npos.active,
+      increments: npos.increments,
       exact: sql<boolean>`${exact}`,
     })
     .from(npos)

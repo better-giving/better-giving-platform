@@ -3,7 +3,7 @@
 `find_nonprofit` on the public MCP endpoint returns marketplace matches and, separately, IRS-verified nonprofits that are not on Better Giving. This flow is HTTP only: it does not open a document and it does not click.
 
 ## Sub-features
-- `POST /agents/mcp` `tools/call` `find_nonprofit` with query `Verify Test Nonprofit` returns that seeded nonprofit in `items`.
+- `POST /agents/mcp` `tools/call` `find_nonprofit` with query `Verify Test Nonprofit` returns that seeded nonprofit in `items`, with `increments` `[]` (it sets none).
 - The same response includes EIN `990000001` in `not_on_better_giving` with `donatable: false`, `status: "not_on_better_giving"`, an `onboarding_url` ending in `/register`, and no `id`.
 - EIN `990000002` (the stubbed revoked org) is absent.
 - `POST /agents/mcp` `tools/call` `quote_donation` with `recipient_id` `990000001` is refused (`invalid_input`).
