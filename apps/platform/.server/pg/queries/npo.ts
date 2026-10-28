@@ -475,7 +475,7 @@ export async function npo_name_search(query: string): Promise<INpoNameHit[]> {
   const q = name_norm(query);
   if (!q) return [];
   // alphanumerics and spaces only, so nothing in a LIKE pattern is a wildcard
-  const words = q.split(" ").filter((w) => w.length > 1);
+  const words = q.split(" ").filter(Boolean);
   const norm = sql`btrim(regexp_replace(lower(${npos.name}), '[^[:alnum:]]+', ' ', 'g'))`;
   const exact = sql`${norm} = ${q}`;
   const prefix = sql`${norm} LIKE ${`${q} %`}`;

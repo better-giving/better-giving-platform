@@ -119,3 +119,8 @@ test("an inactive org is not a match", async () => {
 
   expect(await names("American Red Cross")).toEqual([]);
 });
+
+test('one-character words still count, so "4-H" finds a longer name', async () => {
+  await list(["4-H Youth Development"]);
+  expect(await names("4-H")).toEqual(["4-H Youth Development"]);
+});
