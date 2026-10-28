@@ -469,7 +469,7 @@ const name_norm = (x: string) =>
     .trim();
 
 /** listed npos the query names: exact, then a whole-word prefix, then every
- * query word in the name, then by similarity. unlike `npo_search`, a row
+ * query word as a whole word in the name, then by similarity. unlike `npo_search`, a row
  * sharing one trigram-heavy word ("American", "Cross") is not a hit */
 export async function npo_name_search(query: string): Promise<INpoNameHit[]> {
   const q = name_norm(query);
@@ -479,9 +479,11 @@ export async function npo_name_search(query: string): Promise<INpoNameHit[]> {
   const norm = sql`btrim(regexp_replace(lower(${npos.name}), '[^[:alnum:]]+', ' ', 'g'))`;
   const exact = sql`${norm} = ${q}`;
   const prefix = sql`${norm} LIKE ${`${q} %`}`;
+  // padded so each word is matched whole: "red" must not hit "fred"
+  const padded = sql`' ' || ${norm} || ' '`;
   const all_words = words.length
     ? sql`(${sql.join(
-        words.map((w) => sql`${norm} LIKE ${`%${w}%`}`),
+        words.map((w) => sql`${padded} LIKE ${`% ${w} %`}`),
         sql` AND `
       )})`
     : sql`false`;

@@ -15,6 +15,7 @@ import { donor_refusal } from "#/routes/api.donation-intents/stripe/donor-refusa
 import { MIN_DONATION_USD, PROCESSING_RATES } from "@/constants/common";
 import type { IDonation, IDonor, IProgram, ITo } from "@/donations";
 import { to_from } from "@/donations/helpers";
+import { snap, to_units } from "@/helpers/decimal";
 import { is_funded_member } from "@/settlement/funded-members";
 import { npo_share, settled_parts, shared_parts } from "@/settlement/plan";
 import { app, base_url } from "$/env";
@@ -117,12 +118,14 @@ export interface IQuoteBreakdown {
   total_charged: number;
   /** Stripe's card fee on the whole charge, estimated at its card rate */
   processing_fee: number;
-  /** 1.5% of the gift, charged to a nonprofit that turned off tips */
+  /** 1.5% of a nonprofit's share after the card fee, when that nonprofit
+   * turned off tips. a fund's members are charged by their own setting */
   platform_fee: number;
-  /** 2.9% of the gift, charged to a fiscally sponsored nonprofit */
+  /** 2.9% of a fiscally sponsored nonprofit's share after the card fee */
   fiscal_sponsor_fee: number;
   nonprofit_receives: number;
-  /** the tip and any fee allowance the card fee leaves, net of their share of it */
+  /** the tip and what the fee allowance leaves after the card fee. the two
+   * fees above are Better Giving's too; each line may carry a rounding cent */
   better_giving_receives: number;
 }
 
@@ -201,10 +204,32 @@ function quote_amount(
     cover_processing_fee,
     currency: { code: "USD", rate: 1 },
   });
-  return { ...parts, total: parts.base + parts.tip + parts.fee_allowance };
+  const total_cents =
+    to_units(parts.base, 2) +
+    to_units(parts.tip, 2) +
+    to_units(parts.fee_allowance, 2);
+  return { ...parts, total: total_cents / 100 };
 }
 
-const cents = (x: number) => Math.round(x * 100) / 100;
+/** `pool` cents split by `dollars`, with what they leave as the last share,
+ * returned in dollars: each share the floor or ceiling of its exact cents, the
+ * cents the floors drop going to the largest fractions, so the shares sum to
+ * `pool` exactly */
+function apportion(pool: number, dollars: number[]): number[] {
+  const exact = dollars.map((x) => snap(x * 100));
+  exact.push(pool - snap(exact.reduce((sum, x) => sum + x, 0)));
+  const shares = exact.map(Math.floor);
+  let dropped = pool - shares.reduce((sum, x) => sum + x, 0);
+  const by_fraction = exact
+    .map((x, i) => ({ i, fraction: x - Math.floor(x) }))
+    .sort((a, b) => b.fraction - a.fraction);
+  for (const { i } of by_fraction) {
+    if (dropped <= 0) break;
+    shares[i] += 1;
+    dropped -= 1;
+  }
+  return shares.map((c) => c / 100);
+}
 
 /** what settlement would book for this charge: the same split and fees, with
  * the Stripe fee it would read off the charge estimated at the card rate the
@@ -214,19 +239,29 @@ async function quote_breakdown(
   amount: ReturnType<typeof quote_amount>
 ): Promise<IQuoteBreakdown> {
   const { total, ...parts } = amount;
-  const processing_fee = cents(
-    total * PROCESSING_RATES.stripe + PROCESSING_RATES.stripe_flat
-  );
   const members =
     recipient.to_type === "npo"
       ? [await npo_get(+recipient.to_id)]
       : await npos_batch_get(recipient.to_members.map(Number));
   const funded = members.filter((m) => m && is_funded_member(m));
+  // settlement books no destination for a gift with no funded member
+  if (!funded.length) {
+    throw new AgentDonationError(
+      "recipient_unavailable",
+      "This recipient is not accepting donations."
+    );
+  }
+  const total_cents = to_units(total, 2);
+  const fee_cents = to_units(
+    total * PROCESSING_RATES.stripe + PROCESSING_RATES.stripe_flat,
+    2
+  );
+  const processing_fee = fee_cents / 100;
   const ps = settled_parts(parts, 1, {
-    net: total - processing_fee,
+    net: (total_cents - fee_cents) / 100,
     fee: processing_fee,
   });
-  const share = shared_parts(ps, Math.max(funded.length, 1));
+  const share = shared_parts(ps, funded.length);
   let net = 0;
   let base = 0;
   let fsa = 0;
@@ -239,9 +274,12 @@ async function quote_breakdown(
     base += s.pcfs.base;
     fsa += s.pcfs.fsa;
   }
-  const nonprofit_receives = cents(net);
-  const platform_fee = cents(base);
-  const fiscal_sponsor_fee = cents(fsa);
+  const [
+    nonprofit_receives,
+    platform_fee,
+    fiscal_sponsor_fee,
+    better_giving_receives,
+  ] = apportion(total_cents - fee_cents, [net, base, fsa]);
   return {
     amount: parts.base,
     tip: parts.tip,
@@ -251,13 +289,7 @@ async function quote_breakdown(
     platform_fee,
     fiscal_sponsor_fee,
     nonprofit_receives,
-    better_giving_receives: cents(
-      total -
-        processing_fee -
-        platform_fee -
-        fiscal_sponsor_fee -
-        nonprofit_receives
-    ),
+    better_giving_receives,
   };
 }
 

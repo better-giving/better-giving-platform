@@ -101,7 +101,13 @@ test("every query word in the name is a match, however short the query", async (
   expect(await names("red cross")).toEqual(["Red Cross of Kenya"]);
 });
 
-test("a LIKE wildcard in the query matches nothing by itself", async () => {
+test("a query word inside a longer word is not a match", async () => {
+  await list(["Fred Crossley Trust"]);
+
+  expect(await names("red cross")).toEqual(["Red Cross of Kenya"]);
+});
+
+test("a punctuation-only query matches nothing", async () => {
   await list(["100% Kids"]);
 
   expect(await names("100% kids")).toEqual(["100% Kids"]);

@@ -36,7 +36,7 @@ export const partition_destinations = async (b: IDonationSettled) => {
     date: parent_settlement.date,
     currency: parent_settlement.currency,
   };
-  /** in usd/usdc */
+  /** `sttl*` parts in usd/usdc; `amnt` in the donation's currency */
   const ps: IParts = settled_parts(parent_amount, tx.upusd, parent_settlement);
 
   const source_p = form_id

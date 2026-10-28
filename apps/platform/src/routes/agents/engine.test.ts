@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import type { IQuoteBreakdown } from "./engine";
 
 const KEY = "test-only-not-a-real-nonprofits-key";
 
@@ -97,6 +98,8 @@ beforeEach(() => {
   vi.stubGlobal("fetch", () => {
     throw new Error("unexpected nonprofits fetch");
   });
+  // clearAllMocks keeps implementations, so a test's own setup would otherwise leak into the next
+  mocks.npo_name_search.mockResolvedValue([]);
   mocks.npos_by_regnums.mockResolvedValue([]);
   mocks.to_fn.mockResolvedValue(recipient);
   mocks.reserve.mockResolvedValue("created");
@@ -139,6 +142,29 @@ async function quote(
     cover_processing_fee: false,
     ...patch,
   });
+}
+
+/** how a breakdown breaks the quote's bound: every field a non-negative whole
+ * cent, the charge's parts and its destinations each summing to it exactly */
+function unbalanced(b: IQuoteBreakdown): string[] {
+  const errors = Object.entries(b)
+    .filter(([, x]) => x < 0 || x !== Math.round(x * 100) / 100)
+    .map(([k, x]) => `${k} ${x}`);
+  const cents = (xs: number[]) =>
+    xs.reduce((sum, x) => sum + Math.round(x * 100), 0);
+  const total = cents([b.total_charged]);
+  if (cents([b.amount, b.tip, b.fee_allowance]) !== total) {
+    errors.push("charge parts don't sum");
+  }
+  const destinations = cents([
+    b.nonprofit_receives,
+    b.platform_fee,
+    b.fiscal_sponsor_fee,
+    b.processing_fee,
+    b.better_giving_receives,
+  ]);
+  if (destinations !== total) errors.push("destinations don't sum");
+  return errors;
 }
 
 describe("agent quote", () => {
@@ -233,22 +259,62 @@ describe("agent quote", () => {
 
       expect(b).toEqual(breakdown);
       expect(b.total_charged).toBe(amount.total);
-      const cents = (xs: number[]) =>
-        xs.reduce((sum, x) => sum + Math.round(x * 100), 0);
-      expect(cents([b.amount, b.tip, b.fee_allowance])).toBe(
-        cents([b.total_charged])
-      );
-      expect(
-        cents([
-          b.nonprofit_receives,
-          b.platform_fee,
-          b.fiscal_sponsor_fee,
-          b.processing_fee,
-          b.better_giving_receives,
-        ])
-      ).toBe(cents([b.total_charged]));
+      expect(unbalanced(b)).toEqual([]);
     }
   );
+
+  test("a gift whose fees each round up still balances to the cent", async () => {
+    mocks.npo_get.mockResolvedValue({
+      donor_address_required: false,
+      hide_bg_tip: true,
+      fiscal_sponsored: true,
+    });
+
+    const { amount, breakdown: b } = await quote({ amount: 10.88 });
+
+    // settlement's unrounded split of the 10.34 net: 9.88504 / 0.1551 / 0.29986 / 0
+    expect(b).toEqual({
+      amount: 10.88,
+      tip: 0,
+      fee_allowance: 0,
+      total_charged: 10.88,
+      processing_fee: 0.54,
+      platform_fee: 0.16,
+      fiscal_sponsor_fee: 0.3,
+      nonprofit_receives: 9.88,
+      better_giving_receives: 0,
+    });
+    expect(b.total_charged).toBe(amount.total);
+    expect(unbalanced(b)).toEqual([]);
+  });
+
+  test("every quote's breakdown is whole cents that balance", async () => {
+    mocks.npo_get.mockResolvedValue({
+      donor_address_required: false,
+      hide_bg_tip: true,
+      fiscal_sponsored: true,
+    });
+    const failures: string[] = [];
+    for (let c = 200; c <= 1500; c++) {
+      for (const tip_percent of ["none", "10", "15", "20"] as const) {
+        for (const cover_processing_fee of [false, true]) {
+          const { amount, breakdown: b } = await quote({
+            amount: c / 100,
+            tip_percent,
+            cover_processing_fee,
+          });
+          const errors = unbalanced(b);
+          if (b.total_charged !== amount.total) errors.push("total differs");
+          if (errors.length) {
+            failures.push(
+              `${c / 100} tip ${tip_percent} cover ${cover_processing_fee}: ${errors.join(", ")}`
+            );
+          }
+        }
+      }
+    }
+    expect(failures).toEqual([]);
+  }, 30_000);
 
   test("a fund's breakdown counts only the members settlement pays", async () => {
     mocks.to_fn.mockResolvedValue({
@@ -273,6 +339,74 @@ describe("agent quote", () => {
     expect(result.breakdown).toMatchObject({
       fiscal_sponsor_fee: 0.29,
       nonprofit_receives: 9.71,
+    });
+  });
+
+  test("a fund's gift splits evenly across its funded members, each on its own fees", async () => {
+    mocks.to_fn.mockResolvedValue({
+      ...recipient,
+      to_id: "1b5c9a4e-7f0e-4c39-9d2e-2f8f3b3c1a11",
+      to_type: "fund",
+      to_members: ["1", "2", "3"],
+    });
+    mocks.npos_batch_get.mockResolvedValue([
+      { id: 1, active: true, fiscal_sponsored: true },
+      { id: 2, active: true, hide_bg_tip: true },
+      { id: 3, active: false },
+    ]);
+
+    const { amount, breakdown: b } = await create_quote({
+      recipient_id: "1b5c9a4e-7f0e-4c39-9d2e-2f8f3b3c1a11",
+      amount: 10,
+      tip_percent: "none",
+      cover_processing_fee: false,
+    });
+
+    expect(mocks.npos_batch_get).toHaveBeenCalledWith([1, 2, 3]);
+    // $10, stripe fee 0.52 -> settled 9.48, so each of the two funded members
+    // holds 4.74. fiscally sponsored: net 4.60254, fsa 0.13746. tip-opt-out:
+    // net 4.6689, base 0.0711. sums 9.27144 / 0.0711 / 0.13746, apportioned to
+    // whole cents 9.27 / 0.07 / 0.14 (the dropped cent goes to the .746 fsa)
+    expect(b).toEqual({
+      amount: 10,
+      tip: 0,
+      fee_allowance: 0,
+      total_charged: 10,
+      processing_fee: 0.52,
+      platform_fee: 0.07,
+      fiscal_sponsor_fee: 0.14,
+      nonprofit_receives: 9.27,
+      better_giving_receives: 0,
+    });
+    expect(b.total_charged).toBe(amount.total);
+    expect(unbalanced(b)).toEqual([]);
+  });
+
+  test("refuses a fund whose members settlement would not pay", async () => {
+    mocks.to_fn.mockResolvedValue({
+      ...recipient,
+      to_id: "1b5c9a4e-7f0e-4c39-9d2e-2f8f3b3c1a11",
+      to_type: "fund",
+      to_members: ["1", "2"],
+    });
+    mocks.npos_batch_get.mockResolvedValue([
+      { id: 1, active: false },
+      { id: 2, active: false },
+    ]);
+
+    await expect(
+      create_quote({
+        recipient_id: "1b5c9a4e-7f0e-4c39-9d2e-2f8f3b3c1a11",
+        amount: 10,
+      })
+    ).rejects.toMatchObject({ code: "recipient_unavailable" });
+  });
+
+  test("refuses a nonprofit with no record to settle to", async () => {
+    mocks.npo_get.mockResolvedValue(undefined);
+
+    await expect(quote()).rejects.toMatchObject({
+      code: "recipient_unavailable",
     });
   });
 
@@ -909,7 +1043,7 @@ describe("find_nonprofit IRS fallback", () => {
 
   test("a failed local search is reported and still returns the IRS lookup", async () => {
     const error = new Error("db down");
-    mocks.npo_name_search.mockRejectedValue(error);
+    mocks.npo_name_search.mockRejectedValueOnce(error);
     stub_fetch(() => http(200, { query: "acme", limit: 10, results: [] }));
 
     const result = await find_nonprofit({ query: "acme" }, caller());
