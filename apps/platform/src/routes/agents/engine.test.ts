@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import type { IQuoteBreakdown } from "./engine";
 
 const KEY = "test-only-not-a-real-nonprofits-key";
 
@@ -14,7 +15,8 @@ const env = vi.hoisted(() => ({
 }));
 
 const mocks = vi.hoisted(() => ({
-  get_npos: vi.fn(),
+  npo_name_search: vi.fn(),
+  npos_batch_get: vi.fn(),
   to_fn: vi.fn(),
   reserve: vi.fn(),
   donation_get: vi.fn(),
@@ -32,7 +34,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("$/env", () => env);
 
-vi.mock("#/.server/npos", () => ({ get_npos: mocks.get_npos }));
 vi.mock("#/.server/donation-recipient", () => ({ to_fn: mocks.to_fn }));
 vi.mock("$/pg/queries/donation", () => ({
   agent_checkout_save: mocks.checkout_save,
@@ -44,6 +45,8 @@ vi.mock("$/pg/queries/npo", () => ({
   npo_by_regnum: mocks.npo_by_regnum,
   npos_by_regnums: mocks.npos_by_regnums,
   npo_get: mocks.npo_get,
+  npo_name_search: mocks.npo_name_search,
+  npos_batch_get: mocks.npos_batch_get,
 }));
 vi.mock("#/errors/report", () => ({ report_error: mocks.report_error }));
 vi.mock("$/pg/queries/program", () => ({
@@ -95,6 +98,8 @@ beforeEach(() => {
   vi.stubGlobal("fetch", () => {
     throw new Error("unexpected nonprofits fetch");
   });
+  // clearAllMocks keeps implementations, so a test's own setup would otherwise leak into the next
+  mocks.npo_name_search.mockResolvedValue([]);
   mocks.npos_by_regnums.mockResolvedValue([]);
   mocks.to_fn.mockResolvedValue(recipient);
   mocks.reserve.mockResolvedValue("created");
@@ -139,6 +144,29 @@ async function quote(
   });
 }
 
+/** how a breakdown breaks the quote's bound: every field a non-negative whole
+ * cent, the charge's parts and its destinations each summing to it exactly */
+function unbalanced(b: IQuoteBreakdown): string[] {
+  const errors = Object.entries(b)
+    .filter(([, x]) => x < 0 || x !== Math.round(x * 100) / 100)
+    .map(([k, x]) => `${k} ${x}`);
+  const cents = (xs: number[]) =>
+    xs.reduce((sum, x) => sum + Math.round(x * 100), 0);
+  const total = cents([b.total_charged]);
+  if (cents([b.amount, b.tip, b.fee_allowance]) !== total) {
+    errors.push("charge parts don't sum");
+  }
+  const destinations = cents([
+    b.nonprofit_receives,
+    b.platform_fee,
+    b.fiscal_sponsor_fee,
+    b.processing_fee,
+    b.better_giving_receives,
+  ]);
+  if (destinations !== total) errors.push("destinations don't sum");
+  return errors;
+}
+
 describe("agent quote", () => {
   test("returns the same USD amount split the card form uses", async () => {
     const result = await quote({
@@ -151,6 +179,234 @@ describe("agent quote", () => {
       currency: "USD",
       frequency: "one-time",
       amount: { base: 10, tip: 1, fee_allowance: 0.56, total: 11.56 },
+    });
+  });
+
+  test.each([
+    {
+      label: "$10, 10% tip, fee covered",
+      npo: {},
+      patch: { tip_percent: "10", cover_processing_fee: true },
+      breakdown: {
+        amount: 10,
+        tip: 1,
+        fee_allowance: 0.56,
+        total_charged: 11.56,
+        processing_fee: 0.55,
+        platform_fee: 0,
+        fiscal_sponsor_fee: 0,
+        nonprofit_receives: 10,
+        better_giving_receives: 1.01,
+      },
+    },
+    {
+      label: "the same to a fiscally sponsored nonprofit",
+      npo: { fiscal_sponsored: true },
+      patch: { tip_percent: "10", cover_processing_fee: true },
+      breakdown: {
+        amount: 10,
+        tip: 1,
+        fee_allowance: 0.56,
+        total_charged: 11.56,
+        processing_fee: 0.55,
+        platform_fee: 0,
+        fiscal_sponsor_fee: 0.29,
+        nonprofit_receives: 9.71,
+        better_giving_receives: 1.01,
+      },
+    },
+    {
+      label: "a nonprofit that turned off tips",
+      npo: { hide_bg_tip: true },
+      patch: { tip_percent: "none", cover_processing_fee: true },
+      breakdown: {
+        amount: 10,
+        tip: 0,
+        fee_allowance: 0.54,
+        total_charged: 10.54,
+        processing_fee: 0.53,
+        platform_fee: 0.15,
+        fiscal_sponsor_fee: 0,
+        nonprofit_receives: 9.85,
+        better_giving_receives: 0.01,
+      },
+    },
+    {
+      label: "fee not covered, so the gift pays its share of it",
+      npo: {},
+      patch: { tip_percent: "10", cover_processing_fee: false },
+      breakdown: {
+        amount: 10,
+        tip: 1,
+        fee_allowance: 0,
+        total_charged: 11,
+        processing_fee: 0.54,
+        platform_fee: 0,
+        fiscal_sponsor_fee: 0,
+        nonprofit_receives: 9.51,
+        better_giving_receives: 0.95,
+      },
+    },
+  ] as const)(
+    "breaks the charge down: $label",
+    async ({ npo, patch, breakdown }) => {
+      mocks.npo_get.mockResolvedValue({
+        donor_address_required: false,
+        ...npo,
+      });
+
+      const { amount, breakdown: b } = await quote(patch);
+
+      expect(b).toEqual(breakdown);
+      expect(b.total_charged).toBe(amount.total);
+      expect(unbalanced(b)).toEqual([]);
+    }
+  );
+
+  test("a gift whose fees each round up still balances to the cent", async () => {
+    mocks.npo_get.mockResolvedValue({
+      donor_address_required: false,
+      hide_bg_tip: true,
+      fiscal_sponsored: true,
+    });
+
+    const { amount, breakdown: b } = await quote({ amount: 10.88 });
+
+    // settlement's unrounded split of the 10.34 net: 9.88504 / 0.1551 / 0.29986 / 0
+    expect(b).toEqual({
+      amount: 10.88,
+      tip: 0,
+      fee_allowance: 0,
+      total_charged: 10.88,
+      processing_fee: 0.54,
+      platform_fee: 0.16,
+      fiscal_sponsor_fee: 0.3,
+      nonprofit_receives: 9.88,
+      better_giving_receives: 0,
+    });
+    expect(b.total_charged).toBe(amount.total);
+    expect(unbalanced(b)).toEqual([]);
+  });
+
+  test("every quote's breakdown is whole cents that balance", async () => {
+    mocks.npo_get.mockResolvedValue({
+      donor_address_required: false,
+      hide_bg_tip: true,
+      fiscal_sponsored: true,
+    });
+    const failures: string[] = [];
+    for (let c = 200; c <= 1500; c++) {
+      for (const tip_percent of ["none", "10", "15", "20"] as const) {
+        for (const cover_processing_fee of [false, true]) {
+          const { amount, breakdown: b } = await quote({
+            amount: c / 100,
+            tip_percent,
+            cover_processing_fee,
+          });
+          const errors = unbalanced(b);
+          if (b.total_charged !== amount.total) errors.push("total differs");
+          if (errors.length) {
+            failures.push(
+              `${c / 100} tip ${tip_percent} cover ${cover_processing_fee}: ${errors.join(", ")}`
+            );
+          }
+        }
+      }
+    }
+    expect(failures).toEqual([]);
+  }, 30_000);
+
+  test("a fund's breakdown counts only the members settlement pays", async () => {
+    mocks.to_fn.mockResolvedValue({
+      ...recipient,
+      to_id: "1b5c9a4e-7f0e-4c39-9d2e-2f8f3b3c1a11",
+      to_type: "fund",
+      to_members: ["1", "2"],
+    });
+    mocks.npos_batch_get.mockResolvedValue([
+      { id: 1, active: true, fiscal_sponsored: true },
+      { id: 2, active: false, fiscal_sponsored: false },
+    ]);
+
+    const result = await create_quote({
+      recipient_id: "1b5c9a4e-7f0e-4c39-9d2e-2f8f3b3c1a11",
+      amount: 10,
+      tip_percent: "10",
+      cover_processing_fee: true,
+    });
+
+    expect(mocks.npos_batch_get).toHaveBeenCalledWith([1, 2]);
+    expect(result.breakdown).toMatchObject({
+      fiscal_sponsor_fee: 0.29,
+      nonprofit_receives: 9.71,
+    });
+  });
+
+  test("a fund's gift splits evenly across its funded members, each on its own fees", async () => {
+    mocks.to_fn.mockResolvedValue({
+      ...recipient,
+      to_id: "1b5c9a4e-7f0e-4c39-9d2e-2f8f3b3c1a11",
+      to_type: "fund",
+      to_members: ["1", "2", "3"],
+    });
+    mocks.npos_batch_get.mockResolvedValue([
+      { id: 1, active: true, fiscal_sponsored: true },
+      { id: 2, active: true, hide_bg_tip: true },
+      { id: 3, active: false },
+    ]);
+
+    const { amount, breakdown: b } = await create_quote({
+      recipient_id: "1b5c9a4e-7f0e-4c39-9d2e-2f8f3b3c1a11",
+      amount: 10,
+      tip_percent: "none",
+      cover_processing_fee: false,
+    });
+
+    expect(mocks.npos_batch_get).toHaveBeenCalledWith([1, 2, 3]);
+    // $10, stripe fee 0.52 -> settled 9.48, so each of the two funded members
+    // holds 4.74. fiscally sponsored: net 4.60254, fsa 0.13746. tip-opt-out:
+    // net 4.6689, base 0.0711. sums 9.27144 / 0.0711 / 0.13746, apportioned to
+    // whole cents 9.27 / 0.07 / 0.14 (the dropped cent goes to the .746 fsa)
+    expect(b).toEqual({
+      amount: 10,
+      tip: 0,
+      fee_allowance: 0,
+      total_charged: 10,
+      processing_fee: 0.52,
+      platform_fee: 0.07,
+      fiscal_sponsor_fee: 0.14,
+      nonprofit_receives: 9.27,
+      better_giving_receives: 0,
+    });
+    expect(b.total_charged).toBe(amount.total);
+    expect(unbalanced(b)).toEqual([]);
+  });
+
+  test("refuses a fund whose members settlement would not pay", async () => {
+    mocks.to_fn.mockResolvedValue({
+      ...recipient,
+      to_id: "1b5c9a4e-7f0e-4c39-9d2e-2f8f3b3c1a11",
+      to_type: "fund",
+      to_members: ["1", "2"],
+    });
+    mocks.npos_batch_get.mockResolvedValue([
+      { id: 1, active: false },
+      { id: 2, active: false },
+    ]);
+
+    await expect(
+      create_quote({
+        recipient_id: "1b5c9a4e-7f0e-4c39-9d2e-2f8f3b3c1a11",
+        amount: 10,
+      })
+    ).rejects.toMatchObject({ code: "recipient_unavailable" });
+  });
+
+  test("refuses a nonprofit with no record to settle to", async () => {
+    mocks.npo_get.mockResolvedValue(undefined);
+
+    await expect(quote()).rejects.toMatchObject({
+      code: "recipient_unavailable",
     });
   });
 
@@ -583,18 +839,17 @@ function stub_fetch(
   return fn;
 }
 
-const local_page = {
-  items: [
-    {
-      id: 7,
-      name: "Verify Test Nonprofit",
-      registration_number: "VERIFY0001",
-      hq_country: "United States",
-    },
-  ],
-  page: 1,
-  pages: 3,
-};
+const local_hits = [
+  {
+    id: 7,
+    name: "Verify Test Nonprofit",
+    registration_number: "VERIFY0001",
+    hq_country: "United States",
+    tagline: null,
+    active: true,
+    match: "close",
+  },
+];
 
 describe("find_nonprofit IRS fallback", () => {
   afterEach(() => {
@@ -663,7 +918,7 @@ describe("find_nonprofit IRS fallback", () => {
 
   test("a query keeps local items and drops ineligible or already-listed EINs", async () => {
     const on_page = {
-      ...local_page.items[0],
+      ...local_hits[0],
       registration_number: "88-8888888",
     };
     const canada = {
@@ -672,11 +927,7 @@ describe("find_nonprofit IRS fallback", () => {
       registration_number: "111111111",
       hq_country: "Canada",
     };
-    mocks.get_npos.mockResolvedValue({
-      items: [on_page, canada],
-      page: 1,
-      pages: 3,
-    });
+    mocks.npo_name_search.mockResolvedValue([on_page, canada]);
     mocks.npos_by_regnums.mockImplementation(async (eins: string[]) =>
       eins.includes("999999999")
         ? [
@@ -724,7 +975,9 @@ describe("find_nonprofit IRS fallback", () => {
     const result = await find_nonprofit({ query: "charity" }, caller());
 
     expect(result.items).toEqual([on_page, canada]);
-    expect(result).toEqual(expect.objectContaining({ page: 1, pages: 3 }));
+    expect(result).toEqual(
+      expect.objectContaining({ page: 1, pages: 1, match: "close" })
+    );
     expect(result.external_lookup).toBe("ok");
     expect(result.not_on_better_giving.map((entry) => entry.name)).toEqual([
       "Eligible",
@@ -734,15 +987,82 @@ describe("find_nonprofit IRS fallback", () => {
     expect(JSON.stringify(result)).not.toContain("999999999");
   });
 
+  test("a named org that isn't listed returns no listed items, only the IRS match", async () => {
+    mocks.npo_name_search.mockResolvedValue([]);
+    stub_fetch(() =>
+      http(200, {
+        query: "American Red Cross",
+        limit: 10,
+        results: [
+          search_org({ ein: "530196605", name: "American National Red Cross" }),
+        ],
+      })
+    );
+
+    const result = await find_nonprofit(
+      { query: "American Red Cross" },
+      caller()
+    );
+
+    expect(mocks.npo_name_search).toHaveBeenCalledWith("American Red Cross");
+    expect(result.items).toEqual([]);
+    expect(result.match).toBe("none");
+    expect(result.external_lookup).toBe("ok");
+    expect(result.not_on_better_giving.map((entry) => entry.ein)).toEqual([
+      "530196605",
+    ]);
+  });
+
+  test("a listed exact match is reported as exact and not offered off-platform", async () => {
+    const listed = {
+      ...local_hits[0],
+      name: "American National Red Cross",
+      registration_number: "53-0196605",
+      match: "exact",
+    };
+    mocks.npo_name_search.mockResolvedValue([listed]);
+    stub_fetch(() =>
+      http(200, {
+        query: "American National Red Cross",
+        limit: 10,
+        results: [
+          search_org({ ein: "530196605", name: "American National Red Cross" }),
+        ],
+      })
+    );
+
+    const result = await find_nonprofit(
+      { query: "American National Red Cross" },
+      caller()
+    );
+
+    expect(result.items).toEqual([listed]);
+    expect(result.match).toBe("exact");
+    expect(result.not_on_better_giving).toEqual([]);
+  });
+
+  test("a failed local search is reported and still returns the IRS lookup", async () => {
+    const error = new Error("db down");
+    mocks.npo_name_search.mockRejectedValueOnce(error);
+    stub_fetch(() => http(200, { query: "acme", limit: 10, results: [] }));
+
+    const result = await find_nonprofit({ query: "acme" }, caller());
+
+    expect(mocks.report_error).toHaveBeenCalledWith(error);
+    expect(result.items).toEqual([]);
+    expect(result.match).toBe("none");
+    expect(result.external_lookup).toBe("ok");
+  });
+
   test.each([500, 503])(
     "HTTP %s returns local results and external_lookup unavailable",
     async (status) => {
       stub_fetch(() => http(status, { code: "data_unavailable" }));
-      mocks.get_npos.mockResolvedValue(local_page);
+      mocks.npo_name_search.mockResolvedValue(local_hits);
 
       const result = await find_nonprofit({ query: "acme" }, caller());
 
-      expect(result.items).toEqual(local_page.items);
+      expect(result.items).toEqual(local_hits);
       expect(result.not_on_better_giving).toEqual([]);
       expect(result.external_lookup).toBe("unavailable");
     }
@@ -759,12 +1079,12 @@ describe("find_nonprofit IRS fallback", () => {
     async (_label, query) => {
       const fetch = vi.fn();
       vi.stubGlobal("fetch", fetch);
-      mocks.get_npos.mockResolvedValue(local_page);
+      mocks.npo_name_search.mockResolvedValue(local_hits);
 
       const result = await find_nonprofit({ query }, caller());
 
       expect(fetch).not.toHaveBeenCalled();
-      expect(result.items).toEqual(local_page.items);
+      expect(result.items).toEqual(local_hits);
       expect(result.not_on_better_giving).toEqual([]);
       expect(result.external_lookup).toBe("invalid_query");
     }
@@ -774,12 +1094,12 @@ describe("find_nonprofit IRS fallback", () => {
     const fetch = stub_fetch(() =>
       http(200, { query: "'a", limit: 10, results: [] })
     );
-    mocks.get_npos.mockResolvedValue(local_page);
+    mocks.npo_name_search.mockResolvedValue(local_hits);
 
     const result = await find_nonprofit({ query: "'a" }, caller());
 
     expect(fetch).toHaveBeenCalledOnce();
-    expect(result.items).toEqual(local_page.items);
+    expect(result.items).toEqual(local_hits);
     expect(result.external_lookup).toBe("ok");
   });
 
@@ -787,11 +1107,11 @@ describe("find_nonprofit IRS fallback", () => {
     "HTTP 400 %s keeps local results and is invalid_query",
     async (code) => {
       stub_fetch(() => http(400, { code }));
-      mocks.get_npos.mockResolvedValue(local_page);
+      mocks.npo_name_search.mockResolvedValue(local_hits);
 
       const result = await find_nonprofit({ query: "acme" }, caller());
 
-      expect(result.items).toEqual(local_page.items);
+      expect(result.items).toEqual(local_hits);
       expect(result.not_on_better_giving).toEqual([]);
       expect(result.external_lookup).toBe("invalid_query");
     }
@@ -799,7 +1119,7 @@ describe("find_nonprofit IRS fallback", () => {
 
   test("HTTP 400 with another code stays unavailable", async () => {
     stub_fetch(() => http(400, { code: "something_else" }));
-    mocks.get_npos.mockResolvedValue(local_page);
+    mocks.npo_name_search.mockResolvedValue(local_hits);
 
     const result = await find_nonprofit({ query: "acme" }, caller());
 
@@ -852,11 +1172,11 @@ describe("find_nonprofit IRS fallback", () => {
           signal.addEventListener("abort", () => reject(signal.reason));
         })
     );
-    mocks.get_npos.mockResolvedValue(local_page);
+    mocks.npo_name_search.mockResolvedValue(local_hits);
 
     const result = await find_nonprofit({ query: "acme" }, caller());
 
-    expect(result.items).toEqual(local_page.items);
+    expect(result.items).toEqual(local_hits);
     expect(result.external_lookup).toBe("unavailable");
   });
 
@@ -864,12 +1184,12 @@ describe("find_nonprofit IRS fallback", () => {
     const fetch = stub_fetch(() =>
       http(401, { code: "revoked_api_key", token: KEY })
     );
-    mocks.get_npos.mockResolvedValue(local_page);
+    mocks.npo_name_search.mockResolvedValue(local_hits);
 
     const first = await find_nonprofit({ query: "one" }, caller());
     const second = await find_nonprofit({ query: "two" }, caller());
 
-    expect(first.items).toEqual(local_page.items);
+    expect(first.items).toEqual(local_hits);
     expect(first.external_lookup).toBe("unavailable");
     expect(second.external_lookup).toBe("unavailable");
     expect(fetch).toHaveBeenCalledTimes(2);
@@ -886,15 +1206,15 @@ describe("find_nonprofit IRS fallback", () => {
     const fetch = stub_fetch(() =>
       http(429, { code: "per_minute_limit_exceeded" }, { "retry-after": "120" })
     );
-    mocks.get_npos.mockResolvedValue(local_page);
+    mocks.npo_name_search.mockResolvedValue(local_hits);
 
     const first = await find_nonprofit({ query: "acme" }, caller());
     const second = await find_nonprofit({ query: "other" }, caller());
 
     expect(first.external_lookup).toBe("rate_limited");
-    expect(first.items).toEqual(local_page.items);
+    expect(first.items).toEqual(local_hits);
     expect(second.external_lookup).toBe("rate_limited");
-    expect(second.items).toEqual(local_page.items);
+    expect(second.items).toEqual(local_hits);
     expect(fetch).toHaveBeenCalledOnce();
   });
 
@@ -904,7 +1224,7 @@ describe("find_nonprofit IRS fallback", () => {
     const fetch = stub_fetch(() =>
       http(429, { code: "per_minute_limit_exceeded" })
     );
-    mocks.get_npos.mockResolvedValue(local_page);
+    mocks.npo_name_search.mockResolvedValue(local_hits);
 
     await find_nonprofit({ query: "first" }, caller());
     vi.setSystemTime(new Date("2026-10-17T12:00:59.000Z"));
@@ -920,7 +1240,7 @@ describe("find_nonprofit IRS fallback", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-17T23:00:00.000Z"));
     const fetch = stub_fetch(() => http(429, { code: "daily_quota_exceeded" }));
-    mocks.get_npos.mockResolvedValue(local_page);
+    mocks.npo_name_search.mockResolvedValue(local_hits);
 
     await find_nonprofit({ query: "day" }, caller());
     vi.setSystemTime(new Date("2026-10-17T23:30:00.000Z"));
@@ -934,13 +1254,13 @@ describe("find_nonprofit IRS fallback", () => {
 
   test("a malformed body is unavailable and is not cached", async () => {
     const fetch = stub_fetch(() => http(200, "not-json"));
-    mocks.get_npos.mockResolvedValue(local_page);
+    mocks.npo_name_search.mockResolvedValue(local_hits);
 
     const first = await find_nonprofit({ query: "acme" }, caller());
     const second = await find_nonprofit({ query: "acme" }, caller());
 
     expect(first.external_lookup).toBe("unavailable");
-    expect(first.items).toEqual(local_page.items);
+    expect(first.items).toEqual(local_hits);
     expect(second.external_lookup).toBe("unavailable");
     expect(fetch).toHaveBeenCalledTimes(2);
   });
@@ -949,12 +1269,12 @@ describe("find_nonprofit IRS fallback", () => {
     env.app.nonprofits_api_key = undefined;
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
-    mocks.get_npos.mockResolvedValue(local_page);
+    mocks.npo_name_search.mockResolvedValue(local_hits);
 
     const by_query = await find_nonprofit({ query: "acme" }, caller());
     const by_ein = await find_nonprofit({ ein: ELIGIBLE_EIN }, caller());
 
-    expect(by_query.items).toEqual(local_page.items);
+    expect(by_query.items).toEqual(local_hits);
     expect(by_query.external_lookup).toBe("disabled");
     expect(by_query.not_on_better_giving).toEqual([]);
     expect(by_ein).toMatchObject({
@@ -988,7 +1308,7 @@ describe("find_nonprofit IRS fallback", () => {
         ? http(500, { code: "data_unavailable" })
         : http(200, { query: "once", limit: 10, results: [] });
     });
-    mocks.get_npos.mockResolvedValue(local_page);
+    mocks.npo_name_search.mockResolvedValue(local_hits);
 
     const failed = await find_nonprofit({ query: "once" }, caller());
     const retried = await find_nonprofit({ query: "once" }, caller());
@@ -1002,7 +1322,7 @@ describe("find_nonprofit IRS fallback", () => {
     const fetch = stub_fetch(() =>
       http(200, { query: "q", limit: 10, results: [] })
     );
-    mocks.get_npos.mockResolvedValue(local_page);
+    mocks.npo_name_search.mockResolvedValue(local_hits);
     const req = caller("192.0.2.250");
 
     for (let i = 0; i < 20; i++) {
@@ -1011,7 +1331,7 @@ describe("find_nonprofit IRS fallback", () => {
     }
     const skipped = await find_nonprofit({ query: "name 21" }, req);
     expect(skipped.external_lookup).toBe("skipped");
-    expect(skipped.items).toEqual(local_page.items);
+    expect(skipped.items).toEqual(local_hits);
     expect(skipped.not_on_better_giving).toEqual([]);
     expect(fetch).toHaveBeenCalledTimes(20);
 
@@ -1035,7 +1355,7 @@ describe("find_nonprofit IRS fallback", () => {
         results: [search_org({ ein: "111111111", name: "Eligible" })],
       });
     });
-    mocks.get_npos.mockResolvedValue(local_page);
+    mocks.npo_name_search.mockResolvedValue(local_hits);
     const req = caller("192.0.2.251");
 
     const pending = Promise.all([
@@ -1060,7 +1380,7 @@ describe("find_nonprofit IRS fallback", () => {
     }
     const skipped = await find_nonprofit({ query: "over the cap" }, req);
     expect(skipped.external_lookup).toBe("skipped");
-    expect(skipped.items).toEqual(local_page.items);
+    expect(skipped.items).toEqual(local_hits);
     expect(fetch).toHaveBeenCalledTimes(20);
   });
 

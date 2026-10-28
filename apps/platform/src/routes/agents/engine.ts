@@ -4,17 +4,20 @@ import { href } from "react-router";
 import * as v from "valibot";
 import { client_ip, reserve } from "#/.server/auth/rate-limit";
 import { to_fn } from "#/.server/donation-recipient";
-import { get_npos } from "#/.server/npos";
 import { stripe_amounts } from "#/components/donation/common/amounts";
+import { report_error } from "#/errors/report";
 import {
   checkout_session,
   checkout_session_state,
 } from "#/routes/api.donation-intents/stripe/checkout-session";
 import { npo_descriptor_suffix } from "#/routes/api.donation-intents/stripe/descriptor-suffix";
 import { donor_refusal } from "#/routes/api.donation-intents/stripe/donor-refusal";
-import { MIN_DONATION_USD } from "@/constants/common";
-import type { IDonation, IDonor, IProgram } from "@/donations";
+import { MIN_DONATION_USD, PROCESSING_RATES } from "@/constants/common";
+import type { IDonation, IDonor, IProgram, ITo } from "@/donations";
 import { to_from } from "@/donations/helpers";
+import { snap, to_units } from "@/helpers/decimal";
+import { is_funded_member } from "@/settlement/funded-members";
+import { npo_share, settled_parts, shared_parts } from "@/settlement/plan";
 import { app, base_url } from "$/env";
 import {
   type INonprofitOrg,
@@ -32,7 +35,13 @@ import {
   agent_donation_reserve,
   donation_get,
 } from "$/pg/queries/donation";
-import { npo_get, npos_by_regnums } from "$/pg/queries/npo";
+import {
+  type INpoNameHit,
+  npo_get,
+  npo_name_search,
+  npos_batch_get,
+  npos_by_regnums,
+} from "$/pg/queries/npo";
 import { npo_program_get } from "$/pg/queries/program";
 
 const RATE_WINDOW_MS = 60 * 60 * 1000;
@@ -99,6 +108,27 @@ interface IQuoteToken {
   frequency: "one-time";
 }
 
+/** where a quoted charge goes, in USD. the first three add up to
+ * `total_charged`; so do the last five */
+export interface IQuoteBreakdown {
+  amount: number;
+  tip: number;
+  /** what the donor adds to cover the card fee */
+  fee_allowance: number;
+  total_charged: number;
+  /** Stripe's card fee on the whole charge, estimated at its card rate */
+  processing_fee: number;
+  /** 1.5% of a nonprofit's share after the card fee, when that nonprofit
+   * turned off tips. a fund's members are charged by their own setting */
+  platform_fee: number;
+  /** 2.9% of a fiscally sponsored nonprofit's share after the card fee */
+  fiscal_sponsor_fee: number;
+  nonprofit_receives: number;
+  /** the tip and what the fee allowance leaves after the card fee. the two
+   * fees above are Better Giving's too; each line may carry a rounding cent */
+  better_giving_receives: number;
+}
+
 export interface IAgentQuote {
   quote_token: string;
   quote_id: string;
@@ -106,6 +136,7 @@ export interface IAgentQuote {
   currency: "USD";
   frequency: "one-time";
   amount: IDonation["amount"] & { total: number };
+  breakdown: IQuoteBreakdown;
   program?: IProgram;
 }
 
@@ -173,7 +204,93 @@ function quote_amount(
     cover_processing_fee,
     currency: { code: "USD", rate: 1 },
   });
-  return { ...parts, total: parts.base + parts.tip + parts.fee_allowance };
+  const total_cents =
+    to_units(parts.base, 2) +
+    to_units(parts.tip, 2) +
+    to_units(parts.fee_allowance, 2);
+  return { ...parts, total: total_cents / 100 };
+}
+
+/** `pool` cents split by `dollars`, with what they leave as the last share,
+ * returned in dollars: each share the floor or ceiling of its exact cents, the
+ * cents the floors drop going to the largest fractions, so the shares sum to
+ * `pool` exactly */
+function apportion(pool: number, dollars: number[]): number[] {
+  const exact = dollars.map((x) => snap(x * 100));
+  exact.push(pool - snap(exact.reduce((sum, x) => sum + x, 0)));
+  const shares = exact.map(Math.floor);
+  let dropped = pool - shares.reduce((sum, x) => sum + x, 0);
+  const by_fraction = exact
+    .map((x, i) => ({ i, fraction: x - Math.floor(x) }))
+    .sort((a, b) => b.fraction - a.fraction);
+  for (const { i } of by_fraction) {
+    if (dropped <= 0) break;
+    shares[i] += 1;
+    dropped -= 1;
+  }
+  return shares.map((c) => c / 100);
+}
+
+/** what settlement would book for this charge: the same split and fees, with
+ * the Stripe fee it would read off the charge estimated at the card rate the
+ * fee allowance is priced on. a fund's gift is split across its funded members */
+async function quote_breakdown(
+  recipient: ITo,
+  amount: ReturnType<typeof quote_amount>
+): Promise<IQuoteBreakdown> {
+  const { total, ...parts } = amount;
+  const members =
+    recipient.to_type === "npo"
+      ? [await npo_get(+recipient.to_id)]
+      : await npos_batch_get(recipient.to_members.map(Number));
+  const funded = members.filter((m) => m && is_funded_member(m));
+  // settlement books no destination for a gift with no funded member
+  if (!funded.length) {
+    throw new AgentDonationError(
+      "recipient_unavailable",
+      "This recipient is not accepting donations."
+    );
+  }
+  const total_cents = to_units(total, 2);
+  const fee_cents = to_units(
+    total * PROCESSING_RATES.stripe + PROCESSING_RATES.stripe_flat,
+    2
+  );
+  const processing_fee = fee_cents / 100;
+  const ps = settled_parts(parts, 1, {
+    net: (total_cents - fee_cents) / 100,
+    fee: processing_fee,
+  });
+  const share = shared_parts(ps, funded.length);
+  let net = 0;
+  let base = 0;
+  let fsa = 0;
+  for (const m of funded) {
+    const s = npo_share(share, {
+      fiscal_sponsored: m?.fiscal_sponsored ?? false,
+      hide_bg_tip: m?.hide_bg_tip,
+    });
+    net += s.net;
+    base += s.pcfs.base;
+    fsa += s.pcfs.fsa;
+  }
+  const [
+    nonprofit_receives,
+    platform_fee,
+    fiscal_sponsor_fee,
+    better_giving_receives,
+  ] = apportion(total_cents - fee_cents, [net, base, fsa]);
+  return {
+    amount: parts.base,
+    tip: parts.tip,
+    fee_allowance: parts.fee_allowance,
+    total_charged: total,
+    processing_fee,
+    platform_fee,
+    fiscal_sponsor_fee,
+    nonprofit_receives,
+    better_giving_receives,
+  };
 }
 
 const EIN_DIGITS = 9;
@@ -276,6 +393,7 @@ async function find_by_ein(raw: string, request: Request) {
   if (items.length) {
     return {
       items,
+      match: "exact" as const,
       not_on_better_giving: [],
       external_lookup: (app.nonprofits_api_key?.trim()
         ? "ok"
@@ -285,6 +403,7 @@ async function find_by_ein(raw: string, request: Request) {
   if (!(await allow_fetch(request, "org", ein))) {
     return {
       items: [],
+      match: "none" as const,
       not_on_better_giving: [],
       external_lookup: "skipped",
     };
@@ -295,6 +414,7 @@ async function find_by_ein(raw: string, request: Request) {
   if (remote.status !== "ok") {
     return {
       items: [],
+      match: "none" as const,
       not_on_better_giving: [],
       external_lookup: remote.status,
     };
@@ -302,12 +422,14 @@ async function find_by_ein(raw: string, request: Request) {
   try {
     return {
       items: [],
+      match: "none" as const,
       not_on_better_giving: await offer([remote.org], new Set()),
       external_lookup: "ok" as const,
     };
   } catch {
     return {
       items: [],
+      match: "none" as const,
       not_on_better_giving: [],
       external_lookup: "unavailable" as const,
     };
@@ -326,23 +448,32 @@ async function remote_search(
   );
 }
 
+async function local_matches(query: string): Promise<INpoNameHit[]> {
+  try {
+    return await npo_name_search(query);
+  } catch (error) {
+    report_error(error);
+    return [];
+  }
+}
+
 async function find_by_query(query: string, request: Request) {
-  const [page, remote] = await Promise.all([
-    get_npos({
-      query,
-      page: 1,
-      fields: [
-        "name",
-        "registration_number",
-        "hq_country",
-        "tagline",
-        "active",
-      ],
-    }),
+  const [items, remote] = await Promise.all([
+    local_matches(query),
     irs_query_rejected(query)
       ? Promise.resolve({ status: "invalid_query" as const })
       : remote_search(request, query),
   ]);
+  const page = {
+    items,
+    page: 1,
+    pages: 1,
+    match: (items.some((item) => item.match === "exact")
+      ? "exact"
+      : items.length
+        ? "close"
+        : "none") as INpoNameHit["match"] | "none",
+  };
   if (remote.status !== "ok") {
     return {
       ...page,
@@ -404,6 +535,11 @@ export async function create_quote(input: unknown): Promise<IAgentQuote> {
   const program = program_row
     ? { id: program_row.id, name: program_row.title }
     : undefined;
+  const amount = quote_amount(
+    args.amount,
+    args.tip_percent,
+    args.cover_processing_fee
+  );
   const id = crypto.randomUUID();
   const token: IQuoteToken = {
     v: 1,
@@ -427,11 +563,8 @@ export async function create_quote(input: unknown): Promise<IAgentQuote> {
     },
     currency: "USD",
     frequency: "one-time",
-    amount: quote_amount(
-      args.amount,
-      args.tip_percent,
-      args.cover_processing_fee
-    ),
+    amount,
+    breakdown: await quote_breakdown(recipient, amount),
     program,
   };
 }

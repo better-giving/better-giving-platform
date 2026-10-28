@@ -4,11 +4,13 @@ import { fees } from "../constants";
 import { default_allocation } from "../constants/common";
 import type {
   IAllocation,
+  IAmount,
   IDonation,
   IDonationDist,
   IToSettings,
   TToType,
 } from "../donations";
+import { amnt_sum, partition } from "../donations/helpers";
 import { allocation } from "../donations/schema";
 import { nav_log_date } from "../nav/log-date";
 import type { IPayout } from "../payouts";
@@ -120,6 +122,51 @@ const debit_pcfs = (amount: number, rates: IDistFees): [number, IDistFees] => {
   return [amount - base - fsa, { base, fsa }];
 };
 
+/** a donation's parts as settlement splits them: the charged amount, its
+ * settled net and the processor's fee, each in the donation's proportions */
+export const settled_parts = (
+  amount: IAmount,
+  upusd: number,
+  settled: { net: number; fee: number }
+): IParts => {
+  const parts = partition(amount);
+  const total = amnt_sum(amount);
+  const amnt = parts(total);
+  const sttl = parts(settled.net);
+  return {
+    amnt,
+    amnt_usd: parts(total / upusd),
+    fa: parts(amnt.fee_allowance),
+    sttl,
+    sttl_fee: parts(settled.fee),
+    sttl_fa: parts(sttl.fee_allowance),
+  };
+};
+
+/** what one npo's share nets after the base and fiscal sponsor fees, and what
+ * its tip credits bg. settlement books these; a quote previews them */
+export const npo_share = (
+  ps: IParts,
+  ctx: Pick<NpoSettlementContext, "fiscal_sponsored" | "hide_bg_tip">
+) => {
+  const [fa_added, fa_excess] = credit_fa(ps.sttl.base, {
+    fa: ps.sttl_fa.base,
+    pf: ps.sttl_fee.base,
+  });
+
+  // tip goes to BG (non-fsa, base fee not applicable) — no further deductions
+  const [tip, tip_fa_excess] = credit_fa(ps.sttl.tip, {
+    fa: ps.sttl_fa.tip,
+    pf: ps.sttl_fee.tip,
+  });
+
+  const [net, pcfs] = debit_pcfs(fa_added, {
+    base: ctx.hide_bg_tip ? fees.base : 0,
+    fsa: ctx.fiscal_sponsored ? fees.fiscal_sponsor : 0,
+  });
+  return { net, pcfs, fa_excess, tip, tip_fa_excess };
+};
+
 export const shared_parts = (obj: IParts, n: number): IParts => ({
   amnt: {
     base: obj.amnt.base / n,
@@ -175,21 +222,7 @@ export function calc_settlement_plan(
   ctx: NpoSettlementContext,
   routed_to: string | null
 ): SettlementPlan {
-  const [fa_added, fa_excess] = credit_fa(i.ps.sttl.base, {
-    fa: i.ps.sttl_fa.base,
-    pf: i.ps.sttl_fee.base,
-  });
-
-  // tip goes to BG (non-fsa, base fee not applicable) — no further deductions
-  const [tip, tip_fa_excess] = credit_fa(i.ps.sttl.tip, {
-    fa: i.ps.sttl_fa.tip,
-    pf: i.ps.sttl_fee.tip,
-  });
-
-  const [net, pcfs] = debit_pcfs(fa_added, {
-    base: ctx.hide_bg_tip ? fees.base : 0,
-    fsa: ctx.fiscal_sponsored ? fees.fiscal_sponsor : 0,
-  });
+  const { net, pcfs, fa_excess, tip, tip_fa_excess } = npo_share(i.ps, ctx);
 
   const pooled = pooled_allocation(ctx.allocation);
   const settings: IToSettings = {
