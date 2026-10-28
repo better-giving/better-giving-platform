@@ -651,6 +651,7 @@ describe("sweep", () => {
     ]);
 
     expect(await sweep(as_db(t.db), NOW)).toEqual({
+      keys_deleted: 0,
       keys_revoked: 1,
       codes_deleted: 1,
       idempotency_deleted: 1,
@@ -671,6 +672,61 @@ describe("sweep", () => {
 
     const idem = await t.db.select().from(connector_idempotency);
     expect(idem.map((row) => row.idem_key)).toEqual(["fresh-request"]);
+  });
+  test("deletes keys revoked over 30 days ago with their idempotency rows and keeps the rest", async () => {
+    const { npo, owner } = await seed_pair();
+    const key = (id: string) => ({
+      id,
+      npo_id: npo.id,
+      key_hash: sha256_hex(id),
+      prefix: `bgc_${id.slice(-4)}`,
+      last4: id.slice(-4),
+      allowed_by: owner.id,
+    });
+    await t.db.insert(connector_keys).values([
+      { ...key("key-rev31"), revoked_at: days_before(31) },
+      { ...key("key-rev30"), revoked_at: days_before(30) },
+      { ...key("key-rev29"), revoked_at: days_before(29) },
+      { ...key("key-idle"), created_at: days_before(91) },
+      {
+        ...key("key-live"),
+        created_at: days_before(200),
+        last_used_at: days_before(1),
+      },
+    ]);
+    const idem = (key_id: string, idem_key: string) => ({
+      key_id,
+      idem_key,
+      request_hash: sha256_hex(idem_key),
+      status: "pending" as const,
+      created_at: days_before(0),
+    });
+    await t.db
+      .insert(connector_idempotency)
+      .values([
+        idem("key-rev31", "on-old-key"),
+        idem("key-live", "on-live-key"),
+      ]);
+
+    const swept = await sweep(as_db(t.db), NOW);
+
+    expect(swept.keys_deleted).toBe(1);
+    expect(swept.keys_revoked).toBe(1);
+    const keys = await t.db
+      .select({ id: connector_keys.id, revoked_at: connector_keys.revoked_at })
+      .from(connector_keys);
+    expect(keys.map((row) => row.id).sort()).toEqual([
+      "key-idle",
+      "key-live",
+      "key-rev29",
+      "key-rev30",
+    ]);
+    expect(keys.find((row) => row.id === "key-idle")?.revoked_at).toBe(
+      NOW.toISOString()
+    );
+    expect(keys.find((row) => row.id === "key-live")?.revoked_at).toBeNull();
+    const idems = await t.db.select().from(connector_idempotency);
+    expect(idems.map((row) => row.idem_key)).toEqual(["on-live-key"]);
   });
 });
 
