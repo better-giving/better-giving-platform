@@ -188,6 +188,38 @@ describe("org header", () => {
       await expect.element(in_header).toBeVisible();
     });
 
+    it("runs an in-page Donate as a button under the same rule", async () => {
+      await page.viewport(1280, 900);
+      const on_donate = vi.fn();
+      function InPage() {
+        const [hero, set_hero] = useState<HTMLElement | null>(null);
+        return (
+          <MemoryRouter>
+            <OrgHeader
+              name="Acme Relief"
+              to="/org/acme"
+              on_donate={on_donate}
+              donate_after={hero}
+            />
+            <main className="h-[300dvh]">
+              <DonateButton on_click={() => {}} size="lg" />
+              <span ref={set_hero}>hero donate</span>
+            </main>
+          </MemoryRouter>
+        );
+      }
+      const screen = await render(<InPage />);
+      const banner = screen.getByRole("banner");
+      const in_header = banner.getByRole("button", { name: "Donate" });
+      await expect.element(screen.getByText("hero donate")).toBeVisible();
+      await expect.element(in_header).not.toBeInTheDocument();
+      window.scrollTo(0, 2000);
+      await expect.element(in_header).toBeVisible();
+      expect(banner.getByRole("link", { name: "Donate" }).query()).toBeNull();
+      await in_header.click();
+      expect(on_donate).toHaveBeenCalledOnce();
+    });
+
     it("counts a hero Donate with no box as away", async () => {
       await page.viewport(1280, 900);
       function Hidden() {

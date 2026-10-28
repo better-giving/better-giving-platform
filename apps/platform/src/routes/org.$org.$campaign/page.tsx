@@ -9,7 +9,8 @@ import {
 } from "react";
 import { Link } from "react-router";
 import { DonorMsgs, type IDonorHighlight } from "#/components/donor-msgs";
-import { DappLogo } from "#/components/image";
+import { OrgFooterMinimal } from "#/components/org-page/footer";
+import { OrgHeader } from "#/components/org-page/header";
 import { RichText } from "#/components/rich-text";
 import { extract_youtube_id } from "#/components/youtube-player";
 import { Share } from "#/routes/_app.campaigns.$fund_id/share";
@@ -20,12 +21,15 @@ const ring =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 const donate_inline = `h-16 w-full rounded bg-primary text-2xl font-semibold text-primary-fg hover:bg-blue-10 ${ring}`;
-const donate_header = `h-11 shrink-0 rounded bg-primary px-4 text-base font-semibold text-primary-fg hover:bg-blue-10 ${ring}`;
 const donate_bar = `h-12 min-w-0 flex-1 rounded bg-primary text-base font-semibold text-primary-fg hover:bg-blue-10 ${ring}`;
 const close_btn =
   "grid size-11 place-items-center rounded text-2xl leading-none text-gray-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-9";
 // a bare min-[1288px]: sorts before lg: (px vs 64rem), so the zero is lg:-prefixed
 const gutter = "px-5 lg:px-8 lg:min-[1288px]:px-0";
+// a stuck column sits at lg:top-24 (96px), 36px under OrgHeader's bottom edge
+// (its 61px box pins 1px above the viewport); it also keeps 32px clear of the
+// bottom
+const column_room = 96 + 32;
 
 export interface ICampaignPage {
   title: string;
@@ -61,9 +65,12 @@ export function CampaignPage(props: ICampaignPage) {
     props.open && props.initial_dialog_open === true
   );
   const [away, set_away] = useState(false);
-  // false until the first measure, so a tall column can show the header
+  // false until the first measure, so a tall column starts unstuck
   const [fits, set_fits] = useState(false);
-  const donate_ref = useRef<HTMLButtonElement>(null);
+  // state, not a ref: the header watches it and must hear when it mounts
+  const [inline_donate, set_inline_donate] = useState<HTMLButtonElement | null>(
+    null
+  );
   const close_ref = useRef<HTMLButtonElement>(null);
   const action_ref = useRef<HTMLDivElement>(null);
   const open_dialog = () => set_dialog(true);
@@ -79,7 +86,7 @@ export function CampaignPage(props: ICampaignPage) {
       }
       const height = node.getBoundingClientRect().height;
       // 0 is the mobile display:contents box; it has nothing to stick
-      set_fits(height > 0 && height <= window.innerHeight - 64);
+      set_fits(height > 0 && height <= window.innerHeight - column_room);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -101,8 +108,8 @@ export function CampaignPage(props: ICampaignPage) {
   }, []);
 
   useEffect(() => {
-    const node = donate_ref.current;
-    if (!props.open || !node) {
+    const node = inline_donate;
+    if (!node) {
       set_away(false);
       return;
     }
@@ -114,40 +121,25 @@ export function CampaignPage(props: ICampaignPage) {
     );
     io.observe(node);
     return () => io.disconnect();
-  }, [props.open]);
+  }, [inline_donate]);
 
   const sticky_bar = props.open && away;
-  const sticky_header = sticky_bar && !fits;
 
   return (
     <>
       <div
         inert={dialog ? true : undefined}
-        className="min-h-[100dvh] bg-background text-gray-12"
+        className="flex min-h-[100dvh] flex-col bg-background text-gray-12"
       >
-        {sticky_header && (
-          <header
-            data-sticky="header"
-            className="fixed inset-x-0 top-0 z-sticky hidden h-14 border-b border-gray-6 bg-gray-1 lg:flex"
-          >
-            <div
-              className={`mx-auto flex h-full w-full max-w-[1224px] items-center justify-between gap-3 ${gutter}`}
-            >
-              <p className="min-w-0 truncate text-base font-semibold">
-                {props.title}
-              </p>
-              <button
-                type="button"
-                onClick={open_dialog}
-                className={donate_header}
-              >
-                Donate
-              </button>
-            </div>
-          </header>
-        )}
-        <div
-          className={`mx-auto w-full max-w-[1224px] pt-4 pb-12 lg:pt-8 lg:pb-16 ${gutter}`}
+        <OrgHeader
+          name={props.org_name}
+          logo={props.logo}
+          to={props.org_href}
+          on_donate={props.open ? open_dialog : undefined}
+          donate_after={props.open ? inline_donate : undefined}
+        />
+        <main
+          className={`mx-auto w-full max-w-[1224px] flex-1 pt-4 pb-12 lg:pt-8 lg:pb-16 ${gutter}`}
         >
           <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_392px] lg:items-start lg:gap-8">
             <div
@@ -179,13 +171,13 @@ export function CampaignPage(props: ICampaignPage) {
             <div
               ref={action_ref}
               data-col="action"
-              className={`contents lg:flex lg:min-w-0 lg:flex-col lg:gap-6 lg:has-[[data-feed]]:gap-10${fits ? " lg:sticky lg:top-8 lg:self-start" : ""}`}
+              className={`contents lg:flex lg:min-w-0 lg:flex-col lg:gap-6 lg:has-[[data-feed]]:gap-10${fits ? " lg:sticky lg:top-24 lg:self-start" : ""}`}
             >
               <Notice {...props} />
               <div className="order-4 flex flex-col gap-2 lg:order-none">
                 {props.open && (
                   <button
-                    ref={donate_ref}
+                    ref={set_inline_donate}
                     type="button"
                     onClick={open_dialog}
                     className={donate_inline}
@@ -209,11 +201,8 @@ export function CampaignPage(props: ICampaignPage) {
               />
             </div>
           </div>
-          <footer className="mt-10 flex w-full items-center gap-3 border-t py-6 lg:mt-16">
-            <DappLogo classes="h-8" />
-            <span className="text-sm font-semibold">Better Giving</span>
-          </footer>
-        </div>
+        </main>
+        <OrgFooterMinimal />
         {sticky_bar && (
           <div
             data-sticky="bar"

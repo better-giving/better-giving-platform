@@ -27,8 +27,11 @@ interface IOrgHeader {
   bookmark?: INpoBookmark;
   /** a Share icon button for this target, when given */
   share?: IShareTarget;
-  /** a Donate button to this href, when given */
+  /** a Donate link to this href, when given */
   donate_to?: string;
+  /** a Donate button that runs this, for a page whose Donate acts in place;
+   * given with donate_to, donate_to wins */
+  on_donate?: () => void;
   /** the hero's own Donate. given, the header's Donate waits until it is out
    * of view (one with no box never is in view); null while it mounts.
    * omitted, Donate always shows */
@@ -54,6 +57,7 @@ export function OrgHeader({
   bookmark,
   share,
   donate_to,
+  on_donate,
   donate_after,
   sections = [],
 }: IOrgHeader) {
@@ -77,6 +81,7 @@ export function OrgHeader({
   }, [donate_after]);
   const waits = donate_after !== undefined;
   const donate_in = !waits || (donate_after !== null && gone === donate_after);
+  const donate_classes = `ml-1 max-sm:px-4 sm:ml-2 ${waits ? (donate_in ? DONATE_IN : DONATE_OUT) : ""}`;
 
   return (
     <header
@@ -121,12 +126,11 @@ export function OrgHeader({
               idle_ink="text-primary"
             />
           )}
-          {donate_to && (
-            <DonateButton
-              to={donate_to}
-              classes={`ml-1 max-sm:px-4 sm:ml-2 ${waits ? (donate_in ? DONATE_IN : DONATE_OUT) : ""}`}
-            />
-          )}
+          {donate_to ? (
+            <DonateButton to={donate_to} classes={donate_classes} />
+          ) : on_donate ? (
+            <DonateButton on_click={on_donate} classes={donate_classes} />
+          ) : null}
         </div>
       </div>
     </header>

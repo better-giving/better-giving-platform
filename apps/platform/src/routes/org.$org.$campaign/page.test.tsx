@@ -17,6 +17,23 @@ function mount(props: ICampaignPage) {
   return render(<Stub initialEntries={["/"]} />);
 }
 
+/** enough story to scroll the inline Donate away at any width */
+const long_videos = Array.from({ length: 60 }, (_, i) => ({
+  url: `https://harbor.example/clip-${i}`,
+}));
+
+async function at_viewport(w: number, h: number, run: () => Promise<void>) {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  await browser.viewport(w, h);
+  try {
+    await run();
+  } finally {
+    window.scrollTo(0, 0);
+    await browser.viewport(width, height);
+  }
+}
+
 function page(over: Partial<ICampaignPage> = {}): ICampaignPage {
   return {
     title: "Winter fuel for Harbor Clinic",
@@ -63,6 +80,68 @@ describe("campaign page", () => {
     expect(document.querySelector("[data-sticky]")).toBeNull();
   });
 
+  test("the owner's header leads and the platform credit closes the page", async () => {
+    const screen = await mount(page());
+    const home = screen
+      .getByRole("banner")
+      .getByRole("link", { name: "Harbor Clinic" });
+    await expect.element(home).toBeVisible();
+    expect(home.element().getAttribute("href")).toBe("/org/harbor");
+    const credit = screen
+      .getByRole("contentinfo")
+      .getByRole("link", { name: "Powered by Better Giving", exact: true });
+    await expect.element(credit).toBeVisible();
+    expect(credit.element().getAttribute("href")).toBe("/");
+    expect(
+      screen.getByText("Better Giving", { exact: true }).query()
+    ).toBeNull();
+  });
+
+  test("the header's Donate waits for the inline one to leave, then opens the same dialog", async () => {
+    await at_viewport(375, 800, async () => {
+      const screen = await mount(page({ videos: long_videos }));
+      const in_header = screen
+        .getByRole("banner")
+        .getByRole("button", { name: "Donate", exact: true });
+      await expect
+        .element(
+          screen.getByRole("main").getByRole("button", {
+            name: "Donate",
+            exact: true,
+          })
+        )
+        .toBeVisible();
+      await expect.element(in_header).not.toBeInTheDocument();
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      await expect.element(in_header).toBeVisible();
+      await in_header.click();
+      await expect
+        .element(screen.getByRole("dialog", { name: "Donate" }))
+        .toBeVisible();
+    });
+  });
+
+  test("a stuck give column clears the pinned header", async () => {
+    await at_viewport(1440, 900, async () => {
+      const screen = await mount(page({ videos: long_videos }));
+      const action = () =>
+        document.querySelector("[data-col='action']") as HTMLElement;
+      await vi.waitFor(() => {
+        expect(action().className).toContain("lg:sticky");
+      });
+      window.scrollTo(0, 1200);
+      const banner = screen.getByRole("banner").element();
+      await vi.waitFor(() => {
+        const header_bottom = banner.getBoundingClientRect().bottom;
+        const column_top = action().getBoundingClientRect().top;
+        expect(header_bottom).toBeGreaterThan(0);
+        expect(column_top - header_bottom).toBeGreaterThanOrEqual(32);
+      });
+      // still stuck, not merely scrolled past
+      expect(action().getBoundingClientRect().bottom).toBeGreaterThan(0);
+    });
+  });
+
   test("Donate opens the dialog and Close returns focus", async () => {
     const screen = await mount(page());
     const donate = screen.getByRole("button", { name: "Donate", exact: true });
@@ -94,7 +173,7 @@ describe("campaign page", () => {
       .not.toBeInTheDocument();
   });
 
-  test("an ended page keeps Share and drops Donate and the sticky surfaces", async () => {
+  test("an ended page keeps Share and drops Donate, the header's included, and the sticky bar", async () => {
     const screen = await mount(
       page({
         open: false,
@@ -107,9 +186,13 @@ describe("campaign page", () => {
       screen.getByRole("button", { name: "Donate", exact: true }).query()
     ).toBeNull();
     expect(document.querySelector("[data-sticky]")).toBeNull();
+    window.scrollTo(0, document.documentElement.scrollHeight);
     await expect
       .element(screen.getByRole("button", { name: "Share", exact: true }))
       .toBeVisible();
+    expect(
+      screen.getByRole("banner").getByRole("button", { name: "Donate" }).query()
+    ).toBeNull();
     await expect
       .element(screen.getByRole("heading", { name: "Giving has ended" }))
       .toBeVisible();
@@ -125,16 +208,15 @@ describe("campaign page", () => {
     expect(visit.element().getAttribute("href")).toBe("/org/harbor");
   });
 
-  test("sticky surfaces stay unmounted while Donate is in view", async () => {
+  test("the sticky bar stays unmounted while Donate is in view", async () => {
     const screen = await mount(page());
     await expect
       .element(screen.getByRole("button", { name: "Donate", exact: true }))
       .toBeVisible();
-    expect(document.querySelector("[data-sticky='header']")).toBeNull();
     expect(document.querySelector("[data-sticky='bar']")).toBeNull();
   });
 
-  test("a short column mounts the bar once Donate leaves and keeps the header off", async () => {
+  test("a short column mounts the bar once Donate leaves", async () => {
     const seen: IntersectionObserverCallback[] = [];
     const Real = globalThis.IntersectionObserver;
     class StubIO implements IntersectionObserver {
@@ -162,13 +244,18 @@ describe("campaign page", () => {
       expect(document.querySelector("[data-sticky]")).toBeNull();
       for (const cb of seen) {
         cb(
-          [{ isIntersecting: false } as IntersectionObserverEntry],
+          [
+            {
+              isIntersecting: false,
+              intersectionRatio: 0,
+              target: document.createElement("div"),
+            } as unknown as IntersectionObserverEntry,
+          ],
           seen as unknown as IntersectionObserver
         );
       }
       await vi.waitFor(() => {
         expect(document.querySelector("[data-sticky='bar']")).not.toBeNull();
-        expect(document.querySelector("[data-sticky='header']")).toBeNull();
       });
       await expect
         .element(
@@ -373,7 +460,7 @@ describe("campaign page", () => {
     }
   });
 
-  test("a tall feed stays unstuck, and the header appears once Donate scrolls away", async () => {
+  test("a tall feed stays unstuck, and the header's Donate appears once Donate scrolls away", async () => {
     let release = () => {};
     const hold = new Promise<void>((resolve) => {
       release = resolve;
@@ -438,9 +525,11 @@ describe("campaign page", () => {
         expect(column?.className ?? "").not.toContain("lg:sticky");
       });
       window.scrollTo(0, document.documentElement.scrollHeight);
-      await vi.waitFor(() => {
-        expect(document.querySelector("[data-sticky='header']")).not.toBeNull();
-      });
+      await expect
+        .element(
+          screen.getByRole("banner").getByRole("button", { name: "Donate" })
+        )
+        .toBeVisible();
     } finally {
       release();
       window.scrollTo(0, 0);
