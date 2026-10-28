@@ -136,6 +136,8 @@ export function CampaignPage(props: ICampaignPage) {
           logo={props.logo}
           to={props.org_href}
           on_donate={props.open ? open_dialog : undefined}
+          // the phone bar carries Donate below lg
+          donate_from_lg
           donate_after={props.open ? inline_donate : undefined}
         />
         <main

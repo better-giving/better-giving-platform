@@ -97,8 +97,9 @@ describe("campaign page", () => {
     ).toBeNull();
   });
 
-  test("the header's Donate waits for the inline one to leave, then opens the same dialog", async () => {
-    await at_viewport(375, 800, async () => {
+  test("from lg, the header's Donate waits for the inline one to leave, then opens the same dialog", async () => {
+    // short enough that the give column does not stick, so its Donate leaves
+    await at_viewport(1440, 400, async () => {
       const screen = await mount(page({ videos: long_videos }));
       const in_header = screen
         .getByRole("banner")
@@ -118,6 +119,34 @@ describe("campaign page", () => {
       await expect
         .element(screen.getByRole("dialog", { name: "Donate" }))
         .toBeVisible();
+    });
+  });
+
+  test("on a phone, the bottom bar carries Donate and the header does not", async () => {
+    await at_viewport(375, 800, async () => {
+      const screen = await mount(page({ videos: long_videos }));
+      await expect
+        .element(screen.getByRole("button", { name: "Donate", exact: true }))
+        .toBeVisible();
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      const bar = () => document.querySelector("[data-sticky='bar']");
+      await vi.waitFor(() => expect(bar()).not.toBeNull());
+      await expect
+        .element(
+          browser
+            .elementLocator(bar() as HTMLElement)
+            .getByRole("button", { name: "Donate", exact: true })
+        )
+        .toBeVisible();
+      const in_header = screen
+        .getByRole("banner")
+        .element()
+        .querySelector("button") as HTMLElement;
+      // risen, by the header's own rule, yet not painted
+      await vi.waitFor(() => {
+        expect(in_header.className).toContain("starting:opacity-0");
+      });
+      expect(getComputedStyle(in_header).display).toBe("none");
     });
   });
 

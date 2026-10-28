@@ -32,6 +32,8 @@ interface IOrgHeader {
   /** a Donate button that runs this, for a page whose Donate acts in place;
    * given with donate_to, donate_to wins */
   on_donate?: () => void;
+  /** Donate from lg only, for a page that carries its own below lg */
+  donate_from_lg?: boolean;
   /** the hero's own Donate. given, the header's Donate waits until it is out
    * of view (one with no box never is in view); null while it mounts.
    * omitted, Donate always shows */
@@ -58,6 +60,7 @@ export function OrgHeader({
   share,
   donate_to,
   on_donate,
+  donate_from_lg = false,
   donate_after,
   sections = [],
 }: IOrgHeader) {
@@ -81,7 +84,7 @@ export function OrgHeader({
   }, [donate_after]);
   const waits = donate_after !== undefined;
   const donate_in = !waits || (donate_after !== null && gone === donate_after);
-  const donate_classes = `ml-1 max-sm:px-4 sm:ml-2 ${waits ? (donate_in ? DONATE_IN : DONATE_OUT) : ""}`;
+  const donate_classes = `ml-1 max-sm:px-4 sm:ml-2 ${waits ? (donate_in ? DONATE_IN : DONATE_OUT) : ""} ${donate_from_lg ? "max-lg:hidden" : ""}`;
 
   return (
     <header
