@@ -1,4 +1,11 @@
 import * as v from "valibot";
+import type { DbOrTx } from "$/pg/queries/helpers";
+import {
+  type RateWindow,
+  rate_limit_release,
+  rate_limit_sweep,
+  rate_limit_take,
+} from "$/pg/queries/rate-limit";
 
 /** Application-level throttling for auth work that runs server-side.
  *
@@ -9,9 +16,9 @@ import * as v from "valibot";
  *
  * They are per-process: each serverless instance keeps its own map, so the real
  * ceiling is `max` × live instances, and a cold start resets it. That makes this
- * a blunt cap on a single abusive source rather than an exact quota. A durable
- * one needs a shared store (the app has no redis today); when one exists, swap
- * the map for it and the callers stay as they are.
+ * a blunt cap on a single abusive source rather than an exact quota. The
+ * `_shared` variants are the exact quota: one postgres row per key and window,
+ * counted by every instance, at a db round trip per call.
  */
 
 export interface Quota {
@@ -64,6 +71,84 @@ export function reserve(key: string, quota: Quota): Reservation | null {
 /** Records one use of `key` and reports whether it was within `quota`. */
 export function consume(key: string, quota: Quota): boolean {
   return reserve(key, quota) !== null;
+}
+
+/** a `Reservation` whose release is a write to the shared store */
+export interface SharedReservation extends Reservation {
+  release(): Promise<void>;
+}
+
+/** `reserve` over the counters every instance shares. a db error propagates. */
+export async function reserve_shared(
+  key: string,
+  quota: Quota,
+  conn?: DbOrTx
+): Promise<SharedReservation | null> {
+  const w = fixed_window(quota);
+  if ((await take(key, w, quota.max, conn)) === null) return null;
+  let released = false;
+  return {
+    async release() {
+      if (released) return;
+      released = true;
+      await rate_limit_release(key, w.start, conn);
+    },
+  };
+}
+
+/** `consume` over the shared counters, saying when to come back on a denial.
+ * a db error propagates. */
+export async function limit_shared(
+  key: string,
+  quota: Quota,
+  conn?: DbOrTx
+): Promise<{ ok: true } | { ok: false; retry_after_s: number }> {
+  const w = fixed_window(quota);
+  if ((await take(key, w, quota.max, conn)) !== null) {
+    return { ok: true };
+  }
+  // `now` is inside the window, so this is at least 1
+  return { ok: false, retry_after_s: Math.ceil((w.end_ms - w.now) / 1000) };
+}
+
+/** one take in this many also sweeps ended windows */
+const SWEEP_ONE_IN = 100;
+
+/** the take, plus — on a sampled call — a sweep of ended windows. the sweep is
+ * its own statement so its failure can't fail the take, and it is awaited
+ * because work left running after a serverless response can be frozen. */
+async function take(
+  key: string,
+  w: RateWindow & { now: number },
+  max: number,
+  conn?: DbOrTx
+): Promise<number | null> {
+  const count = await rate_limit_take(key, w, max, conn);
+  if (Math.random() * SWEEP_ONE_IN < 1) {
+    try {
+      await rate_limit_sweep(new Date(w.now).toISOString(), conn);
+    } catch (err) {
+      console.error("rate limit sweep failed", err);
+    }
+  }
+  return count;
+}
+
+/** the `window_s`-long window holding now, aligned to the epoch so every
+ * instance computes the same one */
+function fixed_window(
+  quota: Quota
+): RateWindow & { now: number; end_ms: number } {
+  const now = Date.now();
+  const span = quota.window_s * 1000;
+  const start_ms = Math.floor(now / span) * span;
+  const end_ms = start_ms + span;
+  return {
+    start: new Date(start_ms).toISOString(),
+    end: new Date(end_ms).toISOString(),
+    now,
+    end_ms,
+  };
 }
 
 function prune(now: number): void {
