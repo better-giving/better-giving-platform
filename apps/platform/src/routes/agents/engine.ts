@@ -16,6 +16,7 @@ import { MIN_DONATION_USD, PROCESSING_RATES } from "@/constants/common";
 import type { IDonation, IDonor, IProgram, ITo } from "@/donations";
 import { to_from } from "@/donations/helpers";
 import { snap, to_units } from "@/helpers/decimal";
+import type { IIncrement } from "@/schemas";
 import { is_funded_member } from "@/settlement/funded-members";
 import { npo_share, settled_parts, shared_parts } from "@/settlement/plan";
 import { app, base_url } from "$/env";
@@ -53,16 +54,17 @@ const to_id = v.union([
   v.pipe(v.number(), v.integer(), v.minValue(1)),
   v.pipe(v.string(), v.uuid()),
 ]);
+const amount_input = v.pipe(
+  v.number(),
+  v.minValue(MIN_DONATION_USD),
+  v.check(
+    (amount) => Math.abs(amount * 100 - Math.round(amount * 100)) < 1e-8,
+    "amount must use at most two decimal places"
+  )
+);
 const quote_input = v.strictObject({
   recipient_id: to_id,
-  amount: v.pipe(
-    v.number(),
-    v.minValue(MIN_DONATION_USD),
-    v.check(
-      (amount) => Math.abs(amount * 100 - Math.round(amount * 100)) < 1e-8,
-      "amount must use at most two decimal places"
-    )
-  ),
+  amount: amount_input,
   tip_percent: v.optional(tip_percent, "none"),
   cover_processing_fee: v.optional(v.boolean(), false),
   program_id: v.optional(v.pipe(v.string(), v.uuid())),
@@ -140,6 +142,15 @@ export interface IAgentQuote {
   amount: IDonation["amount"] & { total: number };
   breakdown: IQuoteBreakdown;
   program?: IProgram;
+  /** the nonprofit's own label for this exact amount, when it is one of its
+   * increments and the label isn't blank */
+  increment_label: string | null;
+}
+
+/** a preset amount a nonprofit set in its donation settings, labeled in its own words */
+export interface IAgentIncrement {
+  amount: number;
+  label: string;
 }
 
 export class AgentDonationError extends Error {
@@ -295,6 +306,40 @@ async function quote_breakdown(
   };
 }
 
+/** smallest first, one per amount (the first stored); a value `quote_donation`
+ * would reject is dropped, so every listed amount can be quoted */
+function agent_increments(
+  stored: readonly IIncrement[] | null | undefined
+): IAgentIncrement[] {
+  const by_cents = new Map<number, IAgentIncrement>();
+  for (const x of stored ?? []) {
+    const amount = Number(x?.value);
+    if (!v.is(amount_input, amount)) continue;
+    const cents = to_units(amount, 2);
+    if (by_cents.has(cents)) continue;
+    by_cents.set(cents, { amount: cents / 100, label: x.label?.trim() ?? "" });
+  }
+  return [...by_cents.values()].sort((a, b) => a.amount - b.amount);
+}
+
+function with_increments<T extends { increments: IIncrement[] | null }>({
+  increments,
+  ...rest
+}: T) {
+  return { ...rest, increments: agent_increments(increments) };
+}
+
+function increment_label(
+  stored: readonly IIncrement[] | null | undefined,
+  amount: number
+): string | null {
+  const cents = to_units(amount, 2);
+  const match = agent_increments(stored).find(
+    (x) => to_units(x.amount, 2) === cents
+  );
+  return match?.label || null;
+}
+
 const EIN_DIGITS = 9;
 
 type TExternalLookup = TNonprofitsFailure | "ok" | "skipped";
@@ -394,7 +439,7 @@ async function find_by_ein(raw: string, request: Request) {
   const items = await npos_by_regnums([ein]);
   if (items.length) {
     return {
-      items,
+      items: items.map(with_increments),
       match: "exact" as const,
       not_on_better_giving: [],
       external_lookup: (app.nonprofits_api_key?.trim()
@@ -460,12 +505,13 @@ async function local_matches(query: string): Promise<INpoNameHit[]> {
 }
 
 async function find_by_query(query: string, request: Request) {
-  const [items, remote] = await Promise.all([
+  const [hits, remote] = await Promise.all([
     local_matches(query),
     irs_query_rejected(query)
       ? Promise.resolve({ status: "invalid_query" as const })
       : remote_search(request, query),
   ]);
+  const items = hits.map(with_increments);
   const page = {
     items,
     page: 1,
@@ -498,10 +544,12 @@ async function find_by_query(query: string, request: Request) {
   }
 }
 
+/** the recipient's npo row; undefined for a recipient that isn't a nonprofit or
+ * a missing row. throws when the nonprofit requires a donor address */
 async function assert_address_optional(recipient_id: number | string) {
   if (typeof recipient_id !== "number") return;
   const npo = await npo_get(recipient_id);
-  if (!npo?.donor_address_required) return;
+  if (!npo?.donor_address_required) return npo;
   throw new AgentDonationError(
     "address_required",
     "This nonprofit requires a donor address, which this checkout does not collect."
@@ -517,7 +565,7 @@ export async function create_quote(input: unknown): Promise<IAgentQuote> {
       "This recipient is not accepting donations."
     );
   }
-  await assert_address_optional(args.recipient_id);
+  const npo = await assert_address_optional(args.recipient_id);
   if (!recipient.to_tip_allowed && args.tip_percent !== "none") {
     throw new AgentDonationError(
       "tip_not_allowed",
@@ -568,6 +616,7 @@ export async function create_quote(input: unknown): Promise<IAgentQuote> {
     amount,
     breakdown: await quote_breakdown(recipient, amount),
     program,
+    increment_label: increment_label(npo?.increments, args.amount),
   };
 }
 
