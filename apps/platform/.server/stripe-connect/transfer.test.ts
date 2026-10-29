@@ -79,7 +79,7 @@ vi.mock("../env", async (importOriginal) => {
 const { create_test_db } = await import("../pg/test-utils/pglite");
 const { settle_npo } = await import("../settlement/settle-npo");
 const { transfer_routed_dist } = await import("./transfer");
-const { release_held_transfers } = await import("./release");
+const { held_transfers, send_held } = await import("./release");
 const { calc_settlement_plan } = await import("@/settlement/plan");
 const { payout_total } = await import("../payouts/transfer");
 const { reversed_statuses } = await import("@/donations/settle");
@@ -824,13 +824,24 @@ describe("a dispute open before the transfer ran", () => {
       payload: IConnectTransferPayload;
     }[];
 
+  /** a close's release: the held dists read, then their transfers sent */
+  const release_held = async () => {
+    const held = await held_transfers(DON_ID);
+    await send_held(held, {
+      donation_id: DON_ID,
+      intent_id: INTENT,
+      dispute_id: "dp_1",
+    });
+    return held;
+  };
+
   test("a win releases the held transfer: sent exactly once, a retry of the held delivery sending nothing more", async () => {
     const { payload } = await settle_routed();
     await dispute_row("open");
     await transfer_routed_dist(payload, RETRY);
     await close_row("won");
 
-    const released = await release_held_transfers(DON_ID, INTENT, "dp_1");
+    const released = await release_held();
 
     expect(released.map((d) => d.id)).toEqual([payload.dist_id]);
     const [m] = transfers_enqueued();
@@ -849,7 +860,7 @@ describe("a dispute open before the transfer ran", () => {
     await settle_routed();
     await dispute_row("open");
 
-    expect(await release_held_transfers(DON_ID, INTENT, "dp_1")).toEqual([]);
+    expect(await release_held()).toEqual([]);
     expect(transfers_enqueued()).toEqual([]);
   });
 
@@ -863,7 +874,7 @@ describe("a dispute open before the transfer ran", () => {
         .set({ status })
         .where(eq(donations.id, DON_ID));
 
-      expect(await release_held_transfers(DON_ID, INTENT, "dp_1")).toEqual([]);
+      expect(await release_held()).toEqual([]);
       expect(transfers_enqueued()).toEqual([]);
     }
   );
@@ -873,7 +884,7 @@ describe("a dispute open before the transfer ran", () => {
     await transfer_routed_dist(payload, RETRY);
     await dispute_row("won");
 
-    expect(await release_held_transfers(DON_ID, INTENT, "dp_1")).toEqual([]);
+    expect(await release_held()).toEqual([]);
   });
 
   // the release sends the whole net; the job's own reversal then takes back
@@ -887,7 +898,7 @@ describe("a dispute open before the transfer ran", () => {
       data: [{ id: "dp_1", amount: 4_000, status: "lost", created: 2 }],
     });
 
-    await release_held_transfers(DON_ID, INTENT, "dp_1");
+    await release_held();
     await transfer_routed_dist(transfers_enqueued()[0]!.payload, RETRY);
 
     expect(stripe.disputes.list).toHaveBeenCalledWith({

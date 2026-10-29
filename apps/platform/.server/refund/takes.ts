@@ -6,6 +6,7 @@ import type { DbOrTx } from "../pg/queries/helpers";
 import {
   type IOwed,
   type OwedParty,
+  owed_for_donation,
   owed_for_party,
   record_owed,
 } from "../pg/queries/owed";
@@ -67,11 +68,15 @@ const disputes_past_cut = (
  * routed dist owes no share: a dispute holds its transfer or, lost, reverses
  * its cut, as a refund does. each active dispute's fee is owed in full, split
  * over the dists by settled amount, routed ones included, and each referrer
- * owes the whole share of its commission paid or claimed for a transfer
+ * owes the whole share of its commission paid or claimed for a transfer.
+ * the npos in `legacy` hold a row recorded before routed dists stopped
+ * owing a dispute's share (`legacy_row`): theirs are priced as before, as an
+ * ungranted pooled dist is
  */
 export function owed_targets(
   ds: LockedDist[],
-  takes: ITake[]
+  takes: ITake[],
+  legacy: ReadonlySet<number> = new Set()
 ): Map<string, OwedShare> {
   const all = taken_of(takes);
   const disputes = taken_of(takes, "dispute");
@@ -86,7 +91,7 @@ export function owed_targets(
     owed_shares(ds, {
       f: all,
       f_of: (d) =>
-        d.routed
+        d.routed && !legacy.has(d.to_id)
           ? 0
           : grant_went_out(d)
             ? past_cut(d.refunds_cut_share, all)
@@ -95,6 +100,57 @@ export function owed_targets(
       owes: () => true,
     }).map((s) => [party_key(s.party), s])
   );
+}
+
+/** every npo with a routed dist, as `owed_targets` prices it the old way */
+const routed_npos = (ds: LockedDist[]) =>
+  new Set(ds.filter((d) => d.routed).map((d) => d.to_id));
+
+/**
+ * whether an npo's `row` was recorded when its routed dists still owed a
+ * dispute's share of what they received and of their card fee: it holds more
+ * card fee than the takes owe now (`now`), which nothing records of a routed
+ * dist any more, or at least the received the old pricing owes (`old`) when
+ * that is more than they owe now. such a row is moved by the old pricing, so
+ * a win credits what its open recorded, and a loss leaves its transfer alone
+ * (`legacy_routed_npos`), the debt standing as before
+ */
+export function legacy_row(
+  row: IOwed | undefined,
+  now: OwedShare | undefined,
+  old: OwedShare | undefined
+): boolean {
+  if (!row || !old) return false;
+  const cent = 0.005;
+  if (row.fee_processing_usd > (now?.fee_processing_usd ?? 0) + cent) {
+    return true;
+  }
+  const r = now?.received_usd ?? 0;
+  return (
+    old.received_usd > r + cent && row.received_usd + cent >= old.received_usd
+  );
+}
+
+/** the gift's npos whose row `legacy_row` says the old pricing recorded */
+export async function legacy_routed_npos(
+  donation_id: string
+): Promise<Set<number>> {
+  return db.transaction(async (tx) => {
+    const ds = await gift_dists_locked(tx, donation_id);
+    const routed = routed_npos(ds);
+    if (routed.size === 0) return new Set<number>();
+    const takes = await takes_of(tx, donation_id);
+    const now = owed_targets(ds, takes);
+    const old = owed_targets(ds, takes, routed);
+    const rows = await owed_for_donation(donation_id, tx);
+    const legacy = new Set<number>();
+    for (const npo_id of routed) {
+      const key = party_key({ npo_id });
+      const row = rows.find((o) => o.npo_id === npo_id);
+      if (legacy_row(row, now.get(key), old.get(key))) legacy.add(npo_id);
+    }
+    return legacy;
+  });
 }
 
 /**
@@ -293,19 +349,27 @@ export async function move_owed(
 ): Promise<OwedMove[]> {
   const was = owed_targets(m.ds, m.before);
   const now = owed_targets(m.ds, m.after);
+  const routed = routed_npos(m.ds);
+  const was_old = owed_targets(m.ds, m.before, routed);
+  const now_old = owed_targets(m.ds, m.after, routed);
   const fallen = given_back(m.before, m.after);
   const moves: OwedMove[] = [];
   for (const key of new Set([...was.keys(), ...now.keys()])) {
-    const a = now.get(key);
-    const b = was.get(key);
-    const party = (a ?? b)!.party;
+    const party = (now.get(key) ?? was.get(key))!.party;
+    let row = await owed_for_party(m.donation_id, party, tx);
+    // a row the old pricing recorded moves by it, from what it recorded
+    const legacy =
+      "npo_id" in party &&
+      routed.has(party.npo_id) &&
+      legacy_row(row, was.get(key), was_old.get(key));
+    const a = (legacy ? now_old : now).get(key);
+    const b = (legacy ? was_old : was).get(key);
     const fig = (s: OwedShare | undefined) => ({
       r: s?.received_usd ?? 0,
       p: s?.fee_processing_usd ?? 0,
       f: s?.fee_dispute_usd ?? 0,
     });
     const [x, y] = [fig(b), fig(a)];
-    let row = await owed_for_party(m.donation_id, party, tx);
     // each figure only grows, so one already recorded stays as it is
     if (y.r > 0 || y.p > 0 || y.f > 0) {
       row = await record_owed(tx, {

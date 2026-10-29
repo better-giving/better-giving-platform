@@ -12,35 +12,42 @@ import { donation_status_shared } from "../pg/queries/donation";
 import { dists } from "../pg/schema/dist";
 
 /**
- * sends the transfers a dispute held (`transfer_routed_dist`) once it closed:
- * one `connect-transfer` per routed dist of the gift no transfer has paid,
- * returning the dists it released. none while a dispute on the gift is still
- * open, nor once the gift is reversed. the job's stored check, its lookup of a
- * transfer made and its idempotency key keep a release and the held
- * delivery's retry to one transfer
+ * the transfers a dispute held (`transfer_routed_dist`) that its close
+ * releases: each routed dist of the gift no transfer has paid. none while a
+ * dispute on the gift is still open, nor once the gift is reversed. read
+ * ahead of the notice naming them, which `send_held` follows, so a retry
+ * after a lost notice finds them still held
  */
-export async function release_held_transfers(
-  donation_id: string,
-  intent_id: string,
-  dispute_id: string
+export async function held_transfers(
+  donation_id: string
 ): Promise<IDistAwaitingTransfer[]> {
   const disputes = await disputes_of_donation(donation_id);
   if (disputes.some((d) => d.status === "open")) return [];
   const status = await donation_status_shared(db, donation_id);
   if (!status || is_reversed(status)) return [];
-  const held = await dists_routed_untransferred(donation_id);
-  if (held.length === 0) return [];
+  return dists_routed_untransferred(donation_id);
+}
+
+/**
+ * one `connect-transfer` per held dist, keyed on the releasing dispute. the
+ * job's stored check, its lookup of a transfer made and its idempotency key
+ * keep a release and the held delivery's retry to one transfer
+ */
+export async function send_held(
+  held: IDistAwaitingTransfer[],
+  r: { donation_id: string; intent_id: string; dispute_id: string }
+) {
+  if (held.length === 0) return;
   await enqueue(
     ...held.map((d) =>
       msg("connect-transfer", {
         dist_id: d.id,
-        donation_id,
-        intent_id,
-        release: dispute_id,
+        donation_id: r.donation_id,
+        intent_id: r.intent_id,
+        release: r.dispute_id,
       })
     )
   );
-  return held;
 }
 
 /** for a dispute's open notice, one line per routed dist of the gift: its

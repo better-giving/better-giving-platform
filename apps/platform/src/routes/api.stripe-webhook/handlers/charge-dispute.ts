@@ -10,9 +10,10 @@ import { dispute_opened, dispute_won, owed_lines } from "$/refund/dispute";
 import { load_reversible, reverse_charge } from "$/refund/reverse";
 import { charge_refunds, refund_take } from "$/refund/unsent";
 import {
-  release_held_transfers,
+  held_transfers,
   released_lines,
   routed_open_lines,
+  send_held,
 } from "$/stripe-connect/release";
 import {
   reverse_routed_refunds,
@@ -117,7 +118,12 @@ export async function handle_dispute_closed(
     if (won.status === "credited") return release();
     // a loss recorded earlier reversed its cut of the routed transfers, which
     // nothing re-pays: ops get a line per transfer to settle by hand
-    const routed = await routed_dispute_reversals(don.id, dispute.id);
+    const routed = await routed_dispute_reversals(don.id, {
+      id: dispute.id,
+      amount: dispute.amount,
+      charge: str_id(dispute.charge),
+      created_at: iso(dispute.created),
+    });
     if (won.status === "conflict") {
       // keyed on the event: a redelivery collapses into it
       await enqueue(
@@ -192,10 +198,10 @@ export async function handle_dispute_closed(
     unsent,
   });
   // the job sends the whole net, and its own reversal then takes back this
-  // loss's cut. a full loss reverses the gift, so nothing is left to send
-  const released = partial
-    ? await release_held_transfers(don.id, intent_id, dispute.id)
-    : [];
+  // loss's cut. a full loss reverses the gift, so nothing is left to send.
+  // sent after the notice naming them: a lost notice fails the delivery with
+  // them still held, so the redelivery names them again
+  const released = partial ? await held_transfers(don.id) : [];
 
   const result = await reverse_charge({
     donation_id: don.id,
@@ -229,7 +235,13 @@ export async function handle_dispute_closed(
   if (result.status === "already_reversed") {
     console.info(`already reversed: ${don.id}`);
   }
-  if (result.status !== "failed") return;
+  if (result.status !== "failed") {
+    return send_held(released, {
+      donation_id: don.id,
+      intent_id,
+      dispute_id: dispute.id,
+    });
+  }
   if (result.reason === "incomplete") {
     throw new ReversalIncompleteError(
       don.id,
@@ -247,13 +259,11 @@ async function release_closed(
   intent_id: string
 ) {
   const dispute = event.data.object;
-  const released = await release_held_transfers(
-    donation_id,
-    intent_id,
-    dispute.id
-  );
+  const released = await held_transfers(donation_id);
   if (released.length === 0) return;
-  // keyed on the event: a redelivery collapses into it
+  // keyed on the event: a redelivery collapses into it. ahead of the
+  // transfers, so a lost notice fails the delivery with them still held and
+  // the redelivery sends both
   await enqueue(
     msg("fiat-notice", {
       id: event.id,
@@ -269,6 +279,7 @@ async function release_closed(
       },
     })
   );
+  await send_held(released, { donation_id, intent_id, dispute_id: dispute.id });
 }
 
 /** an inquiry escalating to a chargeback stays the same dispute and sends no

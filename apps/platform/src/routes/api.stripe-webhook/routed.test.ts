@@ -992,6 +992,49 @@ describe("a dispute on a routed gift before its transfer ran", () => {
     expect(failed_alert()).toContain("the npo is short $18.00; pay it by hand");
   });
 
+  // the win restores what the rebook withheld for the loss in no ledger:
+  // the npo was booked $54 of $90, and nothing pays it the $36
+  it("a win of the loss whose cut the refused rebook withheld tells ops to pay that cut", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const job = await awaiting_transfer(charge_of);
+    await deliver(opened(4_000));
+    await transfer_routed_dist(job, RETRY);
+    await deliver(closed("lost", 4_000));
+    transfers.create.mockRejectedValueOnce(
+      new Stripe.errors.StripePermissionError({
+        message: "The provided key does not have access to account",
+      })
+    );
+    await transfer_routed_dist(transfers_enqueued()[0], RETRY);
+
+    await deliver(closed("won", 4_000));
+
+    const changed = notice_text().split("Dispute Outcome Changed\n")[1];
+    expect(changed).toContain(
+      `dist ${job.dist_id} to NPO ${charge_of.id.slice(4)}-0 (npo ${charge_of.npo_ids[0]}): $36.00 of its share was withheld for this dispute when stripe refused its transfer and it was booked pooled less the lost cut; pay it to the nonprofit by hand`
+    );
+    expect(await balance_of(db(), charge_of.npo_ids[0]!)).toBe(54);
+  });
+
+  it("names no withheld cut for a win when the refused rebook ran before the dispute", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const job = await awaiting_transfer(charge_of);
+    await deliver(refund(2_000));
+    transfers.create.mockRejectedValueOnce(
+      new Stripe.errors.StripePermissionError({
+        message: "The provided key does not have access to account",
+      })
+    );
+    await transfer_routed_dist(job, RETRY);
+    await deliver(opened(4_000));
+    await deliver(closed("lost", 4_000));
+
+    await deliver(closed("won", 4_000));
+
+    expect(await balance_of(db(), charge_of.npo_ids[0]!)).toBe(72);
+    expect(notice_text()).not.toContain("withheld for this dispute");
+  });
+
   it("sends nothing on a full loss, the npo owing its dispute fee only", async () => {
     charge_of = await seed_card_gift(db(), ROUTED);
     const job = await awaiting_transfer(charge_of);
@@ -1027,6 +1070,74 @@ describe("a dispute on a routed gift before its transfer ran", () => {
     ]);
     expect(await status_of(charge_of.id)).toBe("settled");
     expect(await owed_of(charge_of.id)).toMatchObject([{ received_usd: 0 }]);
+  });
+});
+
+// a dispute opened before routed dists stopped owing a dispute's share
+// recorded the npo owing what its dist received and its card fee, the way an
+// ungranted pooled one owes them. that row is moved as it was recorded
+describe("a routed dispute whose open recorded its share the old way", () => {
+  /** the transferred routed gift's dispute of `amount` cents opened, its
+   * row as the old pricing wrote it: `share` of the $90 and the $3.20 */
+  const legacy_open = async (amount: number) => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const tr = paid_by_transfer(charge_of);
+    await deliver(opened(amount));
+    const share = amount / 10_000;
+    await db()
+      .update(owed_amounts)
+      .set({
+        received_usd: Math.floor(90 * share * 100 + 1e-6) / 100,
+        fee_processing_usd: Math.floor(3.2 * share * 100 + 1e-6) / 100,
+      })
+      .where(eq(owed_amounts.donation_id, charge_of.id));
+    return tr;
+  };
+
+  it("credits back all its open recorded once the dispute is won, $90 and $3.20 included", async () => {
+    await legacy_open(10_000);
+
+    expect((await deliver(closed("won"))).status).toBe(200);
+
+    expect(await owed_of(charge_of.id)).toEqual([
+      {
+        npo_id: charge_of.npo_ids[0],
+        received_usd: 90,
+        fee_processing_usd: 3.2,
+        fee_dispute_usd: 15,
+        outstanding_usd: 0,
+      },
+    ]);
+    expect(transfers.createReversal).not.toHaveBeenCalled();
+  });
+
+  it("leaves the transfer alone on a partial loss, the debt its open recorded standing", async () => {
+    const tr = await legacy_open(4_000);
+
+    expect((await deliver(closed("lost", 4_000))).status).toBe(200);
+
+    expect(answered_of(tr)).toEqual([]);
+    expect(await owed_of(charge_of.id)).toMatchObject([
+      {
+        received_usd: 36,
+        fee_processing_usd: 1.28,
+        fee_dispute_usd: 15,
+        outstanding_usd: 52.28,
+      },
+    ]);
+    expect(await status_of(charge_of.id)).toBe("settled");
+  });
+
+  it("still reverses the lost cut of a gift whose row the new pricing recorded", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const tr = paid_by_transfer(charge_of);
+    await deliver(opened(4_000));
+
+    await deliver(closed("lost", 4_000));
+
+    expect(answered_of(tr)).toEqual([
+      { amount: 3_600, for: `du_${charge_of.id}` },
+    ]);
   });
 });
 

@@ -274,7 +274,7 @@ async function charge_of(p: IConnectTransferPayload): Promise<ICharge> {
 
 /**
  * a dispute holds the transfer until it closes: its close releases it
- * (`release_held_transfers`). the charge reads disputed before the dispute's
+ * (`held_transfers`, `send_held`). the charge reads disputed before the dispute's
  * webhook puts it on record, and still does once it closes, so the flag alone
  * holds it only while the gift has no dispute on record at all
  */
