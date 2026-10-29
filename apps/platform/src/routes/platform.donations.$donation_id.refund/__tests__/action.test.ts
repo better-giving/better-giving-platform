@@ -56,6 +56,8 @@ vi.mock("$/kit/stripe", () => ({
     },
     paymentIntents: { retrieve: intents_retrieve },
     invoicePayments: { list: invoice_payments_list },
+    // the transfer's charge has no dispute lost: its reversal reads them
+    disputes: { list: vi.fn(async () => ({ data: [] })) },
     transfers,
   },
 }));
@@ -609,6 +611,7 @@ describe("a gift routed to the nonprofit's connected account", () => {
     transfers.retrieve.mockResolvedValue({
       amount: 9000,
       amount_reversed: 0,
+      source_transaction: "ch_1",
       metadata: {},
     });
     transfers.listReversals.mockResolvedValue({ data: [] });

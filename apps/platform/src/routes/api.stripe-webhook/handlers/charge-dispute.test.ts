@@ -11,6 +11,10 @@ const charge_retrieve_mock = vi.hoisted(() => vi.fn());
 const refunds_list_mock = vi.hoisted(() => vi.fn());
 const load_reversible_mock = vi.hoisted(() => vi.fn());
 const dispute_close_mock = vi.hoisted(() => vi.fn());
+const dispute_won_mock = vi.hoisted(() => vi.fn());
+const release_mock = vi.hoisted(() => vi.fn());
+const reverse_routed_mock = vi.hoisted(() => vi.fn());
+const routed_dispute_reversals_mock = vi.hoisted(() => vi.fn());
 
 vi.mock("$/kit/stripe", () => ({
   stripe: {
@@ -29,7 +33,19 @@ vi.mock("$/refund/reverse", () => ({
   reverse_charge: reverse_charge_mock,
   load_reversible: load_reversible_mock,
 }));
-vi.mock("$/refund/dispute", () => ({}));
+vi.mock("$/refund/dispute", () => ({ dispute_won: dispute_won_mock }));
+// the transfers are `.server/stripe-connect/`'s; `../routed.test.ts` runs them
+vi.mock("$/stripe-connect/release", async (importOriginal) => ({
+  released_lines: (
+    await importOriginal<typeof import("$/stripe-connect/release")>()
+  ).released_lines,
+  release_held_transfers: release_mock,
+  routed_open_lines: vi.fn(async () => []),
+}));
+vi.mock("$/stripe-connect/reverse", () => ({
+  reverse_routed_refunds: reverse_routed_mock,
+  routed_dispute_reversals: routed_dispute_reversals_mock,
+}));
 vi.mock("$/pg/db", () => ({ db: {} }));
 vi.mock("$/pg/queries/dispute", () => ({ dispute_close: dispute_close_mock }));
 vi.mock("#/errors/report", () => ({ report_error: report_error_mock }));
@@ -107,7 +123,19 @@ beforeEach(() => {
   });
   send_alert_mock.mockResolvedValue(undefined);
   enqueue_mock.mockResolvedValue(undefined);
+  release_mock.mockResolvedValue([]);
+  reverse_routed_mock.mockResolvedValue([]);
+  routed_dispute_reversals_mock.mockResolvedValue([]);
 });
+
+const HELD = { id: "dist-1", to_id: 7, net: 90, stripe_routed_to: "acct_1" };
+
+/** the fiat notices enqueued, title and body */
+const notices = () =>
+  enqueue_mock.mock.calls
+    .flat()
+    .filter((m) => m.id === "fiat-notice")
+    .map((m) => `${m.payload.alert.title}\n${m.payload.alert.body}`);
 
 describe("stripe charge.dispute.closed → reversal on a loss", () => {
   it("reverses a lost dispute's donation and tells ops what it cost, fee included", async () => {
@@ -233,4 +261,129 @@ describe("stripe charge.dispute.closed → reversal on a loss", () => {
     const ids = reverse_charge_mock.mock.calls.map(([r]) => r.notice.id);
     expect(ids).toEqual([lost.id, lost.id, lost.id]);
   });
+});
+
+describe("stripe charge.dispute.closed → the routed transfers", () => {
+  it("reverses the loss's cut of the sent transfers ahead of the reversal, telling ops in its notice", async () => {
+    refunds = [
+      { id: "re_2", amount: 1_000, status: "pending" },
+      { id: "re_1", amount: 2_000, status: "succeeded" },
+    ];
+    reverse_routed_mock.mockImplementation(async () => {
+      expect(reverse_charge_mock).not.toHaveBeenCalled();
+      return ["dist-1 to npo 7: $36.00 reversed from transfer tr_1"];
+    });
+
+    await handle_dispute_closed(
+      dispute_event("charge.dispute.closed", "lost", 4_000)
+    );
+
+    expect(reverse_routed_mock).toHaveBeenCalledExactlyOnceWith(DON_ID, {
+      of: 10_000,
+      refunds: [{ id: "re_1", amount: 2_000 }],
+      unsent: ["re_2"],
+    });
+    expect(notice_text()).toContain("$36.00 reversed from transfer tr_1");
+  });
+
+  it("fails the delivery when a routed reversal throws, reversing nothing else", async () => {
+    reverse_routed_mock.mockRejectedValue(new Error("socket hang up"));
+
+    await expect(
+      handle_dispute_closed(dispute_event("charge.dispute.closed", "lost"))
+    ).rejects.toThrow("socket hang up");
+
+    expect(reverse_charge_mock).not.toHaveBeenCalled();
+  });
+
+  it("releases the held transfers on a partial loss, naming them in the notice", async () => {
+    release_mock.mockResolvedValue([HELD]);
+
+    await handle_dispute_closed(
+      dispute_event("charge.dispute.closed", "lost", 4_000)
+    );
+
+    expect(release_mock).toHaveBeenCalledExactlyOnceWith(
+      DON_ID,
+      "pi_1",
+      "dp_1"
+    );
+    expect(notice_text()).toContain("dist dist-1: transfer to npo 7 released");
+  });
+
+  it("releases nothing on a full loss", async () => {
+    await handle_dispute_closed(dispute_event("charge.dispute.closed", "lost"));
+
+    expect(release_mock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["won", { status: "credited", owed: [] }],
+    ["warning_closed", undefined],
+  ])(
+    "releases the held transfers on a close %s, telling ops once per event",
+    async (status, won) => {
+      dispute_won_mock.mockResolvedValue(won);
+      release_mock.mockResolvedValue([HELD]);
+      const event = dispute_event("charge.dispute.closed", status);
+
+      await handle_dispute_closed(event);
+
+      expect(release_mock).toHaveBeenCalledExactlyOnceWith(
+        DON_ID,
+        "pi_1",
+        "dp_1"
+      );
+      const [notice] = enqueue_mock.mock.calls.flat();
+      expect(notice).toMatchObject({ dedupe: `fiat.notice_${event.id}` });
+      expect(notices()).toEqual([
+        expect.stringMatching(
+          /^Dispute Closed: Held Transfer Released\n.*\n.*\ndist dist-1: transfer to npo 7 released/
+        ),
+      ]);
+    }
+  );
+
+  it("tells ops nothing when a favourable close released nothing", async () => {
+    dispute_won_mock.mockResolvedValue({ status: "credited", owed: [] });
+
+    await handle_dispute_closed(dispute_event("charge.dispute.closed", "won"));
+
+    expect(enqueue_mock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["conflict", { status: "conflict", prior_status: "lost" }],
+    [
+      "already reversed",
+      {
+        status: "already_reversed",
+        donation_status: "refunded",
+        prior_status: "lost",
+        credited: true,
+        hand: false,
+      },
+    ],
+  ])(
+    "a win %s releases nothing and tells ops to re-pay what its loss reversed",
+    async (_case, won) => {
+      dispute_won_mock.mockResolvedValue(won);
+      routed_dispute_reversals_mock.mockResolvedValue([
+        "dist-1: $36.00 reversed from transfer tr_1 for this dispute; re-pay it to the nonprofit by hand",
+      ]);
+
+      await handle_dispute_closed(
+        dispute_event("charge.dispute.closed", "won")
+      );
+
+      expect(release_mock).not.toHaveBeenCalled();
+      expect(routed_dispute_reversals_mock).toHaveBeenCalledWith(
+        DON_ID,
+        "dp_1"
+      );
+      expect(notices()).toEqual([
+        expect.stringContaining("re-pay it to the nonprofit by hand"),
+      ]);
+    }
+  );
 });

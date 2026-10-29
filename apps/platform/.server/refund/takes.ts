@@ -52,8 +52,10 @@ const party_key = (p: OwedParty) => JSON.stringify(p);
  * owes the share they all take, less the refunds a pooled rebook cut off it,
  * of what it received and of its card fee; one
  * whose grant hasn't owes the disputes' share only, a refund there being ops'
- * to settle by hand. each active dispute's fee is owed in full, split over
- * the dists by settled amount, and each referrer owes the whole share of its
+ * to settle by hand. a routed dist owes no share: a dispute holds its
+ * transfer or, lost, reverses its cut, as a refund does. each active
+ * dispute's fee is owed in full, split over the dists by settled amount,
+ * routed ones included, and each referrer owes the whole share of its
  * commission paid or claimed for a transfer
  */
 export function owed_targets(
@@ -74,7 +76,11 @@ export function owed_targets(
       f: all,
       // a rebook's cut took refunds only, so a dispute owes its share whole
       f_of: (d) =>
-        grant_went_out(d) ? past_cut(d.refunds_cut_share, all) : disputes,
+        d.routed
+          ? 0
+          : grant_went_out(d)
+            ? past_cut(d.refunds_cut_share, all)
+            : disputes,
       fee_usd: fees,
       owes: () => true,
     }).map((s) => [party_key(s.party), s])
@@ -123,14 +129,16 @@ export async function record_dispute_fees(
 /**
  * the npo's row raised to what the gift's takes owe it plus `usd`, every cent
  * of its routed dist's transfer stripe refused to reverse for the gift's
- * refunds so far; its figures only grow, so a rerun records nothing more
+ * refunds and lost disputes so far; its figures only grow, so a rerun
+ * records nothing more
  */
 export async function owe_unreversed(u: {
   donation_id: string;
   npo_id: number;
   usd: number;
-  /** the refund whose cut was refused */
+  /** the refund or lost dispute whose cut was refused */
   source_ref: string;
+  source: OwedSource["source"];
 }) {
   await db.transaction(async (tx) => {
     const ds = await gift_dists_locked(tx, u.donation_id);
@@ -145,7 +153,7 @@ export async function owe_unreversed(u: {
       // the zeros leave what is recorded
       fee_processing_usd: 0,
       fee_dispute_usd: 0,
-      source: "refund",
+      source: u.source,
       source_ref: u.source_ref,
       now: new Date().toISOString(),
     });

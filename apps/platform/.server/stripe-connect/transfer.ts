@@ -7,6 +7,7 @@ import { enqueue } from "../kit/queue";
 import { stripe } from "../kit/stripe";
 import { payout_cents } from "../payouts/transfer";
 import { db } from "../pg/db";
+import { disputes_of_donation } from "../pg/queries/dispute";
 import {
   dist_stripe_transfer_get,
   dist_stripe_transfer_set,
@@ -73,6 +74,10 @@ export async function transfer_routed_dist(
   }
 
   if (!tr) {
+    if (await dispute_holds(p, ch)) {
+      console.info(`${what(p)} held: its charge is disputed`);
+      return;
+    }
     // the donor has the money back; a refund that lands after this check
     // meets a transfer it has to reverse
     const status = await donation_status_shared(db, p.donation_id);
@@ -160,7 +165,7 @@ const NO_CUT = { usd: 0, share: null };
 /**
  * what the charge's sent refunds take off a routed `net`: their share of the
  * charge (null when none), and in usd the cents their cut
- * of its transfer would have been (`refund_cuts` in `./reverse` cuts the same
+ * of its transfer would have been (`take_cuts` in `./reverse` cuts the same
  * total), all of it once they take the whole charge. not an unsent one: it
  * can still fail, and a dist booked pooled has no transfer to give its cut
  * back from, so it is taken back the way a pooled share's refund is
@@ -225,7 +230,7 @@ const unanswered_notice = (p: IConnectTransferPayload) =>
     },
   });
 
-type ICharge = Pick<Stripe.Charge, "id" | "transfer_group">;
+type ICharge = Pick<Stripe.Charge, "id" | "transfer_group" | "disputed">;
 
 async function charge_of(p: IConnectTransferPayload): Promise<ICharge> {
   const intent = await stripe.paymentIntents.retrieve(p.intent_id, {
@@ -234,8 +239,20 @@ async function charge_of(p: IConnectTransferPayload): Promise<ICharge> {
   const charge = intent.latest_charge;
   if (!charge) throw new Error(`intent ${p.intent_id} has no charge`);
   return typeof charge === "string"
-    ? { id: charge, transfer_group: null }
-    : charge;
+    ? { id: charge, transfer_group: null, disputed: false }
+    : { ...charge, disputed: charge.disputed ?? false };
+}
+
+/**
+ * a dispute holds the transfer until it closes: its close releases it
+ * (`release_held_transfers`). the charge reads disputed before the dispute's
+ * webhook puts it on record, and still does once it closes, so it holds only
+ * while the gift has no dispute on record at all
+ */
+async function dispute_holds(p: IConnectTransferPayload, ch: ICharge) {
+  const disputes = await disputes_of_donation(p.donation_id);
+  if (disputes.some((d) => d.status === "open")) return true;
+  return ch.disputed && disputes.length === 0;
 }
 
 /**

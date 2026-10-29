@@ -14,6 +14,7 @@ import type { IConnectTransferPayload } from "@/queue";
 import type { IInput, IParts } from "@/types/donation-dist";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { bal_txs } from "../pg/schema/bal-tx";
+import { donation_disputes } from "../pg/schema/dispute";
 import { dists } from "../pg/schema/dist";
 import { donations } from "../pg/schema/donation";
 import { npos } from "../pg/schema/npo";
@@ -27,6 +28,7 @@ const stripe = vi.hoisted(() => ({
   paymentIntents: { retrieve: vi.fn() },
   charges: { retrieve: vi.fn() },
   refunds: { list: vi.fn() },
+  disputes: { list: vi.fn() },
   transfers: {
     create: vi.fn(),
     list: vi.fn(),
@@ -77,6 +79,7 @@ vi.mock("../env", async (importOriginal) => {
 const { create_test_db } = await import("../pg/test-utils/pglite");
 const { settle_npo } = await import("../settlement/settle-npo");
 const { transfer_routed_dist } = await import("./transfer");
+const { release_held_transfers } = await import("./release");
 const { calc_settlement_plan } = await import("@/settlement/plan");
 const { payout_total } = await import("../payouts/transfer");
 const { reversed_statuses } = await import("@/donations/settle");
@@ -181,6 +184,11 @@ async function settle_routed(
   return { npo: npo!, payload: m.payload as IConnectTransferPayload };
 }
 
+const store_fails_once = () =>
+  vi
+    .mocked(dist_stripe_transfer_set)
+    .mockRejectedValueOnce(new Error("Connection terminated unexpectedly"));
+
 const stored = async (dist_id: string) => {
   const [d] = await db().select().from(dists).where(eq(dists.id, dist_id));
   return d?.stripe_transfer_id;
@@ -226,15 +234,19 @@ beforeEach(async () => {
     id: CHARGE,
     amount_captured: 10_000,
   });
+  // no dispute lost on the charge unless a test says so
+  stripe.disputes.list.mockResolvedValue({ data: [] });
   stripe.transfers.retrieve.mockResolvedValue({
     id: "tr_1",
     amount: 10_000,
     amount_reversed: 0,
+    source_transaction: CHARGE,
     metadata: {},
   });
   stripe.transfers.listReversals.mockResolvedValue({ data: [] });
   stripe.transfers.createReversal.mockResolvedValue({ id: "trr_1" });
   await db().delete(owed_amounts);
+  await db().delete(donation_disputes);
   await db().delete(donation_takes);
   await db().delete(payouts);
   await db().delete(bal_txs);
@@ -581,11 +593,6 @@ describe("transfer_routed_dist", () => {
     expect(await db().select().from(payouts)).toEqual([]);
   });
 
-  const store_fails_once = () =>
-    vi
-      .mocked(dist_stripe_transfer_set)
-      .mockRejectedValueOnce(new Error("Connection terminated unexpectedly"));
-
   // past stripe's 24h hold on the idempotency key, a create makes another
   test("a retry after the transfer's store failed stores the one stripe made, and makes none", async () => {
     const { payload } = await settle_routed();
@@ -746,6 +753,209 @@ describe("a refund that landed before the transfer ran", () => {
     expect(stripe.transfers.createReversal.mock.calls[1]![1]).toMatchObject({
       amount: 4_000,
     });
+  });
+});
+
+describe("a dispute open before the transfer ran", () => {
+  const dispute_row = (status: "open" | "won" | "lost") =>
+    db()
+      .insert(donation_disputes)
+      .values({
+        id: "dp_1",
+        donation_id: DON_ID,
+        opened_at: "2026-07-01T00:00:00.000Z",
+        status,
+        ...(status !== "open" && { closed_at: "2026-07-02T00:00:00.000Z" }),
+      });
+
+  /** stripe marks the charge disputed as the dispute opens */
+  const charge_disputed = () =>
+    stripe.paymentIntents.retrieve.mockResolvedValue({
+      id: INTENT,
+      latest_charge: { id: CHARGE, transfer_group: null, disputed: true },
+    });
+
+  test("holds the transfer while the gift's dispute is on record open", async () => {
+    const { payload } = await settle_routed();
+    await dispute_row("open");
+
+    await expect(transfer_routed_dist(payload, RETRY)).resolves.toBeUndefined();
+
+    expect(stripe.transfers.create).not.toHaveBeenCalled();
+    expect(await stored(payload.dist_id)).toBeNull();
+    expect(report_error).not.toHaveBeenCalled();
+  });
+
+  // the dispute's webhook hasn't landed yet
+  test("holds the transfer when the charge reads disputed and no dispute is on record", async () => {
+    const { payload } = await settle_routed();
+    charge_disputed();
+
+    await transfer_routed_dist(payload, RETRY);
+
+    expect(stripe.transfers.create).not.toHaveBeenCalled();
+    expect(await stored(payload.dist_id)).toBeNull();
+  });
+
+  // stripe keeps `disputed` true after the dispute closes
+  test("sends once the gift's dispute is on record closed won, the charge still reading disputed", async () => {
+    const { payload } = await settle_routed();
+    charge_disputed();
+    await dispute_row("won");
+
+    await transfer_routed_dist(payload, RETRY);
+
+    expect(stripe.transfers.create).toHaveBeenCalledOnce();
+    expect(await stored(payload.dist_id)).toBe("tr_1");
+  });
+
+  const close_row = (status: "won" | "lost") =>
+    db()
+      .update(donation_disputes)
+      .set({ status, closed_at: "2026-07-02T00:00:00.000Z" })
+      .where(eq(donation_disputes.id, "dp_1"));
+
+  /** the connect-transfer messages enqueued so far */
+  const transfers_enqueued = () =>
+    enqueue.mock.calls
+      .flat()
+      .filter((m) => (m as { id: string }).id === "connect-transfer") as {
+      dedupe: string;
+      payload: IConnectTransferPayload;
+    }[];
+
+  test("a win releases the held transfer: sent exactly once, a retry of the held delivery sending nothing more", async () => {
+    const { payload } = await settle_routed();
+    await dispute_row("open");
+    await transfer_routed_dist(payload, RETRY);
+    await close_row("won");
+
+    const released = await release_held_transfers(DON_ID, INTENT, "dp_1");
+
+    expect(released.map((d) => d.id)).toEqual([payload.dist_id]);
+    const [m] = transfers_enqueued();
+    expect(m).toMatchObject({
+      dedupe: `connect.transfer_${payload.dist_id}_dp_1`,
+      payload: { ...payload, release: "dp_1" },
+    });
+    await transfer_routed_dist(m!.payload, RETRY);
+    await transfer_routed_dist(payload, RETRY);
+
+    expect(stripe.transfers.create).toHaveBeenCalledOnce();
+    expect(await stored(payload.dist_id)).toBe("tr_1");
+  });
+
+  test("releases nothing while a dispute on the gift is still open", async () => {
+    await settle_routed();
+    await dispute_row("open");
+
+    expect(await release_held_transfers(DON_ID, INTENT, "dp_1")).toEqual([]);
+    expect(transfers_enqueued()).toEqual([]);
+  });
+
+  test.each(reversed_statuses)(
+    "releases nothing once the donation is %s",
+    async (status) => {
+      await settle_routed();
+      await dispute_row("lost");
+      await db()
+        .update(donations)
+        .set({ status })
+        .where(eq(donations.id, DON_ID));
+
+      expect(await release_held_transfers(DON_ID, INTENT, "dp_1")).toEqual([]);
+      expect(transfers_enqueued()).toEqual([]);
+    }
+  );
+
+  test("releases nothing for a share already transferred", async () => {
+    const { payload } = await settle_routed();
+    await transfer_routed_dist(payload, RETRY);
+    await dispute_row("won");
+
+    expect(await release_held_transfers(DON_ID, INTENT, "dp_1")).toEqual([]);
+  });
+
+  // the release sends the whole net; the job's own reversal then takes back
+  // the lost part
+  test("a partial loss's release sends the net, then reverses the lost cut from it", async () => {
+    const { payload } = await settle_routed();
+    await dispute_row("open");
+    await transfer_routed_dist(payload, RETRY);
+    await close_row("lost");
+    stripe.disputes.list.mockResolvedValue({
+      data: [{ id: "dp_1", amount: 4_000, status: "lost", created: 2 }],
+    });
+
+    await release_held_transfers(DON_ID, INTENT, "dp_1");
+    await transfer_routed_dist(transfers_enqueued()[0]!.payload, RETRY);
+
+    expect(stripe.disputes.list).toHaveBeenCalledWith({
+      charge: CHARGE,
+      limit: 100,
+    });
+    expect(stripe.transfers.create.mock.calls[0]![0]).toMatchObject({
+      amount: 10_000,
+    });
+    expect(stripe.transfers.createReversal.mock.calls).toEqual([
+      [
+        "tr_1",
+        {
+          amount: 4_000,
+          metadata: {
+            dispute_id: "dp_1",
+            dist_id: payload.dist_id,
+            donation_id: DON_ID,
+          },
+        },
+        { idempotencyKey: `connect-reversal:dp_1:${payload.dist_id}` },
+      ],
+    ]);
+  });
+
+  // the cuts run oldest first, each once whichever event reverses it
+  test("a refund and a lost dispute on the charge each reverse their own cut once", async () => {
+    const { payload } = await settle_routed();
+    stripe.refunds.list.mockResolvedValue({
+      data: [{ id: "re_1", amount: 2_500, status: "succeeded", created: 1 }],
+    });
+    stripe.disputes.list.mockResolvedValue({
+      data: [
+        { id: "dp_1", amount: 4_000, status: "lost", created: 2 },
+        // still open: nothing of it is taken yet
+        { id: "dp_2", amount: 1_000, status: "needs_response", created: 3 },
+      ],
+    });
+    await dispute_row("lost");
+    await transfer_routed_dist(payload, RETRY);
+    stripe.transfers.listReversals.mockResolvedValue({
+      data: stripe.transfers.createReversal.mock.calls.map(([, p]) => p),
+    });
+
+    await transfer_routed_dist(payload, RETRY);
+
+    expect(
+      stripe.transfers.createReversal.mock.calls.map(([, p]) => [
+        p.amount,
+        p.metadata.refund_id ?? p.metadata.dispute_id,
+      ])
+    ).toEqual([
+      [2_500, "re_1"],
+      [4_000, "dp_1"],
+    ]);
+  });
+
+  // the hold is a send not made; a transfer stripe has made is stored as ever
+  test("stores a transfer an earlier delivery made, though a dispute opened since", async () => {
+    const { payload } = await settle_routed();
+    store_fails_once();
+    await expect(transfer_routed_dist(payload, RETRY)).rejects.toThrow();
+    await dispute_row("open");
+
+    await transfer_routed_dist(payload, RETRY);
+
+    expect(stripe.transfers.create).toHaveBeenCalledOnce();
+    expect(await stored(payload.dist_id)).toBe("tr_1");
   });
 });
 

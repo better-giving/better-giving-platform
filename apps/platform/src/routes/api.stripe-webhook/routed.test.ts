@@ -19,7 +19,11 @@ const refunds_list_mock = vi.hoisted(() => vi.fn());
 const invoice_payments_list_mock = vi.hoisted(() => vi.fn());
 const enqueue_mock = vi.hoisted(() => vi.fn());
 const report_error_mock = vi.hoisted(() => vi.fn());
+const disputes_list_mock = vi.hoisted(() => vi.fn());
+const intent_retrieve_mock = vi.hoisted(() => vi.fn());
 const transfers = vi.hoisted(() => ({
+  create: vi.fn(),
+  list: vi.fn(),
   retrieve: vi.fn(),
   update: vi.fn(),
   listReversals: vi.fn(),
@@ -36,6 +40,8 @@ vi.mock("$/kit/stripe", () => ({
     webhooks: { constructEvent: construct_event_mock },
     charges: { retrieve: charge_retrieve_mock },
     refunds: { list: refunds_list_mock },
+    disputes: { list: disputes_list_mock },
+    paymentIntents: { retrieve: intent_retrieve_mock },
     invoicePayments: { list: invoice_payments_list_mock },
     transfers,
   },
@@ -63,6 +69,8 @@ vi.mock("$/kit/slack", () => ({ fiat_monitor: { send_alert: vi.fn() } }));
 vi.mock("#/errors/report", () => ({ report_error: report_error_mock }));
 
 const { action } = await import("./route");
+const { transfer_routed_dist } = await import("$/stripe-connect/transfer");
+const { dists } = await import("$/pg/schema/dist");
 const { eq } = await import("drizzle-orm");
 const { owed_for_donation } = await import("$/pg/queries/owed");
 const { donations } = await import("$/pg/schema/donation");
@@ -97,12 +105,22 @@ interface ITransfer {
   id: string;
   amount: number;
   amount_reversed: number;
+  source_transaction: string;
   metadata: Record<string, string>;
   reversals: IReversal[];
 }
 
+interface IStripeDispute {
+  id: string;
+  amount: number;
+  status: string;
+  created: number;
+}
+
 /** stripe's side of the gift's one $100 usd charge; refunds newest first */
 let refunds: IRefund[] = [];
+/** stripe's side of the charge's dispute, as `disputes.list` finds it */
+let stripe_dispute: IStripeDispute | null = null;
 /** stripe's side of each transfer that paid a routed dist, by id */
 let stripe_transfers = new Map<string, ITransfer>();
 /** what stripe answered each idempotency key with, as it replays it */
@@ -184,6 +202,12 @@ const failed_alert = () =>
  * its funds withdrawn with a $15 fee; `status` as stripe has it then */
 const dispute_event = (type: string, amount: number, status: string) => {
   clock += 60;
+  stripe_dispute = {
+    id: `du_${charge_of.id}`,
+    amount,
+    status,
+    created: stripe_dispute?.created ?? clock,
+  };
   return {
     id: `evt_${++event_n}`,
     type,
@@ -198,7 +222,7 @@ const dispute_event = (type: string, amount: number, status: string) => {
         payment_intent: charge_of.sttl_id,
         reason: "fraudulent",
         status,
-        created: clock,
+        created: stripe_dispute.created,
         evidence_details: { due_by: clock + 14 * 86_400 },
         balance_transactions: [
           { id: "txn_dsp", amount: -amount, fee: 1_500, currency: "usd" },
@@ -219,11 +243,31 @@ const paid_by_transfer = (gift: Gift, i = 0, amount = 9_000) => {
     id,
     amount,
     amount_reversed: 0,
+    source_transaction: charge_now().id,
     metadata: {},
     reversals: [],
   });
   return id;
 };
+
+/** the routed dist `i` of `gift`, settled with its transfer not yet run */
+const awaiting_transfer = async (gift: Gift, i = 0) => {
+  const dist_id = `dist-${gift.id}-${i}`;
+  await db()
+    .update(dists)
+    .set({ stripe_transfer_id: null })
+    .where(eq(dists.id, dist_id));
+  return { dist_id, donation_id: gift.id, intent_id: gift.sttl_id };
+};
+
+const RETRY = { last: false };
+
+/** the connect-transfer messages enqueued so far */
+const transfers_enqueued = () =>
+  enqueue_mock.mock.calls
+    .flat()
+    .filter((m) => m.id === "connect-transfer")
+    .map((m) => m.payload);
 
 const deliver = async (event: object) => {
   construct_event_mock.mockReturnValue(event);
@@ -240,6 +284,13 @@ const reversed_of = (tr: string) =>
   stripe_transfers
     .get(tr)!
     .reversals.map((r) => ({ amount: r.amount, refund: r.metadata.refund_id }));
+
+/** what was reversed of `tr` at stripe, each with what it answers */
+const answered_of = (tr: string) =>
+  stripe_transfers.get(tr)!.reversals.map((r) => ({
+    amount: r.amount,
+    for: r.metadata.refund_id ?? r.metadata.dispute_id,
+  }));
 
 /** every ops notice queued so far, title and body */
 const notice_text = () =>
@@ -279,6 +330,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   test_db.fail_next_tx = false;
   refunds = [];
+  stripe_dispute = null;
   captured = 10_000;
   stripe_transfers = new Map();
   answered = new Map();
@@ -287,6 +339,43 @@ beforeEach(async () => {
   invoice_payments_list_mock.mockResolvedValue({ data: [] });
   charge_retrieve_mock.mockImplementation(async () => charge_now());
   refunds_list_mock.mockImplementation(async () => ({ data: [...refunds] }));
+  disputes_list_mock.mockImplementation(async () => ({
+    data: stripe_dispute ? [{ ...stripe_dispute }] : [],
+  }));
+  intent_retrieve_mock.mockImplementation(async () => ({
+    id: charge_of.sttl_id,
+    latest_charge: {
+      ...charge_now(),
+      transfer_group: null,
+      disputed: stripe_dispute !== null,
+    },
+  }));
+  // one transfer per dist, which a create under the same key replays
+  transfers.create.mockImplementation(
+    async (p: {
+      amount: number;
+      source_transaction: string;
+      metadata: Record<string, string>;
+    }) => {
+      const id = `tr_${p.metadata.dist_id}`;
+      if (!stripe_transfers.has(id)) {
+        stripe_transfers.set(id, {
+          id,
+          amount: p.amount,
+          amount_reversed: 0,
+          source_transaction: p.source_transaction,
+          metadata: {},
+          reversals: [],
+        });
+      }
+      return { id, created: clock, ...p };
+    }
+  );
+  transfers.list.mockImplementation(async function* () {
+    for (const t of stripe_transfers.values()) {
+      yield { ...t, metadata: { dist_id: t.id.slice(3) } };
+    }
+  });
   transfers.retrieve.mockImplementation(async (id: string) => {
     const t = stripe_transfers.get(id);
     if (!t) throw new Error(`no transfer ${id}`);
@@ -552,32 +641,35 @@ describe("a reversal stripe refuses", () => {
   });
 });
 
-// stripe debits every dispute from the platform, and the transfer stays
-// where it went: what the npo owes for it is recorded for recoup, nothing is
-// reversed (decisions.md, "cross-border reversal trap")
-describe("a dispute on a routed gift", () => {
-  it("records the npo as owing its share plus its card and dispute fees at open, reversing nothing", async () => {
+// stripe debits every dispute from the platform. the routed share's transfer
+// is held while the dispute is open, or left alone when already sent; a loss
+// reverses its cut, so the npo owes only its part of the dispute fee
+describe("a dispute on a routed gift already transferred", () => {
+  it("records the npo as owing only its dispute fee at open, leaving the transfer alone", async () => {
     charge_of = await seed_card_gift(db(), ROUTED);
-    paid_by_transfer(charge_of);
+    const tr = paid_by_transfer(charge_of);
 
     expect((await deliver(opened())).status).toBe(200);
 
     expect(await owed_of(charge_of.id)).toEqual([
       {
         npo_id: charge_of.npo_ids[0],
-        received_usd: 90,
-        fee_processing_usd: 3.2,
+        received_usd: 0,
+        fee_processing_usd: 0,
         fee_dispute_usd: 15,
-        outstanding_usd: 108.2,
+        outstanding_usd: 15,
       },
     ]);
     expect(await status_of(charge_of.id)).toBe("settled");
     expect(transfers.createReversal).not.toHaveBeenCalled();
+    expect(notice_text()).toContain(
+      `dist dist-${charge_of.id}-0: transfer ${tr} to npo ${charge_of.npo_ids[0]} already sent: left alone until the dispute closes; a loss reverses its share`
+    );
   });
 
   // a withdrawn dispute closes won, or lost without evidence
   // (docs.stripe.com/disputes/withdrawing)
-  it("cancels what the open recorded once the dispute is won or withdrawn", async () => {
+  it("cancels what the open recorded once the dispute is won, reversing and releasing nothing", async () => {
     charge_of = await seed_card_gift(db(), ROUTED);
     paid_by_transfer(charge_of);
     await deliver(opened());
@@ -585,41 +677,236 @@ describe("a dispute on a routed gift", () => {
     await deliver(closed("won"));
 
     expect(await owed_of(charge_of.id)).toMatchObject([
-      { received_usd: 90, fee_dispute_usd: 15, outstanding_usd: 0 },
+      { received_usd: 0, fee_dispute_usd: 15, outstanding_usd: 0 },
     ]);
     expect(await status_of(charge_of.id)).toBe("settled");
     expect(transfers.createReversal).not.toHaveBeenCalled();
+    expect(transfers_enqueued()).toEqual([]);
   });
 
-  it("reduces what is owed when the chargeback comes in under the dispute opened", async () => {
+  it("reverses the whole transfer on a full loss, the npo owing its dispute fee only", async () => {
     charge_of = await seed_card_gift(db(), ROUTED);
-    paid_by_transfer(charge_of);
-    await deliver(opened(6_000));
-    const at_open = await owed_of(charge_of.id);
-
-    await deliver(closed("lost", 4_000));
-
-    expect(at_open).toMatchObject([{ outstanding_usd: 70.92 }]);
-    expect(await owed_of(charge_of.id)).toMatchObject([
-      { received_usd: 54, outstanding_usd: 52.28 },
-    ]);
-    expect(await status_of(charge_of.id)).toBe("settled");
-    expect(transfers.createReversal).not.toHaveBeenCalled();
-  });
-
-  it("leaves what the open recorded standing once lost, the npo's balances untouched", async () => {
-    charge_of = await seed_card_gift(db(), ROUTED);
-    paid_by_transfer(charge_of);
+    const tr = paid_by_transfer(charge_of);
     await deliver(opened());
 
     expect((await deliver(closed("lost"))).status).toBe(200);
 
+    expect(answered_of(tr)).toEqual([
+      { amount: 9_000, for: `du_${charge_of.id}` },
+    ]);
     expect(await status_of(charge_of.id)).toMatch(/^refunded/);
     expect(await owed_of(charge_of.id)).toMatchObject([
-      { received_usd: 90, fee_dispute_usd: 15, outstanding_usd: 108.2 },
+      { received_usd: 0, fee_dispute_usd: 15, outstanding_usd: 15 },
     ]);
     expect(await balance_of(db(), charge_of.npo_ids[0]!)).toBe(0);
+    expect(notice_text()).toContain(
+      `$90.00 reversed from transfer ${tr} for dispute du_${charge_of.id}`
+    );
+  });
+
+  it("reverses the lost part's cut on a partial loss, the gift staying settled", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const tr = paid_by_transfer(charge_of);
+    await deliver(opened(6_000));
+
+    await deliver(closed("lost", 4_000));
+
+    expect(answered_of(tr)).toEqual([
+      { amount: 3_600, for: `du_${charge_of.id}` },
+    ]);
+    expect(await status_of(charge_of.id)).toBe("settled");
+    expect(await owed_of(charge_of.id)).toMatchObject([
+      { received_usd: 0, outstanding_usd: 15 },
+    ]);
+  });
+
+  it("records the cut stripe refuses to reverse owed by the npo, marked on the transfer", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const tr = paid_by_transfer(charge_of);
+    short.add(tr);
+    await deliver(opened());
+
+    expect((await deliver(closed("lost"))).status).toBe(200);
+
+    expect(stripe_transfers.get(tr)!.metadata).toEqual({
+      [`short:du_${charge_of.id}`]: "9000",
+    });
+    expect(await owed_of(charge_of.id)).toMatchObject([
+      { received_usd: 90, fee_dispute_usd: 15, outstanding_usd: 105 },
+    ]);
+    expect(report_error_mock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        transfer_id: tr,
+        dispute_id: `du_${charge_of.id}`,
+      })
+    );
+    expect(notice_text()).toContain(
+      `stripe refused to reverse $90.00 from transfer ${tr} for dispute du_${charge_of.id}; recorded as owed by npo ${charge_of.npo_ids[0]}`
+    );
+  });
+
+  it("reverses nothing more when stripe redelivers the loss", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const tr = paid_by_transfer(charge_of);
+    await deliver(opened(4_000));
+    const lost = closed("lost", 4_000);
+
+    await deliver(lost);
+    // past stripe's 24h idempotency window: only the reversal on record dedupes it
+    answered.clear();
+    await deliver(lost);
+
+    expect(answered_of(tr)).toEqual([
+      { amount: 3_600, for: `du_${charge_of.id}` },
+    ]);
+  });
+
+  it("reverses once when the loss lands before its open", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const tr = paid_by_transfer(charge_of);
+    const open = opened(4_000);
+    const lost = closed("lost", 4_000);
+
+    expect((await deliver(lost)).status).toBe(200);
+    expect((await deliver(open)).status).toBe(200);
+
+    expect(answered_of(tr)).toEqual([
+      { amount: 3_600, for: `du_${charge_of.id}` },
+    ]);
+    expect(await owed_of(charge_of.id)).toMatchObject([{ received_usd: 0 }]);
+  });
+
+  it("reverses a refund's and a lost dispute's cuts each once, however the events repeat", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const tr = paid_by_transfer(charge_of);
+    const refunded = refund(2_000);
+    await deliver(refunded);
+    await deliver(opened(4_000));
+    const lost = closed("lost", 4_000);
+
+    await deliver(lost);
+    answered.clear();
+    await deliver(refunded);
+    await deliver(lost);
+
+    expect(answered_of(tr)).toEqual([
+      { amount: 1_800, for: "re_1" },
+      { amount: 3_600, for: `du_${charge_of.id}` },
+    ]);
+  });
+
+  it("tells ops to re-pay by hand what a partial loss reversed when the dispute is then won", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const tr = paid_by_transfer(charge_of);
+    await deliver(opened(4_000));
+    await deliver(closed("lost", 4_000));
+
+    await deliver(closed("won", 4_000));
+
+    expect(answered_of(tr)).toHaveLength(1);
+    expect(transfers_enqueued()).toEqual([]);
+    const changed = notice_text().split("Dispute Outcome Changed\n")[1];
+    expect(changed).toContain(
+      `$36.00 reversed from transfer ${tr} for this dispute; re-pay it to the nonprofit by hand`
+    );
+  });
+});
+
+describe("a dispute on a routed gift before its transfer ran", () => {
+  it("holds the transfer while the dispute is open, telling ops at open", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const job = await awaiting_transfer(charge_of);
+    await deliver(opened());
+
+    await transfer_routed_dist(job, RETRY);
+
+    expect(transfers.create).not.toHaveBeenCalled();
+    expect(await owed_of(charge_of.id)).toMatchObject([
+      { received_usd: 0, fee_processing_usd: 0, fee_dispute_usd: 15 },
+    ]);
+    expect(notice_text()).toContain(
+      `dist ${job.dist_id}: transfer to npo ${charge_of.npo_ids[0]} held until the dispute closes`
+    );
+  });
+
+  // the charge reads disputed before the dispute's webhook lands
+  it("holds a transfer that runs before the open lands, then the win releases it to send once", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const job = await awaiting_transfer(charge_of);
+    const open = opened();
+    await transfer_routed_dist(job, RETRY);
+    await deliver(open);
+
+    await deliver(closed("won"));
+    const [released] = transfers_enqueued();
+    await transfer_routed_dist(released, RETRY);
+    // the held delivery's retry, and the release's redelivery
+    await transfer_routed_dist(job, RETRY);
+    await transfer_routed_dist(released, RETRY);
+
+    expect(released).toEqual({ ...job, release: `du_${charge_of.id}` });
+    expect(transfers.create).toHaveBeenCalledOnce();
+    expect(transfers.create.mock.calls[0]![0]).toMatchObject({ amount: 9_000 });
     expect(transfers.createReversal).not.toHaveBeenCalled();
+    expect(notice_text()).toMatch(
+      new RegExp(
+        `Dispute Closed: Held Transfer Released\n(.*\n)*.*dist ${job.dist_id}`
+      )
+    );
+  });
+
+  it("an inquiry that closes releases the transfer it held", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const job = await awaiting_transfer(charge_of);
+    await deliver(
+      dispute_event("charge.dispute.created", 10_000, "warning_needs_response")
+    );
+    await transfer_routed_dist(job, RETRY);
+
+    await deliver(
+      dispute_event("charge.dispute.closed", 10_000, "warning_closed")
+    );
+    await transfer_routed_dist(transfers_enqueued()[0], RETRY);
+
+    expect(transfers.create).toHaveBeenCalledOnce();
+  });
+
+  it("sends nothing on a full loss, the npo owing its dispute fee only", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const job = await awaiting_transfer(charge_of);
+    await deliver(opened());
+    await transfer_routed_dist(job, RETRY);
+
+    await deliver(closed("lost"));
+    await transfer_routed_dist(job, RETRY);
+
+    expect(transfers_enqueued()).toEqual([]);
+    expect(transfers.create).not.toHaveBeenCalled();
+    expect(await status_of(charge_of.id)).toMatch(/^refunded/);
+    expect(await owed_of(charge_of.id)).toMatchObject([
+      { received_usd: 0, fee_processing_usd: 0, fee_dispute_usd: 15 },
+    ]);
+  });
+
+  it("a partial loss releases the transfer, whose job sends the net and reverses the lost cut", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const job = await awaiting_transfer(charge_of);
+    await deliver(opened(4_000));
+    await transfer_routed_dist(job, RETRY);
+
+    await deliver(closed("lost", 4_000));
+    const [released] = transfers_enqueued();
+    await transfer_routed_dist(released, RETRY);
+    await transfer_routed_dist(released, RETRY);
+
+    const tr = `tr_${job.dist_id}`;
+    expect(transfers.create).toHaveBeenCalledOnce();
+    expect(answered_of(tr)).toEqual([
+      { amount: 3_600, for: `du_${charge_of.id}` },
+    ]);
+    expect(await status_of(charge_of.id)).toBe("settled");
+    expect(await owed_of(charge_of.id)).toMatchObject([{ received_usd: 0 }]);
   });
 });
 
