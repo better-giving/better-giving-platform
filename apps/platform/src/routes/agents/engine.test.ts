@@ -296,7 +296,7 @@ describe("agent quote", () => {
     }
   );
 
-  test("a gift whose split rounds to a stray cent still balances to the cent", async () => {
+  test("a gift whose floored split drops a cent still balances to the cent", async () => {
     mocks.npo_get.mockResolvedValue({
       donor_address_required: false,
       hide_bg_tip: true,

@@ -326,7 +326,7 @@ const PER_STTL_BASE = (300 * BASE_R) / N; // ≈95.238
 
 // credit_fa path: fa=0 → fa_added = PER_STTL_BASE
 const FA_ADDED = PER_STTL_BASE;
-// fees are on the full gift: the settled share plus its $15 fee share
+// fees are on the full gift: the settled share plus its share of the $15 fee
 const PER_FULL_BASE = ((300 + 15) * BASE_R) / N; // 100
 
 // --- npo a: fsa=2.9%, referrer=30% ---
@@ -378,6 +378,14 @@ describe("fund donation → settlement across 3 NPOs → DB + UI", () => {
         [npo_b_id]: { liq: 0, lock: 0, cash: 100 },
         [npo_c_id]: { liq: 50, lock: 50, cash: 0 },
       };
+    const expected: Record<
+      number,
+      { net: number; fee_base: number; fee_fsa: number }
+    > = {
+      [npo_a_id]: { net: 92.34, fee_base: 0, fee_fsa: 2.9 },
+      [npo_b_id]: { net: 93.74, fee_base: 1.5, fee_fsa: 0 },
+      [npo_c_id]: { net: 95.24, fee_base: 0, fee_fsa: 0 },
+    };
 
     for (const d of rows) {
       expect(d.donation_id).toBe(DON_ID);
@@ -388,6 +396,12 @@ describe("fund donation → settlement across 3 NPOs → DB + UI", () => {
       // split by the allocation persisted beside it
       const alloc = allocs[d.to_id!];
       expect(d.alloc).toEqual(alloc);
+
+      // each member's $95.24 settled share, fees on its $100 full share
+      const exp = expected[d.to_id!];
+      expect(d.net).toBeCloseTo(exp.net, P);
+      expect(d.fee_base).toBeCloseTo(exp.fee_base, P);
+      expect(d.fee_fsa).toBeCloseTo(exp.fee_fsa, P);
 
       const share = (pct: number) => (d.net! * pct) / 100;
       const liq_tx = txs.find(

@@ -400,7 +400,8 @@ describe("calc_settlement_plan routed to a connected account", () => {
 });
 
 // a $100 card gift to a fiscally sponsored npo, settled at stripe's 2.2% + $0.30
-// on the whole charge. the base and fsa fees are on the full gift either way
+// on the whole charge. the base and fsa fees are on the full $100 gift whether
+// or not the donor covers the card fee
 describe("calc_settlement_plan fee base", () => {
   const card = (base: number, tip: number, fee_allowance: number) => {
     const total = base + tip + fee_allowance;
@@ -423,10 +424,10 @@ describe("calc_settlement_plan fee base", () => {
     expect(plan.dist.fees.fsa).toBeCloseTo(2.9, 10);
     expect(plan.dist.fees.processing).toBeCloseTo(2.5, 10);
     expect(plan.dist.net).toBeCloseTo(100 - 2.5 - 2.9, 10);
-    expect(fee_logs(plan)).toEqual([["fsa-fee", plan.dist.fees.fsa]]);
+    expect(fee_logs(plan)).toEqual([["fsa-fee", expect.closeTo(2.9, 10)]]);
   });
 
-  test("covered: fsa and net are what they were before the base moved", () => {
+  test("covered: fsa on $100, net $97.10", () => {
     // $2.56 allowance on $102.56 is a $2.56 card fee
     const plan = calc_settlement_plan(card(100, 0, 2.56), fsa, null);
     expect(plan.dist.fees.fsa).toBeCloseTo(2.9, 10);
@@ -441,17 +442,19 @@ describe("calc_settlement_plan fee base", () => {
     expect(plan.dist.net).toBeCloseTo(107.28 * (100 / 110) - 2.9, 10);
     const tip = plan.revenue_logs.find((r) => r.type === "tip")!;
     expect(tip.gross).toBeCloseTo(107.28 * (10 / 110), 10);
-    expect(fee_logs(plan)).toEqual([["fsa-fee", plan.dist.fees.fsa]]);
+    expect(fee_logs(plan)).toEqual([["fsa-fee", expect.closeTo(2.9, 10)]]);
   });
 
-  test("$10 tip, covered: fsa and net are what they were before", () => {
+  test("$10 tip, covered: fsa on the $100 gift, net $97.10", () => {
     // $2.78 allowance on $112.78 is a $2.78 card fee
     const plan = calc_settlement_plan(card(100, 10, 2.78), fsa, null);
     expect(plan.dist.fees.fsa).toBeCloseTo(2.9, 10);
     expect(plan.dist.net).toBeCloseTo(97.1, 10);
     const tip = plan.revenue_logs.find((r) => r.type === "tip")!;
-    expect(tip.gross).toBeGreaterThan(0);
-    expect(fee_logs(plan)).toEqual([["fsa-fee", plan.dist.fees.fsa]]);
+    // $2.78 card fee on $112.78 leaves $110; the tip's 10/112.78 of that, plus
+    // the same share of the card fee the allowance covered, is the $10 tip
+    expect(tip.gross).toBeCloseTo(10, 10);
+    expect(fee_logs(plan)).toEqual([["fsa-fee", expect.closeTo(2.9, 10)]]);
   });
 
   test("tip turned off, uncovered: base fee is 1.5% of $100", () => {
@@ -463,6 +466,7 @@ describe("calc_settlement_plan fee base", () => {
     expect(plan.dist.fees.base).toBeCloseTo(1.5, 10);
     expect(plan.dist.fees.fsa).toBe(0);
     expect(plan.dist.net).toBeCloseTo(100 - 2.5 - 1.5, 10);
+    expect(fee_logs(plan)).toEqual([["base-fee", expect.closeTo(1.5, 10)]]);
   });
 
   test("referral commission is 30% of the fees on the full gift", () => {
@@ -476,6 +480,10 @@ describe("calc_settlement_plan fee base", () => {
       }),
       null
     );
+    expect(fee_logs(plan)).toEqual([
+      ["base-fee", expect.closeTo(1.5, 10)],
+      ["fsa-fee", expect.closeTo(2.9, 10)],
+    ]);
     expect(plan.commission?.amount).toBeCloseTo((1.5 + 2.9) * 0.3, 10);
   });
 
