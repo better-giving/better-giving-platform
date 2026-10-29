@@ -51,6 +51,18 @@ describe("rate_limit_take", () => {
   });
 });
 
+describe("rate_limit_release", () => {
+  test("leaves an emptied window at zero", async () => {
+    const conn = as_db(test_db.db);
+    await rate_limit_take("k", W1, 2, conn);
+    await rate_limit_release("k", W1.start, conn);
+    await rate_limit_release("k", W1.start, conn);
+
+    const [row] = await test_db.db.select().from(rate_limit_windows);
+    expect(row.count).toBe(0);
+  });
+});
+
 describe("rate_limit_sweep", () => {
   const W2 = {
     start: "2027-01-01T00:10:00.000Z",

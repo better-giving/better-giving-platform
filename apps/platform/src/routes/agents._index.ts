@@ -126,8 +126,8 @@ async function rate_limited(request: Request): Promise<Response | null> {
   try {
     limit = await limit_shared(key, REQUEST_QUOTA);
   } catch (err) {
-    // fail open: lookups and checkouts keep their own caps, and a db outage
-    // shouldn't take the whole endpoint down with it
+    // fail open: a limiter outage shouldn't refuse requests the rest of the
+    // endpoint could still serve
     console.error("agents request limit unavailable", err);
     return null;
   }
