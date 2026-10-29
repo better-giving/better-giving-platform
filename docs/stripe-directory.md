@@ -1,7 +1,7 @@
 # Stripe Directory listing
 
 What a Stripe Directory listing for Better Giving needs, and where each field
-comes from. Nothing here is submitted automatically.
+comes from.
 
 Per [Stripe's Directory page](https://docs.stripe.com/directory) (section
 "List your company in Stripe Directory"), checked 2026-10-29, while the
@@ -12,8 +12,7 @@ feature is in preview:
 2. **Agent / MCP listing.** Register an email in that page's "Be discoverable
    and payable by agents" form; Stripe then gets in touch about the listing.
    Stripe publishes no field list for this step, so the table below is what we
-   keep ready for that conversation. Expect it to change while the feature is
-   in preview.
+   keep ready for that conversation.
 
 ## Submission fields
 

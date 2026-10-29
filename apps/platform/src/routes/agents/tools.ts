@@ -7,7 +7,7 @@ export const MCP_SERVER_INFO = {
 export const GUIDE = `# Better Giving agent donations
 
 Connect to the remote MCP server at \`https://better.giving/agents/mcp\` for
-one-time USD donations. The steps below are its agent guide.
+one-time USD donations.
 
 ## Laira skill
 

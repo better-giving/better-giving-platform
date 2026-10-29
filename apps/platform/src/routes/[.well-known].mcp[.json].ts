@@ -8,7 +8,7 @@ export const loader: LoaderFunction = ({ request }) => {
       name: MCP_SERVER_INFO.name,
       title: "Better Giving donations",
       description:
-        "Find a US nonprofit on Better Giving, quote a one-time USD donation, and hand the donor a Stripe-hosted checkout link.",
+        "Find a nonprofit on Better Giving, quote a one-time USD donation, and hand the donor a Stripe-hosted checkout link.",
       version: MCP_SERVER_INFO.version,
       protocolVersion: MCP_PROTOCOL_VERSION,
       endpoint: { url: `${origin}/agents/mcp`, transport: "streamable-http" },

@@ -20,7 +20,7 @@ Tools:
 - `donate`: open (or reopen) the Stripe-hosted checkout for an unchanged quote token and the donor's name and email
 - `donation_status`: read a donation's status and amounts, without donor details
 
-Authentication: optional. Send `Authorization: Bearer <agent token>` if Better Giving issued you one; anonymous calls are allowed.
+Authentication: optional. Send `Authorization: Bearer <agent token>` if Better Giving issued you one.
 
 Limits:
 
