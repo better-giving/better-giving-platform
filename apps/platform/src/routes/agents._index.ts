@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import type { ActionFunction, LoaderFunction } from "react-router";
+import { client_ip, limit_shared } from "#/.server/auth/rate-limit";
 import {
   AgentDonationError,
   create_quote,
@@ -17,12 +19,48 @@ function jsonrpc(id: unknown, result: unknown) {
   return Response.json({ jsonrpc: "2.0", id, result });
 }
 
-function rpc_error(id: unknown, code: number, message: string, data?: unknown) {
-  return Response.json({
-    jsonrpc: "2.0",
-    id,
-    error: { code, message, ...(data === undefined ? {} : { data }) },
-  });
+function rpc_error(
+  id: unknown,
+  code: number,
+  message: string,
+  data?: unknown,
+  init?: ResponseInit
+) {
+  return Response.json(
+    {
+      jsonrpc: "2.0",
+      id,
+      error: { code, message, ...(data === undefined ? {} : { data }) },
+    },
+    init
+  );
+}
+
+const REQUEST_QUOTA = { max: 60, window_s: 60 };
+
+/** per client address, whatever bearer it sends: the bearer is shared by
+ * every agent holding it, so it can't tell one caller from another */
+async function rate_limited(request: Request): Promise<Response | null> {
+  const ip = client_ip(request.headers) ?? "unknown";
+  const key = `agents-mcp:ip:${createHash("sha256").update(ip).digest("hex")}`;
+  let limit: Awaited<ReturnType<typeof limit_shared>>;
+  try {
+    limit = await limit_shared(key, REQUEST_QUOTA);
+  } catch (err) {
+    // fail open: lookups and checkouts keep their own caps, and a db outage
+    // shouldn't take the whole endpoint down with it
+    console.error("agents request limit unavailable", err);
+    return null;
+  }
+  if (limit.ok) return null;
+  const s = limit.retry_after_s;
+  return rpc_error(
+    null,
+    -32029,
+    `Rate limited: too many requests. Retry after ${s} seconds.`,
+    { retry_after_s: s },
+    { status: 429, headers: { "retry-after": String(s) } }
+  );
 }
 
 async function call_tool(name: string, args: unknown, request: Request) {
@@ -52,6 +90,8 @@ export const action: ActionFunction = async ({ request }) => {
   if (request.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
+  const refused = await rate_limited(request);
+  if (refused) return refused;
 
   let body: any;
   try {

@@ -23,6 +23,8 @@ one-time USD donations.
 
 Send \`Authorization: Bearer\` with the agent token when you have one. The hourly cap is per token, and otherwise per trusted client address.
 
+Requests are limited per client address; a refused one returns HTTP 429 with \`Retry-After\` in seconds.
+
 Repeated \`donate\` calls with the same quote token and an open Checkout return that Checkout and do not create another charge. Quote tokens are signed: send them back unchanged.
 `;
 
