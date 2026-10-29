@@ -1249,15 +1249,7 @@ describe("campaign page structured data", () => {
           potentialAction: {
             "@type": "DonateAction",
             recipient: { "@id": `${org_url}#org` },
-            target: [
-              { "@type": "EntryPoint", urlTemplate: page },
-              {
-                "@type": "EntryPoint",
-                name: "Better Giving donation MCP server",
-                urlTemplate: `${base_url}/agents/mcp`,
-                encodingType: "application/json",
-              },
-            ],
+            target: [{ "@type": "EntryPoint", urlTemplate: page }],
           },
         },
         subjectOf: [
