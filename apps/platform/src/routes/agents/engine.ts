@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { href } from "react-router";
 import * as v from "valibot";
-import { client_ip, reserve } from "#/.server/auth/rate-limit";
+import { client_ip, reserve_shared } from "#/.server/auth/rate-limit";
 import { to_fn } from "#/.server/donation-recipient";
 import { stripe_amounts } from "#/components/donation/common/amounts";
 import { report_error } from "#/errors/report";
@@ -374,8 +374,17 @@ async function allow_fetch(
   raw: string
 ): Promise<boolean> {
   if (!nonprofits_will_fetch(kind, raw)) return true;
-  const reserved =
-    reserve(`nonprofits:${caller_id(request)}`, NONPROFITS_QUOTA) !== null;
+  let reserved = false;
+  try {
+    reserved =
+      (await reserve_shared(
+        `nonprofits:${caller_id(request)}`,
+        NONPROFITS_QUOTA
+      )) !== null;
+  } catch (err) {
+    // fail closed: an uncounted lookup spends the shared nonprofits api quota
+    console.error("nonprofits lookup cap unavailable", err);
+  }
   if (!reserved) nonprofits_cancel_fetch(kind, raw);
   return reserved;
 }

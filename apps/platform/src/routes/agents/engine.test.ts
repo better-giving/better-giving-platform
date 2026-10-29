@@ -31,9 +31,25 @@ const mocks = vi.hoisted(() => ({
   descriptor: vi.fn(),
   expire: vi.fn(),
   report_error: vi.fn(),
+  reserve_shared: vi.fn(),
 }));
 
 vi.mock("$/env", () => env);
+
+// the shared store's own behavior is rate-limit-shared.test.ts's; here the
+// per-process counter stands in for it, so cap counts stay observable
+vi.mock("$/pg/db", () => ({ db: {} }));
+vi.mock("#/.server/auth/rate-limit", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("#/.server/auth/rate-limit")>();
+  mocks.reserve_shared.mockImplementation(
+    async (key: string, quota: { max: number; window_s: number }) => {
+      const r = original.reserve(key, quota);
+      return r && { release: async () => r.release() };
+    }
+  );
+  return { ...original, reserve_shared: mocks.reserve_shared };
+});
 
 vi.mock("#/.server/donation-recipient", () => ({ to_fn: mocks.to_fn }));
 vi.mock("$/pg/queries/donation", () => ({
@@ -1438,6 +1454,45 @@ describe("find_nonprofit IRS fallback", () => {
     const cached = await find_nonprofit({ query: "name 0" }, req);
     expect(cached.external_lookup).toBe("ok");
     expect(fetch).toHaveBeenCalledTimes(20);
+  });
+
+  test("a lookup the shared cap denies is skipped and its claim dropped", async () => {
+    const fetch = stub_fetch(() =>
+      http(200, { query: "denied", limit: 10, results: [] })
+    );
+    mocks.npo_name_search.mockResolvedValue(local_hits);
+    const req = caller("192.0.2.240");
+    mocks.reserve_shared.mockResolvedValueOnce(null);
+
+    const skipped = await find_nonprofit({ query: "denied" }, req);
+    expect(skipped.external_lookup).toBe("skipped");
+    expect(skipped.items).toEqual(local_hits);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.reserve_shared).toHaveBeenCalledWith(
+      expect.stringMatching(/^nonprofits:ip:[0-9a-f]{64}$/),
+      { max: 20, window_s: 600 }
+    );
+
+    // a stuck claim would serve every later identical query as in flight
+    const retried = await find_nonprofit({ query: "denied" }, req);
+    expect(retried.external_lookup).toBe("ok");
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  test("a shared cap that cannot be read skips the lookup and drops its claim", async () => {
+    const fetch = stub_fetch(() => http(200, org_detail()));
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.reserve_shared.mockRejectedValueOnce(new Error("db down"));
+
+    const skipped = await find_nonprofit({ ein: ELIGIBLE_EIN }, caller());
+    expect(skipped.external_lookup).toBe("skipped");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
+
+    const retried = await find_nonprofit({ ein: ELIGIBLE_EIN }, caller());
+    expect(retried.external_lookup).toBe("ok");
+    expect(fetch).toHaveBeenCalledOnce();
   });
 
   test("concurrent identical searches share one fetch and one quota slot", async () => {
