@@ -10,7 +10,7 @@ interface IDonateLink {
   on_click?: never;
 }
 
-/** a Donate that acts in place, such as opening the page's own dialog */
+/** a Donate that opens the page's own donation dialog */
 interface IDonateAction {
   on_click: () => void;
   to?: never;
@@ -37,7 +37,12 @@ export function DonateButton({
   const className = `btn ${fill} ${size === "lg" ? "btn-lg" : ""} ${classes}`;
   if (target.on_click) {
     return (
-      <button type="button" onClick={target.on_click} className={className}>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={target.on_click}
+        className={className}
+      >
         Donate
       </button>
     );

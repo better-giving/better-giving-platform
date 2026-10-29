@@ -19,7 +19,20 @@ export interface IHeaderSection {
   label: string;
 }
 
-interface IOrgHeader {
+/** one Donate per header: a link or a dialog's trigger, never both */
+interface IDonateLink {
+  /** a Donate link to this href, when given */
+  donate_to?: string;
+  on_donate?: never;
+}
+
+interface IDonateDialog {
+  /** a Donate button that opens the page's own donation dialog, when given */
+  on_donate?: () => void;
+  donate_to?: never;
+}
+
+type IOrgHeader = (IDonateLink | IDonateDialog) & {
   name: string;
   logo?: string | null;
   /** the org's profile */
@@ -27,11 +40,6 @@ interface IOrgHeader {
   bookmark?: INpoBookmark;
   /** a Share icon button for this target, when given */
   share?: IShareTarget;
-  /** a Donate link to this href, when given */
-  donate_to?: string;
-  /** a Donate button that runs this, for a page whose Donate acts in place;
-   * given with donate_to, donate_to wins */
-  on_donate?: () => void;
   /** Donate from lg only, for a page that carries its own below lg */
   donate_from_lg?: boolean;
   /** the hero's own Donate. given, the header's Donate waits until it is out
@@ -41,7 +49,7 @@ interface IOrgHeader {
   /** in-page links to these sections, from lg; narrower screens get none
    * here, so a page that passes them carries its own strip there */
   sections?: IHeaderSection[];
-}
+};
 
 /** a Donate that waits rises in once the hero's are gone, and sinks out as
  * one returns; `display` goes last, so the exit is seen */

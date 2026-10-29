@@ -202,7 +202,6 @@ describe("org header", () => {
               donate_after={hero}
             />
             <main className="h-[300dvh]">
-              <DonateButton on_click={() => {}} size="lg" />
               <span ref={set_hero}>hero donate</span>
             </main>
           </MemoryRouter>
@@ -216,34 +215,57 @@ describe("org header", () => {
       window.scrollTo(0, 2000);
       await expect.element(in_header).toBeVisible();
       expect(banner.getByRole("link", { name: "Donate" }).query()).toBeNull();
+      await expect
+        .element(in_header)
+        .toHaveAttribute("aria-haspopup", "dialog");
       await in_header.click();
       expect(on_donate).toHaveBeenCalledOnce();
     });
 
+    interface IHidden {
+      from_lg?: boolean;
+    }
+    /** a hero Donate with no box, so never in view */
+    function Hidden({ from_lg = false }: IHidden) {
+      const [hero, set_hero] = useState<HTMLElement | null>(null);
+      return (
+        <MemoryRouter>
+          <OrgHeader
+            name="Acme Relief"
+            to="/org/acme"
+            donate_to="/donate/7"
+            donate_from_lg={from_lg}
+            donate_after={hero}
+          />
+          <main>
+            <DonateButton to="/donate/7" ref={set_hero} classes="hidden" />
+          </main>
+        </MemoryRouter>
+      );
+    }
+
     it("counts a hero Donate with no box as away", async () => {
       await page.viewport(1280, 900);
-      function Hidden() {
-        const [hero, set_hero] = useState<HTMLElement | null>(null);
-        return (
-          <MemoryRouter>
-            <OrgHeader
-              name="Acme Relief"
-              to="/org/acme"
-              donate_to="/donate/7"
-              donate_after={hero}
-            />
-            <main>
-              <DonateButton to="/donate/7" ref={set_hero} classes="hidden" />
-            </main>
-          </MemoryRouter>
-        );
-      }
       const screen = await render(<Hidden />);
       await expect
         .element(
           screen.getByRole("banner").getByRole("link", { name: "Donate" })
         )
         .toBeVisible();
+    });
+
+    it("keeps a from-lg Donate out below lg, though the hero's is away", async () => {
+      await page.viewport(1280, 900);
+      const screen = await render(<Hidden from_lg />);
+      const in_header = screen
+        .getByRole("banner")
+        .getByRole("link", { name: "Donate" });
+      // shown at lg first, so its absence below is the width alone
+      await expect.element(in_header).toBeVisible();
+      await page.viewport(375, 800);
+      await expect.element(in_header).not.toBeInTheDocument();
+      await page.viewport(1024, 800);
+      await expect.element(in_header).toBeVisible();
     });
   });
 });
