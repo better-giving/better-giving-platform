@@ -976,3 +976,21 @@ describe("settlement create — a confirm sent twice", () => {
     expect(await dons()).toHaveLength(0);
   });
 });
+
+describe("settlement create — fees on a manual settlement", () => {
+  test("a fiscally sponsored nonprofit's cheque is charged on the net it settled", async () => {
+    await test_db
+      .current!.db.update(npos)
+      .set({ fiscal_sponsored: true, hide_bg_tip: true })
+      .where(eq(npos.id, npo_id));
+
+    const res = await settle({ from: "cheque", net: "97.50" });
+
+    expect(res).toEqual({ ok: true });
+    const [dist] = await dist_rows();
+    expect(dist!.fee_processing).toBe(0);
+    expect(dist!.fee_fsa).toBeCloseTo(97.5 * 0.029, 10);
+    expect(dist!.fee_base).toBeCloseTo(97.5 * 0.015, 10);
+    expect(dist!.net).toBeCloseTo(97.5 * (1 - 0.029 - 0.015), 10);
+  });
+});
