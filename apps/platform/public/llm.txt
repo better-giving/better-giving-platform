@@ -15,10 +15,12 @@ AI agents can give on a donor's behalf. The donor pays on a Stripe-hosted checko
 
 Tools:
 
-- `find_nonprofit`: find a nonprofit on Better Giving by name or 9-digit US EIN; only nonprofits whose name matches come back, with `match` set to `exact`, `close` (confirm with the donor) or `none`; IRS-listed charities not yet on Better Giving come back with an onboarding link instead
-- `quote_donation`: price a one-time USD gift with an optional 10%, 15%, or 20% Better Giving tip and optional card-fee coverage; returns a signed quote token
+- `find_nonprofit`: find a nonprofit on Better Giving by name or 9-digit US EIN; only nonprofits whose name matches come back, with `match` set to `exact`, `close` (confirm with the donor) or `none`; IRS-listed charities not yet on Better Giving come back with an onboarding link instead; each listed nonprofit carries its own preset amounts (`increments`)
+- `quote_donation`: price a one-time USD gift with an optional 10%, 15%, or 20% Better Giving tip and optional card-fee coverage; returns a signed quote token, and `increment_label` when the amount is one of the nonprofit's labeled increments
 - `donate`: open (or reopen) the Stripe-hosted checkout for an unchanged quote token and the donor's name and email
 - `donation_status`: read a donation's status and amounts, without donor details
+
+Donation amounts: each `increments` label is written by the nonprofit itself. Offer those amounts as the options, plus a custom amount; an increment with an empty label is offered as the amount alone. Offer generic amounts plus a custom amount only when the list is empty, and never invent what an amount achieves.
 
 Authentication: optional. Send `Authorization: Bearer <agent token>` if Better Giving issued you one.
 

@@ -947,9 +947,12 @@ const local_hits = [
     hq_country: "United States",
     tagline: null,
     active: true,
+    increments: null,
     match: "close",
   },
 ];
+/** what find_nonprofit lists for `local_hits`: none of them set increments */
+const listed_hits = local_hits.map((hit) => ({ ...hit, increments: [] }));
 
 describe("find_nonprofit IRS fallback", () => {
   afterEach(() => {
@@ -991,6 +994,7 @@ describe("find_nonprofit IRS fallback", () => {
     expect(entry).not.toHaveProperty("mission");
     expect(entry).not.toHaveProperty("finances");
     expect(entry).not.toHaveProperty("provenance");
+    expect(entry).not.toHaveProperty("increments");
     expect(JSON.stringify(result)).not.toContain(KEY);
     expect(JSON.stringify(result)).not.toContain("secret mission");
   });
@@ -1001,6 +1005,7 @@ describe("find_nonprofit IRS fallback", () => {
       name: "ACME",
       hq_country: "United States",
       registration_number: "13-1624082",
+      increments: null,
     };
     mocks.npos_by_regnums.mockResolvedValue([row]);
     const fetch = vi.fn();
@@ -1009,8 +1014,8 @@ describe("find_nonprofit IRS fallback", () => {
     const dashed = await find_nonprofit({ ein: "13-1624082" }, caller());
     const plain = await find_nonprofit({ ein: ELIGIBLE_EIN }, caller());
 
-    expect(dashed.items).toEqual([row]);
-    expect(plain.items).toEqual([row]);
+    expect(dashed.items).toEqual([{ ...row, increments: [] }]);
+    expect(plain.items).toEqual([{ ...row, increments: [] }]);
     expect(dashed.not_on_better_giving).toEqual([]);
     expect(fetch).not.toHaveBeenCalled();
     expect(mocks.npos_by_regnums).toHaveBeenCalledWith([ELIGIBLE_EIN]);
@@ -1026,6 +1031,7 @@ describe("find_nonprofit IRS fallback", () => {
       name: "Canadian Twin",
       registration_number: "111111111",
       hq_country: "Canada",
+      increments: null,
     };
     mocks.npo_name_search.mockResolvedValue([on_page, canada]);
     mocks.npos_by_regnums.mockImplementation(async (eins: string[]) =>
@@ -1074,7 +1080,10 @@ describe("find_nonprofit IRS fallback", () => {
 
     const result = await find_nonprofit({ query: "charity" }, caller());
 
-    expect(result.items).toEqual([on_page, canada]);
+    expect(result.items).toEqual([
+      { ...on_page, increments: [] },
+      { ...canada, increments: [] },
+    ]);
     expect(result).toEqual(
       expect.objectContaining({ page: 1, pages: 1, match: "close" })
     );
@@ -1136,7 +1145,7 @@ describe("find_nonprofit IRS fallback", () => {
       caller()
     );
 
-    expect(result.items).toEqual([listed]);
+    expect(result.items).toEqual([{ ...listed, increments: [] }]);
     expect(result.match).toBe("exact");
     expect(result.not_on_better_giving).toEqual([]);
   });
@@ -1162,7 +1171,7 @@ describe("find_nonprofit IRS fallback", () => {
 
       const result = await find_nonprofit({ query: "acme" }, caller());
 
-      expect(result.items).toEqual(local_hits);
+      expect(result.items).toEqual(listed_hits);
       expect(result.not_on_better_giving).toEqual([]);
       expect(result.external_lookup).toBe("unavailable");
     }
@@ -1184,7 +1193,7 @@ describe("find_nonprofit IRS fallback", () => {
       const result = await find_nonprofit({ query }, caller());
 
       expect(fetch).not.toHaveBeenCalled();
-      expect(result.items).toEqual(local_hits);
+      expect(result.items).toEqual(listed_hits);
       expect(result.not_on_better_giving).toEqual([]);
       expect(result.external_lookup).toBe("invalid_query");
     }
@@ -1199,7 +1208,7 @@ describe("find_nonprofit IRS fallback", () => {
     const result = await find_nonprofit({ query: "'a" }, caller());
 
     expect(fetch).toHaveBeenCalledOnce();
-    expect(result.items).toEqual(local_hits);
+    expect(result.items).toEqual(listed_hits);
     expect(result.external_lookup).toBe("ok");
   });
 
@@ -1211,7 +1220,7 @@ describe("find_nonprofit IRS fallback", () => {
 
       const result = await find_nonprofit({ query: "acme" }, caller());
 
-      expect(result.items).toEqual(local_hits);
+      expect(result.items).toEqual(listed_hits);
       expect(result.not_on_better_giving).toEqual([]);
       expect(result.external_lookup).toBe("invalid_query");
     }
@@ -1276,7 +1285,7 @@ describe("find_nonprofit IRS fallback", () => {
 
     const result = await find_nonprofit({ query: "acme" }, caller());
 
-    expect(result.items).toEqual(local_hits);
+    expect(result.items).toEqual(listed_hits);
     expect(result.external_lookup).toBe("unavailable");
   });
 
@@ -1289,7 +1298,7 @@ describe("find_nonprofit IRS fallback", () => {
     const first = await find_nonprofit({ query: "one" }, caller());
     const second = await find_nonprofit({ query: "two" }, caller());
 
-    expect(first.items).toEqual(local_hits);
+    expect(first.items).toEqual(listed_hits);
     expect(first.external_lookup).toBe("unavailable");
     expect(second.external_lookup).toBe("unavailable");
     expect(fetch).toHaveBeenCalledTimes(2);
@@ -1312,9 +1321,9 @@ describe("find_nonprofit IRS fallback", () => {
     const second = await find_nonprofit({ query: "other" }, caller());
 
     expect(first.external_lookup).toBe("rate_limited");
-    expect(first.items).toEqual(local_hits);
+    expect(first.items).toEqual(listed_hits);
     expect(second.external_lookup).toBe("rate_limited");
-    expect(second.items).toEqual(local_hits);
+    expect(second.items).toEqual(listed_hits);
     expect(fetch).toHaveBeenCalledOnce();
   });
 
@@ -1360,7 +1369,7 @@ describe("find_nonprofit IRS fallback", () => {
     const second = await find_nonprofit({ query: "acme" }, caller());
 
     expect(first.external_lookup).toBe("unavailable");
-    expect(first.items).toEqual(local_hits);
+    expect(first.items).toEqual(listed_hits);
     expect(second.external_lookup).toBe("unavailable");
     expect(fetch).toHaveBeenCalledTimes(2);
   });
@@ -1374,7 +1383,7 @@ describe("find_nonprofit IRS fallback", () => {
     const by_query = await find_nonprofit({ query: "acme" }, caller());
     const by_ein = await find_nonprofit({ ein: ELIGIBLE_EIN }, caller());
 
-    expect(by_query.items).toEqual(local_hits);
+    expect(by_query.items).toEqual(listed_hits);
     expect(by_query.external_lookup).toBe("disabled");
     expect(by_query.not_on_better_giving).toEqual([]);
     expect(by_ein).toMatchObject({
@@ -1431,7 +1440,7 @@ describe("find_nonprofit IRS fallback", () => {
     }
     const skipped = await find_nonprofit({ query: "name 21" }, req);
     expect(skipped.external_lookup).toBe("skipped");
-    expect(skipped.items).toEqual(local_hits);
+    expect(skipped.items).toEqual(listed_hits);
     expect(skipped.not_on_better_giving).toEqual([]);
     expect(fetch).toHaveBeenCalledTimes(20);
 
@@ -1480,7 +1489,7 @@ describe("find_nonprofit IRS fallback", () => {
     }
     const skipped = await find_nonprofit({ query: "over the cap" }, req);
     expect(skipped.external_lookup).toBe("skipped");
-    expect(skipped.items).toEqual(local_hits);
+    expect(skipped.items).toEqual(listed_hits);
     expect(fetch).toHaveBeenCalledTimes(20);
   });
 
@@ -1544,5 +1553,208 @@ describe("quote_donation refuses an EIN", () => {
     expect(mocks.to_fn).not.toHaveBeenCalled();
     expect(mocks.reserve).not.toHaveBeenCalled();
     expect(JSON.stringify(found)).not.toContain(KEY);
+  });
+});
+
+describe("nonprofit increments", () => {
+  const stored = [
+    { value: "100", label: "Plant a grove" },
+    { value: "25", label: "Feed a child" },
+    { value: "abc", label: "Not a number" },
+    { value: "0", label: "Nothing" },
+    { value: "-5", label: "Negative" },
+    { value: "", label: "Blank" },
+    { value: "10.5", label: "Buy a book" },
+  ];
+  const parsed = [
+    { amount: 10.5, label: "Buy a book" },
+    { amount: 25, label: "Feed a child" },
+    { amount: 100, label: "Plant a grove" },
+  ];
+
+  beforeEach(() => {
+    env.app.nonprofits_api_key = undefined;
+    reset_nonprofits_client();
+  });
+
+  test("a query lists each nonprofit's increments parsed, sorted, bad values dropped", async () => {
+    mocks.npo_name_search.mockResolvedValue([
+      { ...local_hits[0], increments: stored },
+    ]);
+
+    const result = await find_nonprofit({ query: "verify" }, caller());
+
+    expect(result.items[0].increments).toEqual(parsed);
+  });
+
+  test("an EIN match lists the nonprofit's increments the same way", async () => {
+    mocks.npos_by_regnums.mockResolvedValue([
+      {
+        id: 7,
+        name: "ACME",
+        hq_country: "United States",
+        registration_number: ELIGIBLE_EIN,
+        increments: stored,
+      },
+    ]);
+
+    const result = await find_nonprofit({ ein: ELIGIBLE_EIN }, caller());
+
+    expect(result.items[0].increments).toEqual(parsed);
+  });
+
+  test.each([
+    ["null", null],
+    ["empty", []],
+  ])("%s stored increments list as an empty array", async (_, increments) => {
+    mocks.npo_name_search.mockResolvedValue([{ ...local_hits[0], increments }]);
+    mocks.npos_by_regnums.mockResolvedValue([
+      {
+        id: 7,
+        name: "ACME",
+        hq_country: "United States",
+        registration_number: ELIGIBLE_EIN,
+        increments,
+      },
+    ]);
+
+    const by_query = await find_nonprofit({ query: "verify" }, caller());
+    const by_ein = await find_nonprofit({ ein: ELIGIBLE_EIN }, caller());
+
+    expect(by_query.items[0].increments).toEqual([]);
+    expect(by_ein.items[0].increments).toEqual([]);
+  });
+
+  test("results not on Better Giving carry no increments", async () => {
+    env.app.nonprofits_api_key = KEY;
+    reset_nonprofits_client();
+    stub_fetch(() =>
+      http(200, {
+        query: "off market",
+        limit: 10,
+        results: [search_org({ ein: "111111111", name: "Off Market" })],
+      })
+    );
+
+    const result = await find_nonprofit({ query: "off market" }, caller());
+
+    expect(result.not_on_better_giving).toHaveLength(1);
+    expect(result.not_on_better_giving[0]).not.toHaveProperty("increments");
+  });
+
+  test("a quote of exactly one increment carries its label", async () => {
+    mocks.npo_get.mockResolvedValue({
+      donor_address_required: false,
+      increments: stored,
+    });
+
+    expect((await quote({ amount: 25 })).increment_label).toBe("Feed a child");
+    expect((await quote({ amount: 10.5 })).increment_label).toBe("Buy a book");
+  });
+
+  test.each([
+    ["an amount between increments", stored, 26],
+    ["an amount near one", stored, 25.01],
+    ["a dropped value's amount", [{ value: "abc", label: "x" }], 10],
+    ["no increments", null, 25],
+  ])("%s quotes with a null label", async (_, increments, amount) => {
+    mocks.npo_get.mockResolvedValue({
+      donor_address_required: false,
+      increments,
+    });
+
+    expect((await quote({ amount })).increment_label).toBeNull();
+  });
+
+  test("a fund quote has no increment label", async () => {
+    mocks.to_fn.mockResolvedValue({
+      to_id: "0b5a7a8e-0000-4000-8000-000000000001",
+      to_name: "Fund",
+      to_type: "fund",
+      to_tip_allowed: true,
+      to_members: ["7"],
+    });
+    const member = {
+      id: 7,
+      donor_address_required: false,
+      increments: [{ value: "25", label: "Feed a child" }],
+    };
+    mocks.npos_batch_get.mockResolvedValue([member]);
+    mocks.npo_get.mockResolvedValue(member);
+
+    const result = await create_quote({
+      recipient_id: "0b5a7a8e-0000-4000-8000-000000000001",
+      amount: 25,
+    });
+
+    expect(result.increment_label).toBeNull();
+  });
+
+  test("a blank label lists as an empty string and quotes as null", async () => {
+    const blank = [{ value: "25", label: "  " }];
+    mocks.npo_name_search.mockResolvedValue([
+      { ...local_hits[0], increments: blank },
+    ]);
+    mocks.npo_get.mockResolvedValue({
+      donor_address_required: false,
+      increments: blank,
+    });
+
+    const found = await find_nonprofit({ query: "verify" }, caller());
+
+    expect(found.items[0].increments).toEqual([{ amount: 25, label: "" }]);
+    expect((await quote({ amount: 25 })).increment_label).toBeNull();
+  });
+
+  test("amounts quote_donation would reject are not listed", async () => {
+    mocks.npo_name_search.mockResolvedValue([
+      {
+        ...local_hits[0],
+        increments: [
+          { value: "1", label: "Below the minimum" },
+          { value: "12.345", label: "Three decimals" },
+          { value: "2", label: "The minimum" },
+        ],
+      },
+    ]);
+
+    const result = await find_nonprofit({ query: "verify" }, caller());
+
+    expect(result.items[0].increments).toEqual([
+      { amount: 2, label: "The minimum" },
+    ]);
+  });
+
+  test("a duplicated amount keeps its first stored label, listed and quoted", async () => {
+    const twice = [
+      { value: "25", label: "First" },
+      { value: "25.00", label: "Second" },
+    ];
+    mocks.npo_name_search.mockResolvedValue([
+      { ...local_hits[0], increments: twice },
+    ]);
+    mocks.npo_get.mockResolvedValue({
+      donor_address_required: false,
+      increments: twice,
+    });
+
+    const found = await find_nonprofit({ query: "verify" }, caller());
+
+    expect(found.items[0].increments).toEqual([{ amount: 25, label: "First" }]);
+    expect((await quote({ amount: 25 })).increment_label).toBe("First");
+  });
+
+  test("a quote matches a stored increment in whole cents", async () => {
+    mocks.npo_get.mockResolvedValue({
+      donor_address_required: false,
+      increments: [{ value: "25.50", label: "Half a crate" }],
+    });
+
+    expect((await quote({ amount: 25.5 })).increment_label).toBe(
+      "Half a crate"
+    );
+    expect((await quote({ amount: 25.499999999999 })).increment_label).toBe(
+      "Half a crate"
+    );
   });
 });
