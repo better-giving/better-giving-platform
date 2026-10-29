@@ -54,13 +54,15 @@ const agent_pointers = (base_url: string) => [
 const donate_action = (
   base_url: string,
   form_url: string,
-  recipient_url?: string
+  recipient_url?: string,
+  /** false when the MCP tools cannot carry this gift's target (campaigns) */
+  via_mcp = true
 ) => ({
   "@type": "DonateAction",
   recipient: recipient_url ? { "@id": org_ref(recipient_url) } : undefined,
   target: [
     { "@type": "EntryPoint", urlTemplate: form_url },
-    mcp_entry(base_url),
+    ...(via_mcp ? [mcp_entry(base_url)] : []),
   ],
 });
 
@@ -153,6 +155,8 @@ interface IProjectPage {
   donate_url: string;
   /** donating is closed: the page stays, its DonateAction goes */
   closed?: boolean;
+  /** `quote_donation` takes no campaign, so a campaign gift can't go through MCP */
+  no_mcp?: boolean;
   parent?: INgo;
   members?: INgo[];
 }
@@ -187,7 +191,7 @@ function project_page(p: IProjectPage): TNode {
       ],
       potentialAction: p.closed
         ? undefined
-        : donate_action(p.base_url, p.donate_url, p.parent?.url),
+        : donate_action(p.base_url, p.donate_url, p.parent?.url, !p.no_mcp),
     },
     subjectOf: agent_pointers(p.base_url),
   });
@@ -202,7 +206,7 @@ export interface ICampaignIn
 
 /** the donation form is on the campaign page itself */
 export const campaign_jsonld = ({ org, ...c }: ICampaignIn): TNode =>
-  project_page({ ...c, donate_url: c.url, parent: org });
+  project_page({ ...c, donate_url: c.url, parent: org, no_mcp: true });
 
 export interface IFundMemberIn {
   id: number;

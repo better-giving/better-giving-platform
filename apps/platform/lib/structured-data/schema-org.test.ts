@@ -228,12 +228,6 @@ describe("campaign_jsonld", () => {
               "@type": "EntryPoint",
               urlTemplate: "https://www.better.giving/org/acme/winter",
             },
-            {
-              "@type": "EntryPoint",
-              name: "Better Giving donation MCP server",
-              urlTemplate: "https://www.better.giving/agents/mcp",
-              encodingType: "application/json",
-            },
           ],
         },
       },

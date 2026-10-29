@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { GUIDE, MCP_PROTOCOL_VERSION, tools } from "./agents/tools";
+import { GUIDE, MCP_PROTOCOL_VERSION, MCP_URL, tools } from "./agents/tools";
 import { loader } from "./agents.skill[.md]";
 
 const get = (url: string) =>
@@ -19,13 +19,25 @@ describe("/agents/skill.md", () => {
     );
     expect(res.headers.get("cache-control")).toBe("public, max-age=300");
     const text = await res.text();
-    expect(text.startsWith(GUIDE)).toBe(true);
+    expect(
+      text.startsWith(
+        GUIDE.replaceAll(MCP_URL, "https://preview.better.giving/agents/mcp")
+      )
+    ).toBe(true);
+    expect(text).not.toContain(MCP_URL);
     for (const tool of tools) {
       expect(text).toContain(`### \`${tool.name}\``);
       expect(text).toContain(tool.description);
     }
     expect(text).toContain("https://preview.better.giving/agents/mcp");
     expect(text).toContain(MCP_PROTOCOL_VERSION);
+  });
+
+  test("on production, serves the guide unchanged", async () => {
+    const text = await (
+      await get("https://better.giving/agents/skill.md")
+    ).text();
+    expect(text.startsWith(GUIDE)).toBe(true);
   });
 
   test("lists each argument with its type and whether it is required", async () => {

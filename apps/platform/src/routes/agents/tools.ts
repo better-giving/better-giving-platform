@@ -4,9 +4,12 @@ export const MCP_SERVER_INFO = {
   version: "1.0.0",
 } as const;
 
+/** the production MCP endpoint the guide names */
+export const MCP_URL = "https://better.giving/agents/mcp";
+
 export const GUIDE = `# Better Giving agent donations
 
-Connect to the remote MCP server at \`https://better.giving/agents/mcp\` for
+Connect to the remote MCP server at \`${MCP_URL}\` for
 one-time USD donations.
 
 ## Laira skill

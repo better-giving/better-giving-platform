@@ -1,5 +1,5 @@
 import type { LoaderFunction } from "react-router";
-import { GUIDE, MCP_PROTOCOL_VERSION, tools } from "./agents/tools";
+import { GUIDE, MCP_PROTOCOL_VERSION, MCP_URL, tools } from "./agents/tools";
 
 interface ISchema {
   type?: string;
@@ -54,7 +54,9 @@ function tool_section(tool: (typeof tools)[number]): string {
 
 export const loader: LoaderFunction = ({ request }) => {
   const { origin } = new URL(request.url);
-  const body = `${GUIDE}
+  const mcp_url = `${origin}/agents/mcp`;
+  // one server throughout: a preview host names its own endpoint, not production's
+  const body = `${GUIDE.replaceAll(MCP_URL, mcp_url)}
 ## Tools
 
 ${tools.map(tool_section).join("\n\n")}
@@ -62,7 +64,7 @@ ${tools.map(tool_section).join("\n\n")}
 ## Endpoint
 
 JSON-RPC 2.0 over HTTP POST (MCP Streamable HTTP, JSON responses) at
-\`${origin}/agents/mcp\`. \`initialize\` returns protocol version
+\`${mcp_url}\`. \`initialize\` returns protocol version
 \`${MCP_PROTOCOL_VERSION}\`; then call \`tools/list\` and \`tools/call\`.
 `;
   return new Response(body, {
