@@ -2,7 +2,7 @@
 
 > Nonprofit fundraising and fund management platform — by a nonprofit, for nonprofits. Accept donations via card, crypto, stocks, DAF, and more. Grow funds with savings and investment options. Free for nonprofits.
 
-Better Giving is a 501(c)(3) public charity (EIN 87-3758939) that provides free donation processing, embeddable fundraising forms, fund management (high-yield savings and investment portfolio), and fiscal sponsorship for international NGOs. 195+ countries, 100+ cryptocurrencies, zero platform fees.
+Better Giving is a 501(c)(3) public charity (EIN 87-3758939) that provides free donation processing, embeddable fundraising forms, fund management (high-yield savings and investment portfolio), and fiscal sponsorship for international NGOs. 195+ countries, 100+ cryptocurrencies. No platform fee while donors can add an optional contribution; 1.5% when a nonprofit turns that off.
 
 ## Agent donations (MCP)
 
