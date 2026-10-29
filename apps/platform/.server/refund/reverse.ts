@@ -156,7 +156,8 @@ export interface RoutedRefunds {
   of: number;
   /** its live refunds, sent or not */
   refunds: NonNullable<ChargeReversal["refunds"]>;
-  /** of them, the ones not yet sent: while any is, nothing is reversed */
+  /** of them, the ones not yet sent, which any can still fail: left out of
+   * the cuts until an event sees each sent */
   unsent: string[];
 }
 
@@ -330,9 +331,9 @@ export async function reverse_charge(
     }
   }
   // ahead of the gift's reversal, whose redelivery stops at the guard above,
-  // so a transfer reversal that throws here is retried with the event. it
-  // holds on an unsent refund itself. a lost dispute's close handler reverses
-  // its cut before calling this, so it isn't asked twice
+  // so a transfer reversal that throws here is retried with the event. an
+  // unsent refund is left out of its cuts. a lost dispute's close handler
+  // reverses its cut before calling this, so it isn't asked twice
   const routed_refunds = rail_adapters[r.rail].routed_refunds;
   if (routed_refunds && r.source !== "dispute" && r.refunds && r.share) {
     await routed_refunds(don.id, {

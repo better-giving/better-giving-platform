@@ -8,6 +8,7 @@ import {
   it,
   vi,
 } from "vitest";
+import type { DbOrTx } from "$/pg/queries/helpers";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 // the webhook route with its real refund and dispute handlers over pglite, on
@@ -73,6 +74,7 @@ const { transfer_routed_dist } = await import("$/stripe-connect/transfer");
 const { dists } = await import("$/pg/schema/dist");
 const { eq } = await import("drizzle-orm");
 const { owed_for_donation } = await import("$/pg/queries/owed");
+const { owe_takes } = await import("$/refund/takes");
 const { donations } = await import("$/pg/schema/donation");
 const { owed_amounts } = await import("$/pg/schema/owed");
 const {
@@ -186,6 +188,24 @@ const fail = (id: string) => {
         currency: "usd",
         failure_reason: "expired_or_canceled_card",
       },
+    },
+  };
+};
+
+/** the bank settles refund `id` as `status`; returns stripe's refund.updated */
+const settle = (id: string, status: string) => {
+  const r = refunds.find((x) => x.id === id);
+  if (!r) throw new Error(`no refund ${id}`);
+  const previous = r.status;
+  r.status = status;
+  clock += 60;
+  return {
+    id: `evt_${++event_n}`,
+    type: "refund.updated",
+    created: clock,
+    data: {
+      object: { ...r, charge: charge_now().id, currency: "usd" },
+      previous_attributes: { status: previous },
     },
   };
 };
@@ -796,6 +816,51 @@ describe("a dispute on a routed gift already transferred", () => {
     ]);
   });
 
+  // stripe fails a refund still pending once the charge is disputed, yet a
+  // bank refund may settle either way after the loss
+  describe("lost while a bank refund is pending", () => {
+    const lost_with_pending_refund = async () => {
+      charge_of = await seed_card_gift(db(), ROUTED);
+      const tr = paid_by_transfer(charge_of);
+      await deliver(refund(2_000, "pending"));
+      await deliver(opened(4_000));
+      const lost = closed("lost", 4_000);
+      expect((await deliver(lost)).status).toBe(200);
+      return { tr, lost };
+    };
+
+    it("reverses the dispute's cut at once, and the refund's once it succeeds, each once", async () => {
+      const { tr, lost } = await lost_with_pending_refund();
+      const at_loss = answered_of(tr);
+
+      const sent = settle("re_1", "succeeded");
+      expect((await deliver(sent)).status).toBe(200);
+      answered.clear();
+      await deliver(lost);
+      await deliver(sent);
+
+      expect(at_loss).toEqual([{ amount: 3_600, for: `du_${charge_of.id}` }]);
+      expect(answered_of(tr)).toEqual([
+        { amount: 3_600, for: `du_${charge_of.id}` },
+        { amount: 1_800, for: "re_1" },
+      ]);
+      expect(await status_of(charge_of.id)).toBe("settled");
+    });
+
+    it("reverses the dispute's cut at once and nothing for the refund when it fails", async () => {
+      const { tr, lost } = await lost_with_pending_refund();
+      const at_loss = answered_of(tr);
+
+      await deliver(settle("re_1", "failed"));
+      await deliver(fail("re_1"));
+      answered.clear();
+      await deliver(lost);
+
+      expect(at_loss).toEqual([{ amount: 3_600, for: `du_${charge_of.id}` }]);
+      expect(answered_of(tr)).toEqual(at_loss);
+    });
+  });
+
   it("tells ops to re-pay by hand what a partial loss reversed when the dispute is then won", async () => {
     charge_of = await seed_card_gift(db(), ROUTED);
     const tr = paid_by_transfer(charge_of);
@@ -870,6 +935,61 @@ describe("a dispute on a routed gift before its transfer ran", () => {
     await transfer_routed_dist(transfers_enqueued()[0], RETRY);
 
     expect(transfers.create).toHaveBeenCalledOnce();
+  });
+
+  // the loss's reverse_charge ran while the dist was routed, so it recorded
+  // no share owed: the rebook is what takes the lost cut
+  it("a partial loss whose released transfer stripe refuses books the share less the lost cut, owing none of it", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const job = await awaiting_transfer(charge_of);
+    await deliver(opened(4_000));
+    await transfer_routed_dist(job, RETRY);
+    await deliver(closed("lost", 4_000));
+    const [released] = transfers_enqueued();
+    transfers.create.mockRejectedValueOnce(
+      new Stripe.errors.StripePermissionError({
+        message: "The provided key does not have access to account",
+      })
+    );
+
+    await transfer_routed_dist(released, RETRY);
+    // the gift's next event brings every party's row up to what it owes
+    await (db() as unknown as DbOrTx).transaction((tx) =>
+      owe_takes(tx, charge_of.id, new Date().toISOString())
+    );
+
+    expect(transfers.create).toHaveBeenCalledOnce();
+    expect(await balance_of(db(), charge_of.npo_ids[0]!)).toBe(54);
+    expect(await owed_of(charge_of.id)).toMatchObject([
+      { received_usd: 0, fee_processing_usd: 0, fee_dispute_usd: 15 },
+    ]);
+    expect(notice_text()).toContain(
+      "booked less 36 usd, its share of the charge's lost disputes, which the transfer would have reversed."
+    );
+  });
+
+  it("a refund the refused rebook cut that then fails leaves the npo short only that refund's cut", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const job = await awaiting_transfer(charge_of);
+    await deliver(refund(2_000));
+    await deliver(opened(4_000));
+    await transfer_routed_dist(job, RETRY);
+    await deliver(closed("lost", 4_000));
+    const [released] = transfers_enqueued();
+    transfers.create.mockRejectedValueOnce(
+      new Stripe.errors.StripePermissionError({
+        message: "The provided key does not have access to account",
+      })
+    );
+    await transfer_routed_dist(released, RETRY);
+
+    await deliver(fail("re_1"));
+
+    expect(await balance_of(db(), charge_of.npo_ids[0]!)).toBe(36);
+    expect(notice_text()).toContain(
+      "booked less 54 usd, 18 usd for the charge's refunds and 36 usd for its lost disputes, which the transfer would have reversed."
+    );
+    expect(failed_alert()).toContain("the npo is short $18.00; pay it by hand");
   });
 
   it("sends nothing on a full loss, the npo owing its dispute fee only", async () => {

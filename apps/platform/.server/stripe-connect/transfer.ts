@@ -14,14 +14,15 @@ import {
   npo_donation_get,
 } from "../pg/queries/dist";
 import { donation_status_shared } from "../pg/queries/donation";
-import {
-  type ChargeRefunds,
-  charge_refunds,
-  refund_take,
-} from "../refund/unsent";
+import { charge_refunds, refund_take } from "../refund/unsent";
 import { settle_unrouted, type TUnrouted } from "../settlement/settle-npo";
 import { is_refusal } from "./refusal";
-import { reverse_routed_refunds } from "./reverse";
+import {
+  type ITakeBack,
+  lost_disputes,
+  reverse_routed_refunds,
+  take_cuts,
+} from "./reverse";
 
 /** pay a routed dist's net to the connected account settlement routed it to */
 export async function transfer_routed_dist(
@@ -44,7 +45,9 @@ export async function transfer_routed_dist(
   if (!dist || dist.stripe_transfer_id) return;
   // a refusal rebooked it pooled; this delivery may be the retry of one whose
   // notice never went
-  if (!dist.stripe_routed_to) return enqueue(refused_notice(p, "taken", 0));
+  if (!dist.stripe_routed_to) {
+    return enqueue(refused_notice(p, "taken", NO_CUT));
+  }
   const npo_id = dist.to_id;
   if (npo_id === null) throw new Error(`dist ${p.dist_id} has no npo`);
   const routed: IRefusedDist = {
@@ -125,8 +128,9 @@ interface IRefusedDist {
 }
 
 /** stripe refused the dist's transfer: it is booked pooled, less what the
- * charge's sent refunds would have reversed from the transfer. `charge`
- * absent: refused reading the intent, so no charge to have refunds */
+ * charge's sent refunds and lost disputes would have reversed from the
+ * transfer. `charge` absent: refused reading the intent, so no charge to
+ * have taken any back */
 async function settle_refused(
   p: IConnectTransferPayload,
   dist: IRefusedDist,
@@ -142,9 +146,7 @@ async function settle_refused(
       stripe_code: e.code,
     }
   );
-  const cut = charge
-    ? refunds_cut(dist.net, await charge_refunds(charge))
-    : NO_CUT;
+  const cut = charge ? await rebook_cut(dist.net, charge) : NO_CUT;
   const r = await db.transaction((tx) =>
     settle_unrouted(tx, {
       id: dist.id,
@@ -157,37 +159,60 @@ async function settle_refused(
     })
   );
   const msgs = r.status === "booked" ? r.msgs : [];
-  return enqueue(refused_notice(p, r.status, cut.usd), ...msgs);
+  return enqueue(refused_notice(p, r.status, cut), ...msgs);
 }
 
-const NO_CUT = { usd: 0, share: null };
+interface IRebookCut {
+  /** usd off the routed net */
+  usd: number;
+  /** of the charge, null when none */
+  share: number | null;
+  /** the usd the refunds and the lost disputes each cut */
+  refunds: number;
+  disputes: number;
+}
+
+const NO_CUT: IRebookCut = { usd: 0, share: null, refunds: 0, disputes: 0 };
 
 /**
- * what the charge's sent refunds take off a routed `net`: their share of the
- * charge (null when none), and in usd the cents their cut
- * of its transfer would have been (`take_cuts` in `./reverse` cuts the same
- * total), all of it once they take the whole charge. not an unsent one: it
- * can still fail, and a dist booked pooled has no transfer to give its cut
- * back from, so it is taken back the way a pooled share's refund is
+ * what the charge's sent refunds and lost disputes take off a routed `net`:
+ * their share of the charge, and in usd the cents their cuts of its transfer
+ * would have been (`take_cuts`), all of it once they take the whole charge.
+ * not an unsent refund: it can still fail, and a dist booked pooled has no
+ * transfer to give its cut back from, so it is taken back the way a pooled
+ * share's refund is
  */
-const refunds_cut = (
-  net: number,
-  { of, sent }: Pick<ChargeRefunds, "of" | "sent">
-): { usd: number; share: number | null } => {
+async function rebook_cut(net: number, charge: string): Promise<IRebookCut> {
+  const [{ of, sent }, lost] = await Promise.all([
+    charge_refunds(charge),
+    lost_disputes(charge),
+  ]);
+  const takes: ITakeBack[] = [
+    ...sent.map((r) => ({ kind: "refund" as const, ...refund_take(r) })),
+    ...lost,
+  ];
   const taken = Math.min(
-    sent.reduce((sum, r) => sum + r.amount, 0),
+    takes.reduce((sum, t) => sum + t.amount, 0),
     of
   );
   if (taken === 0) return NO_CUT;
-  const share = taken / of;
-  if (taken === of) return { usd: net, share };
-  return { usd: Math.round((payout_cents([net]) * taken) / of) / 100, share };
-};
+  const cuts = take_cuts(payout_cents([net]), of, takes);
+  const cents_of = (kind?: ITakeBack["kind"]) =>
+    cuts
+      .filter((c) => !kind || c.kind === kind)
+      .reduce((sum, c) => sum + c.amount, 0);
+  return {
+    usd: taken === of ? net : cents_of() / 100,
+    share: taken / of,
+    refunds: cents_of("refund") / 100,
+    disputes: cents_of("dispute") / 100,
+  };
+}
 
 const refused_notice = (
   p: IConnectTransferPayload,
   outcome: TUnrouted["status"],
-  cut: number
+  cut: IRebookCut
 ) =>
   msg("fiat-notice", {
     id: `connect-refused_${p.dist_id}`,
@@ -206,15 +231,19 @@ const refused_notice = (
           taken:
             "stripe refused the transfer to the nonprofit's connected account and the share is no longer routed: see this dist's balance and payout rows for what was booked.",
         }[outcome],
-        ...(outcome === "booked" && cut > 0
-          ? [
-              `booked less ${cut} usd, its share of the charge's refunds, which the transfer would have reversed.`,
-            ]
-          : []),
+        ...(outcome === "booked" && cut.usd > 0 ? [cut_line(cut)] : []),
         "check the nonprofit's stripe connection; later card gifts keep routing to it until it reads disconnected or not ready.",
       ].join("\n"),
     },
   });
+
+const cut_line = ({ usd, refunds, disputes }: IRebookCut) => {
+  const of =
+    refunds > 0 && disputes > 0
+      ? `${refunds} usd for the charge's refunds and ${disputes} usd for its lost disputes`
+      : `its share of the charge's ${disputes > 0 ? "lost disputes" : "refunds"}`;
+  return `booked less ${usd} usd, ${of}, which the transfer would have reversed.`;
+};
 
 const unanswered_notice = (p: IConnectTransferPayload) =>
   msg("fiat-notice", {

@@ -315,17 +315,16 @@ const cash_recovered = (d: LockedDist) =>
 
 /**
  * what the npo of a dist rebooked pooled after a refused transfer is short
- * once the gift's takes fall below the refunds that rebook cut off its net:
- * the cut stays off the booking, and nothing on record gives it back. the
- * takes counted are the ones `owed_targets` takes the cut off, all of them
- * once its grant went out, else the refunds
+ * once the gift's takes fall below the refunds and lost disputes that rebook
+ * cut off its net: the cut stays off the booking, and nothing on record gives
+ * it back. every take counts, as `owed_targets` takes the cut off them all
  */
 function cut_short(d: LockedDist, after: ITake[]): string | null {
   const cut = d.refunds_cut_share;
   if (!cut) return null;
-  const taken = grant_went_out(d) ? taken_of(after) : taken_of(after, "refund");
+  const taken = taken_of(after);
   if (taken >= cut) return null;
-  const what = `its pooled rebook after stripe refused its transfer booked its net less ${humanize(cut * 100)}% of the charge, its refunds sent by then, and with this refund failed the gift's refunds take less than that`;
+  const what = `its pooled rebook after stripe refused its transfer booked its net less ${humanize(cut * 100)}% of the charge, its refunds sent and disputes lost by then, and with this refund failed the gift's refunds and disputes take less than that`;
   // a cut of the whole charge booked nothing, so no net is left to size it by
   if (cut >= 1) {
     return `${what}: the npo is short its whole routed share; pay it by hand`;

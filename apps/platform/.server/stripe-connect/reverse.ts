@@ -17,7 +17,7 @@ interface IRoutedTransfer {
 }
 
 /** what took part of the charge back from us: a refund, or a dispute lost */
-interface ITakeBack {
+export interface ITakeBack {
   kind: "refund" | "dispute";
   id: string;
   /** in the charge's unit */
@@ -33,26 +33,38 @@ interface ICut {
 }
 
 /**
- * each take-back's cut of the transfer, in proportion to its part of the
- * charge, to the nearest cent. cut off the running total, oldest first, so
- * the cuts sum to what they take together and a charge taken back whole
- * reverses the whole transfer; ties on time break on the id, so every run
- * cuts alike
+ * each unanswered take-back's cut of the transfer, in proportion to its part
+ * of the charge, to the nearest cent. `answered` holds what earlier runs cut
+ * for the others (reversed, or refused and marked), which count first, so a
+ * take-back answered out of time order shifts no cent; the rest are cut off
+ * the running total, oldest first, so all the cuts sum to what the takes take
+ * together and a charge taken back whole reverses the whole transfer. ties on
+ * time break on the id, so every run cuts alike
  */
-function take_cuts(transferred: number, of: number, takes: ITakeBack[]) {
+export function take_cuts(
+  transferred: number,
+  of: number,
+  takes: ITakeBack[],
+  answered: ReadonlyMap<string, number> = new Map()
+) {
   const oldest_first = [...takes].sort(
     (a, b) =>
       (a.created_at ?? "").localeCompare(b.created_at ?? "") ||
       a.id.localeCompare(b.id)
   );
+  const done = oldest_first.filter((t) => answered.has(t.id));
+  let taken = Math.min(
+    done.reduce((sum, t) => sum + t.amount, 0),
+    of
+  );
+  let cut_so_far = done.reduce((sum, t) => sum + answered.get(t.id)!, 0);
   const cuts: ICut[] = [];
-  let taken = 0;
-  let cut_so_far = 0;
-  for (const t of oldest_first) {
+  for (const t of oldest_first.filter((t) => !answered.has(t.id))) {
     taken = Math.min(taken + t.amount, of);
     const due = Math.round((transferred * taken) / of);
-    cuts.push({ kind: t.kind, id: t.id, amount: due - cut_so_far });
-    cut_so_far = due;
+    const amount = Math.max(due - cut_so_far, 0);
+    cuts.push({ kind: t.kind, id: t.id, amount });
+    cut_so_far += amount;
   }
   return cuts;
 }
@@ -73,7 +85,7 @@ const shortfalls = (metadata: Record<string, string> | null) =>
 const ANSWERS = { refund: "refund_id", dispute: "dispute_id" } as const;
 
 /** the charge's disputes stripe decided against us, each taking its amount */
-async function lost_disputes(charge: string): Promise<ITakeBack[]> {
+export async function lost_disputes(charge: string): Promise<ITakeBack[]> {
   const { data } = await stripe.disputes.list({ charge, limit: 100 });
   return data
     .filter((d) => d.status === "lost")
@@ -98,9 +110,6 @@ export async function reverse_routed_refunds(
   donation_id: string,
   c: RoutedRefunds
 ): Promise<string[]> {
-  // the refund event that sees the last one sent reverses them all, the lost
-  // disputes' cuts with them
-  if (c.unsent.length > 0) return [];
   const lost = new Map<string, Promise<ITakeBack[]>>();
   const lost_of = (charge: string) => {
     if (!lost.has(charge)) lost.set(charge, lost_disputes(charge));
@@ -152,8 +161,12 @@ async function reverse_taken_share(
     typeof tr.source_transaction === "string"
       ? tr.source_transaction
       : tr.source_transaction?.id;
+  // an unsent refund can still fail: its own event cuts it once sent
+  const unsent = new Set(c.unsent);
   const takes: ITakeBack[] = [
-    ...c.refunds.map((r) => ({ kind: "refund" as const, ...r })),
+    ...c.refunds
+      .filter((r) => !unsent.has(r.id))
+      .map((r) => ({ kind: "refund" as const, ...r })),
     ...(charge ? await lost_of(charge) : []),
   ];
   if (takes.length === 0) return [];
@@ -162,19 +175,17 @@ async function reverse_taken_share(
     { limit: 100 }
   );
   const short = shortfalls(tr.metadata);
-  const answered = new Set([
-    ...reversals.flatMap((r) => [
-      r.metadata?.refund_id,
-      r.metadata?.dispute_id,
-    ]),
-    ...short.keys(),
-  ]);
+  // what earlier runs cut for each take-back: reversed, or refused and marked
+  const answered = new Map(short);
+  for (const r of reversals) {
+    const id = r.metadata?.refund_id ?? r.metadata?.dispute_id;
+    if (id) answered.set(id, (answered.get(id) ?? 0) + r.amount);
+  }
   let left = tr.amount - tr.amount_reversed;
   const at = `dist ${t.dist_id} to ${t.npo_name || "its npo"} (npo ${t.npo_id})`;
   const lines: string[] = [];
 
-  for (const cut of take_cuts(tr.amount, c.of, takes)) {
-    if (answered.has(cut.id)) continue;
+  for (const cut of take_cuts(tr.amount, c.of, takes, answered)) {
     // a reversal made by hand already took part of it back
     const amount = Math.min(cut.amount, left);
     if (amount <= 0) continue;
