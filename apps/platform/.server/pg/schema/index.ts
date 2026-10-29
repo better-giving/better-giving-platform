@@ -17,6 +17,7 @@ export * from "./npo";
 export * from "./owed";
 export * from "./payout";
 export * from "./program";
+export * from "./rate-limit";
 export * from "./referrer";
 export * from "./registration";
 export * from "./revenue";
