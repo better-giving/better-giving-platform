@@ -1674,7 +1674,13 @@ describe("nonprofit increments", () => {
       to_tip_allowed: true,
       to_members: ["7"],
     });
-    mocks.npos_batch_get.mockResolvedValue([{ donor_address_required: false }]);
+    const member = {
+      id: 7,
+      donor_address_required: false,
+      increments: [{ value: "25", label: "Feed a child" }],
+    };
+    mocks.npos_batch_get.mockResolvedValue([member]);
+    mocks.npo_get.mockResolvedValue(member);
 
     const result = await create_quote({
       recipient_id: "0b5a7a8e-0000-4000-8000-000000000001",
@@ -1682,5 +1688,73 @@ describe("nonprofit increments", () => {
     });
 
     expect(result.increment_label).toBeNull();
+  });
+
+  test("a blank label lists as an empty string and quotes as null", async () => {
+    const blank = [{ value: "25", label: "  " }];
+    mocks.npo_name_search.mockResolvedValue([
+      { ...local_hits[0], increments: blank },
+    ]);
+    mocks.npo_get.mockResolvedValue({
+      donor_address_required: false,
+      increments: blank,
+    });
+
+    const found = await find_nonprofit({ query: "verify" }, caller());
+
+    expect(found.items[0].increments).toEqual([{ amount: 25, label: "" }]);
+    expect((await quote({ amount: 25 })).increment_label).toBeNull();
+  });
+
+  test("amounts quote_donation would reject are not listed", async () => {
+    mocks.npo_name_search.mockResolvedValue([
+      {
+        ...local_hits[0],
+        increments: [
+          { value: "1", label: "Below the minimum" },
+          { value: "12.345", label: "Three decimals" },
+          { value: "2", label: "The minimum" },
+        ],
+      },
+    ]);
+
+    const result = await find_nonprofit({ query: "verify" }, caller());
+
+    expect(result.items[0].increments).toEqual([
+      { amount: 2, label: "The minimum" },
+    ]);
+  });
+
+  test("a duplicated amount keeps its first stored label, listed and quoted", async () => {
+    const twice = [
+      { value: "25", label: "First" },
+      { value: "25.00", label: "Second" },
+    ];
+    mocks.npo_name_search.mockResolvedValue([
+      { ...local_hits[0], increments: twice },
+    ]);
+    mocks.npo_get.mockResolvedValue({
+      donor_address_required: false,
+      increments: twice,
+    });
+
+    const found = await find_nonprofit({ query: "verify" }, caller());
+
+    expect(found.items[0].increments).toEqual([{ amount: 25, label: "First" }]);
+    expect((await quote({ amount: 25 })).increment_label).toBe("First");
+  });
+
+  test("a quote matches a stored increment in whole cents", async () => {
+    mocks.npo_get.mockResolvedValue({
+      donor_address_required: false,
+      increments: [{ value: "25.50", label: "Half a crate" }],
+    });
+
+    expect((await quote({ amount: 25.5 })).increment_label).toBe(
+      "Half a crate"
+    );
+    expect((await quote({ amount: 25.499999999999 })).increment_label).toBe(
+      "Half a crate"
+    );
   });
 });

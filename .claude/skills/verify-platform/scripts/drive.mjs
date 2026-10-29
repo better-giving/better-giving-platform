@@ -635,7 +635,7 @@ const FLOWS = {
     },
   },
   "agents-find": {
-    desc: "MCP find_nonprofit returns the seeded nonprofit and a flagged off-marketplace EIN; quote_donation refuses that EIN",
+    desc: "MCP find_nonprofit returns the seeded nonprofit with increments [] and a flagged off-marketplace EIN without increments; quote_donation refuses that EIN",
     async run({ page, entry }) {
       const rpc = agents_rpc(page, entry);
 
@@ -673,6 +673,10 @@ const FLOWS = {
         !("id" in flagged) && !("recipient_id" in flagged),
         "flagged entry carries an id"
       );
+      expect_ok(
+        !("increments" in flagged),
+        `flagged entry carries increments ${JSON.stringify(flagged.increments)}`
+      );
       const dumped = JSON.stringify(body);
       expect_ok(!dumped.includes("990000002"), "revoked EIN was returned");
       expect_ok(
@@ -702,7 +706,7 @@ const FLOWS = {
       );
       return [
         "POST /agents/mcp find_nonprofit query → Verify Test Nonprofit in items, increments []",
-        "990000001 in not_on_better_giving, donatable false, onboarding_url ends /register, no id",
+        "990000001 in not_on_better_giving, donatable false, onboarding_url ends /register, no id, no increments key",
         "revoked EIN 990000002 absent",
         "POST /agents/mcp quote_donation 990000001 → invalid_input",
         "nonprofits stub logged /v1/search",
@@ -722,6 +726,7 @@ const FLOWS = {
       expect_ok(npo, "items missing Verify Campaign Nonprofit");
       const want = [
         { amount: 25, label: "Fixture: feed a child" },
+        { amount: 50, label: "" },
         { amount: 100, label: "Fixture: plant a grove" },
       ];
       expect_ok(
@@ -741,20 +746,27 @@ const FLOWS = {
         );
         return body.increment_label;
       };
-      const on_increment = await label_of(2, 25);
-      expect_ok(
-        on_increment === "Fixture: feed a child",
-        `quote 25 increment_label ${JSON.stringify(on_increment)}`
-      );
-      const off_increment = await label_of(3, 30);
-      expect_ok(
-        off_increment === null,
-        `quote 30 increment_label ${JSON.stringify(off_increment)}`
-      );
+      // 100 is the largest and stored first; 50 matches a blank label.
+      const expected_labels = [
+        [25, "Fixture: feed a child"],
+        [100, "Fixture: plant a grove"],
+        [50, null],
+        [30, null],
+      ];
+      const observed = [];
+      for (const [i, [amount, want_label]] of expected_labels.entries()) {
+        const label = await label_of(i + 2, amount);
+        expect_ok(
+          label === want_label,
+          `quote ${amount} increment_label ${JSON.stringify(label)}`
+        );
+        observed.push(
+          `POST /agents/mcp quote_donation ${amount} → increment_label ${label ?? "null"}`
+        );
+      }
       return [
-        "POST /agents/mcp find_nonprofit Verify Campaign Nonprofit → increments 25, 100 (stored 100, 25, abc)",
-        "POST /agents/mcp quote_donation 25 → increment_label Fixture: feed a child",
-        "POST /agents/mcp quote_donation 30 → increment_label null",
+        'POST /agents/mcp find_nonprofit Verify Campaign Nonprofit → increments 25 "Fixture: feed a child", 50 "", 100 "Fixture: plant a grove" (stored 100, 25, abc, 0, 1, 50)',
+        ...observed,
       ];
     },
   },

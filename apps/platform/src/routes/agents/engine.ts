@@ -54,16 +54,17 @@ const to_id = v.union([
   v.pipe(v.number(), v.integer(), v.minValue(1)),
   v.pipe(v.string(), v.uuid()),
 ]);
+const amount_input = v.pipe(
+  v.number(),
+  v.minValue(MIN_DONATION_USD),
+  v.check(
+    (amount) => Math.abs(amount * 100 - Math.round(amount * 100)) < 1e-8,
+    "amount must use at most two decimal places"
+  )
+);
 const quote_input = v.strictObject({
   recipient_id: to_id,
-  amount: v.pipe(
-    v.number(),
-    v.minValue(MIN_DONATION_USD),
-    v.check(
-      (amount) => Math.abs(amount * 100 - Math.round(amount * 100)) < 1e-8,
-      "amount must use at most two decimal places"
-    )
-  ),
+  amount: amount_input,
   tip_percent: v.optional(tip_percent, "none"),
   cover_processing_fee: v.optional(v.boolean(), false),
   program_id: v.optional(v.pipe(v.string(), v.uuid())),
@@ -141,7 +142,8 @@ export interface IAgentQuote {
   amount: IDonation["amount"] & { total: number };
   breakdown: IQuoteBreakdown;
   program?: IProgram;
-  /** the nonprofit's own label for this exact amount, when it is one of its increments */
+  /** the nonprofit's own label for this exact amount, when it is one of its
+   * increments and the label isn't blank */
   increment_label: string | null;
 }
 
@@ -304,14 +306,20 @@ async function quote_breakdown(
   };
 }
 
-/** smallest first; a stored value that isn't a positive number is dropped */
+/** smallest first, one per amount (the first stored); a value `quote_donation`
+ * would reject is dropped, so every listed amount can be quoted */
 function agent_increments(
   stored: readonly IIncrement[] | null | undefined
 ): IAgentIncrement[] {
-  return (stored ?? [])
-    .map((x) => ({ amount: Number(x?.value), label: x?.label ?? "" }))
-    .filter((x) => Number.isFinite(x.amount) && x.amount > 0)
-    .sort((a, b) => a.amount - b.amount);
+  const by_cents = new Map<number, IAgentIncrement>();
+  for (const x of stored ?? []) {
+    const amount = Number(x?.value);
+    if (!v.is(amount_input, amount)) continue;
+    const cents = to_units(amount, 2);
+    if (by_cents.has(cents)) continue;
+    by_cents.set(cents, { amount: cents / 100, label: x.label?.trim() ?? "" });
+  }
+  return [...by_cents.values()].sort((a, b) => a.amount - b.amount);
 }
 
 function with_increments<T extends { increments: IIncrement[] | null }>({
@@ -325,9 +333,11 @@ function increment_label(
   stored: readonly IIncrement[] | null | undefined,
   amount: number
 ): string | null {
-  return (
-    agent_increments(stored).find((x) => x.amount === amount)?.label ?? null
+  const cents = to_units(amount, 2);
+  const match = agent_increments(stored).find(
+    (x) => to_units(x.amount, 2) === cents
   );
+  return match?.label || null;
 }
 
 const EIN_DIGITS = 9;
@@ -534,7 +544,8 @@ async function find_by_query(query: string, request: Request) {
   }
 }
 
-/** the recipient's npo row, when it is one */
+/** the recipient's npo row; undefined for a recipient that isn't a nonprofit or
+ * a missing row. throws when the nonprofit requires a donor address */
 async function assert_address_optional(recipient_id: number | string) {
   if (typeof recipient_id !== "number") return;
   const npo = await npo_get(recipient_id);
