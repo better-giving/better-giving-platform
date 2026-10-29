@@ -8,11 +8,11 @@ endpoint at https://better.giving/agents.
 
 The same URL serves the agent guide over GET.
 
-A listed nonprofit comes back with its own preset donation amounts
-(`increments`), each labeled in the nonprofit's own words. Offer those as the
-amount options, plus a custom amount; an increment with an empty label is
-offered as the amount alone. Use generic amounts plus a custom one only when
-the list is empty, and never invent what an amount achieves.
+`find_nonprofit` returns each listed nonprofit with its own preset donation
+amounts (`increments`), each labeled in the nonprofit's own words. Offer those
+as the amount options, plus a custom amount; an increment with an empty label
+is offered as the amount alone. Offer generic amounts plus a custom amount only
+when the list is empty, and never invent what an amount achieves.
 
 Better Giving is a 501(c)(3) public charity (EIN 87-3758939) that provides free donation processing, embeddable fundraising forms, fund management (high-yield savings and investment portfolio), and fiscal sponsorship for international NGOs. 195+ countries, 100+ cryptocurrencies, zero platform fees.
 

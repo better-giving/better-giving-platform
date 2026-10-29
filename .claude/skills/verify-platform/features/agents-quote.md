@@ -1,12 +1,12 @@
 # Agent donation amounts
 
-`find_nonprofit` lists each listed nonprofit's own preset amounts (`increments`, from its donation settings) and `quote_donation` names the label of an amount that is one of them. This flow is HTTP only: it does not open a document and it does not click.
+`find_nonprofit` returns each listed nonprofit's own preset amounts (`increments`, from its donation settings) and `quote_donation` names the label of an amount that is one of them. This flow is HTTP only: it does not open a document and it does not click.
 
 ## Sub-features
 - `POST /agents/mcp` `tools/call` `find_nonprofit` with query `Verify Campaign Nonprofit` returns that nonprofit with `increments` `[{ amount: 25, label: "Fixture: feed a child" }, { amount: 50, label: "" }, { amount: 100, label: "Fixture: plant a grove" }]`: sorted by amount, the stored `abc`, `0` and `1` (under the $2 minimum) dropped, and the blank label kept as `""`.
 - `quote_donation` for that nonprofit at `25` returns `increment_label` `Fixture: feed a child`, and at `100` (the largest amount, stored first) `Fixture: plant a grove`.
 - `quote_donation` at `50` returns `increment_label` `null`: the amount is a preset but its label is blank.
-- `quote_donation` at `30` returns `increment_label` `null`.
+- `quote_donation` at `30` returns `increment_label` `null`: the amount is not a preset.
 
 ## How to get to it (user POV)
 - These are direct requests, not clicks. The drive POSTs JSON-RPC to `/agents/mcp`.
