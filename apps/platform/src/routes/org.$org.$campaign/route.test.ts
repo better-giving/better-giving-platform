@@ -469,7 +469,8 @@ describe("public campaign page", () => {
     const data = await load("https://x/org/acme/winter");
     expect(data.npo.ein).toBe("22-2222222");
     expect(data.npo.url).toBe("https://acme.example/give");
-    expect(data.npo).not.toHaveProperty("registration_number");
+    // the profile's public credential, carried for the page's structured data
+    expect(data.npo.registration_number).toBe("EIN-PUBLIC");
     expect(data.npo).not.toHaveProperty("tagline");
   });
 
