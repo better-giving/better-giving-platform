@@ -303,7 +303,8 @@ describe("fund page structured data", () => {
       target_number: 1000,
     });
     const page = `${base_url}/campaigns/${fund.id}`;
-    const org = `${base_url}/org/${npo_id}`;
+    // the member's slug, so its node joins the one on its own profile
+    const org = `${base_url}/org/acme-org`;
 
     const [ld, ...rest] = lds_of(await meta_of(fund.id));
 

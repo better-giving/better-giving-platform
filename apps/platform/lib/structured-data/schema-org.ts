@@ -24,6 +24,11 @@ export interface INgoIn extends INgo {
 
 const org_ref = (url: string) => `${url}#org`;
 
+/** schema.org wants absolute urls; a seeded or legacy asset can be
+ * site-relative */
+const abs = (u: string | null | undefined, page_url: string) =>
+  u ? new URL(u, page_url).href : u;
+
 const mcp_entry = (base_url: string) => ({
   "@type": "EntryPoint",
   name: "Better Giving donation MCP server",
@@ -103,8 +108,8 @@ function ngo_node(o: INgo): TNode {
     "@id": org_ref(o.url),
     name: o.name,
     url: o.url,
-    logo: o.logo,
-    image: o.image,
+    logo: abs(o.logo, o.url),
+    image: abs(o.image, o.url),
     description: o.description,
     address:
       o.country || o.street_address
@@ -166,7 +171,7 @@ function project_page(p: IProjectPage): TNode {
       "@id": `${p.url}#campaign`,
       name: p.name,
       description: p.description,
-      image: p.image,
+      image: abs(p.image, p.url),
       url: p.url,
       parentOrganization: p.parent && ngo_node(p.parent),
       member: p.members?.map(ngo_node),
@@ -191,6 +196,7 @@ export const campaign_jsonld = ({ org, ...c }: ICampaignIn): TNode =>
 
 export interface IFundMemberIn {
   id: number;
+  slug?: string | null;
   name: string;
   logo?: string | null;
 }
@@ -204,7 +210,8 @@ export interface IFundIn extends Omit<IProjectPage, "parent" | "members"> {
 export function fund_jsonld({ members, ...f }: IFundIn): TNode {
   const orgs = members.map(
     (m): INgo => ({
-      url: `${f.base_url}/org/${m.id}`,
+      // the member's own canonical url, so its `@id` matches its profile's
+      url: `${f.base_url}/org/${m.slug || m.id}`,
       name: m.name,
       logo: m.logo,
     })

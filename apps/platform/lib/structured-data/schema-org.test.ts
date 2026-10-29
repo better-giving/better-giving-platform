@@ -277,8 +277,13 @@ describe("fund_jsonld", () => {
     raised: 300,
     goal: null,
   };
-  const acme = { id: 4, name: "Acme", logo: "https://cdn.example/a.png" };
-  const beta = { id: 5, name: "Beta", logo: undefined };
+  const acme = {
+    id: 4,
+    slug: "acme",
+    name: "Acme",
+    logo: "https://cdn.example/a.png",
+  };
+  const beta = { id: 5, slug: null, name: "Beta", logo: undefined };
 
   test("a single-beneficiary fund names it as the parent and the recipient", () => {
     const ld = fund_jsonld({ ...fund, goal: 1000, members: [acme] });
@@ -291,9 +296,9 @@ describe("fund_jsonld", () => {
       url: "https://www.better.giving/campaigns/f-1",
       parentOrganization: {
         "@type": "NGO",
-        "@id": "https://www.better.giving/org/4#org",
+        "@id": "https://www.better.giving/org/acme#org",
         name: "Acme",
-        url: "https://www.better.giving/org/4",
+        url: "https://www.better.giving/org/acme",
         logo: "https://cdn.example/a.png",
       },
       additionalProperty: [
@@ -310,7 +315,7 @@ describe("fund_jsonld", () => {
       ],
       potentialAction: {
         "@type": "DonateAction",
-        recipient: { "@id": "https://www.better.giving/org/4#org" },
+        recipient: { "@id": "https://www.better.giving/org/acme#org" },
         target: [
           {
             "@type": "EntryPoint",
@@ -335,9 +340,9 @@ describe("fund_jsonld", () => {
     expect(about.member).toEqual([
       {
         "@type": "NGO",
-        "@id": "https://www.better.giving/org/4#org",
+        "@id": "https://www.better.giving/org/acme#org",
         name: "Acme",
-        url: "https://www.better.giving/org/4",
+        url: "https://www.better.giving/org/acme",
         logo: "https://cdn.example/a.png",
       },
       {
@@ -351,6 +356,24 @@ describe("fund_jsonld", () => {
     expect(about.additionalProperty).toHaveLength(1);
     expect(holes(ld)).toEqual([]);
   });
+});
+
+test("a site-relative logo or image resolves against the page", () => {
+  const ld = fund_jsonld({
+    base_url: BASE,
+    url: "https://www.better.giving/campaigns/f-2",
+    donate_url: "https://www.better.giving/donate-fund/f-2",
+    name: "Harbor",
+    image: "/banner.png",
+    raised: 0,
+    goal: null,
+    members: [{ id: 6, slug: null, name: "Harbor org", logo: "/logo.png" }],
+  });
+  const about = ld.about as Record<string, any>;
+  expect(about.image).toBe("https://www.better.giving/banner.png");
+  expect(about.parentOrganization.logo).toBe(
+    "https://www.better.giving/logo.png"
+  );
 });
 
 test("agents_link points a reader at llms.txt", () => {

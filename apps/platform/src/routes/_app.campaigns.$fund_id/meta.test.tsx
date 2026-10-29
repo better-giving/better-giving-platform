@@ -22,7 +22,15 @@ describe("fund page json-ld in the document", () => {
       published: true,
       active: true,
       donation_total_usd: 0,
-      members: [{ id: 4, name: NAME, logo: undefined, banner: undefined }],
+      members: [
+        {
+          id: 4,
+          slug: undefined,
+          name: NAME,
+          logo: undefined,
+          banner: undefined,
+        },
+      ],
     };
     const Stub = createRoutesStub([
       {

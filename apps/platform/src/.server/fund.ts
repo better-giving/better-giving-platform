@@ -17,6 +17,7 @@ export const get_fund = async (id: string): Promise<IFund | undefined> => {
     ...fund,
     members: npos.map((m) => ({
       id: m.id,
+      slug: m.slug ?? undefined,
       name: m.name,
       logo: m.logo || m.card_img || undefined,
       banner: m.image ?? undefined,
