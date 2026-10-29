@@ -25,7 +25,7 @@ one-time USD donations. This page is its agent guide.
 
 Send \`Authorization: Bearer\` with the agent token when you have one. The hourly cap is per token, and otherwise per trusted client address.
 
-Requests are limited per client address; a refused one returns HTTP 429 with \`Retry-After\` in seconds.
+Requests are also limited per client address. Past the limit, the server returns HTTP 429 with the wait in seconds, in \`Retry-After\` and in the error's \`data.retry_after_s\`.
 
 Repeated \`donate\` calls with the same quote token and an open Checkout return that Checkout and do not create another charge. Quote tokens are signed: send them back unchanged.
 `;
@@ -136,7 +136,7 @@ async function rate_limited(request: Request): Promise<Response | null> {
   return rpc_error(
     null,
     -32029,
-    `Rate limited: too many requests. Retry after ${s} seconds.`,
+    `Request limit reached. Try again in ${s} seconds.`,
     { retry_after_s: s },
     { status: 429, headers: { "retry-after": String(s) } }
   );

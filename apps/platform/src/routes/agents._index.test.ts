@@ -161,7 +161,7 @@ describe("per-address request limit", () => {
       id: null,
       error: {
         code: -32029,
-        message: "Rate limited: too many requests. Retry after 45 seconds.",
+        message: "Request limit reached. Try again in 45 seconds.",
         data: { retry_after_s: 45 },
       },
     });
