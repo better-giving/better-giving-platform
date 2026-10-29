@@ -21,6 +21,7 @@ import {
 } from "$/pg/queries/npo";
 import { npo_media_list } from "$/pg/queries/npo-media";
 import { npo_programs } from "$/pg/queries/program";
+import { reg_public_ein } from "$/pg/queries/registration";
 import type { Route } from "./+types/route";
 import { layout_lists, shape_counts } from "./layout-data";
 
@@ -66,9 +67,9 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
       throw err;
     });
 
-  // a count is garnish: the profile serves without it
-  const count_or_null = <T>(count: Promise<T>) =>
-    count.catch((err) => {
+  // a count or the ein is garnish: the profile serves without it
+  const or_null = <T>(garnish: Promise<T>) =>
+    garnish.catch((err) => {
       report_error(err, { endow_id: npo.id });
       return null;
     });
@@ -86,11 +87,12 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
   const [
     campaigns,
     donors,
+    registration,
     { messages, messages_next },
     [funds_read, media_read, programs_read],
   ] = await Promise.all([
     campaign_live_for_npo(npo.id).then(async (rows) => {
-      const supporters = await count_or_null(
+      const supporters = await or_null(
         campaign_donor_counts(rows.map((c) => c.id))
       );
       return rows.map((c) => {
@@ -121,7 +123,9 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
         };
       });
     }),
-    count_or_null(npo_donor_count(npo.id)),
+    or_null(npo_donor_count(npo.id)),
+    // only a published profile describes itself to crawlers
+    npo.published ? or_null(reg_public_ein(npo.id)) : null,
     donation_message_list(String(npo.id), { limit: 10, with_message: true })
       .then((page) => ({
         messages: page.items
@@ -166,6 +170,8 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
       npo: npo_public(npo),
       url: new URL(org_href(npo), request.url).toString(),
       donors,
+      /** an approved 501(c)(3) registration's ein */
+      ein: registration?.ein ?? null,
       messages,
       messages_next,
       campaigns,

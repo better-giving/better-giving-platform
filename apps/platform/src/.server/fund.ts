@@ -17,6 +17,8 @@ export const get_fund = async (id: string): Promise<IFund | undefined> => {
     ...fund,
     members: npos.map((m) => ({
       id: m.id,
+      // fund pages are publicly cached; an unpublished org's slug stays out
+      slug: (m.published && m.slug) || undefined,
       name: m.name,
       logo: m.logo || m.card_img || undefined,
       banner: m.image ?? undefined,

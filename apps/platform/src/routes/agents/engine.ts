@@ -90,6 +90,13 @@ const find_input = v.pipe(
   }),
   v.check((input) => !!input.query || !!input.ein, "query or ein is required")
 );
+/** what each tool in `tools` accepts; its advertised `inputSchema` must agree */
+export const tool_inputs = {
+  find_nonprofit: find_input,
+  quote_donation: quote_input,
+  donate: donate_input,
+  donation_status: status_input,
+};
 const quote_token = v.strictObject({
   v: v.literal(1),
   id: v.pipe(v.string(), v.uuid()),
