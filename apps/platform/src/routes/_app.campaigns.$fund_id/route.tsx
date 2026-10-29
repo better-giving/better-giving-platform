@@ -39,23 +39,36 @@ export const meta: Route.MetaFunction = ({ loaderData: d, location: l }) => {
     image: d.banner || flying_character,
     url,
   };
-  // a hidden or closed fund stays out of every index
+  // a hidden or deactivated fund stays out of every index
   if (!(d.published && d.active)) return metas(shared);
+  const goal = goal_amount(d.target, d.donation_total_usd);
   const project = fund_jsonld({
     base_url,
     url,
-    donate_url: `${base_url}${href("/donate-fund/:fund_id", { fund_id: d.id })}`,
+    donate_url: `${base_url}${href("/campaigns/:fund_id/donate", { fund_id: d.id })}`,
+    // an expired fund keeps its description but loses its DonateAction, as
+    // `Fund` shows it closed
+    closed: !fund_status(d, new Date(d.now)).active,
     name: d.name,
     description: to_excerpt(d.description_pt),
     image: d.banner,
-    raised: d.donation_total_usd,
-    goal: goal_amount(d.target, d.donation_total_usd),
+    // the page shows the raised figure only inside `<Target>`, which needs a goal
+    raised: goal == null ? undefined : d.donation_total_usd,
+    goal,
     members: d.members,
   });
   return [...metas({ ...shared, jsonld: project }), agents_link(base_url)];
 };
 export { ErrorBoundary } from "#/components/error";
 export default CacheRoute(Fund);
+
+const fund_status = (fund: IFund, now: Date) =>
+  status_fn(
+    fund.expiration ?? MAX_EXPIRATION_ISO,
+    fund.active,
+    fund.donation_total_usd,
+    now
+  );
 
 function Fund({ loaderData }: Route.ComponentProps) {
   const { url, now: loader_now, ...fund } = loaderData;
@@ -64,12 +77,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
     fund.expiration ? fund_closes_at(fund.expiration) : undefined
   );
 
-  const status = status_fn(
-    fund.expiration ?? MAX_EXPIRATION_ISO,
-    fund.active,
-    fund.donation_total_usd,
-    now
-  );
+  const status = fund_status(fund, now);
 
   return (
     <section className="grid pb-10 bg-gray-3">

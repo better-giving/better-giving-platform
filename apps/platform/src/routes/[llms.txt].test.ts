@@ -25,4 +25,9 @@ describe("/llms.txt", () => {
     expect(guide).toContain("https://better.giving/agents/mcp");
     for (const { name } of tools) expect(guide).toContain(`\`${name}\``);
   });
+
+  test("links the agent skill and the MCP server card", () => {
+    expect(guide).toContain("(https://better.giving/agents/skill.md)");
+    expect(guide).toContain("(https://better.giving/.well-known/mcp.json)");
+  });
 });

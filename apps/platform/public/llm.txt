@@ -35,7 +35,7 @@ Example donor prompts:
 - "Give $100 through Better Giving to the nonprofit with EIN 12-3456789."
 - "Donate $50 to my local food bank on Better Giving, cover the card fee, and skip the tip."
 
-Nonprofit profile pages and campaign pages carry schema.org JSON-LD: each nonprofit is an NGO with a DonateAction, and each campaign is a Project.
+Nonprofit profile pages and campaign pages carry schema.org JSON-LD: each nonprofit is an NGO with a DonateAction, and each campaign is a Project that carries a DonateAction while it takes donations.
 
 ## Product Pages
 

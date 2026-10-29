@@ -264,13 +264,34 @@ describe("campaign_jsonld", () => {
     });
     expect(holes(ld)).toEqual([]);
   });
+
+  test("money is stated to the cent, as the page shows it", () => {
+    const ld = campaign_jsonld({
+      ...input,
+      raised: 1250.456789,
+      goal: 5000.004,
+    });
+    const about = ld.about as Record<string, any>;
+    expect(about.additionalProperty.map((p: any) => p.value.value)).toEqual([
+      5000, 1250.46,
+    ]);
+  });
+
+  test("a closed campaign keeps its page but offers no way to donate", () => {
+    const ld = campaign_jsonld({ ...input, closed: true });
+    const about = ld.about as Record<string, unknown>;
+    expect(about).not.toHaveProperty("potentialAction");
+    expect(about.parentOrganization).toMatchObject({ name: "Acme" });
+    expect(about.additionalProperty).toHaveLength(2);
+    expect(ld.subjectOf).toEqual(agents);
+  });
 });
 
 describe("fund_jsonld", () => {
   const fund = {
     base_url: BASE,
     url: "https://www.better.giving/campaigns/f-1",
-    donate_url: "https://www.better.giving/donate-fund/f-1",
+    donate_url: "https://www.better.giving/campaigns/f-1/donate",
     name: "Flood relief",
     description: "Rebuild after the flood.",
     image: "https://cdn.example/fund.png",
@@ -319,7 +340,7 @@ describe("fund_jsonld", () => {
         target: [
           {
             "@type": "EntryPoint",
-            urlTemplate: "https://www.better.giving/donate-fund/f-1",
+            urlTemplate: "https://www.better.giving/campaigns/f-1/donate",
           },
           {
             "@type": "EntryPoint",
@@ -362,7 +383,7 @@ test("a site-relative logo or image resolves against the page", () => {
   const ld = fund_jsonld({
     base_url: BASE,
     url: "https://www.better.giving/campaigns/f-2",
-    donate_url: "https://www.better.giving/donate-fund/f-2",
+    donate_url: "https://www.better.giving/campaigns/f-2/donate",
     name: "Harbor",
     image: "/banner.png",
     raised: 0,
@@ -375,6 +396,40 @@ test("a site-relative logo or image resolves against the page", () => {
     "https://www.better.giving/logo.png"
   );
 });
+
+test("a fund page showing no figure states no amount raised", () => {
+  const ld = fund_jsonld({
+    base_url: BASE,
+    url: "https://www.better.giving/campaigns/f-3",
+    donate_url: "https://www.better.giving/campaigns/f-3/donate",
+    name: "Quiet",
+    goal: null,
+    members: [{ id: 6, slug: null, name: "Harbor org" }],
+  });
+  const about = ld.about as Record<string, unknown>;
+  expect(about).not.toHaveProperty("additionalProperty");
+  expect(holes(ld)).toEqual([]);
+});
+
+test.each(["http://", "https://:", "http://[::1"])(
+  "an asset url that can't be parsed (%s) is left out",
+  (bad) => {
+    const ld = fund_jsonld({
+      base_url: BASE,
+      url: "https://www.better.giving/campaigns/f-4",
+      donate_url: "https://www.better.giving/campaigns/f-4/donate",
+      name: "Broken",
+      image: bad,
+      raised: 0,
+      goal: null,
+      members: [{ id: 6, slug: null, name: "Harbor org", logo: bad }],
+    });
+    const about = ld.about as Record<string, any>;
+    expect(about).not.toHaveProperty("image");
+    expect(about.parentOrganization).not.toHaveProperty("logo");
+    expect(holes(ld)).toEqual([]);
+  }
+);
 
 test("agents_link points a reader at llms.txt", () => {
   expect(agents_link(BASE)).toEqual({

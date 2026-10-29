@@ -25,9 +25,10 @@ export interface INgoIn extends INgo {
 const org_ref = (url: string) => `${url}#org`;
 
 /** schema.org wants absolute urls; a seeded or legacy asset can be
- * site-relative */
+ * site-relative. one that can't be parsed is dropped, not thrown: a throw in
+ * the route's `meta` fails the whole page */
 const abs = (u: string | null | undefined, page_url: string) =>
-  u ? new URL(u, page_url).href : u;
+  u && URL.canParse(u, page_url) ? new URL(u, page_url).href : undefined;
 
 const mcp_entry = (base_url: string) => ({
   "@type": "EntryPoint",
@@ -144,20 +145,25 @@ interface IProjectPage {
   name: string;
   description?: string | null;
   image?: string | null;
-  /** usd */
-  raised: number;
+  /** usd; omitted when the page shows no raised figure */
+  raised?: number;
   /** usd; null when the page shows no goal */
   goal: number | null;
   /** where the page's donate button goes */
   donate_url: string;
+  /** donating is closed: the page stays, its DonateAction goes */
+  closed?: boolean;
   parent?: INgo;
   members?: INgo[];
 }
 
+/** the stored total is `numeric(38,18)`; the page shows cents */
+const cents = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
 const usd = (name: string, value: number) => ({
   "@type": "PropertyValue",
   name,
-  value: { "@type": "MonetaryAmount", currency: "USD", value },
+  value: { "@type": "MonetaryAmount", currency: "USD", value: cents(value) },
 });
 
 function project_page(p: IProjectPage): TNode {
@@ -177,16 +183,20 @@ function project_page(p: IProjectPage): TNode {
       member: p.members?.map(ngo_node),
       additionalProperty: [
         p.goal == null ? undefined : usd("Fundraising goal", p.goal),
-        usd("Amount raised", p.raised),
+        p.raised == null ? undefined : usd("Amount raised", p.raised),
       ],
-      potentialAction: donate_action(p.base_url, p.donate_url, p.parent?.url),
+      potentialAction: p.closed
+        ? undefined
+        : donate_action(p.base_url, p.donate_url, p.parent?.url),
     },
     subjectOf: agent_pointers(p.base_url),
   });
 }
 
 export interface ICampaignIn
-  extends Omit<IProjectPage, "donate_url" | "parent" | "members"> {
+  extends Omit<IProjectPage, "donate_url" | "parent" | "members" | "raised"> {
+  /** the campaign page always shows it */
+  raised: number;
   org: INgo;
 }
 

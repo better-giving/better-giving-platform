@@ -1296,6 +1296,78 @@ describe("campaign page structured data", () => {
     expect(page.about.parentOrganization).not.toHaveProperty("nonprofitStatus");
   });
 
+  it("states what the campaign raised, to the cent, against its smart goal", async () => {
+    const npo = await org();
+    await campaign(npo.id);
+    const db = test_db.current!.db;
+    await db
+      .update(campaigns)
+      .set({ target_smart: true })
+      .where(eq(campaigns.id, "camp-public"));
+    await gift({
+      id: "raised-1",
+      email: "a@test.com",
+      status: "settled",
+      name: "A",
+    });
+    await db.insert(dists).values({
+      id: "dist-raised-1",
+      donation_id: "raised-1",
+      status: "settled",
+      date_created: "2026-02-01T00:00:00.000Z",
+      to_id: npo.id,
+      amount_denom: "USD",
+      net: 1234.567,
+    });
+
+    const [page] = lds_of(await meta_of("https://x/org/acme/winter"));
+
+    expect(page.about.additionalProperty).toEqual([
+      expect.objectContaining({
+        name: "Fundraising goal",
+        value: expect.objectContaining({ value: 1600 }),
+      }),
+      expect.objectContaining({
+        name: "Amount raised",
+        value: expect.objectContaining({ value: 1234.57 }),
+      }),
+    ]);
+  });
+
+  it.each([
+    { case: "ended", o: { status: "ended" as const } },
+    { case: "past its end date", o: { ends_at: "2020-01-01T00:00:00.000Z" } },
+  ])(
+    "describes a campaign $case but offers no way to donate to it",
+    async ({ o }) => {
+      const npo = await org();
+      await campaign(npo.id, o);
+
+      const ds = await meta_of("https://x/org/acme/winter");
+      const [page] = lds_of(ds);
+
+      expect(page.about).toMatchObject({
+        "@type": "Project",
+        name: "Winter drive",
+        parentOrganization: { name: "Acme" },
+      });
+      expect(page.about).not.toHaveProperty("potentialAction");
+      expect(ds.filter((d) => d.rel === "describedby")).toHaveLength(1);
+    }
+  );
+
+  it("joins the owner's profile node whatever case the link was typed in", async () => {
+    const npo = await org();
+    await campaign(npo.id);
+
+    const [page] = lds_of(await meta_of("https://x/org/ACME/winter"));
+
+    expect(page.about.parentOrganization).toMatchObject({
+      "@id": `${base_url}/org/acme#org`,
+      url: `${base_url}/org/acme`,
+    });
+  });
+
   it("gives a preview of an unpublished owner's campaign no structured data", async () => {
     const npo = await org();
     await test_db

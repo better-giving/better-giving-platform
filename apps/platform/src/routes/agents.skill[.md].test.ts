@@ -37,8 +37,10 @@ describe("/agents/skill.md", () => {
     expect(text).toContain('- `currency`: "USD"');
     expect(text).toContain('- `tip_percent`: "none" | "10" | "15" | "20"');
     expect(text).toContain(
-      "- `recipient_id` (required): integer, minimum 1 | string"
+      "- `recipient_id` (required): integer, minimum 1 | string (uuid)\n"
     );
+    expect(text).toContain("- `program_id`: string (uuid)\n");
+    expect(text).toContain("- `donation_id` (required): string (uuid)\n");
     expect(text).toContain("  - `email` (required): string (email)");
     expect(text).toContain("Requires at least one of `query`, `ein`.");
   });

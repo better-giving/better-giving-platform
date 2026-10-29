@@ -12,6 +12,7 @@ import { DappLogo } from "#/components/image";
 import { richtext_styles } from "#/components/rich-text";
 import { to_excerpt, to_text } from "#/components/rich-text/helpers";
 import { app_name, base_url } from "#/constants/env";
+import { org_href } from "#/helpers/org-href";
 import { metas } from "#/helpers/seo";
 import { use_now } from "#/hooks/use-now";
 import { agents_link, campaign_jsonld } from "@/structured-data/schema-org";
@@ -44,7 +45,7 @@ export const meta: Route.MetaFunction = ({ loaderData, params, error }) => {
     });
   }
   if (!loaderData) return [];
-  const { campaign, canonical, npo } = loaderData;
+  const { campaign, canonical, closed, npo } = loaderData;
   const story = to_text(campaign.description_pt);
   const shared = {
     title: `${campaign.name} - ${app_name}`,
@@ -58,13 +59,16 @@ export const meta: Route.MetaFunction = ({ loaderData, params, error }) => {
   const project = campaign_jsonld({
     base_url,
     url: canonical,
+    closed,
     name: campaign.name,
     description: to_excerpt(campaign.description_pt),
     image: campaign.hero,
     raised: campaign.raised,
     goal: goal_amount(campaign.target, campaign.raised),
     org: {
-      url: `${base_url}/org/${params.org}`,
+      // the stored slug, not `params.org` as typed: the profile 301s case
+      // variants, so only this url's `@id` joins its node
+      url: `${base_url}${org_href({ id: npo.id, slug: campaign.owner_slug })}`,
       name: campaign.owner_name,
       // the org's own logo: `mark` prefers the campaign's
       logo: campaign.owner_logo,

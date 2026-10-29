@@ -29,6 +29,8 @@ const { seed_fund, seed_npo, seed_user } = await import(
 );
 const { user } = await import("$/pg/schema/auth");
 const { campaigns } = await import("$/pg/schema/campaign");
+const { dists } = await import("$/pg/schema/dist");
+const { donations } = await import("$/pg/schema/donation");
 const { funds } = await import("$/pg/schema/fund");
 const { npos } = await import("$/pg/schema/npo");
 const { create_test_db } = await import("$/pg/test-utils/pglite");
@@ -53,6 +55,8 @@ beforeEach(async () => {
   const d = db();
   // campaigns reference funds/npos/user; fund_members and campaign_members
   // cascade from their parents
+  await d.delete(dists);
+  await d.delete(donations);
   await d.delete(campaigns);
   await d.delete(funds);
   await d.delete(npos);
@@ -60,6 +64,35 @@ beforeEach(async () => {
   npo_id = (await seed_npo(d, { slug: "acme-org", published: true })).id;
   creator_id = (await seed_user(d, `creator-${npo_id}@test.com`)).id;
 });
+
+/** a settled gift to the fund, counted in its `donation_total_usd` */
+async function seed_raised(fund_id: string, to_id: number, net: number) {
+  const id = crypto.randomUUID();
+  await db().insert(donations).values({
+    id,
+    upusd: net,
+    status: "settled",
+    amount_base: net,
+    amount_tip: 0,
+    amount_fee_allowance: 0,
+    currency: "USD",
+    frequency: "one-time",
+    source: "stripe",
+    via: "card",
+  });
+  await db()
+    .insert(dists)
+    .values({
+      id: `dist-${id}`,
+      donation_id: id,
+      status: "settled",
+      date_created: new Date().toISOString(),
+      to_id,
+      fund_id,
+      net,
+      amount_denom: "USD",
+    });
+}
 
 function load(fund_id: string, search = "") {
   return loader({
@@ -302,6 +335,7 @@ describe("fund page structured data", () => {
       published: true,
       target_number: 1000,
     });
+    await seed_raised(fund.id, npo_id, 1234.567);
     const page = `${base_url}/campaigns/${fund.id}`;
     // the member's slug, so its node joins the one on its own profile
     const org = `${base_url}/org/acme-org`;
@@ -325,7 +359,7 @@ describe("fund page structured data", () => {
         },
         additionalProperty: [
           { name: "Fundraising goal", value: { value: 1000 } },
-          { name: "Amount raised", value: { value: 0 } },
+          { name: "Amount raised", value: { value: 1234.57 } },
         ],
         potentialAction: {
           "@type": "DonateAction",
@@ -333,7 +367,8 @@ describe("fund page structured data", () => {
           target: [
             {
               "@type": "EntryPoint",
-              urlTemplate: `${base_url}/donate-fund/${fund.id}`,
+              // the canonical form, not the `/donate-fund` 301 alias
+              urlTemplate: `${base_url}/campaigns/${fund.id}/donate`,
             },
             { urlTemplate: `${base_url}/agents/mcp` },
           ],
@@ -342,6 +377,100 @@ describe("fund page structured data", () => {
     });
     expect(ld.about).not.toHaveProperty("member");
     expect(describedby_of(await meta_of(fund.id))).toHaveLength(1);
+  });
+
+  it("states a smart goal as the next step up from what the fund raised", async () => {
+    const fund = await seed_fund(db(), {
+      id: crypto.randomUUID(),
+      npo_owner: null,
+      creator_id,
+      members: [npo_id],
+      published: true,
+      target_smart: true,
+    });
+    await seed_raised(fund.id, npo_id, 1234.567);
+
+    const [ld] = lds_of(await meta_of(fund.id));
+
+    expect(ld.about.additionalProperty).toEqual([
+      expect.objectContaining({
+        name: "Fundraising goal",
+        value: expect.objectContaining({ value: 1600 }),
+      }),
+      expect.objectContaining({
+        name: "Amount raised",
+        value: expect.objectContaining({ value: 1234.57 }),
+      }),
+    ]);
+  });
+
+  it("states no amount raised for a fund without a goal, whose page shows none", async () => {
+    const fund = await seed_fund(db(), {
+      id: crypto.randomUUID(),
+      npo_owner: null,
+      creator_id,
+      members: [npo_id],
+      published: true,
+    });
+    await seed_raised(fund.id, npo_id, 50);
+
+    const [ld] = lds_of(await meta_of(fund.id));
+
+    expect(ld.about).toMatchObject({ "@type": "Project" });
+    expect(ld.about).not.toHaveProperty("additionalProperty");
+  });
+
+  it("describes an expired fund but offers no way to donate to it", async () => {
+    const fund = await seed_fund(db(), {
+      id: crypto.randomUUID(),
+      name: "Past drive",
+      npo_owner: null,
+      creator_id,
+      members: [npo_id],
+      published: true,
+      target_number: 1000,
+      expiration: "2020-01-01T00:00:00.000Z",
+    });
+
+    const ds = await meta_of(fund.id);
+    const [ld] = lds_of(ds);
+
+    expect(ld.about).toMatchObject({
+      "@type": "Project",
+      name: "Past drive",
+      parentOrganization: { name: "Fund Test NPO" },
+    });
+    expect(ld.about).not.toHaveProperty("potentialAction");
+    expect(describedby_of(ds)).toHaveLength(1);
+  });
+
+  it("names an unpublished beneficiary by id, keeping its slug out of the cached page", async () => {
+    const hidden = await seed_npo(db(), {
+      registration_number: "EIN-HIDDEN",
+      name: "Hidden NPO",
+      slug: "hidden-org",
+      published: false,
+    });
+    const fund = await seed_fund(db(), {
+      id: crypto.randomUUID(),
+      npo_owner: null,
+      creator_id,
+      members: [npo_id, hidden.id],
+      published: true,
+    });
+
+    const data = (await load(fund.id)) as { members: unknown[] };
+    const [ld] = lds_of(await meta_of(fund.id));
+
+    expect(JSON.stringify(data)).not.toContain("hidden-org");
+    expect(data.members).toEqual([
+      expect.objectContaining({ id: npo_id, slug: "acme-org" }),
+      expect.objectContaining({ id: hidden.id, slug: undefined }),
+    ]);
+    expect(ld.about.member.map((m: Descriptor) => m.url)).toEqual([
+      `${base_url}/org/acme-org`,
+      `${base_url}/org/${hidden.id}`,
+    ]);
   });
 
   it.each([

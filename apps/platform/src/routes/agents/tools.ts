@@ -7,7 +7,7 @@ export const MCP_SERVER_INFO = {
 export const GUIDE = `# Better Giving agent donations
 
 Connect to the remote MCP server at \`https://better.giving/agents/mcp\` for
-one-time USD donations. This page is its agent guide.
+one-time USD donations. The steps below are its agent guide.
 
 ## Laira skill
 
@@ -32,6 +32,7 @@ export const tools = [
       type: "object",
       properties: { query: { type: "string" }, ein: { type: "string" } },
       anyOf: [{ required: ["query"] }, { required: ["ein"] }],
+      additionalProperties: false,
     },
   },
   {
@@ -42,16 +43,20 @@ export const tools = [
       type: "object",
       properties: {
         recipient_id: {
-          oneOf: [{ type: "integer", minimum: 1 }, { type: "string" }],
+          oneOf: [
+            { type: "integer", minimum: 1 },
+            { type: "string", format: "uuid" },
+          ],
         },
         amount: { type: "number", minimum: 2 },
         currency: { const: "USD" },
         frequency: { const: "one-time" },
         tip_percent: { enum: ["none", "10", "15", "20"] },
         cover_processing_fee: { type: "boolean" },
-        program_id: { type: "string" },
+        program_id: { type: "string", format: "uuid" },
       },
       required: ["recipient_id", "amount"],
+      additionalProperties: false,
     },
   },
   {
@@ -70,9 +75,11 @@ export const tools = [
             last_name: { type: "string" },
           },
           required: ["email", "first_name", "last_name"],
+          additionalProperties: false,
         },
       },
       required: ["quote_token", "donor"],
+      additionalProperties: false,
     },
   },
   {
@@ -83,6 +90,7 @@ export const tools = [
       type: "object",
       properties: { donation_id: { type: "string", format: "uuid" } },
       required: ["donation_id"],
+      additionalProperties: false,
     },
   },
 ] as const;

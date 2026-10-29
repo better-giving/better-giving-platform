@@ -1,4 +1,6 @@
-import type { MetaDescriptor } from "react-router";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
+import { createRoutesStub, Meta, type MetaDescriptor } from "react-router";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { base_url } from "#/constants/env";
 import { npos } from "$/pg/schema/npo";
@@ -207,6 +209,37 @@ describe("org profile meta", () => {
         href: `${base_url}/llms.txt`,
       },
     ]);
+  });
+
+  it("keeps a name that closes the script tag inside its json-ld scripts", async () => {
+    const name = "Acme </script><script>alert(1)</script> & co";
+    await seed("hostile", "meta-hostile", { name, tagline: name });
+    const { data: d } = await loader({
+      request: new Request(`${base_url}/org/meta-hostile`),
+      params: { org: "meta-hostile" },
+    } as never);
+    await Promise.all([d.funds, d.media, d.programs]);
+    const Stub = createRoutesStub([
+      { id: "org", path: "/org/:org", meta: meta as never, Component: Meta },
+    ]);
+
+    // the document head as the server sends it
+    const html = renderToString(
+      createElement(Stub, {
+        initialEntries: ["/org/meta-hostile"],
+        hydrationData: { loaderData: { org: d } },
+      })
+    );
+
+    const ld = [
+      ...html.matchAll(
+        /<script type="application\/ld\+json">([\s\S]*?)<\/script>/g
+      ),
+    ].map((m) => JSON.parse(m[1]!));
+    expect(html.match(/<script/g)).toHaveLength(ld.length);
+    expect(ld.map((x) => x["@type"])).toEqual(["BreadcrumbList", "NGO"]);
+    expect(ld[1].name).toBe(name);
+    expect(ld[1].description).toBe(name);
   });
 
   it("falls back to the story's excerpt and the us registration number", async () => {
