@@ -5,7 +5,7 @@ import { type IAttempt, type IConnectTransferPayload, msg } from "@/queue";
 import { stage } from "../env";
 import { enqueue } from "../kit/queue";
 import { stripe } from "../kit/stripe";
-import { payout_cents } from "../payouts/transfer";
+import { payout_cents } from "../payouts/amount";
 import { db } from "../pg/db";
 import { disputes_of_donation } from "../pg/queries/dispute";
 import {
