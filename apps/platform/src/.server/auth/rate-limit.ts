@@ -15,12 +15,13 @@ import {
  * `auth.api.*` goes straight to the endpoint and is never counted — which is
  * exactly the anonymous lead path. These counters are that missing gate.
  *
- * They are per-process: each serverless instance keeps its own map, so the real
- * ceiling is `max` × live instances, and a cold start resets it. That makes this
- * a blunt cap on a single abusive source rather than an exact quota. The
- * `_shared` variants hold across instances: one postgres row per key and
- * window, at a db round trip per call. their windows are fixed and aligned to
- * the clock, so a burst straddling a window edge can spend up to 2 × `max`.
+ * `reserve` and `consume` are per-process: each serverless instance keeps its
+ * own map, so the real ceiling is `max` × live instances, and a cold start
+ * resets it. That makes them a blunt cap on a single abusive source rather than
+ * an exact quota. The `_shared` variants hold across instances: one postgres
+ * row per key and window, at a db round trip per call. Their windows are fixed
+ * and aligned to the clock, so a burst straddling a window edge can spend up to
+ * 2 × `max`.
  */
 
 export interface Quota {
