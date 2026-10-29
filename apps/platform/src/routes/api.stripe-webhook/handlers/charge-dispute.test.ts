@@ -338,7 +338,7 @@ describe("stripe charge.dispute.closed → the routed transfers", () => {
       expect(notice).toMatchObject({ dedupe: `fiat.notice_${event.id}` });
       expect(notices()).toEqual([
         expect.stringMatching(
-          /^Dispute Closed: Held Transfer Released\n.*\n.*\ndist dist-1: transfer to npo 7 released/
+          /^Dispute Closed: Held Transfers Released\n.*\n.*\ndist dist-1: transfer to npo 7 released/
         ),
       ]);
     }

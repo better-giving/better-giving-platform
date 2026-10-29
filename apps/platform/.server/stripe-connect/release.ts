@@ -14,10 +14,10 @@ import { dists } from "../pg/schema/dist";
 /**
  * sends the transfers a dispute held (`transfer_routed_dist`) once it closed:
  * one `connect-transfer` per routed dist of the gift no transfer has paid,
- * the dists it released. none while a dispute on the gift is still open, nor
- * once the gift is reversed. the job's stored check, its lookup of a transfer
- * made and its idempotency key keep a release and the held delivery's retry
- * to one transfer
+ * returning the dists it released. none while a dispute on the gift is still
+ * open, nor once the gift is reversed. the job's stored check, its lookup of a
+ * transfer made and its idempotency key keep a release and the held
+ * delivery's retry to one transfer
  */
 export async function release_held_transfers(
   donation_id: string,
@@ -58,7 +58,7 @@ export async function routed_open_lines(donation_id: string) {
     );
   return routed.map((d) =>
     d.transfer_id
-      ? `dist ${d.id}: transfer ${d.transfer_id} to npo ${d.npo_id} already sent: left alone until the dispute closes; a loss reverses its share`
+      ? `dist ${d.id}: transfer ${d.transfer_id} to npo ${d.npo_id} already sent, left alone until the dispute closes; a loss reverses its share`
       : `dist ${d.id}: transfer to npo ${d.npo_id} held until the dispute closes`
   );
 }

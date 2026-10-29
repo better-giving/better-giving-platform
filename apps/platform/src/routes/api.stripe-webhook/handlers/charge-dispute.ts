@@ -115,7 +115,8 @@ export async function handle_dispute_closed(
       throw new Error(`dispute ${dispute.id} not credited: ${won.reason}`);
     }
     if (won.status === "credited") return release();
-    // a loss of it reversed the routed transfers' cut, and nothing re-pays it
+    // a loss recorded earlier reversed its cut of the routed transfers, which
+    // nothing re-pays: ops get a line per transfer to settle by hand
     const routed = await routed_dispute_reversals(don.id, dispute.id);
     if (won.status === "conflict") {
       // keyed on the event: a redelivery collapses into it
@@ -239,7 +240,7 @@ export async function handle_dispute_closed(
   throw new Error(`dispute ${dispute.id} not reversed: ${result.reason}`);
 }
 
-/** a favourable close sends the transfers the dispute held, and tells ops */
+/** a favorable close sends the transfers the dispute held, and tells ops */
 async function release_closed(
   event: Stripe.ChargeDisputeClosedEvent,
   donation_id: string,
@@ -259,7 +260,7 @@ async function release_closed(
       alert: {
         type: "NOTICE",
         from: `${ALERT_FROM}-${stage}`,
-        title: "Dispute Closed: Held Transfer Released",
+        title: "Dispute Closed: Held Transfers Released",
         body: [
           dispute_line(dispute, donation_id, event.id),
           `dispute ${dispute.id} closed ${dispute.status}: the transfers it held are sent.`,

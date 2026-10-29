@@ -683,7 +683,7 @@ describe("a dispute on a routed gift already transferred", () => {
     expect(await status_of(charge_of.id)).toBe("settled");
     expect(transfers.createReversal).not.toHaveBeenCalled();
     expect(notice_text()).toContain(
-      `dist dist-${charge_of.id}-0: transfer ${tr} to npo ${charge_of.npo_ids[0]} already sent: left alone until the dispute closes; a loss reverses its share`
+      `dist dist-${charge_of.id}-0: transfer ${tr} to npo ${charge_of.npo_ids[0]} already sent, left alone until the dispute closes; a loss reverses its share`
     );
   });
 
@@ -916,7 +916,7 @@ describe("a dispute on a routed gift before its transfer ran", () => {
     expect(transfers.createReversal).not.toHaveBeenCalled();
     expect(notice_text()).toMatch(
       new RegExp(
-        `Dispute Closed: Held Transfer Released\n(.*\n)*.*dist ${job.dist_id}`
+        `Dispute Closed: Held Transfers Released\n(.*\n)*.*dist ${job.dist_id}`
       )
     );
   });

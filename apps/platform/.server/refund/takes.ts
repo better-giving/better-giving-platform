@@ -64,11 +64,10 @@ const disputes_past_cut = (
  * owes the share they all take, less what a pooled rebook cut off it, of what
  * it received and of its card fee; one whose grant hasn't owes the disputes'
  * share past that cut only, a refund there being ops' to settle by hand. a
- * routed dist owes no share: a dispute holds its transfer or, lost,
- * reverses its cut, as a refund does. each active
- * dispute's fee is owed in full, split over the dists by settled amount,
- * routed ones included, and each referrer owes the whole share of its
- * commission paid or claimed for a transfer
+ * routed dist owes no share: a dispute holds its transfer or, lost, reverses
+ * its cut, as a refund does. each active dispute's fee is owed in full, split
+ * over the dists by settled amount, routed ones included, and each referrer
+ * owes the whole share of its commission paid or claimed for a transfer
  */
 export function owed_targets(
   ds: LockedDist[],

@@ -156,8 +156,8 @@ export interface RoutedRefunds {
   of: number;
   /** its live refunds, sent or not */
   refunds: NonNullable<ChargeReversal["refunds"]>;
-  /** of them, the ones not yet sent, which any can still fail: left out of
-   * the cuts until an event sees each sent */
+  /** of them, the ones not yet sent: any can still fail, so each is left out
+   * of the cuts until an event sees it sent */
   unsent: string[];
 }
 

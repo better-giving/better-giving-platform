@@ -23,7 +23,7 @@ describe("take_cuts", () => {
     ]);
   });
 
-  // a pending refund is cut once it is sent, after a newer take-back was
+  // a pending refund is cut once it is sent, after a newer take-back was cut
   it("counts what was already cut for the take-backs answered out of time order", () => {
     const takes = [
       refund("re_old", 1, "2026-01-01"),
