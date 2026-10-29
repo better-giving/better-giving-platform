@@ -118,10 +118,11 @@ export interface IQuoteBreakdown {
   total_charged: number;
   /** Stripe's card fee on the whole charge, estimated at its card rate */
   processing_fee: number;
-  /** 1.5% of a nonprofit's share after the card fee, when that nonprofit
-   * turned off tips. a fund's members are charged by their own setting */
+  /** 1.5% of a nonprofit's full share, card fee included, when that
+   * nonprofit turned off tips. a fund's members are charged by their own
+   * setting */
   platform_fee: number;
-  /** 2.9% of a fiscally sponsored nonprofit's share after the card fee */
+  /** 2.9% of a fiscally sponsored nonprofit's full share, card fee included */
   fiscal_sponsor_fee: number;
   nonprofit_receives: number;
   /** the tip and what the fee allowance leaves after the card fee. the two

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { calc_settlement_plan, settled_parts } from "@/settlement/plan";
 import type { IQuoteBreakdown } from "./engine";
 
 const KEY = "test-only-not-a-real-nonprofits-key";
@@ -247,6 +248,38 @@ describe("agent quote", () => {
         better_giving_receives: 0.95,
       },
     },
+    {
+      label: "$100 uncovered to a fiscally sponsored nonprofit",
+      npo: { fiscal_sponsored: true },
+      patch: { amount: 100, tip_percent: "none", cover_processing_fee: false },
+      breakdown: {
+        amount: 100,
+        tip: 0,
+        fee_allowance: 0,
+        total_charged: 100,
+        processing_fee: 2.5,
+        platform_fee: 0,
+        fiscal_sponsor_fee: 2.9,
+        nonprofit_receives: 94.6,
+        better_giving_receives: 0,
+      },
+    },
+    {
+      label: "$100 uncovered to a nonprofit that turned off tips",
+      npo: { hide_bg_tip: true },
+      patch: { amount: 100, tip_percent: "none", cover_processing_fee: false },
+      breakdown: {
+        amount: 100,
+        tip: 0,
+        fee_allowance: 0,
+        total_charged: 100,
+        processing_fee: 2.5,
+        platform_fee: 1.5,
+        fiscal_sponsor_fee: 0,
+        nonprofit_receives: 96,
+        better_giving_receives: 0,
+      },
+    },
   ] as const)(
     "breaks the charge down: $label",
     async ({ npo, patch, breakdown }) => {
@@ -263,7 +296,7 @@ describe("agent quote", () => {
     }
   );
 
-  test("a gift whose fees each round up still balances to the cent", async () => {
+  test("a gift whose split rounds to a stray cent still balances to the cent", async () => {
     mocks.npo_get.mockResolvedValue({
       donor_address_required: false,
       hide_bg_tip: true,
@@ -272,7 +305,9 @@ describe("agent quote", () => {
 
     const { amount, breakdown: b } = await quote({ amount: 10.88 });
 
-    // settlement's unrounded split of the 10.34 net: 9.88504 / 0.1551 / 0.29986 / 0
+    // settlement's unrounded split of the 10.34 net, its fees on the full
+    // 10.88: 9.86128 / 0.1632 / 0.31552 / 0. the floors drop a cent, which goes
+    // to the .552 fsa
     expect(b).toEqual({
       amount: 10.88,
       tip: 0,
@@ -280,13 +315,77 @@ describe("agent quote", () => {
       total_charged: 10.88,
       processing_fee: 0.54,
       platform_fee: 0.16,
-      fiscal_sponsor_fee: 0.3,
-      nonprofit_receives: 9.88,
+      fiscal_sponsor_fee: 0.32,
+      nonprofit_receives: 9.86,
       better_giving_receives: 0,
     });
     expect(b.total_charged).toBe(amount.total);
     expect(unbalanced(b)).toEqual([]);
   });
+
+  test.each([
+    { tip_percent: "none", cover_processing_fee: false },
+    { tip_percent: "none", cover_processing_fee: true },
+    { tip_percent: "10", cover_processing_fee: false },
+    { tip_percent: "10", cover_processing_fee: true },
+  ] as const)(
+    "quotes the fees settlement books for the same $100 charge: %o",
+    async (patch) => {
+      const npo = { hide_bg_tip: true, fiscal_sponsored: true };
+      mocks.npo_get.mockResolvedValue({
+        donor_address_required: false,
+        ...npo,
+      });
+
+      const { amount, breakdown: b } = await quote({ amount: 100, ...patch });
+
+      const plan = calc_settlement_plan(
+        {
+          id: 7,
+          ps: settled_parts(amount, 1, {
+            net: b.total_charged - b.processing_fee,
+            fee: b.processing_fee,
+          }),
+          sttl: {
+            id: "pi_1",
+            date: "2026-01-01T00:00:00.000Z",
+            currency: "USD",
+          },
+          prnt: { id: "d-1", ...recipient, type: "npo" },
+          source: undefined,
+          program: undefined,
+          nav_price: 1,
+          tx: {
+            currency: "USD",
+            upusd: 1,
+            frequency: "one-time",
+            status: "settled",
+            source: "bg-agent",
+            via: "stripe:card",
+            from_email: donor.email,
+            updated_at: "2026-01-01T00:00:00.000Z",
+          },
+        },
+        {
+          id: 7,
+          name: "ACME",
+          ...npo,
+          allocation: null,
+          lock_units: 0,
+          liq: 0,
+          referrer_user: null,
+          referrer_npo: null,
+          referrer_expiry: null,
+        },
+        null
+      );
+      expect(b.fiscal_sponsor_fee).toBe(2.9);
+      expect(b.platform_fee).toBe(1.5);
+      expect(b.fiscal_sponsor_fee).toBeCloseTo(plan.dist.fees.fsa, 2);
+      expect(b.platform_fee).toBeCloseTo(plan.dist.fees.base, 2);
+      expect(b.nonprofit_receives).toBeCloseTo(plan.dist.net, 2);
+    }
+  );
 
   test("every quote's breakdown is whole cents that balance", async () => {
     mocks.npo_get.mockResolvedValue({
@@ -364,18 +463,19 @@ describe("agent quote", () => {
 
     expect(mocks.npos_batch_get).toHaveBeenCalledWith([1, 2, 3]);
     // $10, stripe fee 0.52 -> settled 9.48, so each of the two funded members
-    // holds 4.74. fiscally sponsored: net 4.60254, fsa 0.13746. tip-opt-out:
-    // net 4.6689, base 0.0711. sums 9.27144 / 0.0711 / 0.13746, apportioned to
-    // whole cents 9.27 / 0.07 / 0.14 (the dropped cent goes to the .746 fsa)
+    // holds 4.74 of a $5 share. fiscally sponsored: fsa 0.145 on the 5, net
+    // 4.595. tip-opt-out: base 0.075 on the 5, net 4.665. sums 9.26 / 0.075 /
+    // 0.145, apportioned to whole cents 9.26 / 0.08 / 0.14 (the dropped cent
+    // goes to the first of the two .5 fractions, the base)
     expect(b).toEqual({
       amount: 10,
       tip: 0,
       fee_allowance: 0,
       total_charged: 10,
       processing_fee: 0.52,
-      platform_fee: 0.07,
+      platform_fee: 0.08,
       fiscal_sponsor_fee: 0.14,
-      nonprofit_receives: 9.27,
+      nonprofit_receives: 9.26,
       better_giving_receives: 0,
     });
     expect(b.total_charged).toBe(amount.total);

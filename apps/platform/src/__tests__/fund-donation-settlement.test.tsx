@@ -326,13 +326,15 @@ const PER_STTL_BASE = (300 * BASE_R) / N; // ≈95.238
 
 // credit_fa path: fa=0 → fa_added = PER_STTL_BASE
 const FA_ADDED = PER_STTL_BASE;
+// fees are on the full gift: the settled share plus its $15 fee share
+const PER_FULL_BASE = ((300 + 15) * BASE_R) / N; // 100
 
 // --- npo a: fsa=2.9%, referrer=30% ---
-const A_FSA = FA_ADDED * 0.029;
+const A_FSA = PER_FULL_BASE * 0.029;
 const A_NET = FA_ADDED - A_FSA;
 
 // --- npo b: base=1.5%, no referrer ---
-const B_BASE_FEE = FA_ADDED * 0.015;
+const B_BASE_FEE = PER_FULL_BASE * 0.015;
 const B_NET = FA_ADDED - B_BASE_FEE;
 
 // --- npo c: no fees, referrer=30% ---
@@ -473,8 +475,8 @@ describe("fund donation → settlement across 3 NPOs → DB + UI", () => {
     await expect.element(screen.getByText("Fund NPO A")).toBeInTheDocument();
     await expect.element(screen.getByText("Fund NPO B")).toBeInTheDocument();
     await expect.element(screen.getByText("Fund NPO C")).toBeInTheDocument();
-    // Target shows raised from v_donation_total_usd (sum of nets), $1,000 goal from target_number
-    expect(screen.getByText("$282").elements().length).toBeGreaterThanOrEqual(
+    // Target shows raised from v_donation_total_usd (sum of nets, ~281.31), $1,000 goal from target_number
+    expect(screen.getByText("$281").elements().length).toBeGreaterThanOrEqual(
       1
     );
     expect(screen.getByText("$1,000").elements().length).toBeGreaterThanOrEqual(
@@ -513,7 +515,7 @@ describe("fund donation → settlement across 3 NPOs → DB + UI", () => {
       .toBeInTheDocument();
     // the fund's own card: what it raised against its goal
     const card = screen.getByRole("article").filter({ hasText: "Test Fund" });
-    await expect.element(card).toMatchTextContent(/\$282 of \$1,000/);
+    await expect.element(card).toMatchTextContent(/\$281 of \$1,000/);
   });
 
   it("user-dashboard forms page shows form with updated ltd Target", async () => {

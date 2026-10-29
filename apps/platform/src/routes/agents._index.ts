@@ -40,7 +40,7 @@ const tools = [
   {
     name: "quote_donation",
     description:
-      "Quote a one-time USD donation, including tip and optional card-fee coverage. breakdown shows where the money goes: amount + tip + fee_allowance = total_charged, and nonprofit_receives + platform_fee (1.5% of the share, after the card fee, of each nonprofit that turned off tips) + fiscal_sponsor_fee (2.9% of a fiscally sponsored nonprofit's share after the card fee) + processing_fee (Stripe's card fee, estimated at its card rate) + better_giving_receives (the tip and what the fee allowance leaves after the card fee) = total_charged.",
+      "Quote a one-time USD donation, including tip and optional card-fee coverage. breakdown shows where the money goes: amount + tip + fee_allowance = total_charged, and nonprofit_receives + platform_fee (1.5% of the full share, card fee included, of each nonprofit that turned off tips) + fiscal_sponsor_fee (2.9% of a fiscally sponsored nonprofit's full share, card fee included) + processing_fee (Stripe's card fee, estimated at its card rate) + better_giving_receives (the tip and what the fee allowance leaves after the card fee) = total_charged.",
     inputSchema: {
       type: "object",
       properties: {

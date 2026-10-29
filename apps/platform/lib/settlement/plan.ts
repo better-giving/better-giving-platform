@@ -115,10 +115,14 @@ const credit_fa = (
   { fa, pf }: { fa: number; pf: number }
 ): [number, number] => [fa ? amount + pf : amount, fa ? fa - pf : 0];
 
-// [net after fees, fee amounts]
-const debit_pcfs = (amount: number, rates: IDistFees): [number, IDistFees] => {
-  const base = amount * rates.base;
-  const fsa = amount * rates.fsa;
+// [`amount` net of fees charged on `gross`, fee amounts]
+const debit_pcfs = (
+  amount: number,
+  gross: number,
+  rates: IDistFees
+): [number, IDistFees] => {
+  const base = gross * rates.base;
+  const fsa = gross * rates.fsa;
   return [amount - base - fsa, { base, fsa }];
 };
 
@@ -160,7 +164,10 @@ export const npo_share = (
     pf: ps.sttl_fee.tip,
   });
 
-  const [net, pcfs] = debit_pcfs(fa_added, {
+  // the base and fiscal sponsor fees are on the full gift — its settled share
+  // plus its processor fee share — whether or not the donor covered the fee.
+  // an uncovered gift's npo still absorbs the processor fee out of `fa_added`
+  const [net, pcfs] = debit_pcfs(fa_added, ps.sttl.base + ps.sttl_fee.base, {
     base: ctx.hide_bg_tip ? fees.base : 0,
     fsa: ctx.fiscal_sponsored ? fees.fiscal_sponsor : 0,
   });
