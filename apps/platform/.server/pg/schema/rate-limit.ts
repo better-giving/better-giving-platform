@@ -11,7 +11,8 @@ import { timestamptz } from "./columns";
 
 /** fixed-window counters shared by every serverless instance. a row is one
  * key's use count in one window; rows past `expires_at` are dead weight that
- * the sampled sweep in `queries/rate-limit.ts` deletes. */
+ * `rate_limit_sweep` deletes, on a sampled take in
+ * `src/.server/auth/rate-limit.ts`. */
 export const rate_limit_windows = pgTable(
   "rate_limit_windows",
   {

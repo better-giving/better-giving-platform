@@ -9,15 +9,15 @@ import {
   test,
   vi,
 } from "vitest";
-import type { DbOrTx } from "$/pg/queries/helpers";
+import type { Db } from "$/pg/db";
 import { rate_limit_windows } from "$/pg/schema/rate-limit";
 import { create_test_db, type TestDb } from "$/pg/test-utils/pglite";
 import { limit_shared, reserve_shared } from "./rate-limit";
 
-const as_db = (x: unknown) => x as DbOrTx;
+const as_db = (x: unknown) => x as Db;
 
 let test_db: TestDb;
-let conn: DbOrTx;
+let conn: Db;
 
 beforeAll(async () => {
   test_db = await create_test_db();
@@ -95,6 +95,15 @@ describe("reserve_shared", () => {
     );
 
     expect(results.filter((r) => r !== null)).toHaveLength(20);
+    // the count lives in the table, not in either instance
+    expect(
+      await test_db.db
+        .select({
+          key: rate_limit_windows.key,
+          count: rate_limit_windows.count,
+        })
+        .from(rate_limit_windows)
+    ).toEqual([{ key: "shared", count: 20 }]);
     expect(await reserve_shared("shared", quota, instance_a)).toBeNull();
     expect(await reserve_shared("shared", quota, instance_b)).toBeNull();
   });

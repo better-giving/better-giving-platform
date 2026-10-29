@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import type { DbOrTx } from "$/pg/queries/helpers";
+import type { Db } from "$/pg/db";
 import {
   type RateWindow,
   rate_limit_release,
@@ -7,7 +7,8 @@ import {
   rate_limit_take,
 } from "$/pg/queries/rate-limit";
 
-/** Application-level throttling for auth work that runs server-side.
+/** Application-level throttling for server-side work: auth, and the public
+ * agents endpoint.
  *
  * better-auth's own limiter lives in its router's `onRequest`, so it only sees
  * traffic that arrives at `/api/auth/*`. Every call this app makes through
@@ -17,13 +18,14 @@ import {
  * They are per-process: each serverless instance keeps its own map, so the real
  * ceiling is `max` × live instances, and a cold start resets it. That makes this
  * a blunt cap on a single abusive source rather than an exact quota. The
- * `_shared` variants are the exact quota: one postgres row per key and window,
- * counted by every instance, at a db round trip per call.
+ * `_shared` variants hold across instances: one postgres row per key and
+ * window, at a db round trip per call. their windows are fixed and aligned to
+ * the clock, so a burst straddling a window edge can spend up to 2 × `max`.
  */
 
 export interface Quota {
   max: number;
-  /** rolling window, in seconds */
+  /** window length, in seconds */
   window_s: number;
 }
 
@@ -73,16 +75,19 @@ export function consume(key: string, quota: Quota): boolean {
   return reserve(key, quota) !== null;
 }
 
-/** a `Reservation` whose release is a write to the shared store */
-export interface SharedReservation extends Reservation {
+/** like `Reservation`, but its release is a db write to await. not a
+ * `Reservation` on purpose: a caller typed for the sync one would drop the
+ * promise and its error. */
+export interface SharedReservation {
   release(): Promise<void>;
 }
 
-/** `reserve` over the counters every instance shares. a db error propagates. */
+/** `reserve` over the counters every instance shares. a db error propagates.
+ * `conn` is never a transaction: a failed sweep would abort it, take and all. */
 export async function reserve_shared(
   key: string,
   quota: Quota,
-  conn?: DbOrTx
+  conn?: Db
 ): Promise<SharedReservation | null> {
   const w = fixed_window(quota);
   if ((await take(key, w, quota.max, conn)) === null) return null;
@@ -101,7 +106,7 @@ export async function reserve_shared(
 export async function limit_shared(
   key: string,
   quota: Quota,
-  conn?: DbOrTx
+  conn?: Db
 ): Promise<{ ok: true } | { ok: false; retry_after_s: number }> {
   const w = fixed_window(quota);
   if ((await take(key, w, quota.max, conn)) !== null) {
@@ -121,7 +126,7 @@ async function take(
   key: string,
   w: RateWindow & { now: number },
   max: number,
-  conn?: DbOrTx
+  conn?: Db
 ): Promise<number | null> {
   const count = await rate_limit_take(key, w, max, conn);
   if (Math.random() * SWEEP_ONE_IN < 1) {
