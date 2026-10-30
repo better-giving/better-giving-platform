@@ -13,6 +13,7 @@ import {
 } from "../refund/takes";
 import { charge_refunds, refund_take } from "../refund/unsent";
 import { is_refusal } from "./refusal";
+import { SHORT, shortfalls } from "./shortfall";
 
 interface IRoutedTransfer {
   donation_id: string;
@@ -78,18 +79,6 @@ export function take_cuts(
   }
   return cuts;
 }
-
-/** the transfer's metadata key that records a cut stripe refused to
- * reverse, by refund or dispute id; keys are capped at 40 characters */
-const SHORT = "short:";
-
-/** cents of the transfer stripe refused to reverse, by refund or dispute */
-const shortfalls = (metadata: Record<string, string> | null) =>
-  new Map(
-    Object.entries(metadata ?? {})
-      .filter(([k]) => k.startsWith(SHORT))
-      .map(([k, v]) => [k.slice(SHORT.length), Number(v)])
-  );
 
 /** a reversal's metadata key naming what it answers */
 const ANSWERS = { refund: "refund_id", dispute: "dispute_id" } as const;

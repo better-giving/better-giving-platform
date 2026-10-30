@@ -1128,6 +1128,76 @@ describe("a routed dispute whose open recorded its share the old way", () => {
     expect(await status_of(charge_of.id)).toBe("settled");
   });
 
+  it("leaves the transfer alone on a loss when the open's row had no card fee to record", async () => {
+    charge_of = await seed_card_gift(db(), { ...ROUTED, fee_processing: 0 });
+    const tr = paid_by_transfer(charge_of);
+    await deliver(opened(2_000));
+    await db()
+      .update(owed_amounts)
+      .set({ received_usd: 18 })
+      .where(eq(owed_amounts.donation_id, charge_of.id));
+
+    expect((await deliver(closed("lost", 2_000))).status).toBe(200);
+
+    expect(answered_of(tr)).toEqual([]);
+    expect(await owed_of(charge_of.id)).toMatchObject([
+      { received_usd: 18, fee_processing_usd: 0, outstanding_usd: 33 },
+    ]);
+  });
+
+  // the $36 a refused refund reversal recorded is more than the old pricing's
+  // $18 for the dispute, but no dispute's open wrote it
+  it("reverses a loss's cut when the row holds only a refused refund cut", async () => {
+    charge_of = await seed_card_gift(db(), ROUTED);
+    const tr = paid_by_transfer(charge_of);
+    short.add(tr);
+    await deliver(refund(4_000));
+    short.delete(tr);
+    await deliver(opened(2_000));
+
+    await deliver(closed("lost", 2_000));
+
+    expect(answered_of(tr)).toEqual([
+      { amount: 1_800, for: `du_${charge_of.id}` },
+    ]);
+    expect(await owed_of(charge_of.id)).toMatchObject([
+      { received_usd: 36, fee_processing_usd: 0, fee_dispute_usd: 15 },
+    ]);
+  });
+
+  it("owes a loss's cut on top of a refused refund cut when its reversal is refused too, with no card fee", async () => {
+    charge_of = await seed_card_gift(db(), { ...ROUTED, fee_processing: 0 });
+    const tr = paid_by_transfer(charge_of);
+    short.add(tr);
+    await deliver(refund(4_000));
+    await deliver(opened(2_000));
+
+    await deliver(closed("lost", 2_000));
+
+    expect(answered_of(tr)).toEqual([]);
+    expect(await owed_of(charge_of.id)).toMatchObject([
+      { received_usd: 54, fee_processing_usd: 0, fee_dispute_usd: 15 },
+    ]);
+  });
+
+  it("reverses a loss's cut past a refused refund cut with no card fee", async () => {
+    charge_of = await seed_card_gift(db(), { ...ROUTED, fee_processing: 0 });
+    const tr = paid_by_transfer(charge_of);
+    short.add(tr);
+    await deliver(refund(4_000));
+    short.delete(tr);
+    await deliver(opened(2_000));
+
+    await deliver(closed("lost", 2_000));
+
+    expect(answered_of(tr)).toEqual([
+      { amount: 1_800, for: `du_${charge_of.id}` },
+    ]);
+    expect(await owed_of(charge_of.id)).toMatchObject([
+      { received_usd: 36, fee_processing_usd: 0, fee_dispute_usd: 15 },
+    ]);
+  });
+
   it("still reverses the lost cut of a gift whose row the new pricing recorded", async () => {
     charge_of = await seed_card_gift(db(), ROUTED);
     const tr = paid_by_transfer(charge_of);

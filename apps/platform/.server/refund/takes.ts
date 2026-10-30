@@ -102,6 +102,13 @@ export function owed_targets(
   );
 }
 
+/** `refused_usd`, loaded on a call: the core runs on every rail, which
+ * importing it must not need stripe's client for */
+const refused_of = async (tx: DbOrTx, donation_id: string, npo_id: number) => {
+  const { refused_usd } = await import("../stripe-connect/shortfall");
+  return refused_usd(tx, donation_id, npo_id);
+};
+
 /** every npo with a routed dist, as `owed_targets` prices it the old way */
 const routed_npos = (ds: LockedDist[]) =>
   new Set(ds.filter((d) => d.routed).map((d) => d.to_id));
@@ -110,25 +117,30 @@ const routed_npos = (ds: LockedDist[]) =>
  * whether an npo's `row` was recorded when its routed dists still owed a
  * dispute's share of what they received and of their card fee: it holds more
  * card fee than the takes owe now (`now`), which nothing records of a routed
- * dist any more, or at least the received the old pricing owes (`old`) when
- * that is more than they owe now. such a row is moved by the old pricing, so
- * a win credits what its open recorded, and a loss leaves its transfer alone
- * (`legacy_routed_npos`), the debt standing as before
+ * dist any more. where the old pricing (`old`) would have recorded no more
+ * card fee than now, the received decides: at least what the old pricing
+ * owes, when that is more than they owe now, past every cut of the npo's
+ * transfers stripe refused to reverse (`refused`, read only then), which is
+ * all a row records of a routed dist now. such a row is moved by the old
+ * pricing, so a win credits what its open recorded, and a loss leaves its
+ * transfer alone (`legacy_routed_npos`), the debt standing as before
  */
-export function legacy_row(
+export async function legacy_row(
   row: IOwed | undefined,
   now: OwedShare | undefined,
-  old: OwedShare | undefined
-): boolean {
+  old: OwedShare | undefined,
+  refused: () => Promise<number>
+): Promise<boolean> {
   if (!row || !old) return false;
   const cent = 0.005;
-  if (row.fee_processing_usd > (now?.fee_processing_usd ?? 0) + cent) {
-    return true;
-  }
+  const fee = now?.fee_processing_usd ?? 0;
+  if (row.fee_processing_usd > fee + cent) return true;
+  // the open would have recorded a card fee with what they received
+  if (old.fee_processing_usd > fee + cent) return false;
   const r = now?.received_usd ?? 0;
-  return (
-    old.received_usd > r + cent && row.received_usd + cent >= old.received_usd
-  );
+  if (old.received_usd <= r + cent) return false;
+  if (row.received_usd + cent < old.received_usd) return false;
+  return row.received_usd - (await refused()) + cent >= old.received_usd;
 }
 
 /** the gift's npos whose row `legacy_row` says the old pricing recorded */
@@ -147,7 +159,10 @@ export async function legacy_routed_npos(
     for (const npo_id of routed) {
       const key = party_key({ npo_id });
       const row = rows.find((o) => o.npo_id === npo_id);
-      if (legacy_row(row, now.get(key), old.get(key))) legacy.add(npo_id);
+      const refused = () => refused_of(tx, donation_id, npo_id);
+      if (await legacy_row(row, now.get(key), old.get(key), refused)) {
+        legacy.add(npo_id);
+      }
     }
     return legacy;
   });
@@ -361,7 +376,9 @@ export async function move_owed(
     const legacy =
       "npo_id" in party &&
       routed.has(party.npo_id) &&
-      legacy_row(row, was.get(key), was_old.get(key));
+      (await legacy_row(row, was.get(key), was_old.get(key), () =>
+        refused_of(tx, m.donation_id, party.npo_id)
+      ));
     const a = (legacy ? now_old : now).get(key);
     const b = (legacy ? was_old : was).get(key);
     const fig = (s: OwedShare | undefined) => ({
