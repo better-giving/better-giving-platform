@@ -1,7 +1,9 @@
-import { Actions, Button } from "@better-giving/ui";
-import { CircleAlert } from "lucide-react";
+import { Button } from "@better-giving/ui";
+import { Bot, CircleAlert } from "lucide-react";
 import { useId, useLayoutEffect, useRef } from "react";
-import { Form } from "react-router";
+import { Form, href, Link, useLocation } from "react-router";
+import bg_logo from "#/assets/images/bg-logo.webp";
+import { type ClientId, clients } from "./clients";
 
 export interface INpoChoice {
   id: number;
@@ -11,13 +13,40 @@ export interface INpoChoice {
 export interface IAllowScreen {
   nonprofits: INpoChoice[];
   state: string;
+  /** the signed-in account the connection would act as */
+  email: string;
+  client?: ClientId | null;
   error?: string;
   blocked?: boolean;
+}
+
+const TILE = "size-12 shrink-0 rounded overflow-hidden";
+
+interface IClientTile {
+  client: ClientId | null;
+}
+
+function ClientTile({ client }: IClientTile) {
+  if (!client) {
+    return (
+      <span className={`${TILE} flex-center border bg-gray-2 text-gray-11`}>
+        <Bot className="icon-lg" aria-hidden />
+      </span>
+    );
+  }
+  const c = clients[client];
+  return (
+    <span className={`${TILE} ${c.tile}`}>
+      <img src={c.logo} alt={c.name} className="size-full object-contain" />
+    </span>
+  );
 }
 
 export function AllowScreen({
   nonprofits,
   state,
+  email,
+  client = null,
   error,
   blocked = false,
 }: IAllowScreen) {
@@ -25,90 +54,140 @@ export function AllowScreen({
   const empty_id = useId();
   const none = nonprofits.length === 0;
   const alert_ref = useRef<HTMLDivElement>(null);
+  const { pathname, search } = useLocation();
+  const client_name = client ? clients[client].name : "An AI assistant";
 
   useLayoutEffect(() => {
     if (error) alert_ref.current?.focus();
   }, [error]);
 
   return (
-    <section className="card">
-      <Form method="post" className="grid gap-6">
-        <div className="grid gap-2">
-          <h2 className="text-lg">This chat wants to connect to a nonprofit</h2>
-          <p id={disclosure_id} className="max-w-prose text-sm text-gray-11">
-            The connection can read donors' names and email addresses,
-            donations, campaigns, and forms. It can start draft campaigns. It
-            cannot move money.
-          </p>
+    <section className="solo-card mx-auto gap-6">
+      <header className="grid gap-6">
+        <div className="flex items-center justify-center gap-3">
+          <ClientTile client={client} />
+          <span aria-hidden className="text-xl text-gray-9">
+            ⋯
+          </span>
+          <span className={`${TILE} border bg-panel p-2`}>
+            <img
+              src={bg_logo}
+              alt="Better Giving"
+              className="size-full object-contain"
+            />
+          </span>
         </div>
+        <h2 className="text-center text-xl font-bold text-balance">
+          {client_name} wants to connect to Better Giving
+        </h2>
+      </header>
+
+      <div className="flex items-center gap-3 rounded border border-gray-7 bg-gray-2 px-4 py-3.5">
+        <span
+          aria-hidden
+          className="flex-center size-10 shrink-0 rounded-full bg-primary text-lg font-bold text-primary-fg"
+        >
+          {email.charAt(0).toUpperCase()}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-gray-11">Signed in as</p>
+          <p className="truncate font-bold">{email}</p>
+        </div>
+        <Form method="post" action={href("/logout")} className="shrink-0">
+          <input type="hidden" name="redirect" value={pathname + search} />
+          <Button type="submit" variant="outline" size="sm">
+            Switch account
+          </Button>
+        </Form>
+      </div>
+
+      <Form method="post" className="grid gap-6">
         {blocked ? null : <input type="hidden" name="state" value={state} />}
         {blocked ? null : none ? (
-          <p id={empty_id} className="text-sm">
-            This account does not administer a nonprofit yet.
-          </p>
+          <div
+            id={empty_id}
+            className="grid gap-1 rounded border border-dashed border-gray-7 px-4 py-3.5"
+          >
+            <p className="font-bold">This account doesn't manage a nonprofit</p>
+            <p className="text-sm text-gray-11">
+              Switch to the account that runs your nonprofit, or register one at{" "}
+              <Link to={href("/register")} className="link font-semibold">
+                better.giving/register
+              </Link>
+              .
+            </p>
+          </div>
         ) : (
           <fieldset className="grid gap-2">
-            <legend className="text-sm font-medium">Nonprofit</legend>
-            <div className="grid gap-5">
-              {nonprofits.map((npo) => (
-                <label key={npo.id} className="radio text-sm">
-                  <input
-                    type="radio"
-                    name="npo_id"
-                    value={npo.id}
-                    defaultChecked={nonprofits.length === 1}
-                  />
-                  {npo.name}
-                </label>
-              ))}
-            </div>
+            <legend className="mb-2 font-bold">Connect which nonprofit?</legend>
+            {nonprofits.map((npo) => (
+              <label
+                key={npo.id}
+                className="radio rounded border px-3.5 py-3 has-checked:border-primary has-checked:bg-blue-2"
+              >
+                <input
+                  type="radio"
+                  name="npo_id"
+                  value={npo.id}
+                  defaultChecked={nonprofits.length === 1}
+                />
+                {npo.name}
+              </label>
+            ))}
           </fieldset>
         )}
-        <div
-          ref={alert_ref}
-          role="alert"
-          tabIndex={error ? -1 : undefined}
-          className={
-            error
-              ? "flex items-start gap-2 rounded border border-destructive bg-destructive-subtle p-3 text-sm text-destructive-subtle-fg focus-visible:outline-2 focus-visible:outline-offset-2"
-              : undefined
-          }
-        >
-          {error ? (
-            <>
-              <span className="flex h-lh shrink-0 items-center">
-                <CircleAlert className="icon-sm" />
-              </span>
-              <p>{error}</p>
-            </>
-          ) : null}
-        </div>
-        {blocked ? null : (
-          <Actions>
-            <Button
-              type="submit"
-              variant="outline"
-              name="decision"
-              value="deny"
-              aria-describedby={
-                none ? `${disclosure_id} ${empty_id}` : disclosure_id
-              }
-            >
-              Deny
-            </Button>
-            {none ? null : (
+        <p id={disclosure_id} className="text-sm text-gray-11">
+          It can read donors' names and emails, donations, campaigns and forms,
+          and start draft campaigns. It cannot move money.
+        </p>
+        <div className="grid">
+          <div
+            ref={alert_ref}
+            role="alert"
+            tabIndex={error ? -1 : undefined}
+            className={
+              error
+                ? "mb-6 flex items-start gap-2 rounded border border-destructive bg-destructive-subtle p-3 text-sm text-destructive-subtle-fg focus-visible:outline-2 focus-visible:outline-offset-2"
+                : undefined
+            }
+          >
+            {error ? (
+              <>
+                <span className="flex h-lh shrink-0 items-center">
+                  <CircleAlert className="icon-sm" />
+                </span>
+                <p>{error}</p>
+              </>
+            ) : null}
+          </div>
+          {blocked ? null : (
+            <div className="grid grid-cols-[1fr_2fr] gap-3">
+              <Button
+                type="submit"
+                variant="outline"
+                size="lg"
+                name="decision"
+                value="deny"
+                aria-describedby={
+                  none ? `${disclosure_id} ${empty_id}` : disclosure_id
+                }
+              >
+                Deny
+              </Button>
               <Button
                 type="submit"
                 variant="primary"
+                size="lg"
                 name="decision"
                 value="allow"
+                disabled={none}
                 aria-describedby={disclosure_id}
               >
                 Allow
               </Button>
-            )}
-          </Actions>
-        )}
+            </div>
+          )}
+        </div>
       </Form>
     </section>
   );

@@ -15,6 +15,8 @@ export default function Page({ loaderData, actionData }: Route.ComponentProps) {
       <AllowScreen
         nonprofits={loaderData.nonprofits}
         state={loaderData.state}
+        email={loaderData.email}
+        client={loaderData.client}
         error={
           actionData?.error ??
           (loaderData.blocked ? loaderData.error : undefined)
