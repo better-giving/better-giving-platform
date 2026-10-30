@@ -328,3 +328,49 @@ describe("Slack.send_alert", () => {
     expect(texts).toEqual([`${line_a}\n${filler}\n`, line_b]);
   });
 });
+
+describe("Slack.send_alert with skip_bad_credential", () => {
+  const alert = { from: "test", title: "Payout split" };
+
+  test.each([
+    ["invalid_auth", () => Response.json({ ok: false, error: "invalid_auth" })],
+    [
+      "token_revoked",
+      () => Response.json({ ok: false, error: "token_revoked" }),
+    ],
+    ["a 401", () => new Response("{}", { status: 401 })],
+  ])("resolves on %s", async (_, response) => {
+    mock_fetch(response);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const res = await new Slack(CHANNEL, TOKEN, true).send_alert(alert);
+
+    expect(res.ok).toBe(true);
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  test("resolves without posting when there is no token", async () => {
+    mock_fetch(() => Response.json({ ok: true }));
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await new Slack(CHANNEL, undefined, true).send_alert(alert);
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  test("still throws a refusal that is not the credential", async () => {
+    mock_fetch(() => Response.json({ ok: false, error: "channel_not_found" }));
+
+    await expect(
+      new Slack(CHANNEL, TOKEN, true).send_alert(alert)
+    ).rejects.toThrow("slack channel_not_found");
+  });
+
+  test("off by default: a refused token throws", async () => {
+    mock_fetch(() => Response.json({ ok: false, error: "invalid_auth" }));
+
+    await expect(new Slack(CHANNEL, TOKEN).send_alert(alert)).rejects.toThrow(
+      "slack invalid_auth"
+    );
+  });
+});

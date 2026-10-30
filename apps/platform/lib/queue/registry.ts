@@ -351,8 +351,8 @@ const delivery: Partial<{ [K in Kind]: IDelivery }> = {
   "don-match": { retries: 3 },
   // the one reminder to file. three days is long enough that the pack has
   // dropped out of view and short enough to still land inside most filing
-  // windows. a delay this long cannot ride the FIFO queue — it would sit at the
-  // head of it for three days with every other notification stuck behind — so
+  // windows. a delay this long cannot ride a FIFO queue — it would sit at the
+  // head of the notice queue for three days with everything stuck behind — so
   // this kind must be sent through `schedule` in `.server/kit/queue.ts`, never
   // `enqueue`.
   "don-match-chase": { delay_s: 3 * 24 * 60 * 60 },
@@ -365,6 +365,55 @@ const delivery: Partial<{ [K in Kind]: IDelivery }> = {
   // expiry reads a 404 and returns.
   "paypal-order-capture": { delay_s: PAYPAL_CAPTURE_DELAY_S, retries: 5 },
 };
+
+/**
+ * which qstash queue `enqueue` puts a kind on. a queue is FIFO and delivers one
+ * message at a time, waiting out every retry of its head before the next, so a
+ * notification failing on its backoff once held settlement payouts and stripe
+ * transfers behind it for half an hour. money work rides a queue of its own.
+ *
+ * - `money` — moves funds or stops a charge: splits a settlement, transfers to
+ *   a connected account, cancels a subscription at its processor, captures an
+ *   order. the producers already order these (the split is what enqueues the
+ *   transfer), so nothing relies on FIFO between them.
+ * - `notice` — mails, slack posts, crm syncs, metrics and zapier hooks: the
+ *   handler tells someone about work already done. `don-dist` is here: the
+ *   split itself runs on `don_dist`'s own queue, and this kind is the npo's
+ *   notice of its share.
+ *
+ * a scheduled kind (`delay_s`) never rides either queue, but takes a lane all
+ * the same so the map stays exhaustive.
+ */
+export type Lane = "money" | "notice";
+
+const lanes: { [K in Kind]: Lane } = {
+  "banking-approved": "notice",
+  "banking-default": "notice",
+  "banking-new": "notice",
+  "banking-rejected": "notice",
+  "connect-transfer": "money",
+  "don-dist": "notice",
+  "don-fund-receipt": "notice",
+  // writes the match event and mails the pack; no funds move
+  "don-match": "notice",
+  "don-match-chase": "notice",
+  "don-sttl-dist": "money",
+  "don-sttl-receipt": "notice",
+  "fiat-notice": "notice",
+  "fund-member-removed": "notice",
+  "invite-email": "notice",
+  "lock-tx-created": "notice",
+  "owed-notice": "notice",
+  "paypal-order-capture": "money",
+  "reg-created": "notice",
+  "reg-updated": "notice",
+  "sub-cancel-failed-email": "notice",
+  // a cancel stuck behind a failing mail keeps charging a donor who cancelled
+  "sub-deactivated": "money",
+  "tip-received": "notice",
+};
+
+export const lane_of = (kind: Kind): Lane => lanes[kind];
 
 export const msg = <K extends Kind>(kind: K, payload: MsgInput<K>): IMsg => ({
   id: kind,

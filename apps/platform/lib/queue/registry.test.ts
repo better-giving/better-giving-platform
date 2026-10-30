@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { KINDS, type Kind, type MsgInput, msg, retries_of } from "./registry";
+import {
+  KINDS,
+  type Kind,
+  lane_of,
+  type MsgInput,
+  msg,
+  retries_of,
+} from "./registry";
 
 describe("msg() — dedupe keys are wire-format and must not drift", () => {
   // per-row payload shape varies; rely on the test calling msg() to enforce
@@ -208,5 +215,163 @@ describe("retries_of", () => {
     expect(retries_of("sub-deactivated")).toBe(3);
     expect(retries_of("don-dist")).toBe(4);
     expect(retries_of("reg-updated")).toBe(0);
+  });
+});
+
+describe("msg() — delivery is wire-format too", () => {
+  // one fixture per kind, wide enough for every dedupe recipe. the snapshot
+  // was taken before kinds were split across queues: a diff here changes
+  // production retries or dedupe keys.
+  const fixture = {
+    id: "x1",
+    npo_id: 7,
+    to_id: 7,
+    dist_id: "dist-1",
+    fund_id: "f1",
+    creator_id: "u1",
+    invitee: "x@y.z",
+    sent_at: "2026-10-02T12:30:45.678Z",
+    date_created: "2026-01-02T03:04:05Z",
+    order_id: "O-1",
+    status: "02",
+    updated_at: "2026-09-01T10:20:30.456Z",
+    cancelled_at: "2026-10-02T12:30:45.678Z",
+  };
+
+  test("every kind's msg() minus its payload", () => {
+    const out = Object.fromEntries(
+      KINDS.map((k) => {
+        const { payload: _, ...rest } = msg(k, fixture as never);
+        return [k, rest];
+      })
+    );
+    expect(out).toMatchInlineSnapshot(`
+      {
+        "banking-approved": {
+          "dedupe": "banking.approved_7",
+          "id": "banking-approved",
+          "retries": 3,
+        },
+        "banking-default": {
+          "dedupe": "banking.default_7",
+          "id": "banking-default",
+          "retries": 3,
+        },
+        "banking-new": {
+          "dedupe": "banking.new_7",
+          "id": "banking-new",
+          "retries": 3,
+        },
+        "banking-rejected": {
+          "dedupe": "banking.rejected_7",
+          "id": "banking-rejected",
+          "retries": 3,
+        },
+        "connect-transfer": {
+          "dedupe": "connect.transfer_dist-1",
+          "id": "connect-transfer",
+          "retries": 3,
+        },
+        "don-dist": {
+          "dedupe": "don.dist_x1_7",
+          "id": "don-dist",
+          "retries": 4,
+        },
+        "don-fund-receipt": {
+          "dedupe": "don.fund-receipt_x1_0",
+          "id": "don-fund-receipt",
+        },
+        "don-match": {
+          "dedupe": "don.match_x1",
+          "id": "don-match",
+          "retries": 3,
+        },
+        "don-match-chase": {
+          "dedupe": "don.match-chase_x1",
+          "delay_s": 259200,
+          "id": "don-match-chase",
+        },
+        "don-sttl-dist": {
+          "dedupe": "don.sttl-dist_x1",
+          "id": "don-sttl-dist",
+        },
+        "don-sttl-receipt": {
+          "dedupe": "don.sttl-receipt_x1",
+          "id": "don-sttl-receipt",
+          "retries": 3,
+        },
+        "fiat-notice": {
+          "dedupe": "fiat.notice_x1",
+          "id": "fiat-notice",
+          "retries": 3,
+        },
+        "fund-member-removed": {
+          "dedupe": "fund.removed_f1_u1_7",
+          "id": "fund-member-removed",
+          "retries": 3,
+        },
+        "invite-email": {
+          "dedupe": "invite_x@y.z_7_2026-10-02T123045.678Z",
+          "id": "invite-email",
+          "retries": 3,
+        },
+        "lock-tx-created": {
+          "dedupe": "lock_tx_7_2026-01-02T030405Z",
+          "id": "lock-tx-created",
+          "retries": 3,
+        },
+        "owed-notice": {
+          "dedupe": "owed.notice_x1",
+          "id": "owed-notice",
+          "retries": 3,
+        },
+        "paypal-order-capture": {
+          "dedupe": "paypal.order-capture_O-1",
+          "delay_s": 300,
+          "id": "paypal-order-capture",
+          "retries": 5,
+        },
+        "reg-created": {
+          "dedupe": "reg.created_x1",
+          "id": "reg-created",
+          "retries": 3,
+        },
+        "reg-updated": {
+          "dedupe": "reg.updated_x1_02_2026-09-01T102030.456Z",
+          "id": "reg-updated",
+        },
+        "sub-cancel-failed-email": {
+          "dedupe": "sub.cancel-failed-email_x1_2026-10-02T123045.678Z",
+          "id": "sub-cancel-failed-email",
+          "retries": 3,
+        },
+        "sub-deactivated": {
+          "dedupe": "sub.deactivated_x1",
+          "id": "sub-deactivated",
+          "retries": 3,
+        },
+        "tip-received": {
+          "dedupe": "tip_x1",
+          "id": "tip-received",
+          "retries": 3,
+        },
+      }
+    `);
+  });
+});
+
+describe("lane_of", () => {
+  test("every kind takes exactly one lane", () => {
+    for (const k of KINDS) expect(["money", "notice"]).toContain(lane_of(k));
+  });
+
+  // a kind moving lanes changes which queue a failing notification can hold up
+  test("money is the kinds that move funds or stop a charge", () => {
+    expect(KINDS.filter((k) => lane_of(k) === "money").sort()).toEqual([
+      "connect-transfer",
+      "don-sttl-dist",
+      "paypal-order-capture",
+      "sub-deactivated",
+    ]);
   });
 });
