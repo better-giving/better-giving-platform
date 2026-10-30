@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { data, redirect } from "react-router";
 import { user_ctx } from "#/.server/auth";
+import { type ClientId, parse_client } from "#/components/connector/clients";
 import { issue_code } from "$/connector/keys";
 import { origin_allowed, request_origin } from "$/connector/origins";
 import { connector_return_url } from "$/connector/return-url";
@@ -18,9 +19,10 @@ const refused = () => data({ error: CONNECTION_REFUSED }, { status: 400 });
 
 // a returned Response is loader data the page cannot read, so the render throws
 // into the generic boundary and gets reported. `data()` stays on this screen.
-const blocked = () =>
+const blocked = (shared: Shared) =>
   data(
     {
+      ...shared,
       nonprofits: [],
       state: "",
       error: CONNECTION_REFUSED,
@@ -28,6 +30,12 @@ const blocked = () =>
     },
     { status: 400 }
   );
+
+/** what the page shows whether or not the request is usable */
+interface Shared {
+  email: string;
+  client: ClientId | null;
+}
 
 const state_ok = (state: string) => STATE_RE.test(state);
 
@@ -58,11 +66,16 @@ const see_other = (href: string, query: Record<string, string>) => {
 };
 
 export const loader = async ({ request, context }: Route.LoaderArgs) => {
-  const state = new URL(request.url).searchParams.get("state") ?? "";
-  if (!state_ok(state)) return blocked();
+  const query = new URL(request.url).searchParams;
+  const state = query.get("state") ?? "";
   const user = context.get(user_ctx);
+  const shared: Shared = {
+    email: user.email,
+    client: parse_client(query.get("client")),
+  };
+  if (!state_ok(state)) return blocked(shared);
   const nonprofits = await memberships_of(user.id);
-  return { nonprofits, state, blocked: false as const };
+  return { ...shared, nonprofits, state, blocked: false as const };
 };
 
 export const action = async ({ request, context }: Route.ActionArgs) => {
