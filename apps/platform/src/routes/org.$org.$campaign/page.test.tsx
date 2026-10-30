@@ -118,8 +118,8 @@ describe("campaign page", () => {
     expect(screen.getByRole("contentinfo").elements()).toHaveLength(1);
   });
 
-  test.each([768, 1024, 1280, 1536])(
-    "at %ipx the header and the content share both edges",
+  test.each([375, 768, 1024, 1280, 1536, 1920])(
+    "at %ipx the header and the content share both edges, centered",
     async (width) => {
       await at_viewport(width, 900, async () => {
         const screen = await mount(page());
@@ -136,6 +136,12 @@ describe("campaign page", () => {
           .getByRole("main")
           .getByRole("button", { name: "Donate", exact: true })
           .element();
+        const main = screen.getByRole("main").element().getBoundingClientRect();
+        const viewport = document.documentElement.clientWidth;
+        expect(main.left).toBeCloseTo(viewport - main.right, 0);
+        // past the widest rung the page stops widening and both boxes center
+        if (width > 1536) expect(main.left).toBeGreaterThan(0);
+        expect(bar.getBoundingClientRect().left).toBeCloseTo(main.left, 0);
         await vi.waitFor(() => {
           expect(title.getBoundingClientRect().left).toBeCloseTo(
             mark.getBoundingClientRect().left,
@@ -146,6 +152,29 @@ describe("campaign page", () => {
             0
           );
         });
+      });
+    }
+  );
+
+  test.each([1536, 1920])(
+    "at %ipx the story keeps a reading measure",
+    async (width) => {
+      await at_viewport(width, 900, async () => {
+        const screen = await mount(page({ story: long_story }));
+        const story = screen.getByRole("region", { name: "Story" });
+        await expect.element(story).toBeVisible();
+        const walker = document.createTreeWalker(
+          story.element(),
+          NodeFilter.SHOW_TEXT
+        );
+        const text = walker.nextNode() as Text;
+        const range = document.createRange();
+        range.selectNodeContents(text);
+        const lines = [...range.getClientRects()];
+        const total = lines.reduce((sum, line) => sum + line.width, 0);
+        const widest = Math.max(...lines.map((line) => line.width));
+        expect(lines.length).toBeGreaterThan(1);
+        expect(widest / (total / text.length)).toBeLessThanOrEqual(85);
       });
     }
   );
@@ -196,7 +225,7 @@ describe("campaign page", () => {
       const in_header = screen
         .getByRole("banner")
         .getByRole("button", { name: "Donate", includeHidden: true });
-      // the header's Donate has risen by its own rule, yet stays unpainted
+      // below lg the header keeps its Donate unpainted, risen or not
       await expect.element(in_header).toBeInTheDocument();
       await expect.element(in_header).not.toBeVisible();
     });
@@ -253,6 +282,40 @@ describe("campaign page", () => {
             expect(window.innerHeight - column.bottom).toBeGreaterThanOrEqual(
               2 * root_px - 1
             );
+          });
+        });
+      } finally {
+        root.style.fontSize = "";
+      }
+    }
+  );
+
+  test.each([16, 20])(
+    "at a %ipx root font, a give column too tall for the room under the header stays unstuck",
+    async (root_px) => {
+      const root = document.documentElement;
+      root.style.fontSize = `${root_px}px`;
+      try {
+        await at_viewport(1440, 900, async () => {
+          const screen = await mount(page());
+          const action = () =>
+            document.querySelector("[data-col='action']") as HTMLElement;
+          await vi.waitFor(() => {
+            expect(getComputedStyle(action()).position).toBe("sticky");
+          });
+          const column = action().getBoundingClientRect().height;
+          const pinned_bottom =
+            screen.getByRole("banner").element().getBoundingClientRect()
+              .height - 1;
+          // the height at which the column exactly fits, 2rem clear above and below
+          const fits = Math.ceil(column + pinned_bottom + 4 * root_px);
+          await browser.viewport(1440, fits - 4);
+          await vi.waitFor(() => {
+            expect(getComputedStyle(action()).position).not.toBe("sticky");
+          });
+          await browser.viewport(1440, fits + 4);
+          await vi.waitFor(() => {
+            expect(getComputedStyle(action()).position).toBe("sticky");
           });
         });
       } finally {
@@ -331,6 +394,33 @@ describe("campaign page", () => {
       const visit = screen.getByRole("link", { name: "Visit Harbor Clinic" });
       await expect.element(visit).toBeVisible();
       expect(visit.element().getAttribute("href")).toBe("/org/harbor");
+    });
+  });
+
+  test("on a phone, an ended page has no Donate and no bottom bar", async () => {
+    await at_viewport(375, 800, async () => {
+      const screen = await mount(
+        page({
+          open: false,
+          ended_body:
+            "It no longer takes donations. Thank you to everyone who gave.",
+          donor_line: "18 donors · Ended",
+          story: long_story,
+        })
+      );
+      await expect
+        .element(screen.getByRole("heading", { name: "Giving has ended" }))
+        .toBeVisible();
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      await expect
+        .element(screen.getByRole("button", { name: "Share", exact: true }))
+        .toBeVisible();
+      expect(
+        screen
+          .getByRole("button", { name: "Donate", includeHidden: true })
+          .query()
+      ).toBeNull();
+      expect(document.querySelector("[data-sticky]")).toBeNull();
     });
   });
 

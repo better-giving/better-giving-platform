@@ -24,14 +24,12 @@ const donate_inline = `h-16 w-full rounded bg-primary text-2xl font-semibold tex
 const donate_bar = `h-12 min-w-0 flex-1 rounded bg-primary text-base font-semibold text-primary-fg hover:bg-blue-10 ${ring}`;
 const close_btn =
   "grid size-11 place-items-center rounded text-2xl leading-none text-gray-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-9";
-/** where a stuck give column sits, and whether it fits there. OrgHeader pins
- * 1px above the viewport (-top-px in header.tsx), so its bottom edge is its
- * height less one; the column keeps 2rem clear of that edge and of the
- * viewport's bottom */
-function stuck_column(header_height: number) {
+/** where a stuck give column sits, and whether it fits there: 2rem clear of
+ * the pinned header's bottom edge and of the viewport's bottom */
+function stuck_column(header_bottom: number) {
   const clear =
     2 * Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
-  const top = header_height - 1 + clear;
+  const top = header_bottom + clear;
   return { top, room: window.innerHeight - top - clear };
 }
 
@@ -69,8 +67,9 @@ export function CampaignPage(props: ICampaignPage) {
     props.open && props.initial_dialog_open === true
   );
   const [away, set_away] = useState(false);
-  // OrgHeader's box, measured: what it pins over is out of view
-  const [header_height, set_header_height] = useState(0);
+  // the pinned header's bottom edge, in viewport px: OrgHeader pins 1px above
+  // the viewport (-top-px in header.tsx), so its box height less one
+  const [header_bottom, set_header_bottom] = useState(0);
   // null until the first measure, so a tall column starts unstuck
   const [stuck_top, set_stuck_top] = useState<number | null>(null);
   // state, not a ref: the header watches it and must hear when it mounts
@@ -87,14 +86,15 @@ export function CampaignPage(props: ICampaignPage) {
     const header = root_ref.current?.querySelector(":scope > header");
     if (!node || !(header instanceof HTMLElement)) return;
     const measure = () => {
-      set_header_height(header.offsetHeight);
+      const bottom = header.offsetHeight - 1;
+      set_header_bottom(bottom);
       // unresolved feed is a short box; sticking now unsticks when cards land
       if (node.querySelector("[data-feed-pending]")) {
         set_stuck_top(null);
         return;
       }
       const height = node.getBoundingClientRect().height;
-      const column = stuck_column(header.offsetHeight);
+      const column = stuck_column(bottom);
       // 0 is the mobile display:contents box; it has nothing to stick
       set_stuck_top(height > 0 && height <= column.room ? column.top : null);
     };
@@ -128,11 +128,11 @@ export function CampaignPage(props: ICampaignPage) {
       ([entry]) => {
         set_away(entry ? !entry.isIntersecting : false);
       },
-      { rootMargin: `-${header_height}px 0px 0px 0px`, threshold: 0 }
+      { rootMargin: `-${header_bottom}px 0px 0px 0px`, threshold: 0 }
     );
     io.observe(node);
     return () => io.disconnect();
-  }, [inline_donate, header_height]);
+  }, [inline_donate, header_bottom]);
 
   const sticky_bar = props.open && away;
 
@@ -166,7 +166,10 @@ export function CampaignPage(props: ICampaignPage) {
                   className="order-5 aspect-video w-full rounded object-cover lg:order-none"
                 />
               )}
-              <section aria-label="Story" className="order-6 lg:order-none">
+              <section
+                aria-label="Story"
+                className="order-6 max-w-prose lg:order-none"
+              >
                 <RichText
                   readOnly
                   content={props.story}
