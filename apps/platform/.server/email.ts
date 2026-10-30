@@ -40,7 +40,30 @@ interface IInput {
   subject: string;
 }
 
+/** zeptomail's answer to a bad token. nodemailer tags a refused login EAUTH */
+const is_credential_refusal = (err: unknown) =>
+  typeof err === "object" &&
+  err !== null &&
+  ((err as { code?: unknown }).code === "EAUTH" ||
+    (err as { responseCode?: unknown }).responseCode === 535);
+
+/**
+ * off production a mail the credential can't send is not a failure: a preview
+ * with no or a stale SMTP_PASSWORD would otherwise fail every queued send and
+ * retry it on backoff. production keeps every refusal.
+ */
+const skipped = (reason: string, subject: string) => {
+  console.warn(`mail not sent (${reason}): ${subject}`);
+  return {
+    data: { id: "skipped", response: reason },
+    error: null,
+  };
+};
+
 export async function send_email(i: IInput) {
+  if (stage !== "production" && !smtp.password) {
+    return skipped("SMTP_PASSWORD not set", i.subject);
+  }
   const [html, text] = await Promise.all([
     render(i.node),
     render(i.node, { plainText: true, ...text_options }),
@@ -65,6 +88,9 @@ export async function send_email(i: IInput) {
       error: null,
     };
   } catch (err) {
+    if (stage !== "production" && is_credential_refusal(err)) {
+      return skipped("credential refused", i.subject);
+    }
     // reported here rather than at each call site: a swallowed refusal is
     // invisible everywhere else, and vercel's logs are not read until a donor
     // asks where their mail went. subject only — `to`/`bcc` are donor and admin
@@ -85,6 +111,9 @@ export async function send_email(i: IInput) {
  * an action whose whole job is the mail (the dashboard receipt resend) catches
  * the throw and tells the user it failed. it reports what it catches too: a
  * render error throws before `send_email`'s report.
+ *
+ * off production a missing or refused credential resolves, as `send_email`
+ * does (`skipped`).
  *
  * fire-and-forget callers keep `send_email` — a magic link, a webhook handler,
  * an action mailing on the side must not fail the flow that triggered them over

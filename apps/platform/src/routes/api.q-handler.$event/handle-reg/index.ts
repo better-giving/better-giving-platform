@@ -213,11 +213,11 @@ export async function handle_reg_updated(reg: IReg) {
 
   if (ctp) {
     const contact = await update_or_create_contact(reg.r_id, ctp);
-    console.info(`hubspot contact:${contact.id}`);
+    console.info(`hubspot contact:${contact?.id}`);
   }
 
   if (cmp) {
     const company = await update_or_create_company(reg.id, cmp);
-    console.info(`hubspot company:${company.id}`);
+    console.info(`hubspot company:${company?.id}`);
   }
 }

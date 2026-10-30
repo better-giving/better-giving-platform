@@ -1,4 +1,5 @@
 import { Client, Receiver, SignatureError } from "@upstash/qstash";
+import { type Kind, type Lane, lane_of } from "@/queue/registry";
 import type { IMsg } from "@/queue/types";
 import { app, base_url, qstash, stage } from "../env";
 
@@ -22,12 +23,27 @@ export const in_dedupe_window = (at: string | null, now = Date.now()) =>
 const donation_dist_q = client.queue({
   queueName: `${app.slug}-${stage}-don-dist-q`,
 });
-const q = client.queue({
-  queueName: `${app.slug}-${stage}-q`,
-});
+
+/**
+ * one queue per lane (`lane_of` in `lib/queue/registry.ts`). each is FIFO with
+ * one message in flight, so a notification on its backoff holds only other
+ * notifications, never a split, a transfer or a cancel.
+ *
+ * the notice queue keeps the name the single shared queue had. a money message
+ * already on it at deploy still drains through the same handler route, just
+ * behind whatever sits ahead of it there; every money handler absorbs a repeat
+ * (stripe idempotency keys, a live read before a cancel, `don_dist`'s per
+ * destination dedupe), so one sent again on the money queue is safe either way.
+ * qstash creates the money queue on its first enqueue.
+ */
+const queues: Record<Lane, ReturnType<typeof client.queue>> = {
+  notice: client.queue({ queueName: `${app.slug}-${stage}-q` }),
+  money: client.queue({ queueName: `${app.slug}-${stage}-money-q` }),
+};
+
 export async function enqueue(...msgs: IMsg[]) {
   for (const m of msgs) {
-    const res = await q.enqueueJSON({
+    const res = await queues[lane_of(m.id as Kind)].enqueueJSON({
       url: `${base_url}/api/q-handler/${m.id}`,
       body: m.payload,
       deduplicationId: m.dedupe,
@@ -41,9 +57,9 @@ export async function enqueue(...msgs: IMsg[]) {
 /**
  * a message that fires later, delivered on its own rather than through the queue.
  *
- * published, not enqueued: the shared queue is FIFO and delivers one message at
- * a time, waiting for each to succeed or fail before starting the next, so a
- * message parked at its head for days stalls every notification behind it —
+ * published, not enqueued: each queue is FIFO and delivers one message at a
+ * time, waiting for each to succeed or fail before starting the next, so a
+ * message parked at its head for days stalls everything in its lane —
  * which is why qstash documents `delay` on publish and not on enqueue. these
  * have no ordering relationship to anything anyway: each is a standalone timer
  * against one db row, and the handler re-reads that row at fire time rather

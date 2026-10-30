@@ -13,7 +13,8 @@ vi.mock("../env", () => ({
   qstash: qstash_env,
 }));
 
-const { receiver, verify_qstash } = await import("./queue");
+const { receiver, verify_qstash, enqueue } = await import("./queue");
+const { KINDS, lane_of, msg } = await import("@/queue/registry");
 
 const TARGET_URL = "https://app.test/api/cron/grants";
 
@@ -110,5 +111,77 @@ describe("verify_qstash", () => {
 
     expect(res).toBeInstanceOf(Error);
     expect(String(res)).toMatch(/No signing keys/);
+  });
+});
+
+describe("enqueue", () => {
+  /** the queue each enqueued kind went to, in send order */
+  function capture() {
+    const sent: { queue: string; kind: string }[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input instanceof Request ? input.url : input);
+      const [, queue, kind] =
+        url.match(/\/v2\/enqueue\/([^/]+)\/.*\/api\/q-handler\/([^/?]+)/) ?? [];
+      sent.push({ queue: queue!, kind: kind! });
+      return Response.json({ messageId: "m" });
+    });
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    return sent;
+  }
+
+  // fixture wide enough for every dedupe recipe
+  const payload = {
+    id: "x1",
+    npo_id: 7,
+    to_id: 7,
+    dist_id: "dist-1",
+    fund_id: "f1",
+    creator_id: "u1",
+    invitee: "x@y.z",
+    sent_at: "2026-10-02T12:30:45.678Z",
+    date_created: "2026-01-02T03:04:05Z",
+    order_id: "O-1",
+    status: "02",
+    updated_at: "2026-09-01T10:20:30.456Z",
+    cancelled_at: "2026-10-02T12:30:45.678Z",
+  };
+
+  test("sends each kind to its lane's queue", async () => {
+    const sent = capture();
+
+    await enqueue(...KINDS.map((k) => msg(k, payload as never)));
+
+    expect(sent.map((s) => s.kind)).toEqual(KINDS);
+    for (const s of sent) {
+      expect(s.queue).toBe(
+        lane_of(s.kind as never) === "money" ? "bg-test-money-q" : "bg-test-q"
+      );
+    }
+  });
+
+  // a qstash queue delivers one message at a time and waits out every retry
+  // of its head, so what can delay a message is what shares its queue
+  test("a failing notification enqueued first shares no queue with a split or a transfer", async () => {
+    const sent = capture();
+
+    await enqueue(
+      msg("fiat-notice", { id: "evt_1", alert: { from: "t", title: "x" } }),
+      msg("don-sttl-receipt", payload as never),
+      msg("don-sttl-dist", payload as never),
+      msg("connect-transfer", {
+        dist_id: "dist-1",
+        donation_id: "d1",
+        intent_id: "pi_1",
+      })
+    );
+
+    const money = sent.filter((s) => s.queue === "bg-test-money-q");
+    expect(money.map((s) => s.kind)).toEqual([
+      "don-sttl-dist",
+      "connect-transfer",
+    ]);
+    expect(
+      sent.filter((s) => s.queue === "bg-test-q").map((s) => s.kind)
+    ).toEqual(["fiat-notice", "don-sttl-receipt"]);
   });
 });

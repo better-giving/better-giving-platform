@@ -18,6 +18,8 @@ export {
   type ISubDeactivatedPayload,
   type ITipReceivedPayload,
   type Kind,
+  type Lane,
+  lane_of,
   msg,
   PAYPAL_CAPTURE_DELAY_S,
   type Payloads,
