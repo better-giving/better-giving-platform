@@ -4,11 +4,22 @@ import { render } from "vitest-browser-react";
 import { AllowScreen, type IAllowScreen } from "./allow-screen";
 
 const disclosure =
-  "It can read donors' names and emails, donations, campaigns and forms, and start draft campaigns. It cannot move money.";
+  "This connection can read donors' names and emails, donations, campaigns and forms, and start draft campaigns. It cannot move money.";
 
 const CONSENT_URL = "/admin/connector/allow?state=oauth-state&client=chatgpt";
 
 type IProps = Omit<IAllowScreen, "email"> & { email?: string };
+
+/** the header's two logos, client first; both are decorative (`alt=""`) */
+function logos(container: HTMLElement) {
+  return Array.from(
+    container.querySelectorAll<HTMLImageElement>("header img"),
+    (img) => ({ src: img.getAttribute("src"), alt: img.getAttribute("alt") })
+  );
+}
+
+const empty_text =
+  "Switch to the account that runs your nonprofit, or register one at better.giving/register.";
 
 function render_screen({ email = "maria@hopeshelter.org", ...props }: IProps) {
   const Stub = createRoutesStub([
@@ -39,15 +50,20 @@ describe("AllowScreen", () => {
         })
       )
       .toBeVisible();
-    await expect
-      .element(screen.getByRole("img", { name: "ChatGPT" }))
-      .toHaveAttribute("src", "/icons/clients/openai-white-monoblossom.svg");
+    const [client_logo, bg_logo] = logos(screen.container);
+    expect(client_logo).toEqual({
+      src: "/icons/clients/openai-white-monoblossom.svg",
+      alt: "",
+    });
+    expect(bg_logo?.alt).toBe("");
     await expect
       .element(screen.getByText(disclosure, { exact: true }))
       .toBeVisible();
 
     const harbor = screen.getByRole("radio", { name: "Harbor Food Bank" });
     const ridge = screen.getByRole("radio", { name: "Ridge Clinic" });
+    await expect.element(harbor).toBeVisible();
+    await expect.element(ridge).toBeVisible();
     await expect.element(harbor).toHaveAttribute("value", "12");
     await expect.element(ridge).toHaveAttribute("value", "48");
     await expect.element(harbor).not.toBeChecked();
@@ -55,6 +71,8 @@ describe("AllowScreen", () => {
 
     const allow = screen.getByRole("button", { name: "Allow", exact: true });
     const deny = screen.getByRole("button", { name: "Deny", exact: true });
+    await expect.element(allow).toBeVisible();
+    await expect.element(deny).toBeVisible();
     await expect.element(allow).toBeEnabled();
     await expect.element(allow).toHaveAttribute("name", "decision");
     await expect.element(allow).toHaveAttribute("value", "allow");
@@ -75,6 +93,26 @@ describe("AllowScreen", () => {
         })
       )
       .toBeVisible();
+  });
+
+  test("Claude is named and shows its own logo", async () => {
+    const screen = await render_screen({
+      state: "oauth-state",
+      client: "claude",
+      nonprofits: [{ id: 7, name: "Only Kitchen" }],
+    });
+
+    await expect
+      .element(
+        screen.getByRole("heading", {
+          name: "Claude wants to connect to Better Giving",
+        })
+      )
+      .toBeVisible();
+    expect(logos(screen.container)[0]).toEqual({
+      src: "/icons/clients/claude-icon-square.svg",
+      alt: "",
+    });
   });
 
   test("the signed-in account can be switched back to this request", async () => {
@@ -102,9 +140,9 @@ describe("AllowScreen", () => {
       nonprofits: [{ id: 7, name: "Only Kitchen" }],
     });
 
-    await expect
-      .element(screen.getByRole("radio", { name: "Only Kitchen" }))
-      .toBeChecked();
+    const only = screen.getByRole("radio", { name: "Only Kitchen" });
+    await expect.element(only).toBeVisible();
+    await expect.element(only).toBeChecked();
   });
 
   test("a refused connection is an alert above the buttons", async () => {
@@ -140,15 +178,32 @@ describe("AllowScreen", () => {
     await expect.element(alert).toHaveTextContent("Choose a nonprofit");
   });
 
-  test("a blocked connection request shows the refusal and no buttons", async () => {
+  test("a blocked connection request shows the refusal and no buttons, and can still switch account", async () => {
     const message =
       "This connection request can't be completed. Start again from the chat.";
     const screen = await render_screen({
       state: "not-used",
+      client: "chatgpt",
       nonprofits: [{ id: 7, name: "Only Kitchen" }],
       error: message,
       blocked: true,
     });
+
+    await expect
+      .element(
+        screen.getByRole("heading", {
+          name: "ChatGPT wants to connect to Better Giving",
+        })
+      )
+      .toBeVisible();
+    await expect
+      .element(screen.getByText("maria@hopeshelter.org", { exact: true }))
+      .toBeVisible();
+    const swap = screen.getByRole("button", { name: "Switch account" });
+    await expect.element(swap).toBeVisible();
+    expect(
+      (swap.element() as HTMLElement).closest("form")?.getAttribute("action")
+    ).toBe("/logout");
 
     const alert = screen.getByRole("alert");
     await expect.element(alert).toBeVisible();
@@ -178,12 +233,19 @@ describe("AllowScreen", () => {
     await expect
       .element(screen.getByRole("link", { name: "better.giving/register" }))
       .toHaveAttribute("href", "/register");
+    const deny = screen.getByRole("button", { name: "Deny", exact: true });
+    const allow = screen.getByRole("button", { name: "Allow", exact: true });
+    await expect.element(deny).toBeVisible();
+    await expect.element(deny).toBeEnabled();
+    await expect.element(allow).toBeVisible();
+    await expect.element(allow).toBeDisabled();
+    // the disabled Allow says why, as Deny does
     await expect
-      .element(screen.getByRole("button", { name: "Deny", exact: true }))
-      .toBeEnabled();
+      .element(allow)
+      .toHaveAccessibleDescription(expect.stringContaining(empty_text));
     await expect
-      .element(screen.getByRole("button", { name: "Allow", exact: true }))
-      .toBeDisabled();
+      .element(deny)
+      .toHaveAccessibleDescription(expect.stringContaining(empty_text));
     await expect.element(screen.getByRole("radio")).not.toBeInTheDocument();
   });
 });

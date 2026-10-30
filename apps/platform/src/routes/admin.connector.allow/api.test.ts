@@ -233,13 +233,14 @@ describe("connector allow", () => {
     const user_row = { id: member.id, role: "user", email: member.email };
 
     const loaded = await load(
-      `${ALLOW_URL}?state=${encodeURIComponent("../x")}`,
+      `${ALLOW_URL}?state=${encodeURIComponent("../x")}&client=claude`,
       user_row
     );
     expect(loaded).not.toBeInstanceOf(Response);
     expect(loaded).toMatchObject({
       data: {
         email: "ada@test.com",
+        client: "claude",
         nonprofits: [],
         state: "",
         error: CONNECTION_REFUSED,

@@ -11,7 +11,7 @@ export const meta: Route.MetaFunction = () => metas({ title: "Connect" });
 
 export default function Page({ loaderData, actionData }: Route.ComponentProps) {
   return (
-    <main className="page py-10">
+    <main className="page grid justify-items-center py-10">
       <AllowScreen
         nonprofits={loaderData.nonprofits}
         state={loaderData.state}

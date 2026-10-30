@@ -1,5 +1,5 @@
 import { Button } from "@better-giving/ui";
-import { Bot, CircleAlert } from "lucide-react";
+import { Bot, CircleAlert, Ellipsis } from "lucide-react";
 import { useId, useLayoutEffect, useRef } from "react";
 import { Form, href, Link, useLocation } from "react-router";
 import bg_logo from "#/assets/images/bg-logo.webp";
@@ -29,7 +29,7 @@ interface IClientTile {
 function ClientTile({ client }: IClientTile) {
   if (!client) {
     return (
-      <span className={`${TILE} flex-center border bg-gray-2 text-gray-11`}>
+      <span className={`${TILE} flex-center border bg-surface text-gray-11`}>
         <Bot className="icon-lg" aria-hidden />
       </span>
     );
@@ -37,7 +37,7 @@ function ClientTile({ client }: IClientTile) {
   const c = clients[client];
   return (
     <span className={`${TILE} ${c.tile}`}>
-      <img src={c.logo} alt={c.name} className="size-full object-contain" />
+      <img src={c.logo} alt="" className="size-full object-contain" />
     </span>
   );
 }
@@ -56,25 +56,20 @@ export function AllowScreen({
   const alert_ref = useRef<HTMLDivElement>(null);
   const { pathname, search } = useLocation();
   const client_name = client ? clients[client].name : "An AI assistant";
+  const described_by = none ? `${disclosure_id} ${empty_id}` : disclosure_id;
 
   useLayoutEffect(() => {
     if (error) alert_ref.current?.focus();
   }, [error]);
 
   return (
-    <section className="solo-card mx-auto gap-6">
+    <section className="solo-card gap-6">
       <header className="grid gap-6">
         <div className="flex items-center justify-center gap-3">
           <ClientTile client={client} />
-          <span aria-hidden className="text-xl text-gray-9">
-            ⋯
-          </span>
-          <span className={`${TILE} border bg-panel p-2`}>
-            <img
-              src={bg_logo}
-              alt="Better Giving"
-              className="size-full object-contain"
-            />
+          <Ellipsis className="icon-xl text-gray-11" aria-hidden />
+          <span className={`${TILE} border bg-surface p-2`}>
+            <img src={bg_logo} alt="" className="size-full object-contain" />
           </span>
         </div>
         <h2 className="text-center text-xl font-bold text-balance">
@@ -82,7 +77,7 @@ export function AllowScreen({
         </h2>
       </header>
 
-      <div className="flex items-center gap-3 rounded border border-gray-7 bg-gray-2 px-4 py-3.5">
+      <div className="flex items-center gap-3 rounded border bg-surface px-4 py-3.5">
         <span
           aria-hidden
           className="flex-center size-10 shrink-0 rounded-full bg-primary text-lg font-bold text-primary-fg"
@@ -106,7 +101,7 @@ export function AllowScreen({
         {blocked ? null : none ? (
           <div
             id={empty_id}
-            className="grid gap-1 rounded border border-dashed border-gray-7 px-4 py-3.5"
+            className="grid gap-1 rounded border border-dashed px-4 py-3.5"
           >
             <p className="font-bold">This account doesn't manage a nonprofit</p>
             <p className="text-sm text-gray-11">
@@ -123,7 +118,7 @@ export function AllowScreen({
             {nonprofits.map((npo) => (
               <label
                 key={npo.id}
-                className="radio rounded border px-3.5 py-3 has-checked:border-primary has-checked:bg-blue-2"
+                className="radio rounded border px-3.5 py-3 has-checked:border-primary has-checked:bg-secondary-active"
               >
                 <input
                   type="radio"
@@ -137,8 +132,8 @@ export function AllowScreen({
           </fieldset>
         )}
         <p id={disclosure_id} className="text-sm text-gray-11">
-          It can read donors' names and emails, donations, campaigns and forms,
-          and start draft campaigns. It cannot move money.
+          This connection can read donors' names and emails, donations,
+          campaigns and forms, and start draft campaigns. It cannot move money.
         </p>
         <div className="grid">
           <div
@@ -168,9 +163,7 @@ export function AllowScreen({
                 size="lg"
                 name="decision"
                 value="deny"
-                aria-describedby={
-                  none ? `${disclosure_id} ${empty_id}` : disclosure_id
-                }
+                aria-describedby={described_by}
               >
                 Deny
               </Button>
@@ -181,7 +174,7 @@ export function AllowScreen({
                 name="decision"
                 value="allow"
                 disabled={none}
-                aria-describedby={disclosure_id}
+                aria-describedby={described_by}
               >
                 Allow
               </Button>

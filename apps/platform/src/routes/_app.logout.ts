@@ -1,5 +1,5 @@
 import { type ActionFunction, href, redirect } from "react-router";
-import { auth, to_auth } from "#/.server/auth";
+import { auth } from "#/.server/auth";
 import { login_url } from "#/helpers/login-url";
 import { safe_redirect } from "@/helpers/safe-redirect";
 
@@ -13,9 +13,11 @@ const asked_return = async (request: Request) => {
 
 export const action: ActionFunction = async ({ request }) => {
   const back = safe_redirect(await asked_return(request), null);
+  const to = back ? login_url(back) : href("/marketplace");
   const session = await auth.api.getSession({ headers: request.headers });
-  // already signed out (another tab): the sign-in it was headed for still holds
-  if (!session) return back ? redirect(login_url(back)) : to_auth(request);
+  // already signed out (another tab): same destination, no cookie to clear
+  // not to_auth: its sign-in returns to /logout, which has no loader
+  if (!session) return redirect(to);
 
   const res = await auth.api.signOut({
     headers: request.headers,
@@ -25,5 +27,5 @@ export const action: ActionFunction = async ({ request }) => {
   const headers = new Headers();
   const cookie = res.headers.get("set-cookie");
   if (cookie) headers.set("set-cookie", cookie);
-  return redirect(back ? login_url(back) : href("/marketplace"), { headers });
+  return redirect(to, { headers });
 };
