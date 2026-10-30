@@ -9,7 +9,8 @@ import {
 } from "react";
 import { Link } from "react-router";
 import { DonorMsgs, type IDonorHighlight } from "#/components/donor-msgs";
-import { DappLogo } from "#/components/image";
+import { OrgFooterMinimal } from "#/components/org-page/footer";
+import { OrgHeader } from "#/components/org-page/header";
 import { RichText } from "#/components/rich-text";
 import { extract_youtube_id } from "#/components/youtube-player";
 import { Share } from "#/routes/_app.campaigns.$fund_id/share";
@@ -20,12 +21,17 @@ const ring =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 const donate_inline = `h-16 w-full rounded bg-primary text-2xl font-semibold text-primary-fg hover:bg-blue-10 ${ring}`;
-const donate_header = `h-11 shrink-0 rounded bg-primary px-4 text-base font-semibold text-primary-fg hover:bg-blue-10 ${ring}`;
 const donate_bar = `h-12 min-w-0 flex-1 rounded bg-primary text-base font-semibold text-primary-fg hover:bg-blue-10 ${ring}`;
 const close_btn =
   "grid size-11 place-items-center rounded text-2xl leading-none text-gray-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-9";
-// a bare min-[1288px]: sorts before lg: (px vs 64rem), so the zero is lg:-prefixed
-const gutter = "px-5 lg:px-8 lg:min-[1288px]:px-0";
+/** where a stuck give column sits, and whether it fits there: 2rem clear of
+ * the pinned header's bottom edge and of the viewport's bottom */
+function stuck_column(header_bottom: number) {
+  const clear =
+    2 * Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+  const top = header_bottom + clear;
+  return { top, room: window.innerHeight - top - clear };
+}
 
 export interface ICampaignPage {
   title: string;
@@ -61,29 +67,42 @@ export function CampaignPage(props: ICampaignPage) {
     props.open && props.initial_dialog_open === true
   );
   const [away, set_away] = useState(false);
-  // false until the first measure, so a tall column can show the header
-  const [fits, set_fits] = useState(false);
-  const donate_ref = useRef<HTMLButtonElement>(null);
+  // the pinned header's bottom edge, in viewport px: OrgHeader pins 1px above
+  // the viewport (-top-px in header.tsx), so its box height less one
+  const [header_bottom, set_header_bottom] = useState(0);
+  // null until the first measure, so a tall column starts unstuck
+  const [stuck_top, set_stuck_top] = useState<number | null>(null);
+  // state, not a ref: the header watches it and must hear when it mounts
+  const [inline_donate, set_inline_donate] = useState<HTMLButtonElement | null>(
+    null
+  );
   const close_ref = useRef<HTMLButtonElement>(null);
+  const root_ref = useRef<HTMLDivElement>(null);
   const action_ref = useRef<HTMLDivElement>(null);
   const open_dialog = () => set_dialog(true);
 
   useLayoutEffect(() => {
     const node = action_ref.current;
-    if (!node) return;
+    const header = root_ref.current?.querySelector(":scope > header");
+    if (!node || !(header instanceof HTMLElement)) return;
     const measure = () => {
+      // a header with no box (display:none ancestor) would give -1, and `--1px` throws in the IO
+      const bottom = Math.max(0, header.offsetHeight - 1);
+      set_header_bottom(bottom);
       // unresolved feed is a short box; sticking now unsticks when cards land
       if (node.querySelector("[data-feed-pending]")) {
-        set_fits(false);
+        set_stuck_top(null);
         return;
       }
       const height = node.getBoundingClientRect().height;
+      const column = stuck_column(bottom);
       // 0 is the mobile display:contents box; it has nothing to stick
-      set_fits(height > 0 && height <= window.innerHeight - 64);
+      set_stuck_top(height > 0 && height <= column.room ? column.top : null);
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(node);
+    ro.observe(header);
     // a marker can leave without a box change (empty feed, highlight already painted)
     const mo = new MutationObserver(measure);
     mo.observe(node, {
@@ -101,8 +120,8 @@ export function CampaignPage(props: ICampaignPage) {
   }, []);
 
   useEffect(() => {
-    const node = donate_ref.current;
-    if (!props.open || !node) {
+    const node = inline_donate;
+    if (!node) {
       set_away(false);
       return;
     }
@@ -110,46 +129,34 @@ export function CampaignPage(props: ICampaignPage) {
       ([entry]) => {
         set_away(entry ? !entry.isIntersecting : false);
       },
-      { threshold: 0 }
+      { rootMargin: `-${header_bottom}px 0px 0px 0px`, threshold: 0 }
     );
     io.observe(node);
     return () => io.disconnect();
-  }, [props.open]);
+  }, [inline_donate, header_bottom]);
 
   const sticky_bar = props.open && away;
-  const sticky_header = sticky_bar && !fits;
 
   return (
     <>
       <div
+        ref={root_ref}
         inert={dialog ? true : undefined}
-        className="min-h-[100dvh] bg-background text-gray-12"
+        className="flex min-h-[100dvh] flex-col bg-background text-gray-12"
       >
-        {sticky_header && (
-          <header
-            data-sticky="header"
-            className="fixed inset-x-0 top-0 z-sticky hidden h-14 border-b border-gray-6 bg-gray-1 lg:flex"
-          >
-            <div
-              className={`mx-auto flex h-full w-full max-w-[1224px] items-center justify-between gap-3 ${gutter}`}
-            >
-              <p className="min-w-0 truncate text-base font-semibold">
-                {props.title}
-              </p>
-              <button
-                type="button"
-                onClick={open_dialog}
-                className={donate_header}
-              >
-                Donate
-              </button>
-            </div>
-          </header>
-        )}
-        <div
-          className={`mx-auto w-full max-w-[1224px] pt-4 pb-12 lg:pt-8 lg:pb-16 ${gutter}`}
-        >
-          <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_392px] lg:items-start lg:gap-8">
+        <OrgHeader
+          name={props.org_name}
+          logo={props.logo}
+          to={props.org_href}
+          on_donate={props.open ? open_dialog : undefined}
+          // the phone bar carries Donate below lg
+          donate_from_lg
+          donate_after={props.open ? inline_donate : undefined}
+        />
+        <main className="page flex-1 pt-4 pb-12 lg:pt-8 lg:pb-16">
+          {/* the story track caps at 800px (a 1224px box less the give column and gap); past it the
+              slack opens between the columns, so the give column keeps the header's right edge */}
+          <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,800px)_392px] lg:items-start lg:justify-between lg:gap-8">
             <div
               data-col="story"
               className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-10"
@@ -179,14 +186,16 @@ export function CampaignPage(props: ICampaignPage) {
             <div
               ref={action_ref}
               data-col="action"
-              className={`contents lg:flex lg:min-w-0 lg:flex-col lg:gap-6 lg:has-[[data-feed]]:gap-10${fits ? " lg:sticky lg:top-8 lg:self-start" : ""}`}
+              className={`contents lg:flex lg:min-w-0 lg:flex-col lg:gap-6 lg:has-[[data-feed]]:gap-10${stuck_top === null ? "" : " lg:sticky lg:self-start"}`}
+              style={stuck_top === null ? undefined : { top: stuck_top }}
             >
               <Notice {...props} />
               <div className="order-4 flex flex-col gap-2 lg:order-none">
                 {props.open && (
                   <button
-                    ref={donate_ref}
+                    ref={set_inline_donate}
                     type="button"
+                    aria-haspopup="dialog"
                     onClick={open_dialog}
                     className={donate_inline}
                   >
@@ -209,11 +218,8 @@ export function CampaignPage(props: ICampaignPage) {
               />
             </div>
           </div>
-          <footer className="mt-10 flex w-full items-center gap-3 border-t py-6 lg:mt-16">
-            <DappLogo classes="h-8" />
-            <span className="text-sm font-semibold">Better Giving</span>
-          </footer>
-        </div>
+        </main>
+        <OrgFooterMinimal />
         {sticky_bar && (
           <div
             data-sticky="bar"
@@ -225,7 +231,12 @@ export function CampaignPage(props: ICampaignPage) {
               recipientName={props.share.recipientName}
               url={props.share.url}
             />
-            <button type="button" onClick={open_dialog} className={donate_bar}>
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              onClick={open_dialog}
+              className={donate_bar}
+            >
               Donate
             </button>
           </div>

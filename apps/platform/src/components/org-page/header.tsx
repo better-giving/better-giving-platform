@@ -19,7 +19,20 @@ export interface IHeaderSection {
   label: string;
 }
 
-interface IOrgHeader {
+/** one Donate per header: a link or a dialog's trigger, never both */
+interface IDonateLink {
+  /** a Donate link to this href, when given */
+  donate_to?: string;
+  on_donate?: never;
+}
+
+interface IDonateDialog {
+  /** a Donate button that opens the page's own donation dialog, when given */
+  on_donate?: () => void;
+  donate_to?: never;
+}
+
+type IOrgHeader = (IDonateLink | IDonateDialog) & {
   name: string;
   logo?: string | null;
   /** the org's profile */
@@ -27,8 +40,8 @@ interface IOrgHeader {
   bookmark?: INpoBookmark;
   /** a Share icon button for this target, when given */
   share?: IShareTarget;
-  /** a Donate button to this href, when given */
-  donate_to?: string;
+  /** Donate from lg only, for a page that carries its own below lg */
+  donate_from_lg?: boolean;
   /** the hero's own Donate. given, the header's Donate waits until it is out
    * of view (one with no box never is in view); null while it mounts.
    * omitted, Donate always shows */
@@ -36,7 +49,7 @@ interface IOrgHeader {
   /** in-page links to these sections, from lg; narrower screens get none
    * here, so a page that passes them carries its own strip there */
   sections?: IHeaderSection[];
-}
+};
 
 /** a Donate that waits rises in once the hero's are gone, and sinks out as
  * one returns; `display` goes last, so the exit is seen */
@@ -54,6 +67,8 @@ export function OrgHeader({
   bookmark,
   share,
   donate_to,
+  on_donate,
+  donate_from_lg = false,
   donate_after,
   sections = [],
 }: IOrgHeader) {
@@ -77,6 +92,7 @@ export function OrgHeader({
   }, [donate_after]);
   const waits = donate_after !== undefined;
   const donate_in = !waits || (donate_after !== null && gone === donate_after);
+  const donate_classes = `ml-1 max-sm:px-4 sm:ml-2 ${waits ? (donate_in ? DONATE_IN : DONATE_OUT) : ""} ${donate_from_lg ? "max-lg:hidden" : ""}`;
 
   return (
     <header
@@ -121,12 +137,11 @@ export function OrgHeader({
               idle_ink="text-primary"
             />
           )}
-          {donate_to && (
-            <DonateButton
-              to={donate_to}
-              classes={`ml-1 max-sm:px-4 sm:ml-2 ${waits ? (donate_in ? DONATE_IN : DONATE_OUT) : ""}`}
-            />
-          )}
+          {donate_to ? (
+            <DonateButton to={donate_to} classes={donate_classes} />
+          ) : on_donate ? (
+            <DonateButton on_click={on_donate} classes={donate_classes} />
+          ) : null}
         </div>
       </div>
     </header>
