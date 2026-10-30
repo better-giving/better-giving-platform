@@ -63,7 +63,7 @@ export function AllowScreen({
   }, [error]);
 
   return (
-    <section className="solo-card gap-6">
+    <section className="solo-card grid-cols-1 gap-6">
       <header className="grid gap-6">
         <div className="flex items-center justify-center gap-3">
           <ClientTile client={client} />
@@ -96,7 +96,7 @@ export function AllowScreen({
         </Form>
       </div>
 
-      <Form method="post" className="grid gap-6">
+      <Form method="post" className="grid min-w-0 grid-cols-1 gap-6">
         {blocked ? null : <input type="hidden" name="state" value={state} />}
         {blocked ? null : none ? (
           <div
