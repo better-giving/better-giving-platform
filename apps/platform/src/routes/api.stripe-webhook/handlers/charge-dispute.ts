@@ -9,6 +9,16 @@ import { dispute_close, dispute_get, dispute_open } from "$/pg/queries/dispute";
 import { dispute_opened, dispute_won, owed_lines } from "$/refund/dispute";
 import { load_reversible, reverse_charge } from "$/refund/reverse";
 import { charge_refunds, refund_take } from "$/refund/unsent";
+import {
+  held_transfers,
+  released_lines,
+  routed_open_lines,
+  send_held,
+} from "$/stripe-connect/release";
+import {
+  reverse_routed_refunds,
+  routed_dispute_reversals,
+} from "$/stripe-connect/reverse";
 import { ReversalIncompleteError } from "../helpers/reversal-incomplete";
 import { settled_donation } from "../helpers/settled-donation";
 
@@ -50,7 +60,9 @@ const dispute_fee_usd = (d: Stripe.Dispute): { usd: number; line?: string } => {
  * charge has at most one dispute. only succeeded refunds count: stripe fails
  * one still pending when the charge is disputed */
 async function taken_from_charge(d: Stripe.Dispute) {
-  const { charge, of, all, sent } = await charge_refunds(str_id(d.charge));
+  const { charge, of, all, sent, unsent } = await charge_refunds(
+    str_id(d.charge)
+  );
   const counted = sent.map(refund_take);
   const refunded = counted.reduce((sum, r) => sum + r.amount, 0);
   const share = { taken: d.amount + refunded, of };
@@ -58,6 +70,7 @@ async function taken_from_charge(d: Stripe.Dispute) {
     charge,
     refunds: all,
     counted,
+    unsent: unsent.map((r) => r.id),
     share,
     partial: share.taken < share.of,
   };
@@ -77,8 +90,10 @@ export async function handle_dispute_closed(
     console.info(`dispute ${dispute.id} closed ${dispute.status}: kept`);
     return;
   }
-  const don = await settled_donation(str_id(dispute.payment_intent));
+  const intent_id = str_id(dispute.payment_intent);
+  const don = await settled_donation(intent_id);
   const at = { opened_at: iso(dispute.created), closed_at: iso(event.created) };
+  const release = () => release_closed(event, don.id, intent_id);
 
   if (dispute.status === "warning_closed") {
     await dispute_close(db, {
@@ -87,7 +102,7 @@ export async function handle_dispute_closed(
       status: "inquiry_closed",
       ...at,
     });
-    return;
+    return release();
   }
 
   if (dispute.status === "won") {
@@ -100,6 +115,15 @@ export async function handle_dispute_closed(
     if (won.status === "failed") {
       throw new Error(`dispute ${dispute.id} not credited: ${won.reason}`);
     }
+    if (won.status === "credited") return release();
+    // a loss recorded earlier reversed its cut of the routed transfers, which
+    // nothing re-pays: ops get a line per transfer to settle by hand
+    const routed = await routed_dispute_reversals(don.id, {
+      id: dispute.id,
+      amount: dispute.amount,
+      charge: str_id(dispute.charge),
+      created_at: iso(dispute.created),
+    });
     if (won.status === "conflict") {
       // keyed on the event: a redelivery collapses into it
       await enqueue(
@@ -112,13 +136,13 @@ export async function handle_dispute_closed(
             body: [
               dispute_line(dispute, don.id, event.id),
               `dispute ${dispute.id} won after it was recorded ${won.prior_status}: the chargeback stays owed; credit by hand if stripe returned the money.`,
+              ...routed,
             ].join("\n"),
           },
         })
       );
       return;
     }
-    if (won.status !== "already_reversed") return;
     const fee = dispute_fee_usd(dispute);
     // keyed on the event: a redelivery collapses into it inside the queue's
     // dedupe window only
@@ -142,6 +166,7 @@ export async function handle_dispute_closed(
                     ...(fee.line ? [fee.line] : []),
                   ].join(" ")
                 : `stripe returned the disputed ${money(dispute.amount, dispute.currency)}, the platform's own withdrawal: the donation was already ${won.donation_status}, reversed by its refund or another dispute rather than this one, so nothing is owed to the nonprofit.`,
+            ...routed,
           ].join("\n"),
         },
       })
@@ -162,9 +187,21 @@ export async function handle_dispute_closed(
     return;
   }
 
-  const { charge, refunds, counted, share, partial } =
+  const { charge, refunds, counted, unsent, share, partial } =
     await taken_from_charge(dispute);
   const fee = dispute_fee_usd(dispute);
+  // reverse_charge leaves a dispute's routed cut to this; a throw fails the
+  // delivery, for stripe's redelivery to retry
+  const routed = await reverse_routed_refunds(don.id, {
+    of: share.of,
+    refunds: counted,
+    unsent,
+  });
+  // the job sends the whole net, and its own reversal then takes back this
+  // loss's cut. a full loss reverses the gift, so nothing is left to send.
+  // sent after the notice naming them: a lost notice fails the delivery with
+  // them still held, so the redelivery names them again
+  const released = partial ? await held_transfers(don.id) : [];
 
   const result = await reverse_charge({
     donation_id: don.id,
@@ -189,6 +226,8 @@ export async function handle_dispute_closed(
           : []),
         `dispute fee: ${dispute_fees(dispute)}`,
         ...(fee.line ? [fee.line] : []),
+        ...routed,
+        ...released_lines(released),
       ],
     },
   });
@@ -196,7 +235,13 @@ export async function handle_dispute_closed(
   if (result.status === "already_reversed") {
     console.info(`already reversed: ${don.id}`);
   }
-  if (result.status !== "failed") return;
+  if (result.status !== "failed") {
+    return send_held(released, {
+      donation_id: don.id,
+      intent_id,
+      dispute_id: dispute.id,
+    });
+  }
   if (result.reason === "incomplete") {
     throw new ReversalIncompleteError(
       don.id,
@@ -205,6 +250,36 @@ export async function handle_dispute_closed(
     );
   }
   throw new Error(`dispute ${dispute.id} not reversed: ${result.reason}`);
+}
+
+/** a favorable close sends the transfers the dispute held, and tells ops */
+async function release_closed(
+  event: Stripe.ChargeDisputeClosedEvent,
+  donation_id: string,
+  intent_id: string
+) {
+  const dispute = event.data.object;
+  const released = await held_transfers(donation_id);
+  if (released.length === 0) return;
+  // keyed on the event: a redelivery collapses into it. ahead of the
+  // transfers, so a lost notice fails the delivery with them still held and
+  // the redelivery sends both
+  await enqueue(
+    msg("fiat-notice", {
+      id: event.id,
+      alert: {
+        type: "NOTICE",
+        from: `${ALERT_FROM}-${stage}`,
+        title: "Dispute Closed: Held Transfers Released",
+        body: [
+          dispute_line(dispute, donation_id, event.id),
+          `dispute ${dispute.id} closed ${dispute.status}: the transfers it held are sent.`,
+          ...released_lines(released),
+        ].join("\n"),
+      },
+    })
+  );
+  await send_held(released, { donation_id, intent_id, dispute_id: dispute.id });
 }
 
 /** an inquiry escalating to a chargeback stays the same dispute and sends no
@@ -222,10 +297,12 @@ export async function handle_dispute_opened(event: DisputeEvent) {
   // owed only once the funds have left, which the balance transactions show
   // and the status doesn't
   const withdrawn = dispute.balance_transactions.some((bt) => bt.amount < 0);
+  const routed = await routed_open_lines(don.id);
   if (!withdrawn) {
     const inquiry = dispute.status.startsWith("warning_");
     return record_only(event, don.id, [
       `${inquiry ? "an inquiry: " : ""}stripe has withdrawn no funds, so nothing recorded as owed. if it withdraws them, as when an inquiry escalates to a chargeback, what the gift's parties owe is recorded then.`,
+      ...routed,
     ]);
   }
   const { share, partial } = await taken_from_charge(dispute);
@@ -260,6 +337,7 @@ export async function handle_dispute_opened(event: DisputeEvent) {
     if (!sighted) return;
     return notify_opened(event, don.id, `${dispute.id}_unsettled`, [
       "nothing settled to the gift's parties yet, so nothing recorded as owed.",
+      ...routed,
     ]);
   }
   if (res.prior_refs.length > 0 && sighted) {
@@ -276,6 +354,7 @@ export async function handle_dispute_opened(event: DisputeEvent) {
     ...owed_lines(res.owed),
     ...(fee.line ? [fee.line] : []),
     `the donation stays settled while the dispute is open, and what is owed is recovered from each party's next grants. if the dispute is lost, ${partial ? "it stays owed and the donation is not reversed" : "the donation reverses without taking it twice"}; if won, what is owed is credited back.`,
+    ...routed,
   ]);
 }
 

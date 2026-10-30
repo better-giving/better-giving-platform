@@ -11,6 +11,13 @@ describe("msg() — dedupe keys are wire-format and must not drift", () => {
     ["banking-rejected", { npo_id: 42 }, "banking.rejected_42"],
     // one transfer per routed dist, however often settlement resends it
     ["connect-transfer", { dist_id: "dist-1" }, "connect.transfer_dist-1"],
+    // a dispute's release is its own message, never collapsed into the
+    // settlement's send that held
+    [
+      "connect-transfer",
+      { dist_id: "dist-1", release: "dp_1" },
+      "connect.transfer_dist-1_dp_1",
+    ],
     ["don-dist", { id: "d1", to_id: 7 }, "don.dist_d1_7"],
     ["don-fund-receipt", { id: "d5", attempt: 2 }, "don.fund-receipt_d5_2"],
     ["don-match", { id: "d4" }, "don.match_d4"],

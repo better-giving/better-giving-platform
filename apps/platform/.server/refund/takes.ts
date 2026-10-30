@@ -6,6 +6,7 @@ import type { DbOrTx } from "../pg/queries/helpers";
 import {
   type IOwed,
   type OwedParty,
+  owed_for_donation,
   owed_for_party,
   record_owed,
 } from "../pg/queries/owed";
@@ -48,17 +49,34 @@ export const taken_of = (takes: ITake[], kind?: ITake["kind"]) =>
 const party_key = (p: OwedParty) => JSON.stringify(p);
 
 /**
+ * the disputes' share a dist whose grant hasn't gone out owes, past the cut a
+ * refused transfer's rebook took off it for the sent refunds and lost
+ * disputes. a refund can't follow a chargeback (stripe: `charge_disputed`),
+ * so whatever the takes hold past the cut is a dispute's
+ */
+const disputes_past_cut = (
+  cut: number | null,
+  all: number,
+  disputes: number
+) => (cut === null ? disputes : Math.min(past_cut(cut, all), disputes));
+
+/**
  * what each party owes for the active takes. an npo whose grant has gone out
- * owes the share they all take, less the refunds a pooled rebook cut off it,
- * of what it received and of its card fee; one
- * whose grant hasn't owes the disputes' share only, a refund there being ops'
- * to settle by hand. each active dispute's fee is owed in full, split over
- * the dists by settled amount, and each referrer owes the whole share of its
- * commission paid or claimed for a transfer
+ * owes the share they all take, less what a pooled rebook cut off it, of what
+ * it received and of its card fee; one whose grant hasn't owes the disputes'
+ * share past that cut only, a refund there being ops' to settle by hand. a
+ * routed dist owes no share: a dispute holds its transfer or, lost, reverses
+ * its cut, as a refund does. each active dispute's fee is owed in full, split
+ * over the dists by settled amount, routed ones included, and each referrer
+ * owes the whole share of its commission paid or claimed for a transfer.
+ * the npos in `legacy` hold a row recorded before routed dists stopped
+ * owing a dispute's share (`legacy_row`): theirs are priced as before, as an
+ * ungranted pooled dist is
  */
 export function owed_targets(
   ds: LockedDist[],
-  takes: ITake[]
+  takes: ITake[],
+  legacy: ReadonlySet<number> = new Set()
 ): Map<string, OwedShare> {
   const all = taken_of(takes);
   const disputes = taken_of(takes, "dispute");
@@ -72,13 +90,82 @@ export function owed_targets(
   return new Map(
     owed_shares(ds, {
       f: all,
-      // a rebook's cut took refunds only, so a dispute owes its share whole
       f_of: (d) =>
-        grant_went_out(d) ? past_cut(d.refunds_cut_share, all) : disputes,
+        d.routed && !legacy.has(d.to_id)
+          ? 0
+          : grant_went_out(d)
+            ? past_cut(d.refunds_cut_share, all)
+            : disputes_past_cut(d.refunds_cut_share, all, disputes),
       fee_usd: fees,
       owes: () => true,
     }).map((s) => [party_key(s.party), s])
   );
+}
+
+/** `refused_usd`, loaded on a call: the core runs on every rail, which
+ * importing it must not need stripe's client for */
+const refused_of = async (tx: DbOrTx, donation_id: string, npo_id: number) => {
+  const { refused_usd } = await import("../stripe-connect/shortfall");
+  return refused_usd(tx, donation_id, npo_id);
+};
+
+/** every npo with a routed dist, as `owed_targets` prices it the old way */
+const routed_npos = (ds: LockedDist[]) =>
+  new Set(ds.filter((d) => d.routed).map((d) => d.to_id));
+
+/**
+ * whether an npo's `row` was recorded when its routed dists still owed a
+ * dispute's share of what they received and of their card fee: it holds more
+ * card fee than the takes owe now (`now`), which nothing records of a routed
+ * dist any more. where the old pricing (`old`) would have recorded no more
+ * card fee than now, the received decides: at least what the old pricing
+ * owes, when that is more than they owe now, past every cut of the npo's
+ * transfers stripe refused to reverse (`refused`, read only then), which is
+ * all a row records of a routed dist now. such a row is moved by the old
+ * pricing, so a win credits what its open recorded, and a loss leaves its
+ * transfer alone (`legacy_routed_npos`), the debt standing as before
+ */
+export async function legacy_row(
+  row: IOwed | undefined,
+  now: OwedShare | undefined,
+  old: OwedShare | undefined,
+  refused: () => Promise<number>
+): Promise<boolean> {
+  if (!row || !old) return false;
+  const cent = 0.005;
+  const fee = now?.fee_processing_usd ?? 0;
+  if (row.fee_processing_usd > fee + cent) return true;
+  // the open would have recorded a card fee with what they received
+  if (old.fee_processing_usd > fee + cent) return false;
+  const r = now?.received_usd ?? 0;
+  if (old.received_usd <= r + cent) return false;
+  if (row.received_usd + cent < old.received_usd) return false;
+  return row.received_usd - (await refused()) + cent >= old.received_usd;
+}
+
+/** the gift's npos whose row `legacy_row` says the old pricing recorded */
+export async function legacy_routed_npos(
+  donation_id: string
+): Promise<Set<number>> {
+  return db.transaction(async (tx) => {
+    const ds = await gift_dists_locked(tx, donation_id);
+    const routed = routed_npos(ds);
+    if (routed.size === 0) return new Set<number>();
+    const takes = await takes_of(tx, donation_id);
+    const now = owed_targets(ds, takes);
+    const old = owed_targets(ds, takes, routed);
+    const rows = await owed_for_donation(donation_id, tx);
+    const legacy = new Set<number>();
+    for (const npo_id of routed) {
+      const key = party_key({ npo_id });
+      const row = rows.find((o) => o.npo_id === npo_id);
+      const refused = () => refused_of(tx, donation_id, npo_id);
+      if (await legacy_row(row, now.get(key), old.get(key), refused)) {
+        legacy.add(npo_id);
+      }
+    }
+    return legacy;
+  });
 }
 
 /**
@@ -123,14 +210,16 @@ export async function record_dispute_fees(
 /**
  * the npo's row raised to what the gift's takes owe it plus `usd`, every cent
  * of its routed dist's transfer stripe refused to reverse for the gift's
- * refunds so far; its figures only grow, so a rerun records nothing more
+ * refunds and lost disputes so far; its figures only grow, so a rerun
+ * records nothing more
  */
 export async function owe_unreversed(u: {
   donation_id: string;
   npo_id: number;
   usd: number;
-  /** the refund whose cut was refused */
+  /** the refund or lost dispute whose cut was refused */
   source_ref: string;
+  source: OwedSource["source"];
 }) {
   await db.transaction(async (tx) => {
     const ds = await gift_dists_locked(tx, u.donation_id);
@@ -145,7 +234,7 @@ export async function owe_unreversed(u: {
       // the zeros leave what is recorded
       fee_processing_usd: 0,
       fee_dispute_usd: 0,
-      source: "refund",
+      source: u.source,
       source_ref: u.source_ref,
       now: new Date().toISOString(),
     });
@@ -275,19 +364,29 @@ export async function move_owed(
 ): Promise<OwedMove[]> {
   const was = owed_targets(m.ds, m.before);
   const now = owed_targets(m.ds, m.after);
+  const routed = routed_npos(m.ds);
+  const was_old = owed_targets(m.ds, m.before, routed);
+  const now_old = owed_targets(m.ds, m.after, routed);
   const fallen = given_back(m.before, m.after);
   const moves: OwedMove[] = [];
   for (const key of new Set([...was.keys(), ...now.keys()])) {
-    const a = now.get(key);
-    const b = was.get(key);
-    const party = (a ?? b)!.party;
+    const party = (now.get(key) ?? was.get(key))!.party;
+    let row = await owed_for_party(m.donation_id, party, tx);
+    // a row the old pricing recorded moves by it, from what it recorded
+    const legacy =
+      "npo_id" in party &&
+      routed.has(party.npo_id) &&
+      (await legacy_row(row, was.get(key), was_old.get(key), () =>
+        refused_of(tx, m.donation_id, party.npo_id)
+      ));
+    const a = (legacy ? now_old : now).get(key);
+    const b = (legacy ? was_old : was).get(key);
     const fig = (s: OwedShare | undefined) => ({
       r: s?.received_usd ?? 0,
       p: s?.fee_processing_usd ?? 0,
       f: s?.fee_dispute_usd ?? 0,
     });
     const [x, y] = [fig(b), fig(a)];
-    let row = await owed_for_party(m.donation_id, party, tx);
     // each figure only grows, so one already recorded stays as it is
     if (y.r > 0 || y.p > 0 || y.f > 0) {
       row = await record_owed(tx, {
