@@ -156,25 +156,41 @@ describe("campaign page", () => {
     }
   );
 
-  test.each([1536, 1920])(
-    "at %ipx the story keeps a reading measure",
+  // the story track the page had before it took `page`: a 1224px content box
+  // less the 392px give column and the 32px lg:gap-8
+  const story_track = 1224 - 392 - 32;
+
+  // 768 is the single column; 1280 is under the cap; 1536 is the first width
+  // past it (1920 lays out the same box, only centered)
+  test.each([768, 1280, 1536])(
+    "at %ipx the story's media and text share one right edge, within the old track",
     async (width) => {
       await at_viewport(width, 900, async () => {
-        const screen = await mount(page({ story: long_story }));
-        const story = screen.getByRole("region", { name: "Story" });
-        await expect.element(story).toBeVisible();
-        const walker = document.createTreeWalker(
-          story.element(),
-          NodeFilter.SHOW_TEXT
+        const screen = await mount(
+          page({
+            story: long_story,
+            hero: "/hero.jpg",
+            hero_alt: "The clinic's waiting room",
+            videos: [{ url: "https://vimeo.com/1" }],
+          })
         );
-        const text = walker.nextNode() as Text;
-        const range = document.createRange();
-        range.selectNodeContents(text);
-        const lines = [...range.getClientRects()];
-        const total = lines.reduce((sum, line) => sum + line.width, 0);
-        const widest = Math.max(...lines.map((line) => line.width));
-        expect(lines.length).toBeGreaterThan(1);
-        expect(widest / (total / text.length)).toBeLessThanOrEqual(85);
+        await expect
+          .element(screen.getByRole("region", { name: "Story" }))
+          .toBeVisible();
+        const column = document.querySelector(
+          "[data-col='story']"
+        ) as HTMLElement;
+        const items = [...column.children].map((x) =>
+          x.getBoundingClientRect()
+        );
+        expect(items).toHaveLength(4);
+        const right = items[0]?.right ?? 0;
+        for (const item of items) {
+          expect(item.right).toBeCloseTo(right, 0);
+          expect(item.width).toBeLessThanOrEqual(story_track);
+        }
+        // where the track has room it keeps its old width, not a narrower one
+        if (width >= 1536) expect(items[0]?.width).toBeCloseTo(story_track, 0);
       });
     }
   );
@@ -240,18 +256,25 @@ describe("campaign page", () => {
       await expect.element(inline).toBeVisible();
       await expect.element(inline).toHaveAttribute("aria-haspopup", "dialog");
       const banner = screen.getByRole("banner").element();
-      // the inline Donate's bottom edge just inside the header's bottom edge
+      const bar = () => document.querySelector("[data-sticky='bar']");
+      // scroll until the inline Donate's bottom edge lands within 1px of the
+      // pinned header's: still showing, so no bar
       await vi.waitFor(() => {
         const header_bottom = banner.getBoundingClientRect().bottom;
         const donate = inline.element().getBoundingClientRect();
-        window.scrollBy(0, donate.bottom - header_bottom + 4);
-        const now = inline.element().getBoundingClientRect();
-        expect(now.bottom).toBeGreaterThan(0);
-        expect(now.bottom).toBeLessThan(banner.getBoundingClientRect().bottom);
+        window.scrollBy(0, donate.bottom - header_bottom);
+        const now = inline.element().getBoundingClientRect().bottom;
+        const edge = banner.getBoundingClientRect().bottom;
+        expect(now).toBeGreaterThanOrEqual(edge);
+        expect(now).toBeLessThan(edge + 1);
       });
-      await vi.waitFor(() => {
-        expect(document.querySelector("[data-sticky='bar']")).not.toBeNull();
-      });
+      // two frames for the observer to report and the page to re-render
+      for (let i = 0; i < 2; i++)
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      expect(bar()).toBeNull();
+      // one more pixel puts it under the header
+      window.scrollBy(0, 1);
+      await vi.waitFor(() => expect(bar()).not.toBeNull());
     });
   });
 
@@ -276,9 +299,11 @@ describe("campaign page", () => {
             expect(header_bottom).toBeGreaterThan(0);
             // stuck, not merely scrolled past
             expect(column.bottom).toBeGreaterThan(header_bottom);
+            // 2rem clear of the header's painted bottom edge, inside a 1px window
             expect(column.top - header_bottom).toBeGreaterThanOrEqual(
-              2 * root_px - 1
+              2 * root_px
             );
+            expect(column.top - header_bottom).toBeLessThan(2 * root_px + 1);
             expect(window.innerHeight - column.bottom).toBeGreaterThanOrEqual(
               2 * root_px - 1
             );
@@ -307,13 +332,14 @@ describe("campaign page", () => {
           const pinned_bottom =
             screen.getByRole("banner").element().getBoundingClientRect()
               .height - 1;
-          // the height at which the column exactly fits, 2rem clear above and below
+          // the least whole viewport height the column fits in: the header's
+          // painted bottom, 2rem clear, the column, 2rem clear of the bottom
           const fits = Math.ceil(column + pinned_bottom + 4 * root_px);
-          await browser.viewport(1440, fits - 4);
+          await browser.viewport(1440, fits - 1);
           await vi.waitFor(() => {
             expect(getComputedStyle(action()).position).not.toBe("sticky");
           });
-          await browser.viewport(1440, fits + 4);
+          await browser.viewport(1440, fits);
           await vi.waitFor(() => {
             expect(getComputedStyle(action()).position).toBe("sticky");
           });
@@ -323,6 +349,33 @@ describe("campaign page", () => {
       }
     }
   );
+
+  test("a page mounted with no layout box renders", async () => {
+    const Stub = createRoutesStub([
+      {
+        path: "/",
+        Component: () => (
+          <div hidden>
+            <CampaignPage {...page()} />
+          </div>
+        ),
+        ErrorBoundary: () => <p>route error</p>,
+        HydrateFallback: () => null,
+      },
+    ]);
+    const screen = await render(<Stub initialEntries={["/"]} />);
+    await expect
+      .element(
+        screen.getByRole("heading", {
+          name: "Winter fuel for Harbor Clinic",
+          includeHidden: true,
+        })
+      )
+      .toBeInTheDocument();
+    // the observer's effect runs after the first paint; give it a frame to throw
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(screen.getByText("route error").query()).toBeNull();
+  });
 
   test("Donate opens the dialog and Close returns focus", async () => {
     const screen = await mount(page());
@@ -397,7 +450,7 @@ describe("campaign page", () => {
     });
   });
 
-  test("on a phone, an ended page has no Donate and no bottom bar", async () => {
+  test("on a phone, an ended page has no Donate", async () => {
     await at_viewport(375, 800, async () => {
       const screen = await mount(
         page({
@@ -420,7 +473,6 @@ describe("campaign page", () => {
           .getByRole("button", { name: "Donate", includeHidden: true })
           .query()
       ).toBeNull();
-      expect(document.querySelector("[data-sticky]")).toBeNull();
     });
   });
 

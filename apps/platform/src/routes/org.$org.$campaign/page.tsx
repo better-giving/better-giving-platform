@@ -86,7 +86,8 @@ export function CampaignPage(props: ICampaignPage) {
     const header = root_ref.current?.querySelector(":scope > header");
     if (!node || !(header instanceof HTMLElement)) return;
     const measure = () => {
-      const bottom = header.offsetHeight - 1;
+      // a header with no box (display:none ancestor) would give -1, and `--1px` throws in the IO
+      const bottom = Math.max(0, header.offsetHeight - 1);
       set_header_bottom(bottom);
       // unresolved feed is a short box; sticking now unsticks when cards land
       if (node.querySelector("[data-feed-pending]")) {
@@ -153,7 +154,9 @@ export function CampaignPage(props: ICampaignPage) {
           donate_after={props.open ? inline_donate : undefined}
         />
         <main className="page flex-1 pt-4 pb-12 lg:pt-8 lg:pb-16">
-          <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_392px] lg:items-start lg:gap-8">
+          {/* the story track caps at 800px (a 1224px box less the give column and gap); past it the
+              slack opens between the columns, so the give column keeps the header's right edge */}
+          <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,800px)_392px] lg:items-start lg:justify-between lg:gap-8">
             <div
               data-col="story"
               className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-10"
@@ -166,10 +169,7 @@ export function CampaignPage(props: ICampaignPage) {
                   className="order-5 aspect-video w-full rounded object-cover lg:order-none"
                 />
               )}
-              <section
-                aria-label="Story"
-                className="order-6 max-w-prose lg:order-none"
-              >
+              <section aria-label="Story" className="order-6 lg:order-none">
                 <RichText
                   readOnly
                   content={props.story}
