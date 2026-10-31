@@ -35,7 +35,7 @@ export const cards: ICard[] = [
 
 export function Features({ classes = "" }) {
   return (
-    <div className={`${classes} grid bg-panel rounded py-10`}>
+    <div className={`${classes} grid py-10`}>
       <h2 className="text-center section-heading">
         Our features aren't seasonal. They're standard.
       </h2>
@@ -46,7 +46,7 @@ export function Features({ classes = "" }) {
         {cards.map(({ title, description, icon }) => (
           <div
             key={title}
-            className="shadow-lift-card bg-panel grid grid-rows-subgrid justify-items-center row-span-3 items-center p-6 rounded transition-shadow duration-slow"
+            className="card shadow-lift-card grid grid-rows-subgrid justify-items-center row-span-3 items-center transition-shadow duration-slow"
           >
             <div className="p-1">{icon}</div>
             <div className="text-xl font-semibold">{title}</div>

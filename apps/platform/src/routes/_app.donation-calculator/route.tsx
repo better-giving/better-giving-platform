@@ -70,8 +70,12 @@ export default function Page() {
           Export to pdf
         </Link>
 
-        <div className="grid sm:grid-cols-subgrid col-span-2 bg-panel p-4 rounded">
-          <Form1 state={state} setState={setState} classes="sm:border-r" />
+        <div className="grid sm:grid-cols-subgrid col-span-2 card">
+          <Form1
+            state={state}
+            setState={setState}
+            classes="sm:border-r border-hairline"
+          />
           <Result1 {...view} classes="" />
         </div>
       </div>
@@ -117,8 +121,12 @@ export default function Page() {
           Savings & Investment Calculator
         </h2>
 
-        <div className="grid sm:grid-cols-subgrid col-span-2 bg-panel p-4 rounded">
-          <Form2 state={state} setState={setState} classes="sm:border-r" />
+        <div className="grid sm:grid-cols-subgrid col-span-2 card">
+          <Form2
+            state={state}
+            setState={setState}
+            classes="sm:border-r border-hairline"
+          />
           <Table {...view} classes="" />
         </div>
         <h2 className="text-balance text-2xl sm:text-3xl text-primary mt-12 mb-1 text-center col-span-2">

@@ -79,7 +79,7 @@ export default function Page() {
             state's charitable-solicitation rules or ask a nonprofit attorney
             about your specific situation.
           </p>
-          <p className="mt-5 border-t border-gray-6 pt-4 text-xs print:hidden">
+          <p className="mt-5 border-t border-hairline pt-4 text-xs print:hidden">
             <Link
               to={href("/blog/:slug", { slug: BANNER_POST_SLUG })}
               className="font-bold link"

@@ -79,7 +79,7 @@ export function Hero({ classes = "" }: IHero) {
             className="absolute size-50 bg-secondary rounded-full -top-8 -right-4"
             aria-hidden
           />
-          <div className="relative bg-panel border border-gray-6 rounded shadow-lift-media overflow-hidden -rotate-1">
+          <div className="relative bg-card rounded-card shadow-lift-media overflow-hidden -rotate-1">
             <img
               src={donation_form}
               alt="Better Giving embeddable donation form"

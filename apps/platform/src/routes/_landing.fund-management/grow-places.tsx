@@ -15,7 +15,7 @@ export function GrowPlaces({ classes = "" }: IGrowPlaces) {
           Two places your money grows
         </h2>
         <div className="grid gap-6 md:grid-cols-2 mt-11">
-          <div className="bg-secondary border border-gray-6 rounded p-9 grid gap-3.5 content-start">
+          <div className="card grid gap-3.5 content-start">
             <Badge size="md" tone="secondary" className="justify-self-start">
               No market risk
             </Badge>
@@ -26,7 +26,7 @@ export function GrowPlaces({ classes = "" }: IGrowPlaces) {
               balance reaches your payout minimum.
             </p>
           </div>
-          <div className="surface-primary rounded p-9 grid gap-3.5 content-start">
+          <div className="surface-primary rounded-card p-9 grid gap-3.5 content-start">
             <Badge size="md" tone="on-primary" className="justify-self-start">
               Long-term growth
             </Badge>

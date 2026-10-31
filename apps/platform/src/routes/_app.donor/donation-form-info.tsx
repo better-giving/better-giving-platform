@@ -15,7 +15,7 @@ export function DonationFormInfo({ classes = "" }) {
 
       <StepsCarousel classes="w-full max-w-lg self-center justify-self-center" />
 
-      <ul className="divide-y divide-gray-6 mt-6 @6xl:mt-0">
+      <ul className="divide-y divide-hairline mt-6 @6xl:mt-0">
         {benefits.donorsOrder2.map((b, idx) => (
           <ListItem
             title={b.title}

@@ -62,7 +62,7 @@ export default function WpPlugin() {
           is the number that was assigned to your nonprofit when you signed up
           with {app_name} and is unique to it (ex. 121).
         </div>
-        <div className="mx-auto flex max-w-md gap-4 bg-panel p-4 my-4 rounded">
+        <div className="mx-auto flex max-w-md gap-4 card my-4">
           <Image
             alt="Laira mascot waving"
             src={laira_waiving}

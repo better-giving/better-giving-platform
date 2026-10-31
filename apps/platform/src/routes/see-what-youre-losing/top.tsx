@@ -52,7 +52,7 @@ export function Top({ classes = "" }) {
         {open && (
           <Modal
             size="lg"
-            classes="grid bg-panel text-gray-12"
+            classes="grid bg-card text-gray-12"
             open={open}
             onClose={() => set_open(false)}
           >

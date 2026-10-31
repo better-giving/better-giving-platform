@@ -35,7 +35,7 @@ export function ResumeStrip({ prev, action }: Props) {
     <fetcher.Form
       method="POST"
       onSubmit={handleSubmit}
-      className="mt-8 p-4 bg-gray-3 border border-gray-6 rounded"
+      className="mt-8 p-4 bg-panel rounded"
     >
       <p className="text-sm font-bold">Already started an application?</p>
       <div className="flex gap-2 mt-3">

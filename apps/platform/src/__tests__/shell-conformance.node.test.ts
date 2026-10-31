@@ -267,8 +267,6 @@ describe("the card shell", () => {
       // the registration layout: its inset is delegated to the two children
       // that fill its grid, and pt-8 is the shell's own top rule
       "apps/platform/src/routes/_app.register.$reg_id._steps/route.tsx",
-      // the checklist's pinned progress band — sticky chrome, not in the flow
-      "apps/platform/src/routes/_landing.ethical-fundraising-platform-checklist/checklist.tsx",
       // a recharts tooltip body: a floating layer that says so with neither a
       // shadow nor a z-index
       "apps/platform/src/routes/admin.$id.donors_.$email/stewardship.tsx",

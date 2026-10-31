@@ -11,7 +11,7 @@ export default function Layout() {
   ) as Reg$IdData;
 
   return (
-    <div className="w-full md:w-[90%] max-w-250 pt-8 grid md:grid-cols-[auto_1fr] border rounded md:rounded bg-panel">
+    <div className="w-full md:w-[90%] max-w-250 pt-8 grid md:grid-cols-[auto_1fr] bg-card rounded-card">
       <ProgressIndicator
         step={new Progress(reg).step}
         o_type={reg.o_type}

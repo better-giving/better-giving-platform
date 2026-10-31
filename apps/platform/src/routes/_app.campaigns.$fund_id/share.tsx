@@ -83,7 +83,7 @@ export function Share(props: ShareProps) {
           size="panel"
           // `!`: the tier's own width classes match this specificity and would
           // otherwise win or lose by stylesheet order
-          classes="w-fit! grid content-start gap-2 border bg-surface pb-4"
+          classes="w-fit! grid content-start gap-2 bg-card pb-4"
         >
           {/* no `title`: Modal names the dialog by this heading */}
           <div className="flex items-center justify-between gap-4 pt-2 pr-2 pl-4">
@@ -192,9 +192,9 @@ function Prompt({
       open={open}
       onClose={() => set_open(false)}
       size="md"
-      classes="grid content-start border bg-background"
+      classes="grid content-start bg-card"
     >
-      <div className="grid place-items-center relative h-16  font-bold bg-gray-3 border-b">
+      <div className="grid place-items-center relative h-16  font-bold bg-gray-3 border-b border-hairline">
         Share on {social.title}
         <button
           type="button"
@@ -207,7 +207,7 @@ function Prompt({
       </div>
       <p
         ref={msgRef}
-        className="my-6 sm:my-10 mx-4 sm:mx-12 text-sm leading-normal p-3 border rounded"
+        className="my-6 sm:my-10 mx-4 sm:mx-12 text-sm leading-normal p-3 bg-panel rounded"
       >
         Donate to <span className="font-bold">{recipientName}</span> on{" "}
         <span className="font-bold">{social.handle}</span>!{" "}

@@ -44,7 +44,7 @@ interface Props {
 function TooltipRows({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-background border border-gray-6 rounded px-3 py-2 text-[13px]">
+    <div className="bg-card rounded-card shadow-floating px-3 py-2 text-[13px]">
       <p className="mb-1 font-medium">{label}</p>
       {payload.map((entry: any) => (
         <p key={entry.dataKey} style={{ color: ink(entry.dataKey) }}>

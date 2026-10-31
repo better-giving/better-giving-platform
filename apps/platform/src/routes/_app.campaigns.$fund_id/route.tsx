@@ -103,7 +103,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
             />
           </div>
 
-          <div className="bg-panel rounded p-4">
+          <div className="card">
             <div className="grid max-md:gap-y-4 items-center max-md:justify-items-center md:grid-cols-[auto_1fr]">
               <div className="mr-4 md:row-span-2">
                 <Image
@@ -137,7 +137,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
             </div>
           </div>
 
-          <div className="rounded overflow-hidden bg-panel">
+          <div className="bg-card rounded-card overflow-hidden">
             {fund.banner && (
               <img
                 src={fund.banner}
@@ -167,7 +167,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
         </div>
         <div
           id="info-card"
-          className="md:sticky md:top-30 bg-panel self-start flex flex-col content-start z-10 rounded p-4"
+          className="md:sticky md:top-30 card self-start flex flex-col content-start z-10"
         >
           {" "}
           <DonateSection
