@@ -62,7 +62,7 @@ function Page({ loaderData: page1 }: Route.ComponentProps) {
         <Filter isDisabled={loading} classes="w-full @sm:w-auto" />
       </div>
 
-      <div className="grid table-scroll">{node}</div>
+      <div className="grid">{node}</div>
     </div>
   );
 }
