@@ -223,8 +223,9 @@ Three rules fall out of that test, and all three are load-bearing:
 
 - **Ground**: the page. White (`--background`) under four soft radial blots,
   two small blue `--wash` blots at about 4% 4% and 30% 72%, the lighter,
-  cyan-leaning blue `--wash-far` at about 78% 22% and 98% 98%. The two `--wash`
-  blots were shrunk 2026-10-31 (to 38%/34% and 32%/32% of the window): **more
+  cyan-leaning blue `--wash-far` at about 80% 20% and 98% 98%. All four blots
+  were shrunk 2026-10-31 (`--wash` to 38%/34% and 32%/32% of the window,
+  `--wash-far` to 34%/34% and 36%/36%): **more
   white ground is deliberate**, so a card's blue-tinted `shadow-card` has white
   to read against rather than a blot. The blots are **fixed to the window**: they stay put while the
   page scrolls. Painted once, as a fixed `body::before` in platform's
