@@ -35,12 +35,14 @@ function Page({ loaderData }: Route.ComponentProps) {
       {connect_routing && <StripeConnectCard {...stripe} classes="mb-8" />}
 
       {methods.length === 0 ? (
-        <EmptyState
-          heading="No payout methods yet"
-          icon={<Landmark className="icon-xl" />}
-        >
-          Payout methods you add will show up here.
-        </EmptyState>
+        <div className="card">
+          <EmptyState
+            heading="No payout methods yet"
+            icon={<Landmark className="icon-xl" />}
+          >
+            Payout methods you add will show up here.
+          </EmptyState>
+        </div>
       ) : (
         <div className="grid col-span-full table-scroll">
           <Table methods={methods} />

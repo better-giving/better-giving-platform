@@ -105,7 +105,7 @@ interface CardProps {
 }
 function Card({ label, value, dollar = true }: CardProps) {
   return (
-    <div>
+    <div className="card">
       <p className="text-gray-11 text-sm mb-1">{label}</p>
       <p className="text-xl font-bold">
         {dollar ? "$" : ""}

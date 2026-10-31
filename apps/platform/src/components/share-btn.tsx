@@ -71,7 +71,7 @@ export function ShareButton({ classes = "", ...p }: IShareButton) {
         <Portal>
           <Menu.Positioner>
             <Menu.Content
-              className={`z-floating grid grid-cols-2 w-max p-3 rounded-card bg-card text-gray-12 shadow-floating ${popup_anim}`}
+              className={`z-floating grid grid-cols-2 w-max p-3 rounded-card bg-card text-gray-12 shadow-floating focus:outline-0 ${popup_anim}`}
             >
               {menuItems.map((item) => (
                 <Menu.Item key={item.name} value={item.name} asChild>

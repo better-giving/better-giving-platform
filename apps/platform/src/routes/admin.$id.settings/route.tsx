@@ -48,7 +48,7 @@ function Page({ loaderData: endow }: Route.ComponentProps) {
           set_params(next, { preventScrollReset: true });
         }}
       >
-        <div className="py-4 md:py-8">
+        <div className="card mt-4 md:mt-8 mb-6 md:mb-10">
           <TabPanel value="donation">
             <DonationTab
               receipt_msg={endow.receipt_msg ?? ""}

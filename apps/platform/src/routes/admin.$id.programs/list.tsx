@@ -7,12 +7,14 @@ export function List({ programs }: { programs: IProgramDb[] }) {
   return (
     <div className="@container grid gap-3">
       {programs.length === 0 ? (
-        <EmptyState
-          heading="No programs yet"
-          icon={<Layers className="icon-xl" />}
-        >
-          Programs you add will show up here.
-        </EmptyState>
+        <div className="card">
+          <EmptyState
+            heading="No programs yet"
+            icon={<Layers className="icon-xl" />}
+          >
+            Programs you add will show up here.
+          </EmptyState>
+        </div>
       ) : (
         programs.map((p) => <Program {...p} key={p.id} />)
       )}

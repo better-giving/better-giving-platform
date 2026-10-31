@@ -1,24 +1,15 @@
-import { Portal } from "@ark-ui/react/portal";
-import { createListCollection, Select } from "@ark-ui/react/select";
-import { EmptyRow, LoadMoreRow, popup_anim, Target } from "@better-giving/ui";
+import { EmptyRow, LoadMoreRow, Target } from "@better-giving/ui";
 import { to_usd } from "@better-giving/ui/helpers";
-import { ChevronDownIcon, TagIcon } from "lucide-react";
-import { href, NavLink, useNavigate, useSearchParams } from "react-router";
+import { TagIcon } from "lucide-react";
+import { href, NavLink } from "react-router";
+import {
+  type FormStatusFilter,
+  StatusBadge,
+  StatusFilter,
+} from "#/components/forms-table/status";
 import type { IPaginator } from "#/types/components";
 import { toPP } from "@/helpers/date";
 import type { IFormListed } from "$/pg/queries/form";
-
-type Filter = "all" | "active" | "inactive";
-const FILTER_OPTS: Filter[] = ["all", "active", "inactive"];
-const FILTER_LABEL: Record<Filter, string> = {
-  all: "All",
-  active: "Active",
-  inactive: "Inactive",
-};
-const FILTER_COLLECTION = createListCollection({
-  items: FILTER_OPTS,
-  itemToString: (v) => FILTER_LABEL[v],
-});
 
 interface Props extends IPaginator<IFormListed> {
   status: string;
@@ -40,7 +31,7 @@ export function FormsTable({
             <tr>
               <th>Form</th>
               <th>
-                <StatusFilter value={status as Filter} />
+                <StatusFilter value={status as FormStatusFilter} />
               </th>
               <th>Raised / Goal</th>
               <th className="text-right">Donations</th>
@@ -131,61 +122,5 @@ function Row(f: IFormListed) {
         )}
       </td>
     </>
-  );
-}
-
-function StatusBadge({ status }: { status: string | null }) {
-  const is_active = status === "active";
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium ${
-        is_active
-          ? "bg-success-subtle text-success-subtle-fg"
-          : "bg-gray-3 text-gray-11"
-      }`}
-    >
-      <span
-        className={`size-1.5 rounded-full ${is_active ? "bg-success" : "bg-gray-11"}`}
-      />
-      {is_active ? "Active" : "Inactive"}
-    </span>
-  );
-}
-
-function StatusFilter({ value }: { value: Filter }) {
-  const [search] = useSearchParams();
-  const navigate = useNavigate();
-  return (
-    <Select.Root
-      collection={FILTER_COLLECTION}
-      value={[value]}
-      onValueChange={(e) => {
-        const v = e.value[0];
-        if (!v) return;
-        const p = new URLSearchParams(search);
-        p.set("status", v);
-        p.delete("next");
-        navigate(`?${p.toString()}`);
-      }}
-      positioning={{ placement: "bottom-start", gutter: 4 }}
-    >
-      <Select.Trigger className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide cursor-pointer">
-        <Select.ValueText placeholder="Status" />
-        <ChevronDownIcon className="text-gray-11 icon-sm" />
-      </Select.Trigger>
-      <Portal>
-        <Select.Positioner>
-          <Select.Content
-            className={`bg-card rounded-card shadow-floating text-gray-12 min-w-28 overflow-hidden z-floating ${popup_anim}`}
-          >
-            {FILTER_OPTS.map((v) => (
-              <Select.Item key={v} item={v} className="selector-opt text-sm">
-                <Select.ItemText>{FILTER_LABEL[v]}</Select.ItemText>
-              </Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Positioner>
-      </Portal>
-    </Select.Root>
   );
 }

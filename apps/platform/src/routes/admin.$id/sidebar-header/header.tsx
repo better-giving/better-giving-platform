@@ -32,7 +32,7 @@ export function Loader({ name, logo = flying_character }: IEndow) {
       <Portal>
         <Menu.Positioner>
           <Menu.Content
-            className={`z-floating grid w-max min-w-56 p-2 rounded-card bg-card text-gray-12 shadow-floating ${popup_anim}`}
+            className={`z-floating grid w-max min-w-56 p-2 rounded-card bg-card text-gray-12 shadow-floating focus:outline-0 ${popup_anim}`}
           >
             {list.map((org) => {
               const is_current = org.id.toString() === current_id;

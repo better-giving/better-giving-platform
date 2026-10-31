@@ -355,7 +355,8 @@ describe("admin filters forms", () => {
 
     const screen = await render_page(npo.id, "inactive");
 
-    expect(screen.getByRole("table").query()).toBeNull();
+    // the empty state is a row of the table card, under the filter header
+    await expect.element(screen.getByRole("table")).toBeInTheDocument();
     await expect
       .element(screen.getByText(/no.*inactive.*forms found/i))
       .toBeVisible();
@@ -385,7 +386,8 @@ describe("admin filters forms", () => {
     const screen = await render_page(npo.id);
 
     await expect.element(screen.getByText("Donation forms")).toBeVisible();
-    expect(screen.getByRole("table").query()).toBeNull();
+    // the empty state is a row of the table card, under the filter header
+    await expect.element(screen.getByRole("table")).toBeInTheDocument();
     await expect.element(screen.getByText(/no.*forms found/i)).toBeVisible();
     await expect
       .element(screen.getByText("Forms you create will show up here."))

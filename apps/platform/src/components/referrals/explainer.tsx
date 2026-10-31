@@ -24,10 +24,10 @@ export function Explainer({ classes = "" }) {
   }, []);
 
   return (
-    <div className={`w-full ${classes}`}>
+    <div className={`card w-full ${classes}`}>
       <Collapsible.Root open={open} onOpenChange={(e) => set_open(e.open)}>
-        <div className="flex items-center gap-x-1 mb-1 relative">
-          <LightBulbIcon className="max-md:hidden text-primary shrink-0 absolute -left-6 icon-xl" />
+        <div className="flex items-center gap-x-2 mb-1">
+          <LightBulbIcon className="max-md:hidden text-primary shrink-0 icon-xl" />
           <h3 className="text-lg">About the {app_name} Referral Program</h3>
         </div>
         <p>
@@ -37,8 +37,8 @@ export function Explainer({ classes = "" }) {
           next 3 years.
         </p>
         <Collapsible.Content className="overflow-hidden data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
-          <div className="flex items-start gap-3 mt-4 max-w-4xl relative">
-            <BrainIcon className="icon-lg max-md:hidden text-primary absolute -left-6 top-1" />
+          <div className="flex items-start gap-3 mt-4 max-w-4xl">
+            <BrainIcon className="icon-lg max-md:hidden text-primary shrink-0 mt-0.5" />
             <div>
               <p>
                 {app_name} doesn't charge fees — instead, donors can choose to

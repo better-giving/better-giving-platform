@@ -1,4 +1,4 @@
-import { LoadMoreRow } from "@better-giving/ui";
+import { EmptyRow, LoadMoreRow } from "@better-giving/ui";
 import { format } from "date-fns";
 import type { IPaginator } from "#/types/components";
 import { humanize } from "@/helpers/decimal";
@@ -23,12 +23,16 @@ export function BalanceHistoryTable({
           </tr>
         </thead>
         <tbody>
-          {items.map((r, idx) => (
-            <tr key={idx} className="text-sm">
-              <td>{format(r.date, "PP")}</td>
-              <td>${humanize(r.total)}</td>
-            </tr>
-          ))}
+          {items.length === 0 ? (
+            <EmptyRow col_span={2}>No balance data yet</EmptyRow>
+          ) : (
+            items.map((r, idx) => (
+              <tr key={idx} className="text-sm">
+                <td>{format(r.date, "PP")}</td>
+                <td>${humanize(r.total)}</td>
+              </tr>
+            ))
+          )}
         </tbody>
         {load_next && (
           <LoadMoreRow

@@ -1,4 +1,4 @@
-import { Info } from "@better-giving/ui";
+import { EmptyState } from "@better-giving/ui";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import type { Route } from "./+types/route";
 import { Fund } from "./fund";
@@ -11,7 +11,9 @@ export default CacheRoute(Page);
 function Page({ loaderData: { funds } }: Route.ComponentProps) {
   const items =
     funds.length === 0 ? (
-      <Info>No campaigns yet</Info>
+      <div className="card">
+        <EmptyState>No campaigns yet</EmptyState>
+      </div>
     ) : (
       <div className="grid @xl:grid-cols-2 @2xl:grid-cols-3 gap-4">
         {funds.map((fund) => (

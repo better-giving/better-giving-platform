@@ -12,9 +12,9 @@ interface Props {
 }
 export function Allocation(props: Props) {
   return (
-    <div className={`grid rounded ${props.classes ?? ""}`}>
+    <div className={`grid gap-4 rounded ${props.classes ?? ""}`}>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="mb-1">Distribution</h2>
+        <h2>Distribution</h2>
 
         <NavLink
           title="Edit allocation settings"
