@@ -108,7 +108,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  // a take samples Math.random to sweep ended windows; unsampled unless a test says
+  // a take samples Math.random to sweep; unsampled unless a test says otherwise
   vi.spyOn(Math, "random").mockReturnValue(0.5);
   await test_db.current!.db.delete(rate_limit_windows);
   // Date only: pglite keeps its own timers

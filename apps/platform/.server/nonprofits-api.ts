@@ -133,7 +133,7 @@ function cache_set(key: string, entry: Omit<ICacheEntry, "exp">, ttl: number) {
 }
 
 /** whether a lookup now would reach the api, claiming nothing. cache hits, an
- * in-flight request, an active cooldown, and a missing key would not. */
+ * in-flight request, an active cooldown, and a missing api key would not. */
 export function nonprofits_needs_fetch(
   kind: "search" | "org",
   raw: string
@@ -144,8 +144,9 @@ export function nonprofits_needs_fetch(
 }
 
 /** true only when this caller claims the fetch, which holds the key until the
- * lookup runs. check and claim are one synchronous step, so a caller that
- * awaited since `nonprofits_needs_fetch` claims through this. */
+ * lookup runs. check and claim are one synchronous step, so a caller that has
+ * awaited since `nonprofits_needs_fetch` claims here rather than trusting that
+ * answer. */
 export function nonprofits_will_fetch(
   kind: "search" | "org",
   raw: string

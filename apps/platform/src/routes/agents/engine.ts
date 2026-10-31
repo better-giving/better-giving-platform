@@ -430,8 +430,9 @@ async function allow_fetch(
   raw: string
 ): Promise<boolean> {
   if (!nonprofits_needs_fetch(kind, raw)) return true;
-  // reserve before claiming: a claim held across this await lets a duplicate
-  // join a flight no reservation pays for, and starts it
+  // reserve before claiming: a duplicate arriving during this await would see
+  // a held claim, skip the cap, and start the fetch even if this reservation
+  // is then denied
   let reservation: SharedReservation | null;
   try {
     reservation = await reserve_shared(
@@ -446,7 +447,8 @@ async function allow_fetch(
   if (!reservation) return false;
   if (nonprofits_will_fetch(kind, raw)) return true;
   // a concurrent caller claimed it during the await: join theirs, refund ours.
-  // not awaited: the flight could end during the write, and the join with it
+  // not awaited: the flight could finish during the write, leaving nothing to
+  // join
   reservation.release().catch((err) => {
     console.error("nonprofits lookup slot not released", err);
   });
