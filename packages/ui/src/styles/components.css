@@ -428,11 +428,6 @@
       line-height: var(--text-sm--line-height);
     }
 
-    /* column dividers */
-    & :is(th, td) + :is(th, td) {
-      border-left: 1px solid var(--hairline);
-    }
-
     /* row dividers */
     & :is(tbody, tfoot) > tr > :is(th, td) {
       border-top: 1px solid var(--hairline);
@@ -441,6 +436,12 @@
     & :is(th, td) {
       padding: calc(var(--spacing) * 2);
       text-align: left;
+    }
+
+    /* a money or count column: header and cells both carry `num`, so the
+       figures line up on the decimal and the label sits over them. */
+    & :is(th, td).num {
+      text-align: right;
     }
 
     & tfoot button {

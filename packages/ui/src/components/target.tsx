@@ -1,7 +1,7 @@
-import { Progress } from "@ark-ui/react/progress";
 import type { ReactNode } from "react";
 import diversity from "../assets/diversity.svg";
 import { to_usd } from "../helpers/to-usd";
+import { GoalBar } from "./goal-bar";
 
 export interface ITarget {
   text?: ReactNode;
@@ -25,15 +25,7 @@ export function Target({ text, target, classes = "", progress }: ITarget) {
   return (
     <div className={classes}>
       {text}
-      <Progress.Root
-        value={Math.min(progress, to)}
-        max={to}
-        className="h-1.5 w-full"
-      >
-        <Progress.Track className="h-full w-full rounded-full bg-gray-3 inset-shadow-track">
-          <Progress.Range className="h-full rounded-full bg-success shadow-track-fill" />
-        </Progress.Track>
-      </Progress.Root>
+      <GoalBar raised={progress} goal={to} />
       <div className="flex items-center justify-between mt-1">
         <p className="flex items-center gap-x-1 text-sm text-gray-11">
           <span className="font-medium">{to_usd(progress)}</span>
@@ -60,15 +52,7 @@ Target.Inline = ({ text, target, classes = "", progress }: ITarget) => {
         <span className="font-medium">{to_usd(progress)}</span>
         <span className="text-xs">Raised</span>
       </p>
-      <Progress.Root
-        value={Math.min(progress, to)}
-        max={to}
-        className="h-1.5 flex-1"
-      >
-        <Progress.Track className="h-full w-full rounded-full bg-gray-3 inset-shadow-track">
-          <Progress.Range className="h-full rounded-full bg-success shadow-track-fill" />
-        </Progress.Track>
-      </Progress.Root>
+      <GoalBar raised={progress} goal={to} classes="flex-1" />
       <p className="flex items-center gap-x-1 text-sm text-gray-11 whitespace-nowrap">
         <span className="font-medium">{to_usd(to)}</span>
         <span className="text-xs">Goal</span>

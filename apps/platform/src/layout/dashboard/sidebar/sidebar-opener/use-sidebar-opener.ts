@@ -9,7 +9,7 @@ import type { Link, LinkGroup } from "../types";
 
 const DEFAULT_LINK: Link = {
   title: "Open Menu",
-  icon: { fn: Menu, size: 24 },
+  icon: { fn: Menu },
   to: "",
 };
 

@@ -68,12 +68,12 @@ export function TipField({ classes = "", ...p }: Props) {
         {/* affordance nudge — hops the thumb toward on and back once, tinting
             the track secondary while hopping, after the donor settles the amount */}
         <Switch.Control
-          className={`group text-xs flex items-center h-lh w-8 rounded-full p-1 transition-colors data-[state=checked]:bg-form-primary data-focus-visible:outline-2 data-focus-visible:outline-ring data-focus-visible:outline-offset-2 data-disabled:opacity-50 ${play && !p.checked ? "bg-form-secondary" : "bg-gray-3"}`}
+          className={`group text-xs flex items-center h-lh w-8 rounded-full inset-ring inset-ring-gray-9 p-1 transition-colors data-[state=checked]:bg-form-primary data-[state=checked]:inset-ring-form-primary data-focus-visible:outline-2 data-focus-visible:outline-ring data-focus-visible:outline-offset-2 data-disabled:opacity-50 ${play && !p.checked ? "bg-form-secondary" : "bg-gray-3"}`}
         >
           <ThumbWiggle play={play && !p.checked} on_done={end_nudge}>
             <Switch.Thumb
               aria-hidden="true"
-              className="pointer-events-none inline-block h-[0.8lh] aspect-square -translate-x-0.5 rounded-full bg-panel transition-transform group-data-[state=checked]:translate-x-3.5"
+              className="pointer-events-none inline-block h-[0.8lh] aspect-square -translate-x-0.5 rounded-full bg-surface transition-transform group-data-[state=checked]:translate-x-3.5"
             />
           </ThumbWiggle>
         </Switch.Control>
@@ -150,7 +150,7 @@ function BgTxtLogoLink() {
     <ExtLink href={don.base_url}>
       <span className="font-bold text-primary">Better.</span>
       <span className="font-bold text-primary">Giving</span>{" "}
-      <span className="text-primary text-2xs">501(c)(3)</span>
+      <span className="text-primary text-xs">501(c)(3)</span>
     </ExtLink>
   );
 }

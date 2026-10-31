@@ -87,7 +87,7 @@ export const colors = {
   success: "#0e8c62",
   success_hover: "#007e55",
   success_fg: "#ffffff",
-  success_subtle: "#e6f6ee",
+  success_subtle: "#f4fbf7",
   success_subtle_fg: "#008057",
   warning: "#f59e0b",
   warning_hover: "#e99300",

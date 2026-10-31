@@ -1,10 +1,9 @@
-import { Image } from "@better-giving/ui";
+import { GoalBar, Image } from "@better-giving/ui";
 import { to_usd } from "@better-giving/ui/helpers";
 import { ArrowLeft } from "lucide-react";
 import { href, Link } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { OrgFooterMinimal } from "#/components/org-page/footer";
-import { GoalBar } from "#/components/org-page/goal-bar";
 import { OrgHeader } from "#/components/org-page/header";
 import { RichText, richtext_styles, to_text } from "#/components/rich-text";
 import { app_name } from "#/constants/env";

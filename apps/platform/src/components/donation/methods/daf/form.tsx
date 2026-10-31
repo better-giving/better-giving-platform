@@ -58,7 +58,7 @@ export function Form(props: TMethodState<"daf">) {
           custom_tip={
             rhf.tip_format.value === "custom" ? (
               <div className="relative w-full flex items-baseline">
-                <span className="font-bold text-2xs self-baseline text-form-primary">
+                <span className="font-bold text-xs self-baseline text-form-primary">
                   {usd_option.code}
                 </span>
                 <input

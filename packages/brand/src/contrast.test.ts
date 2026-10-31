@@ -321,7 +321,7 @@ const pairings: Pairing[] = [
     "--success-subtle-fg on --success-subtle",
     colors.success_subtle_fg,
     colors.success_subtle,
-    66.1,
+    70.3,
     min.content
   ),
   p(
@@ -399,7 +399,7 @@ const pairings: Pairing[] = [
     "gray-12 on --success-subtle",
     colors.gray_12,
     colors.success_subtle,
-    95.7,
+    99.9,
     min.body_preferred
   ),
   p(
@@ -765,5 +765,27 @@ describe("--overlay, the dialog scrim", () => {
 describe("the hero scrim composites to the recorded color", () => {
   it("is #60778c over a pure-white region", () => {
     expect(to_hex(scrim)).toBe("#60778c");
+  });
+});
+
+// WCAG 2 ratio, for the one pairing an outside audit holds to 1.4.3 rather than
+// to APCA: the success pill's ink on its band, small text at 4.5:1.
+describe("the success pill clears WCAG 1.4.3", () => {
+  // wcag's piecewise relative luminance, not apca's sRGBtoY (a plain 2.4 power)
+  const lum = (hex: string) => {
+    const [r, g, b] = rgb(hex).map((n) => {
+      const c = n / 255;
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a: string, b: string) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  it("--success-subtle-fg on --success-subtle is at least 4.5:1", () => {
+    expect(
+      ratio(colors.success_subtle_fg, colors.success_subtle)
+    ).toBeGreaterThanOrEqual(4.5);
   });
 });

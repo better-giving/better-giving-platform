@@ -64,7 +64,7 @@ export function AnnouncementBanner() {
           {/* only the visible "Find out more" text is the link — the sentence
               around it is plain text, so hovering or clicking the rest of the
               bar does nothing. */}
-          <p className="flex-1 text-center text-2xs leading-relaxed text-balance sm:text-xs">
+          <p className="flex-1 text-center text-xs leading-relaxed text-balance">
             Setting a new standard for digital giving. Better Giving endorses
             the National Council of Nonprofits Principles for Ethical Online
             Fundraising.{" "}

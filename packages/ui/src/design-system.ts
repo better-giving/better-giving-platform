@@ -31,6 +31,7 @@ export { Label } from "./components/form/label";
 export { MaskedInput } from "./components/form/masked-input";
 export { PasswordInput } from "./components/form/password-input";
 export { UrlInput } from "./components/form/url-input";
+export { GoalBar } from "./components/goal-bar";
 export { Group } from "./components/group";
 export { HeaderButton } from "./components/header-button";
 export { HoverCard } from "./components/hover-card";

@@ -20,7 +20,7 @@ export function TerminalCard({ label, classes = "", children }: ITerminalCard) {
         <span className="font-mono text-xs text-primary-fg/80 ml-2">
           {label}
         </span>
-        <span className="font-mono text-2xs text-primary-fg/80 border border-primary-fg/25 rounded-full px-2 py-0.5 ml-auto">
+        <span className="font-mono text-xs text-primary-fg border border-primary-fg/25 rounded-full px-2 py-0.5 ml-auto">
           Public
         </span>
       </div>

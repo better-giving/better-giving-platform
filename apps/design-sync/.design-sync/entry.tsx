@@ -58,6 +58,7 @@ export { MaskedInput } from "../../../packages/ui/src/components/form/masked-inp
 export * as masks from "../../../packages/ui/src/components/form/masks";
 export { PasswordInput } from "../../../packages/ui/src/components/form/password-input";
 export { UrlInput } from "../../../packages/ui/src/components/form/url-input";
+export { GoalBar } from "../../../packages/ui/src/components/goal-bar";
 export { Group } from "../../../packages/ui/src/components/group";
 // the sortable column head: label, then the caret that says which key the
 // table is ordered by and in which direction.

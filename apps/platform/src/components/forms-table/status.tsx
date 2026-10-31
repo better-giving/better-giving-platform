@@ -60,7 +60,7 @@ export function StatusBadge({ status }: { status: string | null }) {
   const is_active = status === "active";
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium ${
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
         is_active
           ? "bg-success-subtle text-success-subtle-fg"
           : "bg-gray-3 text-gray-11"

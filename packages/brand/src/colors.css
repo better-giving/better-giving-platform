@@ -205,11 +205,12 @@
      rather than a filled control. --success itself is a FILL and must never be
      painted on it — as text on the page it is Lc 67.0, clear of Lc 60 but under
      the Lc 75 body copy needs, and a step 9 is a fill by the ramp's rule either
-     way; --success-subtle-fg is the success ink everywhere, Lc 66.1 here — over
-     Lc 60, taken as the ramp generates it. an icon is a shape, not
+     way; --success-subtle-fg is the success ink everywhere, Lc 70.3 here, and
+     4.73:1 — step 2, not 3, because green-11 on green-3 is 4.45:1, under the
+     4.5:1 a badge label needs. an icon is a shape, not
      text, and keeps step 9. gray-12 on the band stays far clear, so it also takes
      neutral body copy. */
-  --success-subtle: var(--green-3);
+  --success-subtle: var(--green-2);
   --success-subtle-fg: var(--green-11);
   --warning: var(--amber-9); /* a fill, never text */
   /* hovered and pressed rung of the filled warning control — one step for both,

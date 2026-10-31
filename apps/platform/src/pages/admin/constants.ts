@@ -25,7 +25,6 @@ const group1: LinkGroup = {
       to: sidebar_routes.dashboard,
       icon: {
         fn: LayoutDashboard,
-        size: 20,
       },
       end: true,
     },
@@ -34,7 +33,6 @@ const group1: LinkGroup = {
       to: sidebar_routes.donations,
       icon: {
         fn: CircleDollarSign,
-        size: 22,
       },
     },
     {
@@ -42,7 +40,6 @@ const group1: LinkGroup = {
       to: sidebar_routes.forms,
       icon: {
         fn: Blocks,
-        size: 25,
       },
     },
     {
@@ -50,7 +47,6 @@ const group1: LinkGroup = {
       to: sidebar_routes.funds,
       icon: {
         fn: Heart,
-        size: 21,
       },
     },
     {
@@ -58,7 +54,6 @@ const group1: LinkGroup = {
       to: sidebar_routes.assets,
       icon: {
         fn: BoxIcon,
-        size: 20,
       },
     },
   ],
@@ -72,7 +67,6 @@ const group2: LinkGroup = {
       to: sidebar_routes.savings,
       icon: {
         fn: PiggyBankIcon,
-        size: 22,
       },
     },
     {
@@ -80,7 +74,6 @@ const group2: LinkGroup = {
       to: sidebar_routes.investments,
       icon: {
         fn: SproutIcon,
-        size: 22,
       },
     },
   ],
@@ -94,7 +87,6 @@ const group3: LinkGroup = {
       to: sidebar_routes.programs,
       icon: {
         fn: ListCheck,
-        size: 22,
       },
     },
   ],
@@ -108,7 +100,6 @@ const group4: LinkGroup = {
       to: "settings",
       icon: {
         fn: Settings,
-        size: 21,
       },
     },
     {
@@ -116,7 +107,6 @@ const group4: LinkGroup = {
       to: "members",
       icon: {
         fn: UsersRound,
-        size: 21,
       },
     },
     {
@@ -124,7 +114,6 @@ const group4: LinkGroup = {
       to: sidebar_routes.banking,
       icon: {
         fn: Wallet,
-        size: 20,
       },
     },
     {
@@ -132,7 +121,6 @@ const group4: LinkGroup = {
       to: sidebar_routes.integrations,
       icon: {
         fn: PlugZap,
-        size: 23,
       },
     },
     {
@@ -140,7 +128,6 @@ const group4: LinkGroup = {
       to: sidebar_routes.referrals,
       icon: {
         fn: MegaphoneIcon,
-        size: 22,
       },
     },
   ],

@@ -3,9 +3,9 @@ import type { Church } from "lucide-react";
 export type Link = {
   title: string;
   to: string;
+  /** drawn at `icon-md` by the sidebar, so every row keeps one pitch */
   icon: {
     fn: typeof Church;
-    size: number;
   };
   end?: boolean;
   disabled?: boolean;

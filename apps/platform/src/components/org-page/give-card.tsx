@@ -1,8 +1,7 @@
-import { Image } from "@better-giving/ui";
+import { GoalBar, Image } from "@better-giving/ui";
 import { to_usd } from "@better-giving/ui/helpers";
 import { Clock } from "lucide-react";
 import { Link } from "react-router";
-import { GoalBar } from "./goal-bar";
 import { ends_label, type IGiveItem } from "./items";
 
 export interface IGiveCard {

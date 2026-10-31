@@ -147,7 +147,7 @@ describe("the dashboard shell", () => {
 
   test("the shell is defined in one place", () => {
     expect(
-      files_with("md:grid-cols-[auto_1fr] border-b border-hairline")
+      files_with("grid max-md:content-start md:grid-cols-[auto_1fr]")
     ).toEqual(["apps/platform/src/layout/dashboard/layout.tsx"]);
   });
 });

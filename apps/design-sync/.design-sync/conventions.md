@@ -65,6 +65,8 @@ The other real class names, for when you compose a control by hand rather than u
 `.selector-btn`, `.selector-opt`, `.table`, and the utilities `.surface-primary`,
 `.eyebrow`, `.section-heading`, `.section-body`, `.hero-heading`, `.article-heading`,
 `.flex-center`, `.absolute-center`, `.link`.
+Inside `.table`, a money or count column puts `num` on its `<th>` and every `<td>`: the column
+right-aligns. Rows are separated by hairlines only; there are no column rules.
 
 ### Empty states — use `EmptyState`
 

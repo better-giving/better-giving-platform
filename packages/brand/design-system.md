@@ -111,8 +111,8 @@ tokens resolves to a step, to `#ffffff`, or to a `color-mix()` off one.
 | --- | --- | --- | --- | --- | --- |
 | white | | | | | `--background` `--card` `--surface` (`oklch(1 0 0)`, above the ramp) |
 | 1 | | | | | *no token: the emails' ground (`flat_colors.gray_1`)* |
-| 2 | `--band` | | | | `--panel` |
-| 3 | `--secondary` | `--destructive-subtle` | `--success-subtle` | `--warning-subtle` | `--hairline` |
+| 2 | `--band` | | `--success-subtle` | | `--panel` |
+| 3 | `--secondary` | `--destructive-subtle` | | `--warning-subtle` | `--hairline` |
 | 5 | `--secondary-active` | `--destructive-subtle-active` | | | |
 | 6 | | | | | `--border` |
 | 7 | | | | | *no token: the control recipes spell `gray-7` (Lc 23.8 on the page)* |
@@ -169,7 +169,7 @@ last is the surface model's, the design's own rather than the ramp's):
 | `--hairline` (`gray-3`) on `--card` | **Lc 0.0** | Lc 15 | a line inside a card groups rows rather than gridding them; a line that must be found is `--border` |
 
 Every own-scale band pairing clears: amber-11 is Lc 62.5 on amber-3 and Lc 67.2
-on amber-2, green-11 is Lc 66.1 on green-3, and white on green-9 is Lc 74.3.
+on amber-2, green-11 is Lc 70.3 on green-2 (Lc 66.1 on green-3), and white on green-9 is Lc 74.3.
 
 The first row is the shape of the whole policy. Radix guarantees step 11 only
 against step **2**, so a step-11 ink degrades predictably as the surface climbs
@@ -321,7 +321,7 @@ when one element carries both".
 | `--primary-hover` | yes | **yes** | Lc 80.7 | step 10, the fill every solid variant hovers to and the `link` recipe's hover ink. The ramp pairs a step 10 with nothing, so this one is measured, not inferred from the step below it |
 | `--primary-deep` | yes | **no, by rule** | Lc 93.9 | dark enough to be legible, but `gray-12` is the app's dark ink and a second one is drift. Fill only, see its section |
 | `--success` | yes | **no, by rule** | Lc 67.0 | green-9 is a solid. It clears Lc 60 as text on the page and misses the Lc 75 body copy needs, so the ramp's role decides it, not the measurement. The green ink is `--success-subtle-fg` (green-11) at Lc 72.0, on every surface, the same way `--warning-subtle-fg` is the warning ink |
-| `--success-subtle-fg` | no | yes | Lc 72.0 | ink for `--success-subtle` (Lc 66.1) and the app's green ink. Lc 65.1 on `gray-3` and Lc 65.8 on `--secondary`, both over Lc 60 |
+| `--success-subtle-fg` | no | yes | Lc 72.0 | ink for `--success-subtle` (Lc 70.3) and the app's green ink. Lc 65.1 on `gray-3` and Lc 65.8 on `--secondary`, both over Lc 60 |
 | `--destructive` | yes | **yes** | Lc 74.1 | Lc 67.3 on `gray-3`, Lc 68.0 on `--secondary`, Lc 66.7 on `--destructive-subtle`: red-9 clears Lc 60 on every surface in the palette |
 | `--warning` | yes | **no, at any size** | Lc 39.9 | under even the Lc 45 a headline needs. Fill only. Never `text-warning`. Use `--warning-subtle-fg` |
 | `gray-12` | no | yes | Lc 101.5 | |
@@ -367,7 +367,7 @@ call-site edit to notice. Use an authored pair wherever one exists.
 | `--destructive-subtle-active` | **fill only.** The pressed rung of a control whose hover is `--destructive-subtle`; its ink stays `--destructive-subtle-fg` |
 
 All three bands also take neutral body copy: `gray-12` measures Lc 94.6 on
-`--warning-subtle`, Lc 94.0 on `--destructive-subtle` and Lc 95.7 on
+`--warning-subtle`, Lc 94.0 on `--destructive-subtle` and Lc 99.9 on
 `--success-subtle`, over the Lc 90 preferred for body text. Only the *semantically colored* copy needs the `-fg`, and on
 two of the three bands that ink is the tighter of the two by a wide margin.
 
@@ -443,11 +443,14 @@ control hovers into either. When one does, it is `amber-5` / `green-5`, the same
 ### `--success-subtle` / `-fg`: the band, and the green ink
 
 The band that keeps `bg-<token>/10 text-<token>` out of the success case.
-Surface `green-3`, ink `green-11`. **Measured: Lc 66.1 ink on `--success-subtle`
-(the pairing Radix itself assigns); Lc 70.0 on `--panel` and Lc 72.0 on
-`--background`, Lc 70.3 on the `green-2` band, Lc 65.1 on `gray-3`,
+Surface `green-2`, ink `green-11`. **Measured: Lc 70.3 ink on `--success-subtle`
+(step 11 on step 2, the pairing Radix guarantees); Lc 70.0 on `--panel` and Lc 72.0 on
+`--background`, Lc 65.1 on `gray-3`,
 Lc 65.8 on `--secondary`, Lc 55.1 on the `blue-5` pressed rung;
-`gray-12` on the band is Lc 95.7, so it also takes neutral body copy.**
+`gray-12` on the band is Lc 99.9, so it also takes neutral body copy.**
+The surface was `green-3` until 2026-10-31: green-11 on it is 4.45:1, under the
+4.5:1 WCAG 1.4.3 holds the `Badge` pill's 12px label to, and `green-2` is the
+nearest step that clears (4.73:1). `contrast.test.ts` pins the ratio.
 
 The three cross-scale figures in that list (green ink on a gray or blue surface)
 are **not** covered by the accepted-misses policy, which only speaks for

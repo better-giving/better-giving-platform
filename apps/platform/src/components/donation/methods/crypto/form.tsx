@@ -200,7 +200,7 @@ export function Form(props: TMethodState<"crypto">) {
           custom_tip={
             tip_format.value === "custom" ? (
               <div className="relative w-full flex items-baseline">
-                <span className="font-bold text-2xs self-baseline text-form-primary">
+                <span className="font-bold text-xs self-baseline text-form-primary">
                   {token.value.symbol}
                 </span>
                 <input

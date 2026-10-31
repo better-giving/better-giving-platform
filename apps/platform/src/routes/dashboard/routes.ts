@@ -31,7 +31,6 @@ export const linkGroups: LinkGroup[] = [
         end: true,
         icon: {
           fn: HomeIcon,
-          size: 22,
         },
       },
       {
@@ -39,7 +38,6 @@ export const linkGroups: LinkGroup[] = [
         to: routes.donations,
         icon: {
           fn: CircleDollarSign,
-          size: 22,
         },
       },
       {
@@ -47,7 +45,6 @@ export const linkGroups: LinkGroup[] = [
         to: routes.subscriptions,
         icon: {
           fn: RefreshCw,
-          size: 20,
         },
       },
       {
@@ -55,7 +52,6 @@ export const linkGroups: LinkGroup[] = [
         to: routes.edit_profile,
         icon: {
           fn: CircleUserRound,
-          size: 21,
         },
       },
       {
@@ -63,7 +59,6 @@ export const linkGroups: LinkGroup[] = [
         to: routes.settings,
         icon: {
           fn: Settings,
-          size: 22,
         },
       },
       {
@@ -71,7 +66,6 @@ export const linkGroups: LinkGroup[] = [
         to: routes.funds,
         icon: {
           fn: Heart,
-          size: 21,
         },
       },
       {
@@ -79,7 +73,6 @@ export const linkGroups: LinkGroup[] = [
         to: routes.referrals,
         icon: {
           fn: MegaphoneIcon,
-          size: 22,
         },
       },
       {
@@ -87,7 +80,6 @@ export const linkGroups: LinkGroup[] = [
         to: routes.forms,
         icon: {
           fn: BlocksIcon,
-          size: 25,
         },
       },
     ],

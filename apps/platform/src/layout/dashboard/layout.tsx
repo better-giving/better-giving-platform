@@ -29,7 +29,7 @@ export function Layout({
   return (
     <div className="grid">
       <AppHeader variant={headerVariant} classes="sticky z-sticky -top-px" />
-      <div className="grid max-md:content-start md:grid-cols-[auto_1fr] border-b border-hairline">
+      <div className="grid max-md:content-start md:grid-cols-[auto_1fr]">
         <SidebarOpener
           classes="md:hidden"
           linkGroups={linkGroups}

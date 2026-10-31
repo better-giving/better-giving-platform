@@ -222,8 +222,9 @@ describe("card image", () => {
     expect(bars).toHaveLength(2);
     const [a, b] = bars.map((x) => x.getBoundingClientRect());
     expect(a.top).toBeCloseTo(b.top, 0);
-    const column = (bars[0].parentElement as HTMLElement)
-      .parentElement as HTMLElement;
+    // track → GoalBar root → the figures block → the text column
+    const column = bars[0].parentElement?.parentElement
+      ?.parentElement as HTMLElement;
     const inner = column.getBoundingClientRect().width - 32; // p-4 either side
     expect(a.width).toBeCloseTo(inner, 0);
   });
