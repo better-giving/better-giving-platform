@@ -18,11 +18,11 @@ export function Sidebar({
   return (
     <div className={`flex flex-col w-72 md:w-64 h-full ${classes}`}>
       {sidebarHeader}
-      <div className="grid grid-cols-[auto_1fr] py-3 gap-x-2">
+      <nav aria-label="Dashboard" className="grid px-3 py-4">
         {linkGroups.map((group) => (
           <React.Fragment key={`link_group-${group.title}`}>
             {group.title && (
-              <h6 className="col-span-2 pt-5 px-5 pb-1 font-bold text-xs uppercase text-gray-11 tracking-wide">
+              <h6 className="pt-5 px-3 pb-1 font-bold text-xs uppercase text-gray-11 tracking-wide">
                 {group.title}
               </h6>
             )}
@@ -32,19 +32,23 @@ export function Sidebar({
                 key={`nav_link-${link.to}`}
                 to={link.to}
                 className={({ isActive, isPending }) =>
-                  `grid grid-cols-subgrid col-span-2 items-center py-3 px-5 font-bold text-sm hover:text-primary transition duration-slow aria-disabled:text-gray-11 aria-disabled:pointer-events-none
+                  `flex items-center gap-3 py-3 px-3 rounded font-medium text-sm hover:bg-gray-3 transition-colors focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2 aria-disabled:text-gray-11 aria-disabled:pointer-events-none
                 ${isActive ? "pointer-events-none text-primary" : ""} ${isPending ? "pointer-events-none text-gray-11" : ""}`
                 }
                 onClick={onChange}
                 aria-disabled={link.disabled}
               >
-                <link.icon.fn className="justify-self-center icon-md" />
-                {link.title}
+                <link.icon.fn className="shrink-0 icon-md" />
+                {/* a long label stays on one line and fades out at the row's
+                    trailing edge instead of ending in an ellipsis */}
+                <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap mask-r-from-75%">
+                  {link.title}
+                </span>
               </NavLink>
             ))}
           </React.Fragment>
         ))}
-      </div>
+      </nav>
     </div>
   );
 }

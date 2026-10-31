@@ -147,10 +147,9 @@ const exempt: Record<string, string[]> = {
   "apps/platform/src/routes/dashboard.forms/table.tsx": [
     "text-destructive-subtle-fg",
   ],
-  // two navs that mark their current item by ink alone: `link` paints every
-  // item the brand colour and the current one stops being visible. the state
-  // table in packages/brand/design-system.md carries the blank.
-  "apps/platform/src/layout/dashboard/sidebar/sidebar.tsx": ["text-primary"],
+  // a nav that marks its current item by ink alone: `link` paints every item
+  // the brand colour and the current one stops being visible. the state table
+  // in packages/brand/design-system.md carries the blank.
   "apps/platform/src/components/header/marketing-header.tsx": ["text-primary"],
   // campaign identity name rests in gray-12 and shifts to primary on hover.
   // `link` would paint the name brand blue at rest, which the page spec rejects.

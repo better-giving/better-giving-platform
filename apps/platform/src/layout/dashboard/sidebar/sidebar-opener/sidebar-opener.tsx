@@ -1,11 +1,22 @@
 import { ChevronRight } from "lucide-react";
+import type { ReactNode } from "react";
 import type { LinkGroup } from "../types";
 import { ToggleableSidebar } from "./toggleable-sidebar";
 import { use_sidebar_opener } from "./use-sidebar-opener";
 
-type Props = { classes?: string; linkGroups: LinkGroup[]; rootRoute: string };
+type Props = {
+  classes?: string;
+  linkGroups: LinkGroup[];
+  rootRoute: string;
+  header?: ReactNode;
+};
 
-export function SidebarOpener({ classes = "", linkGroups, rootRoute }: Props) {
+export function SidebarOpener({
+  classes = "",
+  linkGroups,
+  rootRoute,
+  header,
+}: Props) {
   const { open, active_link, set_open } = use_sidebar_opener(
     linkGroups,
     rootRoute
@@ -27,6 +38,7 @@ export function SidebarOpener({ classes = "", linkGroups, rootRoute }: Props) {
         open={open}
         linkGroups={linkGroups}
         set_open={set_open}
+        header={header}
       />
     </>
   );

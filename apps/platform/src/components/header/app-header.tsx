@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { href, Link, useLocation } from "react-router";
 import { DappLogo } from "#/components/image";
 import { auth_routes } from "#/constants/routes";
@@ -9,9 +10,16 @@ import { UserAvatar } from "./user-avatar";
 interface IAppHeader {
   variant?: "default" | "minimal" | "bare";
   classes?: string;
+  /** rendered right of the logo from `md` up; below it the dashboard drawer
+   *  carries it instead, since a phone header has no room beside the logo */
+  context?: ReactNode;
 }
 
-export function AppHeader({ variant = "default", classes }: IAppHeader) {
+export function AppHeader({
+  variant = "default",
+  classes,
+  context,
+}: IAppHeader) {
   const { session, is_loading } = use_session();
   const { pathname: p, search: s } = useLocation();
   const to = auth_routes.includes(p) ? undefined : p + s;
@@ -37,8 +45,13 @@ export function AppHeader({ variant = "default", classes }: IAppHeader) {
       }}
     >
       <div className={`${inner} flex items-center gap-4 py-2`}>
-        <div className="flex-1">
+        <div className="flex-1 flex items-center gap-4 min-w-0">
           <DappLogo classes="h-12 w-auto inline-block" />
+          {context && (
+            <div className="max-md:hidden flex items-center min-w-0">
+              {context}
+            </div>
+          )}
         </div>
         {variant !== "bare" && (
           <AuthSlot

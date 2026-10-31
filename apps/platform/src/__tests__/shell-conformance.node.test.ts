@@ -123,6 +123,19 @@ describe("the popup content shell", () => {
     expect(offenders).toEqual([]);
   });
 
+  test("the header context reaches the app header through the shell alone", () => {
+    // the slot beside the logo (the npo admin's org switcher) also has a
+    // phone-width home at the top of the drawer, which only `Layout` wires.
+    // a caller handing `AppHeader` a context directly gets the desktop half
+    // and silently drops it below md.
+    const offenders = sources
+      .filter((x) => /<AppHeader\b[^>]*\bcontext=/.test(x.text))
+      .map((x) => x.file);
+    expect(offenders).toEqual([
+      "apps/platform/src/layout/dashboard/layout.tsx",
+    ]);
+  });
+
   test("the shell is defined in one place", () => {
     expect(files_with("shadow-floating rounded-card p-4 z-floating")).toEqual([
       "packages/ui/src/components/popup.ts",

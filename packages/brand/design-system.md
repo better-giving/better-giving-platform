@@ -280,7 +280,9 @@ an element: see "the tint ladder" below.
 | `--band` | the alternating full-bleed section on the marketing pages, and the far stop of the hero's `--background` → tint gradient. `blue-2`, the ramp's page-level subtle ground: **not** a UI element, and nothing hovers it. It is a *lighter* rung than `--secondary`, so every ink figure recorded below against `blue-3` is a floor for this band, not a ceiling. A card on it is the plain white `card` |
 
 **The dashboard nav paints nothing.** `--sidebar` was deleted with the model:
-the desktop sidebar's links sit on the ground with no fill and no edge. The
+the desktop sidebar's links sit on the ground with no fill and no edge; a row
+acknowledges hover with `bg-gray-3`, the step-3 fill of an element resting
+transparent, and marks the current item by ink alone. The
 mobile drawer is a dialog and carries `bg-card` like every other one.
 
 **The embedded donation form takes the model but not the ground.** The
