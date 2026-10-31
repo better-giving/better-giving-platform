@@ -3,7 +3,7 @@ import { href, Link } from "react-router";
 
 interface ICheck {
   children: React.ReactNode;
-  /** on-navy featured card uses success accent for contrast */
+  /** on the blue featured card the check takes the fill's own ink; a green check measured 1.29:1 there */
   dark?: boolean;
 }
 
@@ -11,7 +11,7 @@ function Check({ children, dark }: ICheck) {
   return (
     <span className="flex gap-2.5 text-sm/normal">
       <CheckIcon
-        className={`flex-none icon-md mt-0.5 ${dark ? "text-success" : "text-primary"}`}
+        className={`flex-none icon-md mt-0.5 ${dark ? "text-primary-fg" : "text-primary"}`}
         strokeWidth={3}
         aria-hidden
       />

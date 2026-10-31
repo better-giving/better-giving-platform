@@ -67,7 +67,7 @@ export function AmountFlow({ total, font_size = 14, allocation }: Props) {
             {item.text && (
               <div
                 className="text-gray-11 whitespace-nowrap"
-                style={{ fontSize: `${font_size * 0.75}px` }}
+                style={{ fontSize: `${Math.max(12, font_size * 0.75)}px` }}
               >
                 - {item.text}
               </div>

@@ -37,7 +37,10 @@ export function Hero({ classes = "" }: IHero) {
           <h1 className="hero-heading text-balance">
             Every way to give.
             <br />
-            One form. <span className="text-primary">Free forever.</span>
+            One form.{" "}
+            <span className="text-primary whitespace-nowrap">
+              Free forever.
+            </span>
           </h1>
           <p className="text-lg/relaxed text-gray-11 max-w-lg text-pretty">
             Better Giving is a donation platform for nonprofits: one form takes

@@ -156,6 +156,9 @@
   font-size: var(--text-sm) /* 0.875rem = 14px */;
   line-height: var(--tw-leading, var(--text-sm--line-height) /* 20px */);
   min-block-size: var(--btn-size);
+  /* a field-height button sits in a row with fields, so it is exactly their
+     height rather than at least it: border-box, so the border is inside. */
+  block-size: var(--btn-size);
 }
 
 /* square icon-only shape. a modifier, not a fourth tier: it composes with all
