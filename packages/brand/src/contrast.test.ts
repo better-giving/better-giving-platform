@@ -199,14 +199,14 @@ const pairings: Pairing[] = [
     "--warning-subtle-fg on gray-1",
     colors.warning_subtle_fg,
     page,
-    69.3,
+    94.2,
     min.content
   ),
   p(
     "--warning-subtle-fg on white",
     colors.warning_subtle_fg,
     white,
-    71.2,
+    96.0,
     min.content
   ),
   p("--warning-fg on gray-1", colors.warning_fg, page, 94.2, min.content),
@@ -342,44 +342,43 @@ const pairings: Pairing[] = [
     "--warning-subtle-fg on --warning-subtle",
     colors.warning_subtle_fg,
     colors.warning_subtle,
-    62.5,
+    87.3,
     min.content
   ),
   p(
     "--warning-subtle-fg on --panel",
     colors.warning_subtle_fg,
     colors.panel,
-    67.4,
+    92.2,
     min.content
   ),
   p(
     "--warning-subtle-fg on amber-2",
     colors.warning_subtle_fg,
     colors.amber_2,
-    67.2,
+    92.0,
     min.content
   ),
   p(
     "--warning-subtle-fg on --secondary",
     colors.warning_subtle_fg,
     colors.secondary,
-    63.2,
+    88.0,
     min.content
   ),
   p(
     "--warning-subtle-fg on gray-3",
     colors.warning_subtle_fg,
     colors.gray_3,
-    62.5,
+    87.3,
     min.content
   ),
   p(
     "--warning-subtle-fg on --secondary-active",
     colors.warning_subtle_fg,
     colors.secondary_active,
-    52.5,
-    min.content,
-    "cross-scale, on the pressed rung: the tightest ink in the palette and the one surface it misses"
+    77.3,
+    min.content
   ),
   p(
     "gray-12 on --warning-subtle",
@@ -450,9 +449,9 @@ const pairings: Pairing[] = [
     "--warning-subtle-fg on --primary",
     colors.warning_subtle_fg,
     colors.primary,
-    0.0,
+    17.1,
     min.content,
-    "invisible"
+    "under any text threshold: a dark ink on the dark fill"
   ),
   p(
     "--success-subtle-fg on --primary",
@@ -769,7 +768,8 @@ describe("the hero scrim composites to the recorded color", () => {
 });
 
 // WCAG 2 ratio, for the pairings an outside audit holds to 1.4.3 / 1.4.11
-// rather than to APCA: the success pill's ink on its band, and a switch's ring.
+// rather than to APCA: the success and warning inks on their bands, and a
+// switch's ring.
 describe("the audited WCAG 2 pairings clear", () => {
   // wcag's piecewise relative luminance, not apca's sRGBtoY (a plain 2.4 power)
   const lum = (hex: string) => {
@@ -786,6 +786,11 @@ describe("the audited WCAG 2 pairings clear", () => {
   // 1.4.11: a switch's off state reads by its ring alone
   it("a switch's gray-9 off-state ring is at least 3:1 on --card", () => {
     expect(ratio(colors.gray_9, colors.card)).toBeGreaterThanOrEqual(3);
+  });
+  it("--warning-subtle-fg on --warning-subtle is at least 4.5:1", () => {
+    expect(
+      ratio(colors.warning_subtle_fg, colors.warning_subtle)
+    ).toBeGreaterThanOrEqual(4.5);
   });
   it("--success-subtle-fg on --success-subtle is at least 4.5:1", () => {
     expect(

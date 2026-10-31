@@ -93,7 +93,7 @@ export const colors = {
   warning_hover: "#e99300",
   warning_fg: "#4f3515",
   warning_subtle: "#ffefcd",
-  warning_subtle_fg: "#ac6500",
+  warning_subtle_fg: "#4f3515",
   border: "#d2dbe7",
   surface: "#ffffff",
   ring: "#6daee9",

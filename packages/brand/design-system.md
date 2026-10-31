@@ -119,8 +119,8 @@ tokens resolves to a step, to `#ffffff`, or to a `color-mix()` off one.
 | 8 | `--ring` | | | | |
 | 9 | `--primary` | `--destructive` | `--success` | `--warning` | |
 | 10 | `--primary-hover` | `--destructive-hover` | `--success-hover` | `--warning-hover` | |
-| 11 | | `--destructive-subtle-fg` | `--success-subtle-fg` | `--warning-subtle-fg` | |
-| 12 | `--primary-deep` | | | `--warning-fg` | |
+| 11 | | `--destructive-subtle-fg` | `--success-subtle-fg` | | |
+| 12 | `--primary-deep` | | | `--warning-fg` `--warning-subtle-fg` | |
 
 **The gray column is empty from step 11 down, and that is the point.** Neutral
 ink has no token: `--fg`, `--card-fg`, `--popover-fg`, `--secondary-fg`,
@@ -165,10 +165,10 @@ last is the surface model's, the design's own rather than the ramp's):
 | control boundary `gray-7` on `gray-1` / `--card` / `--panel` | **Lc 23.8 / 25.6 / 21.8** | Lc 30 | the element-border rung the field and button recipes draw; `gray-8` would clear and was declined, see "Decisions that look like bugs". Closed for switches: their off-state ring is `gray-9` |
 | `--destructive-subtle-fg` on `--destructive-subtle-active` (red-11 on red-5) | **Lc 51.7** | Lc 60 | the pressed rung of a subtle error control; transient |
 | `--warning-fg` on `--warning` (amber-12 on amber-9) | **Lc 52.1** | Lc 60 | the filled warning button's label and the checklist badge; white would be weaker still at Lc 46.4 |
-| `--warning` as a meaningful icon on `gray-1` / white | **Lc 39.9 / 41.8** | Lc 45 | a fill, not an icon ink: a meaningful amber glyph takes `--warning-subtle-fg` (Lc 69.3 / 71.2) |
+| `--warning` as a meaningful icon on `gray-1` / white | **Lc 39.9 / 41.8** | Lc 45 | a fill, not an icon ink: a meaningful amber glyph takes `--warning-subtle-fg` (Lc 94.2 / 96.0) |
 | `--hairline` (`gray-3`) on `--card` | **Lc 0.0** | Lc 15 | a line inside a card groups rows rather than gridding them; a line that must be found is `--border` |
 
-Every own-scale band pairing clears: amber-11 is Lc 62.5 on amber-3 and Lc 67.2
+Every own-scale band pairing clears: amber-12 is Lc 87.3 on amber-3 and Lc 92.0
 on amber-2, green-11 is Lc 70.3 on green-2 (Lc 66.1 on green-3), and white on green-9 is Lc 74.3.
 
 The first row is the shape of the whole policy. Radix guarantees step 11 only
@@ -177,7 +177,7 @@ the same scale: Lc 70.3 on red-2, 64.8 on red-3, 57.6 on red-4, 51.7 on red-5.
 Nothing is wrong at red-5; the guarantee simply ran out at red-4.
 
 **What this policy does not cover is a pairing Radix never made.** An own-scale
-ink on a *different* scale's surface, amber-11 on `gray-3` or green-11
+ink on a *different* scale's surface, amber-12 on `gray-3` or green-11
 on `--secondary` (blue-3), is the palette's own combination, and this file's rule
 applies instead: *a fill and an ink are only safe together if someone measured
 that combination*. Those figures are in the sections below; the ones under
@@ -331,7 +331,7 @@ when one element carries both".
 Icons are Lucide. A *meaningful* icon (one carrying information no adjacent text
 carries) is a fine-detail pictogram, since Lucide draws in thin strokes, and
 needs Lc 45. `stroke-warning` on the page at Lc 39.9 does not qualify: give it
-`--warning-subtle-fg` (Lc 69.3). A decorative icon beside a text label is exempt.
+`--warning-subtle-fg` (Lc 94.2). A decorative icon beside a text label is exempt.
 `stroke-success` at Lc 67.0 clears Lc 45, so a green glyph is fine.
 
 ## The pair rule
@@ -501,7 +501,7 @@ vanish:
 | ink on a `--primary` fill | measured | |
 | --- | --- | --- |
 | `--destructive-subtle-fg` | **Lc 0.0** | invisible |
-| `--warning-subtle-fg` | **Lc 0.0** | invisible |
+| `--warning-subtle-fg` | **Lc 17.1** | under any text threshold |
 | `--success-subtle-fg` | **Lc 0.0** | invisible |
 | `--success` | **Lc 0.0** | invisible; was live on the `Check` beside the footer newsletter's success message, now `--primary-fg` |
 | `--warning` | **Lc 34.8** | under the Lc 60 its copy needs; was live on the footer newsletter's field error, now `--primary-fg` |
@@ -589,30 +589,26 @@ be a drift trap the test cannot catch. Green has the same shape (see
 `--success-subtle`), which leaves red as the one hue with a fill that also reads
 as text.
 
-`--warning-subtle-fg` is `amber-11`, `#ac6500`. **It is the tightest ink in the
-palette: it clears Lc 60 on every resting surface and misses on the pressed
-`blue-5` rung**, measured:
+`--warning-subtle-fg` is `amber-12`, `#4f3515`, **and clears every surface it
+lands on, the pressed `blue-5` rung included**, measured:
 
 | on | Lc | |
 | --- | --- | --- |
-| `--background` | Lc 69.3 | |
-| `--panel` | Lc 67.4 | |
-| the `amber-2` band | Lc 67.2 | Radix's own pairing |
-| `--secondary` (blue-3) | Lc 63.2 | cross-scale; the palette's own pairing |
-| `gray-3` | Lc 62.5 | cross-scale |
-| `--warning-subtle` (amber-3) | Lc 62.5 | Radix's own pairing; the tightest band in the system |
-| `--secondary-active` (blue-5) | **Lc 52.5** | cross-scale; under Lc 60 |
+| `--background` | Lc 96.0 | |
+| `--panel` | Lc 92.2 | |
+| the `amber-2` band | Lc 92.0 | |
+| `--secondary` (blue-3) | Lc 88.0 | cross-scale; the palette's own pairing |
+| `gray-3` | Lc 87.3 | cross-scale |
+| `--warning-subtle` (amber-3) | Lc 87.3 | 9.98:1 by WCAG 2 |
+| `--secondary-active` (blue-5) | Lc 77.3 | cross-scale |
 
-The two amber-on-amber rows are the ramp's own assignments and stand under the
-standing policy. The rest are cross-scale (amber ink on a grey or blue
-surface) and are what "measure the combination" means in practice: those are
-pairings the palette makes, not ones Radix generated.
-
-`--warning-fg` (`amber-12`) is the scale's other ink and clears every surface
-here (Lc 94.2 on the page, Lc 87.3 on the warning band) but it is authored as
-the label for the `--warning` **fill**, and which ink a band carries is a palette
-decision, not a call-site one. Warning copy takes `--warning-subtle-fg` today,
-with the figures above.
+It was `amber-11` (`#ac6500`) until 2026-10-31, the ramp's own band ink: Lc 62.5
+on the band and 4.00:1 by WCAG 2, under the 4.5:1 small warning copy needs, and
+`amber-2` under it only reached 4.30:1. So the band keeps `amber-3` and the ink
+takes step 12, the same step as `--warning-fg`. The two names stay distinct
+roles over one step, each `var(--amber-12)`, so they cannot drift apart:
+`--warning-fg` is the label on the `--warning` fill, `--warning-subtle-fg` the
+warning ink on everything else. `contrast.test.ts` pins the 4.5:1.
 
 ### `--primary-deep`: the dark brand ground, and the scrim
 

@@ -225,11 +225,11 @@
   /* de-emphasised warning surface: an advisory panel, banner, or row carrying
      warning copy rather than a filled control. --warning is a FILL and is not
      legible as text at any size; --warning-subtle-fg is the warning ink
-     everywhere — Lc 62.5 on this band, over Lc 60 by the narrowest margin of
-     any resting band. gray-12 on
+     everywhere — step 12, not the ramp's 11: amber-11 on this band is 4.00:1,
+     under the 4.5:1 warning copy needs; amber-12 is 9.98:1 (Lc 87.3). gray-12 on
      the band stays far clear, so it also takes neutral body copy. */
   --warning-subtle: var(--amber-3);
-  --warning-subtle-fg: var(--amber-11);
+  --warning-subtle-fg: var(--amber-12);
   /* the form control's edge: field, checkbox, radio, `.btn-secondary`,
      dropzone, and whatever the base `*` rule reaches. WCAG 1.4.11 asks a
      control's boundary to be findable, and the control is the one surface in
