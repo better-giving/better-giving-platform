@@ -27,7 +27,6 @@ export default function Page({ classes = "" }) {
       <DonationFormInfo classes="mt-20 page" />
       <Benefits
         classes="mt-56 page"
-        subheading="Simple path to financial stability"
         heading="Making a Lasting Impact: Give today, Give Forever"
         body="Access our free fundraising technology and tools."
         items={benefits.sf}

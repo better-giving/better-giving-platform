@@ -4,7 +4,7 @@ import { page } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import {
   BANNER,
-  donate_on_banner,
+  donate_under_banner,
   donates,
   give_panel,
   header_donate,
@@ -14,7 +14,6 @@ import {
   panel_parts,
   pinned_to_bottom,
   scroll_past_hero_donate,
-  token_color,
 } from "#/__tests__/fixtures/layout-dom";
 import {
   above_fold,
@@ -154,7 +153,7 @@ describe("Poster", () => {
     [375, 812],
     [1440, 900],
   ])(
-    "the give card: the banner at 4:1 with Donate floating on its bottom-right corner, at %i",
+    "the give card: the banner at 4:1 with Donate under it, clear of the image and as wide, at %i",
     async (w, h) => {
       await page.viewport(w, h);
       const screen = await mount();
@@ -166,23 +165,20 @@ describe("Poster", () => {
         .toBeCloseTo(4, 1);
       expect(panel_banner(panel)?.flush).toBe(true);
       expect(panel_parts(panel)).toEqual(["banner", "donate"]);
-      const at = donate_on_banner(panel);
-      expect(at?.inside).toBe(true);
-      expect(at?.right).toBeCloseTo(12, 0);
-      expect(at?.bottom).toBeCloseTo(12, 0);
-      expect(donate.getBoundingClientRect().width).toBeLessThan(
-        panel.getBoundingClientRect().width / 2
-      );
+      const at = donate_under_banner(panel);
+      expect(at?.gap).toBeCloseTo(12, 0);
+      expect(at?.spans).toBe(true);
     }
   );
 
-  test("on the deep band, Donate on the banner is the primary button", async () => {
+  test("on the deep band, Donate under the banner takes the inverse fill, as it does alone", async () => {
     const screen = await mount();
     const panel = give_panel(screen.container);
     const [donate] = donates(panel);
     await expect.poll(() => donate.checkVisibility()).toBe(true);
     expect(panel.closest(".bg-primary-deep")).not.toBeNull();
-    expect(donate).toHaveClass("btn-primary");
+    expect(donate).not.toHaveClass("btn-primary");
+    expect(donate).toHaveClass("bg-primary-fg", "text-primary");
   });
 
   test("with no banner, Donate alone on the deep band takes the inverse fill", async () => {
@@ -199,31 +195,26 @@ describe("Poster", () => {
    * every outline in --ring, so it is readable at rest */
   const ring = (el: Element) => getComputedStyle(el).outlineColor;
 
-  test("Donate on the banner draws its focus ring inside the fill, in the fill's own ink", async () => {
-    await page.viewport(1440, 900);
-    const screen = await mount();
-    const [donate] = donates(give_panel(screen.container));
-    await expect.poll(() => donate.checkVisibility()).toBe(true);
-    const focused = await keyboard_ring(donate);
-    expect(focused.style).toBe("solid");
-    expect(focused.color).toBe(token_color("--primary-fg"));
-    expect(focused.offset).toBeLessThan(0);
-  });
-
-  test("Donate alone on the deep band takes the band's white focus ring", async () => {
-    await page.viewport(1440, 900);
-    const screen = await mount({}, { image: null });
-    const panel = give_panel(screen.container);
-    const [donate] = donates(panel);
-    await expect.poll(() => donate.checkVisibility()).toBe(true);
-    const band = panel.closest(".bg-primary-deep") as HTMLElement;
-    expect(ring(donate)).toBe(ring(band));
-    expect(ring(donate)).not.toBe(ring(document.body));
-    const focused = await keyboard_ring(donate);
-    expect(focused.style).toBe("solid");
-    expect(focused.color).toBe(ring(band));
-    expect(focused.offset).toBeGreaterThan(0);
-  });
+  test.each([
+    ["under the banner", BANNER],
+    ["alone", null],
+  ])(
+    "Donate %s on the deep band takes the band's white focus ring",
+    async (_, image) => {
+      await page.viewport(1440, 900);
+      const screen = await mount({}, { image });
+      const panel = give_panel(screen.container);
+      const [donate] = donates(panel);
+      await expect.poll(() => donate.checkVisibility()).toBe(true);
+      const band = panel.closest(".bg-primary-deep") as HTMLElement;
+      expect(ring(donate)).toBe(ring(band));
+      expect(ring(donate)).not.toBe(ring(document.body));
+      const focused = await keyboard_ring(donate);
+      expect(focused.style).toBe("solid");
+      expect(focused.color).toBe(ring(band));
+      expect(focused.offset).toBeGreaterThan(0);
+    }
+  );
 
   test.each([
     [375, 812],

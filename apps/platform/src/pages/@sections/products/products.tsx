@@ -10,9 +10,6 @@ export function Products({ classes = "" }) {
       aria-labelledby="fundraising-section-heading"
     >
       <div className="grid max-w-2xl order-2 xl:order-1">
-        <p className="text-center xl:text-left uppercase mb-5 pre-heading text-primary">
-          Everything you need, already included.
-        </p>
         <h2
           id="fundraising-section-heading"
           className="text-center xl:text-left section-heading mb-4"

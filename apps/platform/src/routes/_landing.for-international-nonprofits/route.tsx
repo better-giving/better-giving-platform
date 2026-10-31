@@ -3,7 +3,6 @@ import { app_name, base_url } from "#/constants/env";
 import { metas } from "#/helpers/seo";
 import { CtaBand } from "#/pages/@sections/cta-band";
 import { PartnersStrip } from "#/pages/@sections/partners/strip";
-import { TrustBar } from "#/pages/@sections/trust-bar";
 import type { ILeadInvalid } from "@/reg/lead";
 import type { Route } from "./+types/route";
 import { Credentials } from "./credentials";
@@ -33,11 +32,6 @@ export const meta: Route.MetaFunction = () =>
     description: `Reach U.S. donors without your own 501(c)(3). ${app_name}'s fiscal sponsorship makes gifts tax-deductible for your U.S. supporters at 2.9%, versus the 4-10% market rate (as of 2026).`,
   });
 
-const stats = [
-  { value: "2.9%", label: "fiscal sponsorship fee", accent: true },
-  { value: "2021", label: "serving nonprofits since" },
-] as const;
-
 export default function Page() {
   // success is a redirect into the wizard, so the only thing that ever comes
   // back here is a failed submit
@@ -55,11 +49,7 @@ export default function Page() {
         pending={nav.state === "submitting"}
       />
       <Credentials classes="bg-panel py-4" />
-      <TrustBar
-        classes="bg-gray-3 border-y border-hairline py-7"
-        items={stats}
-      />
-      <PartnersStrip classes="border-b border-hairline" />
+      <PartnersStrip classes="border-y border-hairline" />
       <FeeGap classes="bg-gray-3 border-b border-hairline py-10 md:py-16" />
       <RateComparison classes="border-b border-hairline py-10 md:py-16" />
       <HowItWorks classes="border-b border-hairline py-10 md:py-16" />

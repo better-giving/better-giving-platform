@@ -4,7 +4,7 @@ import { page } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import {
   BANNER,
-  donate_on_banner,
+  donate_under_banner,
   donates,
   give_panel,
   header_donate,
@@ -254,10 +254,9 @@ describe("Feature", () => {
     await expect.poll(() => panel_banner(panel)?.ratio ?? 0).toBeCloseTo(4, 1);
     expect(panel_banner(panel)?.flush).toBe(true);
     expect(panel_parts(panel)).toEqual(["banner", "donate"]);
-    const at = donate_on_banner(panel);
-    expect(at?.inside).toBe(true);
-    expect(at?.right).toBeCloseTo(12, 0);
-    expect(at?.bottom).toBeCloseTo(12, 0);
+    const at = donate_under_banner(panel);
+    expect(at?.gap).toBeCloseTo(12, 0);
+    expect(at?.spans).toBe(true);
     // one Donate in main: the card's
     expect(
       donates(screen.container.querySelector("main") as HTMLElement)
@@ -309,7 +308,7 @@ describe("Feature", () => {
     const screen = await mount();
     const panel = give_panel(screen.container);
     await expect.poll(() => panel.checkVisibility()).toBe(true);
-    expect(getComputedStyle(panel).position).toBe("relative");
+    expect(["static", "relative"]).toContain(getComputedStyle(panel).position);
     const band = screen.container.querySelector("main .bg-band") as HTMLElement;
     const lead = band.querySelector("p") as HTMLElement;
     const strip = screen

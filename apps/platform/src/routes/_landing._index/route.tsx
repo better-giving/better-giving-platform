@@ -6,7 +6,6 @@ import { metas } from "#/helpers/seo";
 import { CtaBand } from "#/pages/@sections/cta-band";
 import { FAQ } from "#/pages/@sections/faq";
 import { PartnersStrip } from "#/pages/@sections/partners/strip";
-import { TrustBar } from "#/pages/@sections/trust-bar";
 import type { Route } from "./+types/route";
 import { home_faqs } from "./faqs";
 import { GrowFunds } from "./grow-funds";
@@ -76,8 +75,7 @@ export default function Page() {
   return (
     <main>
       <Hero />
-      <TrustBar classes="border-y border-hairline py-7" />
-      <PartnersStrip classes="border-b border-secondary" />
+      <PartnersStrip classes="border-y border-t-hairline border-b-secondary" />
       <Steps classes="py-24" />
       <OwnGrow classes="bg-band py-24" />
       <Pillars classes="py-24" />

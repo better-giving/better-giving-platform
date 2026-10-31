@@ -4,18 +4,12 @@ import type { Benefit as TBenefit } from "#/content/benefits";
 type Props = {
   classes?: string;
   items: TBenefit[];
-  subheading?: string;
   heading: string;
   body: string;
 };
 export function Benefits(props: Props) {
   return (
     <section className={`grid ${props.classes ?? ""}`}>
-      {props.subheading && (
-        <h4 className="text-lg uppercase text-primary text-center mb-4">
-          {props.subheading}
-        </h4>
-      )}
       <h2 className="text-3xl md:text-4.5xl capitalize text-center text-pretty mb-4">
         {props.heading}
       </h2>

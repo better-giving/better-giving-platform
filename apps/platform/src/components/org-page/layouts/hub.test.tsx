@@ -4,7 +4,7 @@ import { page } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import {
   BANNER,
-  donate_on_banner,
+  donate_under_banner,
   donates,
   give_panel,
   header_donate,
@@ -14,7 +14,6 @@ import {
   panel_parts,
   pinned_to_bottom,
   scroll_past_hero_donate,
-  token_color,
 } from "#/__tests__/fixtures/layout-dom";
 import {
   above_fold,
@@ -266,10 +265,9 @@ describe("Hub", () => {
     await expect.poll(() => panel_banner(panel)?.ratio ?? 0).toBeCloseTo(4, 1);
     expect(panel_banner(panel)?.flush).toBe(true);
     expect(panel_parts(panel)).toEqual(["banner", "donate"]);
-    const at = donate_on_banner(panel);
-    expect(at?.inside).toBe(true);
-    expect(at?.right).toBeCloseTo(12, 0);
-    expect(at?.bottom).toBeCloseTo(12, 0);
+    const at = donate_under_banner(panel);
+    expect(at?.gap).toBeCloseTo(12, 0);
+    expect(at?.spans).toBe(true);
     expect(imgs_outside_panel(screen.container)).toEqual([]);
     // the mark sits inside the band
     const mark = band.querySelector("[data-monogram]") as HTMLElement;
@@ -278,15 +276,16 @@ describe("Hub", () => {
     );
   });
 
-  test("Donate on the banner draws its focus ring inside the fill, in the fill's own ink", async () => {
+  test("Donate under the banner is the primary button with the page's focus ring, outside its fill", async () => {
     await page.viewport(1440, 900);
     const screen = await mount(org_layout({ npo: npo({ image: BANNER }) }));
     const [donate] = donates(give_panel(screen.container));
     await expect.poll(() => donate.checkVisibility()).toBe(true);
+    expect(donate).toHaveClass("btn-primary");
     const focused = await keyboard_ring(donate);
     expect(focused.style).toBe("solid");
-    expect(focused.color).toBe(token_color("--primary-fg"));
-    expect(focused.offset).toBeLessThan(0);
+    expect(focused.color).toBe(getComputedStyle(document.body).outlineColor);
+    expect(focused.offset).toBeGreaterThanOrEqual(0);
   });
 
   test("with no banner the band stays the tint and the give card is Donate alone", async () => {

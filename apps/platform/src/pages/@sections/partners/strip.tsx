@@ -14,7 +14,7 @@ interface IPartnersStrip {
 export function PartnersStrip({ classes = "" }: IPartnersStrip) {
   return (
     <section className={`${classes} overflow-hidden py-8`}>
-      <p className="text-center text-xs font-bold uppercase tracking-wider text-gray-11 px-6">
+      <p className="text-center text-sm text-gray-11 px-6">
         Trusted by nonprofits, faith charities, schools &amp; universities
         worldwide
       </p>
