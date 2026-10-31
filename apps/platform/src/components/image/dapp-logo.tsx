@@ -11,6 +11,7 @@ export function DappLogo({ classes = "" }: Props) {
     <Image
       className={classes}
       src={dapp_logo}
+      alt="Better Giving"
       render={(img) => (
         <Link to={href("/")} title="Go to Home page">
           {img}

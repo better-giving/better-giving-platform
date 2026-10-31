@@ -1,7 +1,7 @@
+import { to_usd } from "@better-giving/ui/helpers";
 import { format, formatDistance } from "date-fns";
 import { PencilIcon } from "lucide-react";
 import { Link } from "react-router";
-import { humanize } from "@/helpers/decimal";
 
 interface Props {
   bal_cash: number;
@@ -18,11 +18,11 @@ export function Payout({ classes = "", ...p }: Props) {
       <div className="flex items-center justify-between mb-1">
         <div className="space-x-1 mb-1">
           <span className="text-xs uppercase">total</span>
-          <span className="font-bold">${humanize(p.bal_cash)}</span>
+          <span className="font-bold">{to_usd(p.bal_cash, 2)}</span>
         </div>
         <div className="space-x-1">
           <span className="text-xs">of</span>
-          <span className="text-sm">${humanize(p.threshold)}</span>
+          <span className="text-sm">{to_usd(p.threshold, 2)}</span>
           <Link
             to={{ pathname: "payout-min", search: `?min=${p.threshold}` }}
             replace
