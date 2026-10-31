@@ -45,9 +45,9 @@ export function Prompt({
       onClose={close}
       onExitComplete={onExitComplete}
       title={title}
-      classes="grid bg-panel text-gray-12"
+      classes="grid bg-card text-gray-12"
     >
-      <div className="flex justify-end p-4 border-b">
+      <div className="flex justify-end p-4 border-b border-hairline">
         <button
           type="button"
           onClick={close}

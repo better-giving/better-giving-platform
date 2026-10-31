@@ -34,7 +34,7 @@ export function GrowFunds({ classes = "" }: IGrowFunds) {
             Route any share of your donations into two places money grows:
           </p>
           <div className="grid gap-3.5">
-            <div className="card-on-band flex gap-3.5 items-start">
+            <div className="card flex gap-3.5 items-start">
               <span className="flex-none size-9.5 rounded bg-secondary grid place-items-center font-bold">
                 <PercentIcon aria-hidden className="icon-xl" />
               </span>
@@ -46,7 +46,7 @@ export function GrowFunds({ classes = "" }: IGrowFunds) {
                 </p>
               </div>
             </div>
-            <div className="card-on-band flex gap-3.5 items-start">
+            <div className="card flex gap-3.5 items-start">
               <span className="flex-none size-9.5 rounded bg-secondary grid place-items-center font-bold">
                 <TrendingUpIcon aria-hidden className="icon-xl" />
               </span>
@@ -64,7 +64,7 @@ export function GrowFunds({ classes = "" }: IGrowFunds) {
           </p>
         </div>
 
-        <div className="card-on-band shadow-lift-card grid gap-6 justify-items-center">
+        <div className="card shadow-lift-card grid gap-6 justify-items-center">
           <span className="text-lg font-bold">
             Sustainability Fund target allocation as of 2026
           </span>

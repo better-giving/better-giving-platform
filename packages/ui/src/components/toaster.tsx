@@ -34,7 +34,7 @@ export function Toaster({ children }: { children: React.ReactNode }) {
         className="fixed bottom-4 right-4 z-floating w-[356px] max-w-[calc(100vw-2rem)] outline-none"
       >
         {(toast) => (
-          <Toast.Root className="bg-panel text-gray-12 border rounded shadow-floating px-4 py-3 flex items-center gap-3 data-[state=open]:animate-popup-in data-[state=closed]:animate-popup-out">
+          <Toast.Root className="bg-card text-gray-12 rounded-card shadow-floating px-4 py-3 flex items-center gap-3 data-[state=open]:animate-popup-in data-[state=closed]:animate-popup-out">
             {toast.type && icons[toast.type]}
             <Toast.Description className="text-sm flex-1">
               {toast.description}

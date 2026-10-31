@@ -40,3 +40,33 @@
 #donation-container {
   --ring: var(--form-primary);
 }
+
+/* the ground: --background under four radial blots, painted once for every
+   screen and fixed to the window, so the blots stay put while the page
+   scrolls. a fixed pseudo-element rather than `background-attachment: fixed`,
+   which iOS Safari ignores. z-index -1 with no stacking context on body puts it
+   over the canvas and under every in-flow box. the blots' sizes and stops are
+   the approved Surfaces spec's; the colours are the --wash set, which has no
+   utility anywhere else. a screen holding a `solo-card` swaps the main blue for
+   --wash-strong — one card on an empty page needs more colour under its edge.
+   the embedded donation form takes the card/field model but never the ground:
+   it sits in an iframe on a nonprofit's own page, so its two routes
+   (`donate-widget.$id`, `forms.$id`) mark their root `data-surfaces="embed"`
+   and the page behind them stays the host's. */
+:root:not(:has([data-surfaces="embed"])) body::before {
+  --ground-main: var(--wash);
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 55% at 6% 6%, var(--ground-main), transparent 75%),
+    radial-gradient(50% 55% at 78% 22%, var(--wash-far), transparent 75%),
+    radial-gradient(50% 50% at 30% 70%, var(--wash), transparent 75%),
+    radial-gradient(55% 55% at 98% 98%, var(--wash-far), transparent 75%),
+    var(--background);
+}
+:root:has(.solo-card) body::before {
+  --ground-main: var(--wash-strong);
+}

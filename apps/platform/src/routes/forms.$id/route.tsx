@@ -75,7 +75,7 @@ export default function Page({ loaderData, params }: Route.ComponentProps) {
 
   if (d.status === "inactive") {
     return (
-      <div className="relative">
+      <div className="relative" data-surfaces="embed">
         <div className="blur-sm pointer-events-none">{steps}</div>
         <div className="absolute inset-0 flex items-center justify-center bg-background/50">
           <p className="font-medium">This form has been disabled</p>
@@ -84,5 +84,10 @@ export default function Page({ loaderData, params }: Route.ComponentProps) {
     );
   }
 
-  return steps;
+  // no blot ground on a nonprofit's page (src/index.css)
+  return (
+    <div className="contents" data-surfaces="embed">
+      {steps}
+    </div>
+  );
 }

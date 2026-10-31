@@ -250,7 +250,13 @@
      the token is read by the base `*` rule, which is what makes the rebind
      reach every element inside. */
   --color-background: var(--background);
+  --color-card: var(--card);
   --color-panel: var(--panel);
+  /* `border-hairline` / `divide-hairline`: a line inside a card. the blots
+     (--wash, --wash-far, --wash-strong) have NO utility on purpose — they are
+     painted once, by the ground in platform's index.css, and a `bg-wash` would
+     be the first decorative hue a call site could reach for as a fill. */
+  --color-hairline: var(--hairline);
   --color-primary: var(--primary);
   --color-primary-fg: var(--primary-fg);
   --color-primary-deep: var(--primary-deep);
@@ -282,9 +288,10 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  /* the radius ladder is closed, the same way --color-* is. this repo has ONE
-     corner: `rounded`, bound to --radius by @utility in styles/utilities.css.
+  /* the radius ladder is closed, the same way --color-* is. this repo has TWO
+     corners: `rounded`, bound to --radius, for a control or a well, and
+     `rounded-card`, bound to --radius-card, for a container or a floating
+     layer — both by @utility in styles/utilities.css.
      the seven steps this scale would define are fractions and multiples of
      that one value (1.6px / 2.4px / 3.2px …) — near-sharp corners nobody picks
      on purpose, and they accumulate silently. resetting the scale makes

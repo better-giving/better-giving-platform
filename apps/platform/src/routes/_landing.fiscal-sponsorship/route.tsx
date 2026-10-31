@@ -135,7 +135,7 @@ export default function Page() {
             {audiences.map((a) => (
               <div
                 key={a.title}
-                className="card-on-band shadow-lift-card grid gap-2.5 content-start"
+                className="card shadow-lift-card grid gap-2.5 content-start"
               >
                 <span className="text-xl font-bold">{a.title}</span>
                 <p className="text-sm/relaxed text-gray-11">{a.body}</p>

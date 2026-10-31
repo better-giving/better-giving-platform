@@ -10,7 +10,7 @@ export const Confirmation = () => (
     open
     onClose={() => {}}
     size="panel"
-    classes="p-8 bg-panel text-gray-12 text-center"
+    classes="p-8 bg-card text-gray-12 text-center"
   >
     <h3 className="text-xl font-bold text-balance">
       This organization is already registered
@@ -28,7 +28,7 @@ export const Confirmation = () => (
 
 // no `size` — the default `sm` (512px) is the single-column form tier.
 export const InviteMember = () => (
-  <Modal open onClose={() => {}} classes="p-6 bg-panel text-gray-12">
+  <Modal open onClose={() => {}} classes="p-6 bg-card text-gray-12">
     <h4 className="text-center text-xl font-bold mb-6">Invite a team member</h4>
     <div className="grid gap-4">
       <Field
@@ -56,7 +56,7 @@ export const DestructiveConfirm = () => (
     open
     onClose={() => {}}
     size="panel"
-    classes="p-8 bg-panel text-gray-12"
+    classes="p-8 bg-card text-gray-12"
   >
     <h3 className="text-xl font-bold">Cancel this payout?</h3>
     <p className="text-gray-11 text-pretty mt-3">

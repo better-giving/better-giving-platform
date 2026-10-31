@@ -72,10 +72,14 @@ const p = (
   miss,
 });
 
-// the page ground is gray-1, not #ffffff: every figure but the two the ledger
-// explicitly measures on white is against the real ground.
-const page = colors.background;
+// the figures recorded "on gray-1" were measured when gray-1 was the page. it
+// still is the ground of the embedded donation form and of the emails, and it
+// is the darkest ground any of these inks sits on outside a well: --background,
+// --card and --surface are white now, which only raises a dark ink's Lc. the
+// white ground's own figures are the "on --card" block below.
+const page = colors.gray_1;
 const white = "#ffffff";
+const card = colors.card;
 
 // tailwind's `/<alpha>` modifier, composited over the ground the ledger names.
 const tint = (hex: string, alpha: number, ground: string | Rgb = page) =>
@@ -85,14 +89,73 @@ const tint = (hex: string, alpha: number, ground: string | Rgb = page) =>
 const scrim = tint(colors.primary_deep, 0.7, white);
 
 const pairings: Pairing[] = [
-  // --- borders, the focus ring, neutral ink on the page
+  // --- the white ground: --card, and --background / --surface with it
+  p("gray-12 on --card", colors.gray_12, card, 103.3, min.body_preferred),
+  p("gray-11 on --card", colors.gray_11, card, 79.6, min.content),
+  p("gray-6 (--border) on --card", colors.border, card, 19.3, min.hairline),
   p(
-    "gray-6 (--border) on --background",
-    colors.gray_6,
-    page,
-    17.4,
-    min.hairline
+    "gray-7 control boundary on --card",
+    colors.gray_7,
+    card,
+    25.6,
+    min.spot,
+    "radix's element-border rung taken as generated; the white card lifts it 1.8 and it still misses"
   ),
+  p(
+    "gray-3 (--hairline) on --card",
+    colors.hairline,
+    card,
+    0,
+    min.hairline,
+    "the design's: a line inside a card groups rows rather than gridding them, and apca clips a step this faint to 0. a line that must be found is --border"
+  ),
+  p("--ring on --card", colors.ring, card, 46.5, min.spot),
+  p("--primary on --card", colors.primary, card, 76.9, min.content),
+  p(
+    "gray-11 on --panel (a well)",
+    colors.gray_11,
+    colors.panel,
+    75.8,
+    min.content
+  ),
+  p(
+    "gray-12 on --panel (a well)",
+    colors.gray_12,
+    colors.panel,
+    99.5,
+    min.body_preferred
+  ),
+
+  // --- the blots, for copy that lands on the ground outside a card
+  p("gray-12 on --wash", colors.gray_12, colors.wash, 87.5, min.body),
+  p("gray-11 on --wash", colors.gray_11, colors.wash, 63.7, min.content),
+  p("gray-12 on --wash-far", colors.gray_12, colors.wash_far, 88.5, min.body),
+  p(
+    "gray-11 on --wash-far",
+    colors.gray_11,
+    colors.wash_far,
+    64.8,
+    min.content
+  ),
+  p(
+    "gray-12 on --wash-strong",
+    colors.gray_12,
+    colors.wash_strong,
+    82,
+    min.body
+  ),
+  p(
+    "gray-11 on --wash-strong",
+    colors.gray_11,
+    colors.wash_strong,
+    58.2,
+    min.content,
+    "the solo-card blot is behind the card, not behind copy: de-emphasised copy on the bare blot takes gray-12"
+  ),
+  p("--primary on --wash", colors.primary, colors.wash, 61.1, min.content),
+
+  // --- borders, the focus ring, neutral ink on the page
+  p("gray-6 (--border) on gray-1", colors.gray_6, page, 17.4, min.hairline),
   p(
     "gray-6 (--border) on --panel",
     colors.gray_6,
@@ -101,7 +164,7 @@ const pairings: Pairing[] = [
     min.hairline
   ),
   p(
-    "gray-7 control boundary on --background",
+    "gray-7 control boundary on gray-1",
     colors.gray_7,
     page,
     23.8,
@@ -116,48 +179,36 @@ const pairings: Pairing[] = [
     min.spot,
     "same rung, one surface down"
   ),
-  p("gray-8 on --background", colors.gray_8, page, 34.3, min.spot),
+  p("gray-8 on gray-1", colors.gray_8, page, 34.3, min.spot),
   p("gray-8 on --panel", colors.gray_8, colors.panel, 32.4, min.spot),
-  p("gray-11 on --background", colors.gray_11, page, 77.7, min.content),
-  p("gray-12 on --background", colors.gray_12, page, 101.5, min.body_preferred),
-  p("--ring (blue-8) on --background", colors.ring, page, 44.6, min.spot),
+  p("gray-11 on gray-1", colors.gray_11, page, 77.7, min.content),
+  p("gray-12 on gray-1", colors.gray_12, page, 101.5, min.body_preferred),
+  p("--ring (blue-8) on gray-1", colors.ring, page, 44.6, min.spot),
   // on the line and not over it, which is what surface-primary's ring rebind
   // exists for.
   p("--ring on --primary", colors.ring, colors.primary, 30.0, min.spot),
   p("gray-6 on --primary", colors.gray_6, colors.primary, 58.6, min.spot),
 
   // --- fill or ink: every token measured on the real page ground
-  p("--primary on --background", colors.primary, page, 75.1, min.content),
+  p("--primary on gray-1", colors.primary, page, 75.1, min.content),
   // the hover rung of the `link` recipe, and the first place step 10 is spent
   // as ink rather than as a fill. the ramp pairs a step 10 with nothing, so
   // this is the palette's own combination and is measured rather than inferred
   // from the step below it.
-  p(
-    "--primary-hover on --background",
-    colors.primary_hover,
-    page,
-    80.7,
-    min.content
-  ),
+  p("--primary-hover on gray-1", colors.primary_hover, page, 80.7, min.content),
   // fill only by rule (gray-12 is the app's dark ink), so no threshold binds.
-  p("--primary-deep on --background", colors.primary_deep, page, 93.9, null),
-  p("--success glyph on --background", colors.success, page, 67.0, min.detail),
+  p("--primary-deep on gray-1", colors.primary_deep, page, 93.9, null),
+  p("--success glyph on gray-1", colors.success, page, 67.0, min.detail),
   p(
-    "--success-subtle-fg on --background",
+    "--success-subtle-fg on gray-1",
     colors.success_subtle_fg,
     page,
     72.0,
     min.content
   ),
+  p("--destructive on gray-1", colors.destructive, page, 74.1, min.content),
   p(
-    "--destructive on --background",
-    colors.destructive,
-    page,
-    74.1,
-    min.content
-  ),
-  p(
-    "--warning glyph on --background",
+    "--warning glyph on gray-1",
     colors.warning,
     page,
     39.9,
@@ -173,7 +224,7 @@ const pairings: Pairing[] = [
     "same fill, on white"
   ),
   p(
-    "--warning-subtle-fg on --background",
+    "--warning-subtle-fg on gray-1",
     colors.warning_subtle_fg,
     page,
     69.3,
@@ -186,7 +237,7 @@ const pairings: Pairing[] = [
     71.2,
     min.content
   ),
-  p("--warning-fg on --background", colors.warning_fg, page, 94.2, min.content),
+  p("--warning-fg on gray-1", colors.warning_fg, page, 94.2, min.content),
   p("gray-11 on gray-3", colors.gray_11, colors.gray_3, 70.9, min.content),
   p(
     "gray-11 on --secondary",
@@ -727,12 +778,12 @@ describe("--overlay, the dialog scrim", () => {
     expect(second).toBe("transparent");
   });
 
-  // composited over the page it scrims. no ledger figure exists for it either:
+  // composited over the white page and cards it scrims. no ledger figure exists for it either:
   // the token's job is to dim, and this pins how far it does.
   it("dims the page by a recorded amount", () => {
-    const dimmed = over(rgb(hex_of(first)), pct / 100, rgb(page));
-    expect(to_hex(dimmed)).toBe("#b8babe");
-    expect(lc(dimmed, rgb(page))).toBe(35.5);
+    const dimmed = over(rgb(hex_of(first)), pct / 100, rgb(card));
+    expect(to_hex(dimmed)).toBe("#babcbf");
+    expect(lc(dimmed, rgb(card))).toBe(36.2);
   });
 });
 

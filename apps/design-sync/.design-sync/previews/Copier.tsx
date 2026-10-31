@@ -35,7 +35,7 @@ export const IconBesideValue = () => (
 
 // the crypto checkout: a long wallet address that must be copied verbatim.
 export const WalletAddress = () => (
-  <div className="w-96 bg-panel border rounded p-4 grid gap-2">
+  <div className="w-96 bg-card rounded-card p-4 grid gap-2">
     <p className="text-xs font-semibold uppercase tracking-badge text-gray-11">
       Send ETH to this address
     </p>
@@ -93,7 +93,7 @@ export const ReferralBlock = () => (
 
 // with a label inside the trigger — the wire-transfer memo panel.
 export const LabeledTrigger = () => (
-  <div className="w-96 bg-panel border rounded p-4">
+  <div className="w-96 bg-card rounded-card p-4">
     <p className="text-sm text-gray-11 mb-3">
       Include this code with your transfer of $1,200.00 so we can match the
       deposit.

@@ -14,7 +14,7 @@ export const FundraiserCover = () => (
 
 // how a marketplace card renders before its cover image exists.
 export const InCard = () => (
-  <div className="w-64 bg-panel border rounded overflow-clip">
+  <div className="w-64 bg-card rounded-card overflow-clip">
     <ImagePlaceholder classes="h-40 w-full" />
     <div className="p-3">
       <h3 className="text-center mb-2">Books for Kids</h3>

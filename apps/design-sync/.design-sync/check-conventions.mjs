@@ -41,13 +41,13 @@ const INKED = ["primary", "success", "warning", "destructive"];
 // fills that carry the neutral ink rung instead of an -fg of their own.
 const PLAIN = [
   "background",
+  "card",
   "panel",
   "surface",
   "overlay",
   "band",
   "secondary",
   "secondary-active",
-  "sidebar",
 ];
 const BOX = [
   0,
@@ -100,7 +100,13 @@ const claims = {
   "authored subtle pairs": ["destructive", "success", "warning"].flatMap(
     (s) => [`bg-${s}-subtle`, `text-${s}-subtle-fg`]
   ),
-  lines: ["border-gray-6", "ring-ring", "outline-ring"],
+  lines: [
+    "border-gray-6",
+    "border-hairline",
+    "divide-hairline",
+    "ring-ring",
+    "outline-ring",
+  ],
   "chart ramp": ["bg", "text", "border", "fill", "stroke"].flatMap((p) =>
     [1, 2, 3, 4, 5].map((n) => `${p}-chart-${n}`)
   ),
@@ -126,7 +132,7 @@ const claims = {
     "mb",
     "ml",
   ].flatMap((p) => SPACE.map((s) => `${p}-${s}`)),
-  radius: ["rounded", "rounded-full", "rounded-none"],
+  radius: ["rounded", "rounded-card", "rounded-full", "rounded-none"],
   buttons: [
     "btn",
     "btn-primary",
@@ -165,7 +171,13 @@ const claims = {
     "absolute-center",
     "link",
   ],
-  "page + scrollers": ["page", "table-scroll", "scrollbars", "solo-card"],
+  "page + scrollers": [
+    "page",
+    "table-scroll",
+    "scrollbars",
+    "solo-card",
+    "card",
+  ],
   measure: ["max-w-3xl", "max-w-prose"],
   type: ["text-sm", "text-xs", "text-2xs"],
   // none of these is a class any scanned file writes: the speeds and curves
@@ -206,6 +218,8 @@ const MUST_BE_ABSENT = [
   "rounded-lg",
   "rounded-xl",
   "rounded-xs",
+  "bg-sidebar",
+  "card-on-band",
   "btn-link",
   "bg-gray-500",
   "text-red-600",

@@ -802,3 +802,21 @@ Fifteen previews wrote a deleted name and moved with the rest: `bg-card` → `bg
 in the panel-shaped ones, `bg-input` → `bg-surface` in `Increments`, `text-popover-fg` →
 `text-gray-12` in `Tooltip` and `HoverCard`. `Group.tsx` needed nothing and already
 covers the page → panel → field stack the rename is about.
+
+## 2026-10-31: the surface model (ground → card → well → field)
+
+Cards, dialogs and floating layers went white, borderless and `rounded-card` (12px);
+`--panel` became a well inside a card; `--sidebar` and `card-on-band` were deleted;
+`--card` and `--hairline` arrived. What this directory had to change:
+
+- **`styles-entry.css`**: `card` and `hairline` joined the semantic inline list,
+  `sidebar` left it, and `divide-hairline` / `rounded-card` are listed explicitly.
+- **`check-conventions.mjs`**: `card` in `PLAIN`, `sidebar` out; the hairline pair in
+  `lines`; `rounded-card` in `radius`; `bg-sidebar` and `card-on-band` documented absent.
+- **previews**: every panel-shaped wrapper (`bg-panel border rounded`) moved to
+  `bg-card rounded-card`, and `Modal`'s fills to `bg-card`.
+
+The **ground is not in this bundle**: the four radial blots are painted once by
+platform's `src/index.css` (a fixed `body::before`), not by `packages/ui`'s stylesheet,
+so a preview card renders white on the preview's own white. That is the model with its
+ground missing, not a broken card; don't add a border to make it show.

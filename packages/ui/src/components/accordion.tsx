@@ -26,7 +26,7 @@ const looks = {
     content: "text-sm grid gap-3 text-gray-11 mb-6",
   },
   divided: {
-    root: "divide-y divide-gray-6",
+    root: "divide-y divide-hairline",
     trigger: "flex items-center justify-between gap-2 w-full py-6 px-4",
     label: "text-left group-data-[state=open]:font-semibold",
     content: "pb-4 px-4",

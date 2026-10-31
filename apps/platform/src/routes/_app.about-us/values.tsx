@@ -34,10 +34,7 @@ export function Values({ classes = "" }: IValues) {
         </h2>
         <div className="grid gap-5 md:grid-cols-3 mt-11">
           {values.map((v) => (
-            <div
-              key={v.title}
-              className="card-on-band grid gap-2 content-start"
-            >
+            <div key={v.title} className="card grid gap-2 content-start">
               <span className="text-xl font-bold">{v.title}</span>
               <p className="text-sm/relaxed text-gray-11">{v.body}</p>
             </div>

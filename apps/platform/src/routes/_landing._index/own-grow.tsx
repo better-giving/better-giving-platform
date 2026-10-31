@@ -24,7 +24,7 @@ export function OwnGrow({ classes = "" }: IOwnGrow) {
           opposite: infrastructure you can own, and reserves that grow.
         </p>
         <div className="grid gap-6 md:grid-cols-2 mt-12">
-          <div className="card-on-band shadow-lift-card flex flex-col gap-4">
+          <div className="card shadow-lift-card flex flex-col gap-4">
             <Image
               src={laira_shaking_hands}
               width={120}
@@ -43,7 +43,7 @@ export function OwnGrow({ classes = "" }: IOwnGrow) {
               donors to your new platform, free, no exit toll.
             </p>
           </div>
-          <div className="card-on-band shadow-lift-card flex flex-col gap-4">
+          <div className="card shadow-lift-card flex flex-col gap-4">
             <Image
               src={laira_presentation}
               width={120}

@@ -29,7 +29,7 @@ export const Split = () => (
 // full-bleed to the dialog's edges. this is the only place that strip is
 // authored; never write `bg-gray-3 border-t` on a footer row by hand.
 export const InADialog = () => (
-  <div className="w-80 border rounded overflow-hidden bg-panel">
+  <div className="w-80 rounded-card overflow-hidden bg-card">
     <p className="font-bold text-center border-b bg-gray-3 p-5">
       Delete payout method
     </p>

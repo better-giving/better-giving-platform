@@ -84,7 +84,11 @@
    and `text-secondary-fg` are gone rather than aliased.
    the line row is `ring` alone — `border` and `input` both moved, `border` to
    the neutral scale below and `input` to `surface`, which is a fill. */
-@source inline("{bg,text,border,ring}-{background,panel,surface,overlay,primary,primary-fg,secondary,secondary-active,band,destructive,destructive-fg,destructive-subtle,destructive-subtle-fg,success,success-fg,success-subtle,success-subtle-fg,warning,warning-fg,warning-subtle,warning-subtle-fg,sidebar,ring}");
+@source inline("{bg,text,border,ring}-{background,card,panel,surface,hairline,overlay,primary,primary-fg,secondary,secondary-active,band,destructive,destructive-fg,destructive-subtle,destructive-subtle-fg,success,success-fg,success-subtle,success-subtle-fg,warning,warning-fg,warning-subtle,warning-subtle-fg,ring}");
+/* the surface model's line and corner: a divider inside a card, and the
+   container's 12px corner. the blots have no utility on purpose. */
+@source inline("divide-hairline");
+@source inline("rounded-card");
 
 /* the neutral scale, whose steps replaced the names dropped from the row
    above — fg, muted, muted-fg and border, plus every surface's -fg twin. those

@@ -55,7 +55,7 @@ export function PriceCards({ classes = "" }: IPriceCards) {
           </Link>
         </div>
 
-        <div className="card-on-band flex flex-col gap-3.5">
+        <div className="card flex flex-col gap-3.5">
           <span className="text-lg font-bold">Fiscal sponsorship</span>
           <span className="text-5xl font-bold">
             2.9%

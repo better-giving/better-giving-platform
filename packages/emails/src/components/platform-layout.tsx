@@ -20,7 +20,9 @@ export function PlatformLayout({
       <Body
         style={{
           fontFamily: "sans-serif",
-          backgroundColor: flat_colors.background,
+          // the ramp step, not --background: mail keeps the gray-1 ground the
+          // app moved off when its page went white.
+          backgroundColor: flat_colors.gray_1,
           // explicit ink: clients that force dark mode invert inherited text
           // while still honouring an explicit background — white on white.
           color: flat_colors.gray_12,
