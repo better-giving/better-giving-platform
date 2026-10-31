@@ -266,10 +266,6 @@ describe("Card", () => {
       await page.viewport(w, h);
       const screen = await mount({ messages: [message(1)] });
       const root = screen.container;
-      // the card alone may fit the screen; room below it makes the scroll certain
-      const room = document.createElement("div");
-      room.style.height = `${h * 3}px`;
-      root.append(room);
 
       const [hero] = donates(main_of(root));
       await expect.poll(() => in_view(hero)).toBe(true);

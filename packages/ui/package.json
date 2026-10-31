@@ -15,7 +15,8 @@
     "./masks": "./src/components/form/masks/index.ts",
     "./tooltip": "./src/components/tooltip.tsx",
     "./hover-card": "./src/components/hover-card.tsx",
-    "./styles.css": "./src/styles/index.css"
+    "./styles.css": "./src/styles/index.css",
+    "./fonts/*": "./src/styles/fonts/*"
   },
   "scripts": {
     "build": "tailwindcss -i ./src/styles/build-entry.css -o ./dist/styles.css && mkdir -p ./dist/fonts && cp ./src/styles/fonts/*.woff2 ./dist/fonts/",

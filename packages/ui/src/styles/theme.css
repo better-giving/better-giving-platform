@@ -53,11 +53,12 @@
   --text-6xl--line-height: 1;
 
   /* the weight ladder is closed to the four in use. font-extrabold and
-     font-black are the point of it: Quicksand's wght axis stops at 700, so 800
-     and 900 have only ever rendered as bold — an inert class that would go
-     live, unreviewed, the day a heavier face is adopted. thin/extralight/light
-     go for the reverse reason: nothing under 400 is legible at this face's
-     low stroke contrast, and none of them carries a call site.
+     font-black stay closed: only the display face ships 800 and 900 (text and
+     mono stop at 700, so on body copy they would synthesize or fall back to
+     bold), and no call site asks for them — opening them is a design
+     decision. thin/extralight/light go
+     because none of them carries a call site; the 300 files are declared
+     (./fonts.css) but no name reaches them, so none is downloaded.
      `font-[550]` is still arbitrary and still compiles — names close, brackets
      do not. */
   --font-weight-*: initial;
@@ -102,10 +103,11 @@
   --tracking-label: 0.12em;
   --tracking-badge: 0.08em;
 
-  /* two roles, ONE face. both resolve to Quicksand, and the split exists
-     anyway because it is the seam: h1-h6 and body are bound to these in
-     ./base.css, so no call site ever names a face, and adopting a second one
-     is a one-line edit here rather than a forty-file sweep.
+  /* two roles, two faces of one family: red hat round display for headings
+     and figures, red hat round text for everything else. faces load in
+     ./fonts.css. the split is the seam: h1-h6 and body are bound to these in
+     ./base.css, so no call site ever names a face, and swapping either one is
+     a one-line edit here rather than a forty-file sweep.
      display: every heading h1-h6, marketing and dashboard alike, plus every
        numeric figure — see the `figures` utility in ./utilities.css.
      body: everything else — copy, buttons, forms, tables, labels.
@@ -114,22 +116,22 @@
      reach for it. display-vs-body is a role, so the semantic faces take role
      names and the decorative one keeps its face name (--font-gochi below).
      ledger entry in packages/brand/design-system.md. */
-  --font-display: Quicksand Variable, sans-serif;
-  --font-body: Quicksand Variable, sans-serif;
+  --font-display: "Red Hat Round Display", "Red Hat Round Text", sans-serif;
+  --font-body: "Red Hat Round Text", sans-serif;
 
   /* the handwritten aside. named by face, not by role: it is the decorative
      one-off, so a role name would put it in the semantic set. */
   --font-gochi: Gochi Hand, cursive;
 
   /* the --font-* namespace is NOT closed the way --text-*, --font-weight-*,
-     --leading-* and --tracking-* above are: clearing it would take the three
-     faces down with it and leave nothing to name. so `font-mono` otherwise
-     resolves to whatever stack tailwind ships and nobody in this repo picked.
-     pinned to system mono — no third webfont: mono here carries ids, hashes
-     and wallet addresses, not reading copy. */
+     --leading-* and --tracking-* above are: clearing it would take the
+     faces down with it and leave nothing to name. so `font-mono` is pinned
+     here rather than left on whatever stack tailwind ships. it carries ids,
+     hashes and wallet addresses: red hat round mono first, so it matches the
+     product's rounded type, then the system mono stack. */
   --font-mono:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
-    monospace;
+    "Red Hat Round Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+    Consolas, "Liberation Mono", monospace;
 
   /* the --breakpoint-* namespace stays OPEN: tailwind's sm–2xl ladder is
      inherited, and these two are added to it, sorted in by value. ledger

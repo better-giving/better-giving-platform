@@ -97,12 +97,22 @@ export const header_donate = (root: Element): HTMLAnchorElement | undefined =>
   );
 
 /** scrolls the hero's shown Donate past the top of the viewport, under the
- * pinned header */
+ * pinned header. a viewport of room goes under the page first (inside `root`,
+ * so cleanup takes it): the page's height follows the face's metrics, and a
+ * short page clamps the scroll with the hero's Donate still showing */
 export function scroll_past_hero_donate(root: Element) {
   const hero = donates(root.querySelector("main") as HTMLElement).find((a) =>
     a.checkVisibility()
   ) as HTMLElement;
-  window.scrollTo(0, hero.getBoundingClientRect().bottom + window.scrollY);
+  const room = document.createElement("div");
+  room.style.height = `${window.innerHeight}px`;
+  root.append(room);
+  const target = hero.getBoundingClientRect().bottom + window.scrollY;
+  window.scrollTo(0, target);
+  expect(
+    window.scrollY,
+    "the page could not scroll that far"
+  ).toBeGreaterThanOrEqual(Math.floor(target));
 }
 
 /** a colour token as the browser computes it, for comparing with a computed

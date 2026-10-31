@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# regenerates the self-hosted webfont subsets beside this script.
+# regenerates the self-hosted gochi hand subset beside this script.
 #
 # the output is COMMITTED SOURCE, not a build artifact — same convention as
 # packages/crypto's and packages/stocks' src/generated/**. nothing in the task
-# graph runs this; it is a maintenance script for a font bump or a face change.
+# graph runs this; it is a maintenance script for a font bump.
 #
-# why we subset at all instead of taking fontsource's files: fontsource cuts
-# with the default layout-feature retain list, which does not include `zero`.
-# quicksand HAS a dotted-zero alternate behind that feature, and
-# `font-variant-numeric: slashed-zero` is how css asks for it. their build
-# discards it; this one keeps it. see ../fonts.css.
+# the red hat round files beside this script are NOT made here: they are the
+# vendor's own static woff2 files, committed whole (see ../fonts.css). a red
+# hat round bump is a copy of the new release's files, not a run of this.
+#
+# gochi hand is cut to the latin range below rather than taken from a font
+# package so the one subset we own has one pipeline and one place to look.
 #
 # output is equivalent but not byte-identical across runs — woff2 compression
 # is not deterministic. compare glyph counts, codepoints and feature tags, not
@@ -29,15 +30,13 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 echo "fetching upstream sources from google/fonts…"
-curl -sfL -o "$tmp/Quicksand.ttf" \
-  "https://github.com/google/fonts/raw/main/ofl/quicksand/Quicksand%5Bwght%5D.ttf"
 curl -sfL -o "$tmp/GochiHand.ttf" \
   "https://github.com/google/fonts/raw/main/ofl/gochihand/GochiHand-Regular.ttf"
 
-# the unicode-ranges in ../fonts.css, verbatim. each subset is cut to the UNION
+# the unicode-range in ../fonts.css, verbatim. the subset is cut to the UNION
 # of its range and the coverage the committed subset beside this script already
 # has, so a regeneration can never serve less than what the site served before.
-# that union is why the ranges are expanded in python rather than passed as-is.
+# that union is why the range is expanded in python rather than passed as-is.
 "$PY" - "$tmp" <<'PYEOF'
 import subprocess, sys, os
 from fontTools.ttLib import TTFont
@@ -45,13 +44,8 @@ from fontTools.ttLib import TTFont
 tmp = sys.argv[1]
 here = os.getcwd()  # the shell cd'd to this script's dir above
 
-RANGES = {
- "latin": "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD",
- "latin-ext": "U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF",
- "vietnamese": "U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB",
-}
-# `zero` is the whole point — everything else is pyftsubset's own default set.
-QUICKSAND_FEATURES = "ccmp,locl,mark,mkmk,kern,liga,dnom,numr,frac,zero"
+LATIN = "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD"
+# the layout features the subset keeps: shaping, marks, kerning, ligatures.
 GOCHI_FEATURES = "ccmp,locl,mark,mkmk,kern,liga"
 
 def expand(spec):
@@ -68,7 +62,7 @@ def expand(spec):
 def floor(out):
     """the coverage the committed subset at `out` already has — the ratchet the
     union above is taken against. it is read from the committed woff2 rather
-    than from the font package the subsets were first derived from, because
+    than from the font package the subset was first derived from, because
     that package is no longer a dependency: deriving the floor from node_modules
     would quietly return nothing on a clean install and cut a SMALLER font than
     the one it replaced. the shipped bytes are the only copy of this number that
@@ -102,16 +96,11 @@ def cut(src, out, spec, features):
             for fr in f[t].table.FeatureList.FeatureRecord:
                 feats.add(fr.FeatureTag)
     print(f"  {os.path.basename(out):44} {os.path.getsize(out):>6}B  "
-          f"{len(f.getBestCmap()):>3} cps  zero={'yes' if 'zero' in feats else 'no'}")
-
-for sub, spec in RANGES.items():
-    cut(f"{tmp}/Quicksand.ttf",
-        os.path.join(here, f"quicksand-{sub}-wght-normal.woff2"),
-        spec, QUICKSAND_FEATURES)
+          f"{len(f.getBestCmap()):>3} cps  {','.join(sorted(feats))}")
 
 cut(f"{tmp}/GochiHand.ttf",
     os.path.join(here, "gochi-hand-latin-400-normal.woff2"),
-    RANGES["latin"], GOCHI_FEATURES)
+    LATIN, GOCHI_FEATURES)
 PYEOF
 
 echo "done. verify with: pnpm --filter @better-giving/ui build && grep -c woff2 dist/styles.css"

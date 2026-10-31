@@ -527,9 +527,10 @@
    call site.
 
    tracking is the one spacing these roles do carry, and only where it is a
-   function of the size rather than a voice: quicksand is drawn for text and
-   its sidebearings read loose once the size curve reaches display rungs, so
-   the correction differs per breakpoint. a call site cannot express that — it
+   function of the size rather than a voice: display rungs want a tighter fit
+   than text sizes, so the correction differs per breakpoint (the values were
+   set against quicksand, the previous face, and have not been re-tuned for
+   red hat round display). a call site cannot express that — it
    sees one class, not the rungs behind it — which is why it lives here with
    the curve it corrects. */
 
@@ -577,18 +578,19 @@
 /* aligned numbers — any figure that sits in a column, a total, or beside
    another figure a reader compares it to: money, counts, dates, percentages.
 
-   both halves are inert today, and that is recorded rather than hidden.
-   `tabular-nums` emits `font-variant-numeric: tabular-nums`, and Quicksand
-   ships no `tnum` feature (checked against the binary with fontTools) — its
-   digits are proportional, so a money column does not line up and cannot be
-   made to under this face. `--font-display` meanwhile equals `--font-body`,
-   so the family declaration changes nothing either.
+   both halves fire. `tabular-nums` emits `font-variant-numeric: tabular-nums`,
+   and red hat round display and text both ship a `tnum` feature (checked
+   against the binaries with fontTools) — with it digits take a 600-unit
+   advance, so a money column lines up. the vendor's tabular nine is off-grid
+   in some weights (display 612/636, text bold 651), a drift of a few
+   hundredths of an em per 9 that nothing here can correct. `--font-display` is red hat
+   round display, a different face from --font-body, so the family
+   declaration moves figures off the body face too.
 
-   the utility earns its line as a seam, not as a rule that fires: it collapses
-   every such call site into one name, so the day a face with real tabular figures is
-   adopted this is a one-line change instead of a 22-site sweep. both halves
-   are written out for that reason — a seam that is missing half the intent is
-   a seam that gets re-derived wrong. */
+   one name rather than two classes at every call site: any figure a reader
+   compares to another takes `figures`, and a change to how figures render is
+   a one-line edit here. both halves stay written out — a seam that is missing
+   half the intent is a seam that gets re-derived wrong. */
 @utility figures {
   font-family: var(--font-display);
   @apply tabular-nums;

@@ -1,5 +1,10 @@
 import { ErrorStatus } from "@better-giving/ui";
+import text_700 from "@better-giving/ui/fonts/RedHatRoundText-Bold.woff2?url";
+import text_500 from "@better-giving/ui/fonts/RedHatRoundText-Medium.woff2?url";
+import text_400 from "@better-giving/ui/fonts/RedHatRoundText-Regular.woff2?url";
+import text_600 from "@better-giving/ui/fonts/RedHatRoundText-SemiBold.woff2?url";
 import { Elements } from "@stripe/react-stripe-js";
+import type { CustomFontSource } from "@stripe/stripe-js";
 import { href } from "react-router";
 import use_swr from "swr/immutable";
 import { report_error } from "#/errors/report";
@@ -22,6 +27,34 @@ const fetcher = async (intent: IDonationIntent) =>
     method: "POST",
     body: JSON.stringify(intent),
   }).then((res) => json_ok<IStripeIntentReturn>(res));
+
+// stripe elements renders in a cross-origin iframe that cannot see our
+// @font-face rules, so the body face is handed over as font files. vite's url
+// is the blob asset origin on deployed stages (vite.config.ts → asset_base)
+// and root-relative locally; stripe only fetches https fonts, so the local
+// http url is skipped and dev renders the fallback face. called only once the
+// intent has loaded, so never during ssr.
+const stripe_fonts = (): CustomFontSource[] => {
+  const files = [
+    [400, text_400],
+    [500, text_500],
+    [600, text_600],
+    [700, text_700],
+  ] as const;
+  const fonts = files.map(([weight, url]) => ({
+    family: "Red Hat Round Text",
+    url: new URL(url, window.location.origin),
+    weight: String(weight),
+  }));
+  if (fonts.some((f) => f.url.protocol !== "https:")) return [];
+  return fonts.map(({ family, url, weight }) => ({
+    family,
+    src: `url(${url.href}) format("woff2")`,
+    weight,
+    style: "normal",
+    display: "swap",
+  }));
+};
 
 interface IStripeCheckoutProps extends StripeDonationDetails {
   bank_only?: boolean;
@@ -108,18 +141,13 @@ export function StripeCheckout(props: IStripeCheckoutProps) {
         ) : (
           <Elements
             options={{
-              fonts: [
-                {
-                  family: "Quicksand",
-                  cssSrc: "https://fonts.googleapis.com/css2?family=Quicksand",
-                },
-              ],
+              fonts: stripe_fonts(),
               clientSecret: data.client_secret,
               appearance: {
                 theme: "flat",
                 variables: {
                   colorPrimary: don.config?.accent_primary,
-                  fontFamily: "Quicksand, sans-serif",
+                  fontFamily: '"Red Hat Round Text", sans-serif',
                   borderRadius: "4px",
                   gridRowSpacing: "20px",
                 },
