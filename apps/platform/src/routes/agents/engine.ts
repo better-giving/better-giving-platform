@@ -2,7 +2,11 @@ import { Buffer } from "node:buffer";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { href } from "react-router";
 import * as v from "valibot";
-import { client_ip, reserve_shared } from "#/.server/auth/rate-limit";
+import {
+  client_ip,
+  reserve_shared,
+  type SharedReservation,
+} from "#/.server/auth/rate-limit";
 import { to_fn } from "#/.server/donation-recipient";
 import { stripe_amounts } from "#/components/donation/common/amounts";
 import { report_error } from "#/errors/report";
@@ -22,7 +26,7 @@ import { npo_share, settled_parts, shared_parts } from "@/settlement/plan";
 import { app, base_url } from "$/env";
 import {
   type INonprofitOrg,
-  nonprofits_cancel_fetch,
+  nonprofits_needs_fetch,
   nonprofits_org,
   nonprofits_search,
   nonprofits_will_fetch,
@@ -425,20 +429,28 @@ async function allow_fetch(
   kind: "search" | "org",
   raw: string
 ): Promise<boolean> {
-  if (!nonprofits_will_fetch(kind, raw)) return true;
-  let reserved = false;
+  if (!nonprofits_needs_fetch(kind, raw)) return true;
+  // reserve before claiming: a claim held across this await lets a duplicate
+  // join a flight no reservation pays for, and starts it
+  let reservation: SharedReservation | null;
   try {
-    reserved =
-      (await reserve_shared(
-        `nonprofits:${caller_id(request)}`,
-        NONPROFITS_QUOTA
-      )) !== null;
+    reservation = await reserve_shared(
+      `nonprofits:${caller_id(request)}`,
+      NONPROFITS_QUOTA
+    );
   } catch (err) {
     // fail closed: an uncounted lookup spends the shared nonprofits api quota
     console.error("nonprofits lookup cap unavailable", err);
+    return false;
   }
-  if (!reserved) nonprofits_cancel_fetch(kind, raw);
-  return reserved;
+  if (!reservation) return false;
+  if (nonprofits_will_fetch(kind, raw)) return true;
+  // a concurrent caller claimed it during the await: join theirs, refund ours.
+  // not awaited: the flight could end during the write, and the join with it
+  reservation.release().catch((err) => {
+    console.error("nonprofits lookup slot not released", err);
+  });
+  return true;
 }
 
 export async function find_nonprofit(input: unknown, request: Request) {

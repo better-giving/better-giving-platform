@@ -970,6 +970,14 @@ const local_hits = [
 /** what find_nonprofit lists for `local_hits`: none of them set increments */
 const listed_hits = local_hits.map((hit) => ({ ...hit, increments: [] }));
 
+/** a shared-cap answer that lands after both concurrent lookups have checked */
+function decided_later<T>(answer: () => T) {
+  return async () => {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    return answer();
+  };
+}
+
 describe("find_nonprofit IRS fallback", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -1465,7 +1473,7 @@ describe("find_nonprofit IRS fallback", () => {
     expect(fetch).toHaveBeenCalledTimes(20);
   });
 
-  test("a lookup the shared cap denies is skipped and its claim dropped", async () => {
+  test("a lookup the shared cap denies is skipped and leaves no claim", async () => {
     const fetch = stub_fetch(() =>
       http(200, { query: "denied", limit: 10, results: [] })
     );
@@ -1488,7 +1496,7 @@ describe("find_nonprofit IRS fallback", () => {
     expect(fetch).toHaveBeenCalledOnce();
   });
 
-  test("a shared cap that cannot be read skips the lookup and drops its claim", async () => {
+  test("a shared cap that cannot be read skips the lookup and leaves no claim", async () => {
     const fetch = stub_fetch(() => http(200, org_detail()));
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     mocks.reserve_shared.mockRejectedValueOnce(new Error("db down"));
@@ -1546,6 +1554,79 @@ describe("find_nonprofit IRS fallback", () => {
     expect(skipped.external_lookup).toBe("skipped");
     expect(skipped.items).toEqual(listed_hits);
     expect(fetch).toHaveBeenCalledTimes(20);
+  });
+
+  test("a duplicate sent while the shared cap is still deciding does not fetch past a denial", async () => {
+    const fetch = stub_fetch(() =>
+      http(200, { query: "dup", limit: 10, results: [] })
+    );
+    mocks.reserve_shared
+      .mockImplementationOnce(decided_later(() => null))
+      .mockImplementationOnce(decided_later(() => null));
+    const req = caller("192.0.2.241");
+
+    const [first, second] = await Promise.all([
+      find_nonprofit({ query: "dup" }, req),
+      find_nonprofit({ query: "dup" }, req),
+    ]);
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(first.external_lookup).toBe("skipped");
+    expect(second.external_lookup).toBe("skipped");
+  });
+
+  test("a slot reserved for a lookup another caller claimed first is released, and the caller joins", async () => {
+    const fetch = stub_fetch(() =>
+      http(200, { query: "race", limit: 10, results: [] })
+    );
+    const released = [vi.fn(async () => {}), vi.fn(async () => {})];
+    mocks.reserve_shared
+      .mockImplementationOnce(decided_later(() => ({ release: released[0] })))
+      .mockImplementationOnce(decided_later(() => ({ release: released[1] })));
+    const req = caller("192.0.2.242");
+
+    const [first, second] = await Promise.all([
+      find_nonprofit({ query: "race" }, req),
+      find_nonprofit({ query: "race" }, req),
+    ]);
+
+    expect(mocks.reserve_shared).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(first.external_lookup).toBe("ok");
+    expect(second.external_lookup).toBe("ok");
+    expect(released[0]).not.toHaveBeenCalled();
+    expect(released[1]).toHaveBeenCalledOnce();
+  });
+
+  test("a refund that fails is logged and the caller still joins", async () => {
+    const fetch = stub_fetch(() =>
+      http(200, { query: "refund", limit: 10, results: [] })
+    );
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.reserve_shared
+      .mockImplementationOnce(
+        decided_later(() => ({ release: async () => {} }))
+      )
+      .mockImplementationOnce(
+        decided_later(() => ({
+          release: () => Promise.reject(new Error("db down")),
+        }))
+      );
+    const req = caller("192.0.2.243");
+
+    const [first, second] = await Promise.all([
+      find_nonprofit({ query: "refund" }, req),
+      find_nonprofit({ query: "refund" }, req),
+    ]);
+
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(first.external_lookup).toBe("ok");
+    expect(second.external_lookup).toBe("ok");
+    expect(log).toHaveBeenCalledWith(
+      "nonprofits lookup slot not released",
+      expect.any(Error)
+    );
+    log.mockRestore();
   });
 
   test("concurrent EIN lookups share one fetch", async () => {
