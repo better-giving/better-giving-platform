@@ -30,7 +30,7 @@ curl -s -H "Authorization: Bearer $QSTASH_TOKEN" "https://qstash.upstash.io/v2/.
 ## Conventions
 
 - schedule IDs: `better-giving-{stage}-{name}`
-- queue names: `${APP_SLUG}-${STAGE}-q` (notices), `-money-q` (splits, Connect transfers, subscription cancels, PayPal captures) and `-don-dist-q`, computed at `.server/kit/queue.ts:22-42`. Which kind rides which queue is `lane_of` in `lib/queue/registry.ts`. A stuck money job is on `-money-q`, not `-q` — check both. Local `.env` is `STAGE=staging`, so a laptop run touches the **staging** set — never assume `production-`.
+- queue names: `${APP_SLUG}-${STAGE}-q` (notices), `-money-q` (settlement splits, Connect transfers, subscription cancels) and `-don-dist-q`, built in `.server/kit/queue.ts` (`queues`, `donation_dist_q`). Which kind rides which queue is `lane_of` in `lib/queue/registry.ts`. A stuck money job is on `-money-q`, not `-q` — check both. A kind with `delay_s` (`paypal-order-capture`, `don-match-chase`) is published by `schedule`, so it sits on no queue. Local `.env` is `STAGE=staging`, so a laptop run touches the **staging** set — never assume `production-`.
 - production destination `https://better.giving`, preview `https://test.better.giving`
 
 ## Destination URLs — mapping an event back to code
@@ -38,7 +38,7 @@ curl -s -H "Authorization: Bearer $QSTASH_TOKEN" "https://qstash.upstash.io/v2/.
 The one thing the API can't tell you.
 
 - `/api/q-handler/{kind}` — every queued and scheduled message. `{kind}` is a key of `Payloads` in `lib/queue/registry.ts`; that file holds the payload shape, the dedupe key, and the per-kind retry/delay config.
-- `/api/q-don-dist/{npo_id}` — donation distribution fan-out (`don_dist`, `.server/kit/queue.ts:85`).
+- `/api/q-don-dist/{npo_id}` — donation distribution fan-out (`don_dist` in `.server/kit/queue.ts`).
 - `/api/cron/{name}` — scheduled crons.
 - `/api/cron/grants-execute` shows up in events with **no matching schedule**: the `grants` cron publishes it with a 24h delay (`src/routes/api.cron.grants/route.ts:10-14`).
 

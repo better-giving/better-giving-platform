@@ -29,12 +29,8 @@ const donation_dist_q = client.queue({
  * one message in flight, so a notification on its backoff holds only other
  * notifications, never a split, a transfer or a cancel.
  *
- * the notice queue keeps the name the single shared queue had. a money message
- * already on it at deploy still drains through the same handler route, just
- * behind whatever sits ahead of it there; every money handler absorbs a repeat
- * (stripe idempotency keys, a live read before a cancel, `don_dist`'s per
- * destination dedupe), so one sent again on the money queue is safe either way.
- * qstash creates the money queue on its first enqueue.
+ * qstash creates a queue on its first enqueue; nothing provisions the money
+ * queue ahead of it.
  */
 const queues: Record<Lane, ReturnType<typeof client.queue>> = {
   notice: client.queue({ queueName: `${app.slug}-${stage}-q` }),

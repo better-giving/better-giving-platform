@@ -373,16 +373,17 @@ const delivery: Partial<{ [K in Kind]: IDelivery }> = {
  * transfers behind it for half an hour. money work rides a queue of its own.
  *
  * - `money` — moves funds or stops a charge: splits a settlement, transfers to
- *   a connected account, cancels a subscription at its processor, captures an
- *   order. the producers already order these (the split is what enqueues the
- *   transfer), so nothing relies on FIFO between them.
+ *   a connected account, cancels a subscription at its processor. the
+ *   producers already order these (the split is what enqueues the transfer),
+ *   so nothing relies on FIFO between them.
  * - `notice` — mails, slack posts, crm syncs, metrics and zapier hooks: the
  *   handler tells someone about work already done. `don-dist` is here: the
  *   split itself runs on `don_dist`'s own queue, and this kind is the npo's
  *   notice of its share.
  *
  * a scheduled kind (`delay_s`) never rides either queue, but takes a lane all
- * the same so the map stays exhaustive.
+ * the same so the map stays exhaustive: `paypal-order-capture` is `money` by
+ * what it does, and `schedule` publishes it.
  */
 export type Lane = "money" | "notice";
 

@@ -40,7 +40,8 @@ interface IInput {
   subject: string;
 }
 
-/** zeptomail's answer to a bad token. nodemailer tags a refused login EAUTH */
+/** a refused login: zeptomail answers a bad token with smtp 535, and nodemailer
+ * tags the failure EAUTH */
 const is_credential_refusal = (err: unknown) =>
   typeof err === "object" &&
   err !== null &&
@@ -49,8 +50,8 @@ const is_credential_refusal = (err: unknown) =>
 
 /**
  * off production a mail the credential can't send is not a failure: a preview
- * with no or a stale SMTP_PASSWORD would otherwise fail every queued send and
- * retry it on backoff. production keeps every refusal.
+ * with a missing or stale SMTP_PASSWORD would otherwise fail every queued send
+ * and retry it on backoff. production keeps every refusal.
  */
 const skipped = (reason: string, subject: string) => {
   console.warn(`mail not sent (${reason}): ${subject}`);
