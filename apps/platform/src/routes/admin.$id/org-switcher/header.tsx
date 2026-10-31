@@ -26,7 +26,7 @@ export function OrgSwitcher({ name, logo = flying_character }: IEndow) {
     <Menu.Root positioning={{ placement: "bottom-start", gutter: 4 }}>
       {/* the app header's slot from md up, capped so a long name truncates
           beside the logo; below md the drawer's first row, full width */}
-      <Menu.Trigger className="group flex items-center gap-2 min-w-0 max-md:w-full md:max-w-80 p-2 rounded text-left hover:bg-gray-3 transition-colors focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2">
+      <Menu.Trigger className="group flex items-center gap-2 min-w-0 max-md:w-full md:max-w-80 p-2 max-md:px-3 rounded text-left hover:bg-gray-3 transition-colors focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2">
         <Image
           className="size-8 shrink-0 rounded object-cover"
           src={logo || flying_character}

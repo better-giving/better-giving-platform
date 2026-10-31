@@ -28,7 +28,7 @@ export function ToggleableSidebar({
         classes="overflow-y-auto scrollbars"
         linkGroups={linkGroups}
         onChange={() => set_open(false)}
-        sidebarHeader={header && <div className="px-6 pt-6">{header}</div>}
+        sidebarHeader={header && <div className="px-3 pt-4">{header}</div>}
       />
     </Modal>
   );
