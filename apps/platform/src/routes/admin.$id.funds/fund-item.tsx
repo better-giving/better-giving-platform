@@ -150,7 +150,7 @@ function LeaveConfirm({
         const heading = document.querySelector("h1");
         return heading instanceof HTMLElement ? heading : null;
       }}
-      classes="bg-panel text-gray-12"
+      classes="bg-card text-gray-12"
     >
       <div className="p-6 sm:p-8 grid gap-2">
         <h3 className="text-lg font-bold">Leave {name}?</h3>

@@ -53,7 +53,7 @@ export default function Page() {
             processing fees? Most donors choose to cover them, so the vast
             majority of every gift reaches you.
           </p>
-          <div className="bg-secondary border border-gray-6 rounded px-7 py-5 max-w-xl">
+          <div className="card max-w-xl">
             <p className="text-sm/relaxed text-gray-11 text-pretty">
               <strong className="text-gray-12">
                 Prefer no contribution ask on your form?

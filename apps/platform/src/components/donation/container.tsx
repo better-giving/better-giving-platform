@@ -51,8 +51,8 @@ export function Donation({ classes = "", on_pay_busy, ...props }: Props) {
       style={styles}
       className={
         pinned
-          ? `flex min-h-full ${classes} w-full flex-col @container/steps bg-background`
-          : `grid ${classes} w-full @container/steps overflow-clip bg-background min-h-96`
+          ? `flex min-h-full ${classes} w-full flex-col @container/steps bg-card`
+          : `grid ${classes} w-full @container/steps overflow-clip bg-card min-h-96`
       }
     >
       <Context

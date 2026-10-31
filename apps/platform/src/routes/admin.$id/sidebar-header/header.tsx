@@ -32,7 +32,7 @@ export function Loader({ name, logo = flying_character }: IEndow) {
       <Portal>
         <Menu.Positioner>
           <Menu.Content
-            className={`z-floating grid w-max min-w-56 p-2 rounded bg-panel text-gray-12 shadow-floating ${popup_anim}`}
+            className={`z-floating grid w-max min-w-56 p-2 rounded-card bg-card text-gray-12 shadow-floating ${popup_anim}`}
           >
             {list.map((org) => {
               const is_current = org.id.toString() === current_id;
@@ -57,7 +57,7 @@ export function Loader({ name, logo = flying_character }: IEndow) {
             <Menu.Item value="register" asChild>
               <Link
                 to={href("/register")}
-                className="hover:bg-gray-3 data-highlighted:bg-gray-3 data-highlighted:text-gray-12 data-highlighted:outline-2 data-highlighted:outline-ring data-highlighted:-outline-offset-2 border-t mt-1 flex items-center gap-2 px-2 py-2 rounded text-gray-11 hover:text-gray-12"
+                className="hover:bg-gray-3 data-highlighted:bg-gray-3 data-highlighted:text-gray-12 data-highlighted:outline-2 data-highlighted:outline-ring data-highlighted:-outline-offset-2 border-t border-hairline mt-1 flex items-center gap-2 px-2 py-2 rounded text-gray-11 hover:text-gray-12"
               >
                 <PlusIcon className="shrink-0 icon-md" />
                 <span className="text-sm">Register another org</span>

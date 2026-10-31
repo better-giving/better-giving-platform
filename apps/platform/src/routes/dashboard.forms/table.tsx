@@ -176,7 +176,7 @@ function StatusFilter({ value }: { value: Filter }) {
       <Portal>
         <Select.Positioner>
           <Select.Content
-            className={`rounded border bg-panel text-gray-12 min-w-28 overflow-hidden z-10 ${popup_anim}`}
+            className={`bg-card rounded-card shadow-floating text-gray-12 min-w-28 overflow-hidden z-floating ${popup_anim}`}
           >
             {FILTER_OPTS.map((v) => (
               <Select.Item key={v} item={v} className="selector-opt text-sm">

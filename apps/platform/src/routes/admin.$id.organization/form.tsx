@@ -291,7 +291,7 @@ export function Form({ init, profile, id, base_url, videos }: IProps) {
         </Fieldset>
         {/* below the Save: videos apply right away, so they aren't what it
             saves. a rule on the fieldset itself would run through its legend */}
-        <div className="mt-2 border-t pt-6">
+        <div className="mt-2 border-t border-hairline pt-6">
           <VideosGroup npo_id={id} videos={videos} />
         </div>
       </section>
@@ -335,7 +335,7 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
         open={lock_open}
         size="panel"
         onClose={() => set_lock_open(false)}
-        classes="grid gap-4 bg-panel p-6"
+        classes="grid gap-4 bg-card p-6"
         initialFocusEl={() => cancel_ref.current}
       >
         <h2 className="text-xl font-bold">Lock your profile link?</h2>

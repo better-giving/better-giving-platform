@@ -35,7 +35,7 @@ export function Milestone(props: Props) {
   const fetcher = useFetcher();
 
   return (
-    <Collapsible.Root className="bg-panel border rounded overflow-hidden">
+    <Collapsible.Root className="bg-panel rounded overflow-hidden">
       <div className="relative py-3 px-4 text-center bg-gray-3">
         <span className="text-xl font-bold ">{props.title}</span>
         <Collapsible.Trigger className="absolute right-4 top-1/2 -translate-y-1/2 group">
@@ -48,7 +48,7 @@ export function Milestone(props: Props) {
 
       <Collapsible.Content
         asChild
-        className="data-[state=open]:border-t bg-panel py-6 px-4 grid content-start gap-6"
+        className="data-[state=open]:border-t border-hairline bg-panel py-6 px-4 grid content-start gap-6"
       >
         <Form
           disabled={isSubmitting}

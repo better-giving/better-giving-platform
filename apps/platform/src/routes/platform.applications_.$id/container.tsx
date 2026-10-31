@@ -10,7 +10,9 @@ export function Container({ title, children, classes = "" }: Props) {
   const [is_open, set_open] = useState(true);
 
   return (
-    <div className={`w-full border rounded divide-y divide-gray-6 ${classes}`}>
+    <div
+      className={`w-full bg-card rounded-card divide-y divide-hairline ${classes}`}
+    >
       <div className="flex items-center gap-x-3 p-3">
         <button
           type="button"

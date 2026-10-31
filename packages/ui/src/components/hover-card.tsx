@@ -37,9 +37,9 @@ export function HoverCard(props: Props) {
     >
       <Ark.Trigger asChild>{props.children}</Ark.Trigger>
       <Portal>
-        <Ark.Positioner className="[--arrow-size:10px] [--arrow-background:var(--panel)]">
+        <Ark.Positioner className="[--arrow-size:10px] [--arrow-background:var(--card)]">
           <Ark.Arrow>
-            <Ark.ArrowTip className="border-l border-t border-gray-6" />
+            <Ark.ArrowTip />
           </Ark.Arrow>
           {props.tip}
         </Ark.Positioner>

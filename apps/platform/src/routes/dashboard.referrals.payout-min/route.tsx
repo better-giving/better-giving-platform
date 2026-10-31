@@ -22,7 +22,7 @@ export default function Page({ loaderData: user }: Route.ComponentProps) {
   const { min = pay_min } = search(params);
 
   return (
-    <RouteModal classes="grid bg-panel text-gray-12 p-6">
+    <RouteModal classes="grid bg-card text-gray-12 p-6">
       <Content prev={+min} />
     </RouteModal>
   );

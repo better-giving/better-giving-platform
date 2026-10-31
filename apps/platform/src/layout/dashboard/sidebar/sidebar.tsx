@@ -16,9 +16,7 @@ export function Sidebar({
   sidebarHeader,
 }: Props) {
   return (
-    <div
-      className={`flex flex-col w-72 md:w-64 h-full bg-sidebar border-r ${classes}`}
-    >
+    <div className={`flex flex-col w-72 md:w-64 h-full ${classes}`}>
       {sidebarHeader}
       <div className="grid grid-cols-[auto_1fr] py-3 gap-x-2">
         {linkGroups.map((group) => (

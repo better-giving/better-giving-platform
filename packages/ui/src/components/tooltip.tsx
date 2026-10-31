@@ -163,9 +163,9 @@ export function Tooltip(props: Props) {
         </span>
       )}
       <Portal>
-        <ArkTooltip.Positioner className="[--arrow-size:10px] [--arrow-background:var(--panel)]">
+        <ArkTooltip.Positioner className="[--arrow-size:10px] [--arrow-background:var(--card)]">
           <ArkTooltip.Arrow>
-            <ArkTooltip.ArrowTip className="border-l border-t border-gray-6" />
+            <ArkTooltip.ArrowTip />
           </ArkTooltip.Arrow>
           {props.tip}
         </ArkTooltip.Positioner>

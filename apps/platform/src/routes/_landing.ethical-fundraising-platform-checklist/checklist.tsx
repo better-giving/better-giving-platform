@@ -121,7 +121,7 @@ export function Checklist({ classes = "" }: IChecklist) {
       <div
         role="status"
         aria-live="polite"
-        className="sticky top-16 z-subbar flex flex-wrap items-center gap-5 rounded border border-gray-6 bg-panel p-4 print:static"
+        className="sticky top-16 z-subbar flex flex-wrap items-center gap-5 rounded-card bg-card shadow-floating p-4 print:static"
       >
         <p className="flex items-baseline gap-1.5 leading-none figures">
           {/* the space is load-bearing: without it the live region announces
@@ -162,7 +162,7 @@ export function Checklist({ classes = "" }: IChecklist) {
         </button>
       </div>
 
-      <p className="mb-6 flex flex-wrap items-start gap-2 rounded border border-gray-6 bg-gray-3 px-4 py-3 text-sm text-gray-11">
+      <p className="mb-6 flex flex-wrap items-start gap-2 card text-sm text-gray-11">
         <Badge tone="warning">Flashpoint</Badge>
         <span className="min-w-64 flex-1">
           A practice named in the Alaska, multi-state GoFundMe, or California
@@ -190,7 +190,7 @@ export function Checklist({ classes = "" }: IChecklist) {
                   /* the row is the unit that must not split, not the panel: a
                      panel of eleven questions is taller than a sheet, and
                      `break-inside: avoid` on a box that can't fit is ignored */
-                  className="grid break-inside-avoid grid-cols-[auto_1fr] items-start gap-x-3 border-t border-gray-6 py-2.5"
+                  className="grid break-inside-avoid grid-cols-[auto_1fr] items-start gap-x-3 border-t border-hairline py-2.5"
                 >
                   <input
                     id={item.id}

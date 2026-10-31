@@ -20,7 +20,7 @@ export default function Page() {
       onClose={() =>
         navigate("..", { preventScrollReset: true, replace: true })
       }
-      classes="p-6 bg-panel"
+      classes="p-6 bg-card"
     >
       <Content />
     </Modal>

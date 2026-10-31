@@ -115,15 +115,15 @@ are the semantic tokens:
 
 | family | names |
 | --- | --- |
-| surfaces | `background` (the page), `panel` (a card, dialog, popover or menu — radix files all four under one rung), `surface` (a form control's fill, one step *lighter* than the panel it sits on), `overlay` (a dialog scrim), `sidebar` |
+| surfaces | `background` (the page base, white, under the blot ground the app paints once), `card` (white: a card, dialog, popover, menu, select list, hovercard or toast), `panel` (a **well** inside a card, gray-2), `surface` (a form control's fill, white), `overlay` (a dialog scrim) |
 | brand tint | `band` (a page-level ground), `secondary` (a ui element at rest, and the hover fill of anything resting transparent), `secondary-active` (that element selected) |
 | brand / state | `primary`, `success`, `warning`, `destructive` |
 | tinted band | `destructive-subtle` / `success-subtle` / `warning-subtle` (+ their `-fg`) |
-| ink | the `-fg` partner of the four fills whose ink follows them: `primary-fg`, `success-fg`, `warning-fg`, `destructive-fg`. **no other surface has one.** ink on a light fill is always `text-gray-12`, so `panel`, `surface`, `band`, `secondary` and `sidebar` take the neutral rung |
-| neutral ink + lines | **step names, not token names**: `text-gray-12` body, `text-gray-11` de-emphasised, `border-gray-6` hairline. `text-fg`, `text-panel-fg`, `text-secondary-fg`, `text-muted-fg`, `bg-muted` and `border-border` do **not** compile — they named a rung, and the rung is what you write |
+| ink | the `-fg` partner of the four fills whose ink follows them: `primary-fg`, `success-fg`, `warning-fg`, `destructive-fg`. **no other surface has one.** ink on a light fill is always `text-gray-12`, so `card`, `panel`, `surface`, `band` and `secondary` take the neutral rung |
+| neutral ink + lines | **step names, not token names**: `text-gray-12` body, `text-gray-11` de-emphasised, `border-gray-6` a control's edge. The one line with a token name is `hairline` (`border-hairline`, `divide-hairline`): a line inside a card. `text-fg`, `text-panel-fg`, `text-secondary-fg`, `text-muted-fg`, `bg-muted` and `border-border` do **not** compile — they named a rung, and the rung is what you write |
 | other lines | `ring` |
 
-Use them as `bg-panel`, `text-gray-11`, `border-gray-6`, and so on. **A fill token is not
+Use them as `bg-card`, `text-gray-11`, `border-hairline`, and so on. **A fill token is not
 automatically a text color.** `text-warning` is illegible at Lc 39.9 — use `text-warning-subtle-fg`,
 which is the warning ink on *every* surface. Never pair an alpha tint with its own ink
 (`bg-warning/10 text-warning` measures Lc 34.9, and no tint's figure survives a change of ground); use the authored pair
@@ -170,15 +170,18 @@ display face equals the body face right now. The name exists so the fix is one l
 with real tabular figures is adopted, rather than a 22-site sweep. Any figure a reader compares to
 another — a money column, a total, a count, a date — takes it.
 
-Radius is one value and the ladder is **closed**: `rounded` is the only corner name, everywhere —
-buttons, inputs, cards, dialogs, option lists. Buttons and inputs get it from their own recipe, so
-no `rounded*` class at the call site. `rounded-sm`, `-md`, `-lg`, `-xl`, `-xs` are reset to
-`initial` and **fail to compile** — writing one produces no rule at all, which is deliberate: it is
-how the single radius stays single. `rounded-full` and `rounded-none` still work. Nothing is a pill.
+Radius is two values and the ladder is **closed**: `rounded` (6px) for a control or a well inside a
+card, `rounded-card` (12px) for a container or a floating layer — card, dialog, menu, popover, option
+list, hovercard, toast. Buttons and inputs get theirs from their own recipe, so no `rounded*` class at
+the call site. `rounded-sm`, `-md`, `-lg`, `-xl`, `-xs` are reset to `initial` and **fail to
+compile** — writing one produces no rule at all, which is deliberate: it is how the two corners stay
+two. `rounded-full` and `rounded-none` still work. Nothing is a pill.
 
-**The app is flat, and the shadow namespace is closed.** A card is `bg-panel` + `border` + `rounded` — never a
-shadow. The fill sits one rung below the page, so the panel reads by fill *and* border; a field inside it goes back
-up to `bg-surface`. `shadow-xs`/`-sm`/`-md`/`-lg`/`-xl`/`-2xl`/`-inner` are reset to `initial` and **fail to
+**The app is flat, and the shadow namespace is closed.** The surface model, outside in: **ground** (the white page
+under four soft blue and violet blots, fixed to the window — the app paints it, never a screen) → **card** (`card`:
+white, `rounded-card`, **no border, no shadow**; colour shows under part of its edge and the eye completes the box)
+→ **well** (`bg-panel rounded`, inside a card) → **field** (white `bg-surface` with its full border). Lines inside a
+card are `border-hairline` / `divide-hairline`; a container never has an edge. `shadow-xs`/`-sm`/`-md`/`-lg`/`-xl`/`-2xl`/`-inner` are reset to `initial` and **fail to
 compile**, so depth cannot be re-picked one call site at a time; `shadow-[…]` still compiles and is caught by a
 sweep instead. The whole set a call site may spend:
 
@@ -254,7 +257,7 @@ Two scrollers, both classes:
 
 **A screen that is one card is `solo-card`**, not a narrowed `page`. Login, signup, check-email and
 the five password-reset panels each sit alone on an otherwise empty page in exactly one shape: a
-`max-w-md` bordered card with its own `bg-panel` fill and its own padding. `page` is a width and a
+`max-w-md` white, borderless card with its own padding. `page` is a width and a
 gutter for a full layout; this is the single card that *is* the layout. It sets no `gap` and no
 `justify-items` on purpose — space its children with per-child `mt-*`, and say the alignment
 yourself, because these screens split evenly on whether their content is centered.

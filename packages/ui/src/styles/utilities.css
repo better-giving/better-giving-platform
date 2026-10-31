@@ -32,6 +32,16 @@
   border-end-end-radius: var(--radius);
 }
 
+/* the container's corner — `card`, `solo-card`, and every layer over the page:
+   dialog, menu, popover, select list, hovercard, toast. bound here for the
+   same reason `rounded` is: the --radius-* scale is reset in theme.css, so a
+   theme-derived `rounded-card` would not exist. a control or a well inside a
+   card keeps `rounded`; the smaller corner nested in the larger one is what
+   reads as "inside". */
+@utility rounded-card {
+  border-radius: var(--radius-card);
+}
+
 /* the three named speeds from theme.css, as the names a call site writes.
    tailwind's own `duration-*` is a bare-value utility with no theme namespace
    behind it, so there is no scale to declare a ladder in and none to reset:
@@ -387,10 +397,16 @@
   }
 }
 
-/* the in-flow panel-shaped container: a marketing card, a dashboard tile, a
-   figure, a callout, a link tile. the fill, the edge, the corner and the inset
-   — the four things the ownership rule in packages/brand/design-system.md
-   assigns to a shell — and nothing else.
+/* the in-flow container: a marketing card, a dashboard tile, a figure, a
+   callout, a link tile. the fill, the corner and the inset — the shell's half
+   of the ownership rule in packages/brand/design-system.md — and nothing else.
+
+   no border. a card is white on a ground that is white under four soft blots,
+   so colour sits under part of its edge and the eye completes the box; an
+   edge would grid the page the blots exist to soften. a line INSIDE a card is
+   --hairline (`border-hairline`, `divide-hairline`), and the one surface that
+   keeps a full edge is a form control. the same white works on a `bg-band`
+   ground, so there is one card for both grounds.
 
    the inset is one value at every width and in every role — no tier, and no
    per-file variant.
@@ -406,46 +422,27 @@
    — the same split `solo-card` records below. a card that needs an outer
    margin takes it from the caller too.
 
-   the edge is `border`, which reads --border through the base `*` rule, not
-   `border-gray-6` which pins the step. that is what lets `surface-primary`
-   rebind the hairline inside a brand fill, and it is the separator rung on
-   purpose: gray-7 is the ELEMENT-BORDER rung that ./components.css spells on
-   controls, and a card is a container, not a control.
-
    a surface with no inset has delegated it and is a different shell — a table
    shell, a `divide-y` list, an `overflow-hidden` media frame. it is not this
    one, and `shell-conformance.node.test.ts` is written to leave it alone. */
 @utility card {
-  @apply bg-panel border rounded p-6;
-}
-
-/* `card` for a card whose ground is `bg-band`, not the page. the panel rung
-   sits one step below the page, but --band is blue-2 — the same rung as
-   --panel in another hue — so a panel on a band measures 1.004:1 and is not
-   an object. on a tinted ground a container separates by going UP, to
-   --surface (gray-1, 1.033:1 on the band); the "Resting surfaces" rule in
-   packages/brand/design-system.md says so.
-
-   its own name rather than `card bg-surface`: a second fill beside `card`
-   resolves by stylesheet order, which is what shell-conformance fails on.
-   everything else is `card`'s, and so is everything `card` leaves to the
-   caller. */
-@utility card-on-band {
-  @apply bg-surface border rounded p-6;
+  @apply bg-card rounded-card p-6;
 }
 
 /* the card that is the whole of a single-purpose screen — login, signup,
    check-email, and the five password-reset panels each sit alone on an
    otherwise empty page in exactly this shape. not a narrower `page`: that one
-   is a width and a gutter for a full layout, this is one bordered card with
-   its own fill.
+   is a width and a gutter for a full layout, this is one card with its own
+   fill. the ground behind it swaps its main blot for --wash-strong when one is
+   on the page (platform's index.css), because a lone card needs more colour
+   under its edge than a dashboard of them.
 
    no gap and no `justify-items`, both deliberately. the ten it collapsed
    space their children with per-child `mt-*`, so a gap here would add to those
    margins rather than replace them; and they split evenly on whether their
    content is centred, which makes alignment the caller's to say. */
 @utility solo-card {
-  @apply grid w-full max-w-md px-6 sm:px-7 py-7 sm:py-8 bg-panel border rounded;
+  @apply grid w-full max-w-md px-6 sm:px-7 py-7 sm:py-8 bg-card rounded-card;
 }
 
 /* the scrollbar skin. tailwind 4.3 ships `scrollbar-width`/`scrollbar-color`
@@ -470,8 +467,10 @@
   @apply overflow-x-auto scrollbars;
 }
 
+/* position only. the corner is the layer's: a dialog box takes `rounded-card`
+   from helpers/modal-box.ts, and a bare frame says its own. */
 @utility fixed-center {
-  @apply rounded fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2;
+  @apply fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2;
 }
 
 /* the row a form's or a dialog's terminal controls sit in: the submit, and
@@ -497,8 +496,9 @@
    width.
 
    `actions-band` is the dialog footer's fill and padding, and composes with
-   either row. `empty:h-12` holds the band open when the footer renders no
-   control at all. */
+   either row. its top edge is --hairline: a line inside the dialog's card.
+   `empty:h-12` holds the band open when the footer renders no control at
+   all. */
 @utility actions {
   @apply flex max-sm:flex-col sm:items-center sm:justify-end gap-4 w-full;
 }
@@ -508,7 +508,7 @@
 }
 
 @utility actions-band {
-  @apply p-3 sm:px-8 sm:py-4 bg-gray-3 border-t empty:h-12;
+  @apply p-3 sm:px-8 sm:py-4 bg-gray-3 border-t border-hairline empty:h-12;
 }
 
 @utility absolute-center {

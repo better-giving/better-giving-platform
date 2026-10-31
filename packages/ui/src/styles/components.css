@@ -33,15 +33,16 @@
   }
 
   /* gray-7 is the ramp's ELEMENT-BORDER rung and every control recipe in this
-     file spells it — not --border, which is gray-6, the separator rung that
-     dividers, panel hairlines and table rules keep. spelled as the step rather
-     than as a token because a neutral line has no semantic name here: the
-     --color-* comment block in ./theme.css has the rule. */
+     file spells it — one rung over --border (gray-6), which is what an app
+     call site's bare `border` on a control draws. spelled as the step rather
+     than as a token because the control edge has no second semantic name: the
+     --color-* comment block in ./theme.css has the rule. a line inside a card
+     is --hairline, and a container has no edge at all. */
 
   /* --surface, not --panel: this is a control, and --surface is the fill a
-     control carries — on a --panel it is what lifts the button off its
-     container. on the bare page it is fill-identical instead and reads by its
-     border alone, the same bargain .field-input takes. */
+     control carries — inside a well (--panel) it is what lifts the button off
+     it. on a white card it is fill-identical instead and reads by its border
+     alone, the same bargain .field-input takes. */
   /* a tinted control presses UP its scale: resting tint → -active, which is the
      ramp's own selected rung. it does not darken toward black, which on a
      near-white tint would carry the surface away from the ink sitting on it. */
@@ -343,7 +344,7 @@
     left: 0;
     color: var(--ring);
     transition: transform var(--duration-base) var(--ease-out);
-    background-color: var(--panel);
+    background-color: var(--card);
     padding-right: var(--spacing);
     font-weight: var(--font-weight-semibold);
     font-size: var(--text-xs);
@@ -384,9 +385,11 @@
     color: var(--gray-11);
   }
 
+  /* a table is content inside a card, so it draws no outer edge of its own —
+     the card is the container — and its row and column lines are --hairline,
+     the line inside a card. */
   .table {
     min-width: 100%;
-    border: 1px solid var(--gray-6);
     border-collapse: separate;
     border-spacing: 0;
     font-feature-settings: "tnum", "zero";
@@ -409,12 +412,12 @@
 
     /* column dividers */
     & :is(th, td) + :is(th, td) {
-      border-left: 1px solid var(--gray-6);
+      border-left: 1px solid var(--hairline);
     }
 
     /* row dividers */
     & :is(tbody, tfoot) > tr > :is(th, td) {
-      border-top: 1px solid var(--gray-6);
+      border-top: 1px solid var(--hairline);
     }
 
     & :is(th, td) {

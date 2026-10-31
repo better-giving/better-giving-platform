@@ -35,7 +35,7 @@ export default function DisablePrompt() {
     <RouteModal
       title="Disable form"
       busy={fetcher.state !== "idle"}
-      classes="grid content-start justify-items-center bg-panel"
+      classes="grid content-start justify-items-center bg-card"
     >
       <Content />
     </RouteModal>
@@ -50,7 +50,7 @@ function Content() {
   return (
     <>
       <div className="relative w-full">
-        <p className="sm:text-xl font-bold text-center border-b bg-gray-3 p-5">
+        <p className="sm:text-xl font-bold text-center border-b border-hairline bg-gray-3 p-5">
           Disable form
         </p>
       </div>

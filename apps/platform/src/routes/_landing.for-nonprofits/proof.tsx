@@ -39,7 +39,7 @@ export function Proof({ classes = "" }: IProof) {
           </Link>
         </div>
 
-        <div className="grid divide-y divide-gray-6">
+        <div className="grid divide-y divide-hairline">
           {points.map((p) => (
             <div key={p.title} className="py-8 first:pt-0 last:pb-0">
               <h3 className="text-xl leading-snug">{p.title}</h3>

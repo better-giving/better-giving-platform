@@ -193,7 +193,7 @@ export function VideosGroup({ npo_id, videos }: IVideosGroup) {
           }
         />
         {!empty && (
-          <ul className="mt-2 divide-y border rounded bg-surface">
+          <ul className="mt-2 divide-y divide-hairline rounded bg-panel">
             {items.map((v) => {
               const spot = featured.findIndex((f) => f.id === v.id) + 1;
               return (

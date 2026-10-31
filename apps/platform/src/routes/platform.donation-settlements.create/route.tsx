@@ -79,7 +79,7 @@ export default function Page(_: Route.ComponentProps) {
     navigate("..", { preventScrollReset: true, replace: true });
 
   return (
-    <RouteModal size="lg" classes="bg-panel">
+    <RouteModal size="lg" classes="bg-card">
       <Content on_close={close} />
     </RouteModal>
   );

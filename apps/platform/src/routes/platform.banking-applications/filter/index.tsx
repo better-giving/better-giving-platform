@@ -92,7 +92,7 @@ export function Filter({ classes = "", isDisabled }: Props) {
           <Popover.Positioner>
             <Popover.Content
               asChild
-              className={`grid content-start gap-4 w-(--reference-width) rounded border bg-panel text-gray-12 ${popup_anim}`}
+              className={`grid content-start gap-4 w-(--reference-width) bg-card rounded-card shadow-floating text-gray-12 ${popup_anim}`}
             >
               <form
                 onSubmit={handleSubmit(submit)}

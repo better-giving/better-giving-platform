@@ -366,7 +366,7 @@ export function CampaignForm({
           open
           onClose={() => set_ask(null)}
           initialFocusEl={() => cancel_ref.current}
-          classes="bg-panel"
+          classes="bg-card"
         >
           <div className="p-6 grid gap-4">
             <h2 className="text-lg font-bold">{ASK[ask].title}</h2>

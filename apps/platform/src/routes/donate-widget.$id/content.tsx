@@ -71,7 +71,7 @@ export function Content({
         base_url={base_url}
         source="bg-widget"
         mode="live"
-        classes="w-full border rounded"
+        classes="w-full border rounded-card"
         recipient={recipient}
         config={c}
         user={user}

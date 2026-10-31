@@ -92,7 +92,14 @@
   --gray-11: oklch(0.503 0.019 254); /* #5d656f */
   --gray-12: oklch(0.242 0.019 258.4); /* #1a2029 */
 
-  --radius: 0.25rem;
+  /* two corners, one per job. --radius is the control's and the well's: a
+     field, a button, a chip that is not a pill, a well inside a card.
+     --radius-card is the container's: the card, and every layer that floats or
+     sits over the page — dialog, menu, popover, select list, hovercard, toast.
+     the ladder is closed otherwise (theme.css resets --radius-*); a third
+     corner is a decision to take back to the system, not one to spell. */
+  --radius: 0.375rem;
+  --radius-card: 0.75rem;
 
   /* there is no --fg, and no -fg twin for any surface below: every one of them
      would resolve to gray-12. each surface below is light, so the ink never
@@ -104,23 +111,41 @@
      radix's per-ramp contrast token: three are white and --warning-fg is not,
      because amber's step 9 sits light enough to need dark ink. they share a
      value by coincidence of the ramps, not by duplication. */
-  --background: var(--gray-1);
-  /* step 2, the ramp's subtle ground — one rung down from the page, so a panel
-     is read by its fill as well as its border, and anything resting on step 1
-     inside it (a field, see --surface) reads lighter than the panel. that
-     direction is radix's: its default text-field variant sits LIGHTER than the
-     panel it is on, and the tinted fill is the opt-in `soft` variant. it is
-     also the only direction available here — --surface is already step 1 and
-     there is no rung above it, so the separation has to come from moving the
-     container down. NOT a substitute for the border: a field's step-7 edge is
-     Lc 21.8 on this rung and step 1 on step 2 is fainter still. the two
-     together are what makes a field findable; neither does it alone.
-     one name covers the card and the floating layer alike: radix files panels,
-     menus, dialogs and popovers under a single rung, and a second name holding
-     the same value is the drift the -fg twins were deleted for. lifting a
-     popover off panels later means splitting this back out — greppable, and
-     nothing in the product asks for it today. */
+  /* the surface model, outside in: ground -> card -> well -> field.
+     the GROUND is the page — --background under four soft radial blots
+     (--wash / --wash-far, painted once in platform's index.css and fixed to the
+     window). a CARD is white with no border and no shadow: it needs colour
+     under only part of its edge for the eye to complete the box, which is the
+     blots' job. a WELL (--panel) is a recess inside a card. a FIELD
+     (--surface + --border) is white with its full edge, inside either. */
+  --background: oklch(1 0 0); /* #ffffff */
+  /* the resting container — `card`, `solo-card`, and the fill every dialog,
+     menu, popover, select list, hovercard and toast carries. white, the same
+     value as the page base: a card reads off the blots under its edge, never
+     off a border. */
+  --card: oklch(1 0 0); /* #ffffff */
+  /* a WELL inside a card: a recessed block that groups a figure, a meter
+     track, a payout summary. step 2, one rung under the card it sits in. it is
+     not a container fill any more — a container is --card. */
   --panel: var(--gray-2);
+  /* the blots under the ground, and nothing else: no text, no fill, no state,
+     no chart. no utility maps them (theme.css), so a call site cannot reach
+     one. --wash is the brand blue at blot strength; --wash-far is the
+     palette's only violet, there so the ground is not one flat hue; and
+     --wash-strong is the main blot on the single-card screens (`solo-card`:
+     login, signup, password reset, check-email), where one card on an
+     otherwise empty page needs more colour behind it. literal oklch() rather
+     than ramp steps: the ramp has no violet, and no blue rung at this chroma.
+     gray-12 and gray-11 ink measured on each in contrast.test.ts, for the
+     moment copy lands on a blot outside a card. */
+  --wash: oklch(0.92 0.05 247.3);
+  --wash-far: oklch(0.93 0.05 300);
+  --wash-strong: oklch(0.89 0.07 247.3);
+  /* lines INSIDE a card: table rows, a card's header strip, dividers between
+     sections or list rows. step 3 — quiet enough that a white card's content
+     is grouped rather than gridded. not a control edge (that is --border) and
+     not a container edge (a container has none). */
+  --hairline: var(--gray-3);
   --primary: var(--blue-9); /* white-on-fill Lc 82.3 */
   /* the hovered rung of the filled control, and its pressed rung too. the ramp
      gives a solid fill two steps, 9 and 10; steps 11 and 12 are text and both
@@ -212,27 +237,28 @@
      the band stays far clear, so it also takes neutral body copy. */
   --warning-subtle: var(--amber-3);
   --warning-subtle-fg: var(--amber-11);
-  /* the separator rung: dividers, panel hairlines, table rules, card edges,
-     and whatever the base `*` rule reaches. Lc 17.4 on --background and 15.5
-     on --panel, over the Lc 15 a separator needs.
-     a control's edge is step 7 in the shared recipes (packages/ui
-     components.css), Lc 23.8 on --background and Lc 21.8 on --panel; an app
-     call site spelling border-gray-6 on a control still draws the separator
-     rung. both are under the Lc 30 a control boundary needs — an accepted miss.
-     step 8 would clear it (Lc 34.3 / 32.4); step 7 stays because it is
-     radix's element-border rung, taken as generated. NOT compensated for by
-     the focus ring below: the ring clears its own Lc 30, but it draws only on
-     focus, so it does not rescue a resting boundary. */
+  /* the form control's edge: field, checkbox, radio, `.btn-secondary`,
+     dropzone, and whatever the base `*` rule reaches. WCAG 1.4.11 asks a
+     control's boundary to be findable, and the control is the one surface in
+     the model that keeps its full edge. a container carries no border and a
+     line inside one is --hairline — so this is no longer the separator rung.
+     Lc 17.4 on gray-1 (the embed's ground), higher on the white card.
+     the shared recipes in packages/ui components.css draw a control's edge at
+     step 7, Lc 23.8 on gray-1; an app call site spelling border-gray-6 on a
+     control still draws this rung. both are under the Lc 30 a control
+     boundary needs — an accepted miss. step 8 would clear it (Lc 34.3); step 7
+     stays because it is radix's element-border rung, taken as generated. NOT
+     compensated for by the focus ring below: the ring clears its own Lc 30,
+     but it draws only on focus, so it does not rescue a resting boundary. */
   --border: var(--gray-6);
-  /* the fill a form control carries — radix's --color-surface, and the reason
-     the container moved rather than this: step 1 is the lightest rung there is,
-     so a field can only sit ABOVE its panel, never below. the same value the
-     page carries, doing the opposite job — on a --panel this is what lifts the
-     field off its container, while a field on the bare page is fill-identical
-     to it and reads by its border alone.
+  /* the fill a form control carries — radix's --color-surface. white, the
+     same value as --card: a field inside a card is fill-identical to it and is
+     found by its --border alone; a field inside a well (--panel) also lifts off
+     it by fill. the same value as --card doing a different job, so it keeps
+     its own name.
      unrelated to the `surface-primary` utility, which is a brand-filled BAND.
      that one names what fills it; this one names what sits on a fill. */
-  --surface: var(--gray-1);
+  --surface: oklch(1 0 0); /* #ffffff */
   /* step 8 is the ramp's focus rung, and deliberately not --primary: a ring
      that equals the fill it surrounds measures Lc 0.0 against it and is not
      there at all. on a --primary fill step 8 reaches Lc 30.0 — on the Lc 30 a
@@ -263,14 +289,6 @@
      browser before leaning on the last digit. */
   --primary-ring: var(--primary-fg);
   --primary-border: color-mix(in oklch, var(--primary-fg) 80%, var(--primary));
-
-  /* the dashboard sidebar's own ground. same step as --background today, and
-     named separately so the sidebar can leave the page's ground without
-     touching its one call site. it is the ONLY --sidebar-* token: the five
-     that shadowed --primary / --primary-fg / --secondary / --border / --ring
-     were aliases nothing ever spent, and a reskin had to answer for them. a
-     sidebar that later needs its own accent adds the one token it needs. */
-  --sidebar: var(--gray-1);
 
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);

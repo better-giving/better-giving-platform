@@ -138,3 +138,53 @@ describe("a --primary fill declares its own ink", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+/**
+ * the surface model: ground -> card -> well -> field
+ * (packages/brand/design-system.md, "Resting surfaces"). a container is
+ * `bg-card` + `rounded-card` with no edge; a floating layer is that plus
+ * `shadow-floating`. the shared shells in packages/ui are held to it here.
+ * the app's own hand-written floating layers still spell the pre-model
+ * `bg-panel … border rounded` and are a later sweep's; the rule widens to
+ * apps/platform/src once they move.
+ */
+describe("the surface model", () => {
+  // comments blanked first, newlines kept: prose quotes class names in
+  // backticks, and a doc comment naming `shadow-floating` is not a layer.
+  const string_literals = (text: string) =>
+    [
+      ...text
+        .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+        .replace(/^([ \t]*)\/\/.*$/gm, "$1")
+        .matchAll(/"([^"\n]*)"|`([^`]*)`/g),
+    ].map((m) => ({
+      i: m.index,
+      value: m[1] ?? m[2] ?? "",
+    }));
+
+  test("a shared floating layer is a card with no edge", () => {
+    const offenders = sources
+      .filter((x) => x.file.startsWith("packages/ui/src/"))
+      .flatMap(({ file, text }) =>
+        string_literals(text).flatMap(({ i, value }) => {
+          const t = raw_tokens(value);
+          if (!t.includes("shadow-floating")) return [];
+          const ok =
+            t.includes("bg-card") &&
+            t.includes("rounded-card") &&
+            !t.some((c) => /^(border|outline)(-[\w-]+)?$/.test(c));
+          return ok ? [] : [`${file}:${line_of(text, i)}`];
+        })
+      );
+    expect(offenders).toEqual([]);
+  });
+
+  test("the sidebar paints nothing", () => {
+    // --sidebar was deleted with the model: the dashboard nav sits on the
+    // ground. the utility no longer compiles, so a stray one is silent.
+    const offenders = sources
+      .filter(({ text }) => /(?<![-\w])bg-sidebar(?![-\w])/.test(text))
+      .map(({ file }) => file);
+    expect(offenders).toEqual([]);
+  });
+});

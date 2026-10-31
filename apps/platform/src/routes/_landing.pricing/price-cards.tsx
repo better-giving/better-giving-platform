@@ -28,7 +28,7 @@ export function PriceCards({ classes = "" }: IPriceCards) {
   return (
     <div className={`${classes}`}>
       <div className="page grid gap-6 md:grid-cols-2">
-        <div className="bg-primary rounded p-8 flex flex-col gap-3.5 shadow-lift-cta text-primary-fg">
+        <div className="bg-primary rounded-card p-8 flex flex-col gap-3.5 shadow-lift-cta text-primary-fg">
           <span className="text-lg font-bold">
             Fundraising &amp; fund management
           </span>
@@ -55,7 +55,7 @@ export function PriceCards({ classes = "" }: IPriceCards) {
           </Link>
         </div>
 
-        <div className="card-on-band flex flex-col gap-3.5">
+        <div className="card flex flex-col gap-3.5">
           <span className="text-lg font-bold">Fiscal sponsorship</span>
           <span className="text-5xl font-bold">
             2.9%

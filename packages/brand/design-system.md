@@ -28,7 +28,7 @@ Thresholds are APCA **Bronze Simple Mode**:
 | 60 | content text that is not body | labels, a filled button's label, status ink on a band, step-11 ink generally |
 | 45 | headlines (≥36px normal, ≥24px bold) and fine-detail pictograms | icons: Lucide's thin-stroke glyphs |
 | 30 | any other text (spot-readable, placeholder, disabled) and solid semantic non-text | a control boundary, the focus ring |
-| 15 | non-semantic non-text; below it, treat as invisible | separators, hairlines, table rules |
+| 15 | non-semantic non-text; below it, treat as invisible | a control's resting `--border`. `--hairline` inside a card sits under it by design (see "Resting surfaces") |
 
 Every color in the palette comes off a **generated 12-step ramp** (see "The
 ramp", below) and every semantic token is an alias onto one of its steps. No
@@ -104,14 +104,16 @@ Three properties of the generated set travel with it:
 
 ### Which step each token points at
 
-The values live in `colors.css`; this is the shape. Every one of the 42 semantic
-tokens resolves to a step (or to `#ffffff`, or to a `color-mix()` off one).
+The values live in `colors.css`; this is the shape. Every one of the 41 semantic
+tokens resolves to a step, to `#ffffff`, to a `color-mix()` off one, or (the
+three blots, alone) to a decorative literal off the ramp.
 
 | step | blue | red | green | amber | gray |
 | --- | --- | --- | --- | --- | --- |
-| 1 | | | | | `--background` `--surface` `--sidebar` |
+| white | | | | | `--background` `--card` `--surface` (`oklch(1 0 0)`, above the ramp) |
+| 1 | | | | | *no token: the emails' ground (`flat_colors.gray_1`)* |
 | 2 | `--band` | | | | `--panel` |
-| 3 | `--secondary` | `--destructive-subtle` | `--success-subtle` | `--warning-subtle` | |
+| 3 | `--secondary` | `--destructive-subtle` | `--success-subtle` | `--warning-subtle` | `--hairline` |
 | 5 | `--secondary-active` | `--destructive-subtle-active` | | | |
 | 6 | | | | | `--border` |
 | 7 | | | | | *no token: the control recipes spell `gray-7` (Lc 23.8 on the page)* |
@@ -131,17 +133,20 @@ control's own edge, and the control recipes in
 `packages/ui/src/styles/components.css` (`.field-input`,
 `.field-input-container`, `.btn-secondary`, and `.selector-btn` through the
 `.field-input` it composes with) spend it as a bare `var(--gray-7)`. `--border`
-keeps step 6 and the separator job: dividers, panel hairlines, table rules, card
-edges. The split reaches the shared recipes only, so app call sites that spell
-`border-gray-6` on a control still draw a separator-weight edge.
+keeps step 6 and is a control's edge too, the one the base `*` rule hands a bare
+`border`; lines inside a card moved to `--hairline` (step 3) and a container has
+no edge. The split reaches the shared recipes only, so app call sites that spell
+`border-gray-6` on a control draw one rung fainter than the shared recipes do.
+
+`--wash` / `--wash-far` / `--wash-strong` are the only colors off the ramp
+besides the chart set: the blots under the ground, which no utility reaches.
 
 `--overlay` is the one token off the solid ramp on purpose: `gray-12` at 30%,
 via `color-mix()`, for a dialog scrim.
 
 `--primary-fg` / `--destructive-fg` / `--success-fg` are `oklch(1 0 0)`: white,
 each scale's own `contrast` color. `--primary-ring` is `--primary-fg`;
-`--primary-border` is a `color-mix()` off it. The five `--sidebar-*` beyond
-`--sidebar` alias app tokens. `--form-primary` / `--form-secondary` are tenant
+`--primary-border` is a `color-mix()` off it. `--form-primary` / `--form-secondary` are tenant
 values. `--chart-1…5` are stock shadcn defaults and are **not** on the ramp.
 
 ## The accepted misses (APCA)
@@ -154,14 +159,17 @@ threshold on a pair *Radix itself assigns* (an own-scale step 11 or 12 on an
 own-scale surface, or a scale's own contrast ink on its step 9) is a known
 consequence of the scale, not a mistake in the mapping.
 
-Four pairings land under their threshold and are **accepted**, not defects:
+Six pairings land under their threshold and are **accepted**, not defects (the
+last two are the surface model's, the design's own rather than the ramp's):
 
 | pairing | measured | threshold | |
 | --- | --- | --- | --- |
-| control boundary `gray-7` on `--background` / `--panel` | **Lc 23.8 / 21.8** | Lc 30 | the element-border rung the shared control recipes draw; `gray-8` would clear and was declined, see "Decisions that look like bugs" |
+| control boundary `gray-7` on `gray-1` / `--card` / `--panel` | **Lc 23.8 / 25.6 / 21.8** | Lc 30 | the element-border rung the shared control recipes draw; `gray-8` would clear and was declined, see "Decisions that look like bugs" |
 | `--destructive-subtle-fg` on `--destructive-subtle-active` (red-11 on red-5) | **Lc 51.7** | Lc 60 | the pressed rung of a subtle error control; transient |
 | `--warning-fg` on `--warning` (amber-12 on amber-9) | **Lc 52.1** | Lc 60 | the filled warning button's label and the checklist badge; white would be weaker still at Lc 46.4 |
-| `--warning` as a meaningful icon on `--background` / white | **Lc 39.9 / 41.8** | Lc 45 | a fill, not an icon ink: a meaningful amber glyph takes `--warning-subtle-fg` (Lc 69.3 / 71.2) |
+| `--warning` as a meaningful icon on `gray-1` / white | **Lc 39.9 / 41.8** | Lc 45 | a fill, not an icon ink: a meaningful amber glyph takes `--warning-subtle-fg` (Lc 69.3 / 71.2) |
+| `--hairline` (`gray-3`) on `--card` | **Lc 0.0** | Lc 15 | a line inside a card groups rows rather than gridding them; a line that must be found is `--border` |
+| `gray-11` on `--wash-strong` | **Lc 58.2** | Lc 60 | the solo-card blot sits behind the card, not behind copy; de-emphasised copy on the bare blot takes `gray-12` (Lc 82.0). `gray-11` clears on `--wash` (63.7) and `--wash-far` (64.8) |
 
 Every own-scale band pairing clears: amber-11 is Lc 62.5 on amber-3 and Lc 67.2
 on amber-2, green-11 is Lc 66.1 on green-3, and white on green-9 is Lc 74.3.
@@ -192,15 +200,17 @@ Three rules fall out of that test, and all three are load-bearing:
 - **A `var()` alias mirrors; a `color-mix()` does not.** The test reads a literal
   `oklch(...)` declaration, and it follows a `var()` alias chain of any depth to the literal
   behind it, which is what keeps the flat twin alive now that the semantic
-  tokens are aliases onto ramp steps: 40 of the 42 get a twin; the two
+  tokens are aliases onto ramp steps: 39 of the 41 get a twin; the two
   `color-mix()`es (`--primary-border`, `--overlay`) have no literal behind them. `flat_colors.primary` is `#1e6dab` because
   the mirror resolved `var(--blue-9)`, not because anyone typed it twice.
   Anything minted as a mix is left out by rule.
 - **Adding a literal `oklch()` token to `:root` means adding its hex to
   `colors.ts` in the same commit**, or `colors.test.ts` fails: `packages/brand`
   has no build step, so the test is the whole gate. The mirror is mechanically
-  complete, not curated: that is why all 60 ramp steps, `chart_*` and `sidebar`
-  are in it despite no email using them.
+  complete, not curated: that is why all 60 ramp steps, `chart_*` and the three
+  `wash*` blots are in it despite no email using them. The mail layouts paint
+  `gray_1`, not `background`: the app's page went white with the surface model
+  and mail kept its ground.
 - **The guard re-derives rather than imports.** `colors.test.ts` parses the CSS
   itself instead of calling the generator's parser, deliberately: a drift guard
   that imports the code it guards cannot catch a bug in that code. The cost is a
@@ -208,37 +218,64 @@ Three rules fall out of that test, and all three are load-bearing:
 
 ## Resting surfaces: what each one is for
 
+**The model, outside in: ground → card → well → field.** Approved by the PM
+2026-10-31 and rolled out to the whole app at once.
+
+- **Ground**: the page. White (`--background`) under four soft radial blots,
+  blue `--wash` at about 6% 6% and 30% 70%, violet `--wash-far` at about 78% 22%
+  and 98% 98%. The blots are **fixed to the window**: they stay put while the
+  page scrolls. Painted once, as a fixed `body::before` in platform's
+  `src/index.css` (not `background-attachment: fixed`, which iOS Safari
+  ignores), never per screen. A screen holding a `solo-card` swaps the main
+  blue blot for `--wash-strong`.
+- **Card**: white (`--card`), **no border, no shadow**, 12px corners
+  (`rounded-card`). A card needs colour under only part of its edge; the eye
+  completes the box. That is the whole reason for the blots.
+- **Well**: `--panel` (`gray-2`) inside a card, at the control corner
+  (`rounded`). A recess that groups a figure, a meter track or a summary.
+- **Field**: white (`--surface`) with its full `--border` edge, inside a card or
+  a well. The one surface that keeps an edge, because WCAG 1.4.11 asks a
+  control's boundary to be findable.
+
+Lines **inside** a card (table rows, a card's header strip, dividers between
+sections or list rows) are `--hairline`. A container has no edge at all.
+
 Every token here is a **fill**, and its `-fg` is the only ink authored for it.
-The neutral surfaces are gray steps; `--band` (`blue-2`) and `--secondary`
-(`blue-3`) are tints of the brand hue and not the brand color itself: `--primary`
-is the brand action color. The two blues split a ground from an element: see
-"the tint ladder" below.
+The neutral surfaces are white or gray steps; `--band` (`blue-2`) and
+`--secondary` (`blue-3`) are tints of the brand hue and not the brand color
+itself: `--primary` is the brand action color. The two blues split a ground from
+an element: see "the tint ladder" below.
 
 | token | what it is |
 | --- | --- |
-| `--background` | the page itself: `gray-1`, `#fbfcfe`. The page ground is **not** `#ffffff`, and every contrast figure in this file is measured against the real ground rather than white. `--surface` is set to this same value on purpose; see "decisions that look like bugs". Ink is `text-gray-12`; there is no `--fg` |
-| `--panel` | every container lifted off the page, in the flow or over it: panel, tile, table shell, row, and the transient layers too (menu, combobox and select list, dialog, toast). Radix files all of them under one rung and so does this. `gray-2`, one step below the page, so a panel reads by its fill *and* its `--border`; that matters because the border alone is Lc 17.4. Splitting a floating layer back out later is a grep |
-| `--surface` | the fill a form control carries: Radix's `--color-surface`. `gray-1`, so on a `--panel` it sits one step *lighter* than its container, which is the direction Radix uses and the only one available: step 1 is the lightest rung there is. On the bare page it is fill-identical and reads by its border alone. Not fields only: `.btn-secondary` and the file dropzone rest here too, for the same reason: a control is a control wherever it sits. One container rests here as well: a card on a `--band`, spelled `card-on-band`; see "On a band, a container goes up" below |
+| `--background` | the page base under the blots: white, `oklch(1 0 0)`. Ink is `text-gray-12`; there is no `--fg`. The figures in this file recorded "on the page" were measured when it was `gray-1`; `gray-1` is still the ground of the emails, and white only raises a dark ink's Lc, so each is a floor for the white page. The white page's own figures are recorded as "on `--card`" |
+| `--card` | the resting container, in the flow or over it: `card`, `solo-card`, and the fill every dialog, menu, popover, combobox and select list, hovercard and toast carries. White, the same value as the page base, on purpose: a card reads off the blots under its edge, never off a border. One card for every ground: the same white reads on a `--band` |
+| `--panel` | a **well** inside a card. `gray-2`, one rung under the card. Not a container fill any more; a hand-written `bg-panel` used as a container is the pre-model spelling and is being swept |
+| `--wash` / `--wash-far` / `--wash-strong` | the blots, and nothing else: never text, a fill, a state or a chart. **No utility maps them**, so a call site cannot reach one. `--wash` is the brand blue at blot strength; `--wash-far` is the palette's **only violet**, there so the ground is not one flat hue; `--wash-strong` is the main blot on the single-card screens (login, signup, password reset, check-email, the connector consent screen). Literal `oklch()` rather than ramp steps: the ramp has no violet and no blue rung at this chroma. They have email twins because the mirror is mechanically complete, not because mail uses them |
+| `--hairline` | a line inside a card: `gray-3`. Lc 0.0 on the white card (under `apca-w3`'s low clip) and an accepted miss against the Lc 15 a separator needs: the design's, because a line inside a card groups rows rather than gridding them. A line that has to be **found** is a control's `--border`, not this. `border-hairline` / `divide-hairline` |
+| `--border` | a form control's edge: field, checkbox, radio, `.btn-secondary`, dropzone. `gray-6`, Lc 19.3 on the card. No longer the separator rung; see "Decisions that look like bugs" for the control-boundary miss |
+| `--surface` | the fill a form control carries: Radix's `--color-surface`. White, the same value as `--card`: inside a card a field is fill-identical and is found by its `--border` alone; inside a well it also lifts off by fill. Not fields only: `.btn-secondary` and the file dropzone rest here too |
 | `--overlay` | the scrim a dialog lays over the page: `gray-12` at 30%, via `color-mix()`. The token is what stops a backdrop being picked by eye. It is the whole of the `modal` level's color: that level carries no shadow, so the scrim and the stacking step are what define it; see "Elevation". **Every backdrop in the app spells it** (the sites are listed under "Dialogs carry no shadow"). `apps/docs` spells it too, in the embed playground's `<dialog>`: that page is our own docs chrome around an embedded form, not a stand-in for a customer's site. The one backdrop outside this token is `demo-nonprofit`'s, and only because that whole page impersonates a fictional nonprofit's website: a system token there would stop it demonstrating the one thing it is for |
 | `--secondary` | second-tier action, plus chips and tags. The button does **not** rest on it: `.btn-secondary` rests on `--surface` with a `--border` (it is a control, and `--surface` is the fill a control carries) and takes `--secondary` (`blue-3`) on hover and `--secondary-active` (`blue-5`) pressed. So `--secondary` is a *state* fill for the button and a *resting* fill for chips: check which one you are in before assuming its ink. Ink is `text-gray-12` |
-| `--band` | the alternating full-bleed section on the marketing pages, and the far stop of the hero's `--background` → tint gradient. `blue-2`, the ramp's page-level subtle ground: **not** a UI element, and nothing hovers it. It is a *lighter* rung than `--secondary`, so every ink figure recorded below against `blue-3` is a floor for this band, not a ceiling |
-| `--sidebar-*` (6 tokens) | the dashboard sidebar's own set, so the nav chrome can diverge from the page without touching app tokens. It currently does not: `--sidebar` is `gray-1`, equal to `--background`, and the other five alias `--primary` / `--primary-fg` / `--secondary` / `--border` / `--ring`. Its two `-fg` twins went with the rest of the neutral ink. One call site today (`bg-sidebar` in `layout/dashboard/sidebar/sidebar.tsx`) |
+| `--band` | the alternating full-bleed section on the marketing pages, and the far stop of the hero's `--background` → tint gradient. `blue-2`, the ramp's page-level subtle ground: **not** a UI element, and nothing hovers it. It is a *lighter* rung than `--secondary`, so every ink figure recorded below against `blue-3` is a floor for this band, not a ceiling. A card on it is the plain white `card` |
 
-**On a band, a container goes up.** The `--panel` rule above assumes the ground
-is the page. `--band` is `blue-2`, the *same rung* as `--panel` in another hue,
-so going down a step from it lands nowhere: a panel on a band measures
-**1.004:1**, against **1.029:1** for a panel on the page, and reads as a
-same-value patch rather than an object. On a tinted ground a container
-separates by going **up**, to `--surface` (`gray-1`): **1.033:1** on a band,
-marginally more than a panel gets on the page. That is the `card-on-band`
-utility, `card` with its fill swapped and nothing else; a card that delegates
-its inset (the blog's media-framed post card) swaps `bg-panel` for `bg-surface`
-the same way. Not `#ffffff` (1.060:1): `gray-1` is this system's white, for the
-reason given under `--background`. The hairline does not rescue a panel here
-either: `border-gray-6` is 1.36:1 on the page and only **1.318:1** on a band,
-so on the one ground where the fill contributes nothing the edge is at its
-weakest. No sweep catches a panel on a band: the band usually arrives through a
-`classes` prop, so the pairing is not visible in any one file.
+**The dashboard nav paints nothing.** `--sidebar` was deleted with the model:
+the desktop sidebar's links sit on the ground with no fill and no edge. The
+mobile drawer is a dialog and carries `bg-card` like every other one.
+
+**The embedded donation form takes the model but not the ground.** The
+`donate-widget.$id` and `forms.$id` routes render inside an iframe on a
+nonprofit's own page, so they mark their root `data-surfaces="embed"` and the
+ground rule skips them: the page behind the form stays the host's. Inside, the
+form is the white card with white bordered fields like everywhere else; the
+widget's outer box alone keeps a `border` at its call site (`donate-widget.$id/
+content.tsx`), because the host page's colour is unknowable and a borderless
+white card vanishes on a white site. Our own pages render the same form
+borderless.
+
+**Emails keep `gray-1`.** The two mail layouts paint `flat_colors.gray_1`, not
+`flat_colors.background`: mail has no blots to complete a card's box, and the
+template set was designed on that ground.
 
 ## Fill or ink: the distinction that causes the most drift
 
@@ -641,20 +678,22 @@ that is neither an `oklch()`, a `var()` alias, a `color-mix()` nor a plain
 length. A shadow there would take the email mirror down with it. Only the scrim
 color, `--overlay`, is a color and stays in the palette.
 
-**Depth is scarce here on purpose: the app is flat.** A card does not lift. The
-fill ladder already separates a container from the page by going *down*
-(`--panel` is `gray-2`, one rung below `--background`), and a shadow separates by
-going up, so spending both on one object says the same thing twice. Depth is
-reserved for what genuinely hovers over content.
+**Depth is scarce here on purpose: the app is flat.** A card does not lift. It
+is white on a white ground, and what separates it is the colour of the blots
+under part of its edge (see "Resting surfaces"); a shadow would be a second
+signal for the same object, and an edge would grid the page the blots exist to
+soften. Depth is reserved for what genuinely hovers over content. Every level
+shares one fill: a floating layer and a dialog are `--card` too, and are told
+from the page by their shadow or their scrim, never by a different fill.
 
 The set is closed and small. `--shadow-*` and `--inset-shadow-*` are reset to
 `initial`, so a call site has these names and nothing else.
 
 | level | what sits here | shadow | stacking |
 | --- | --- | --- | --- |
-| `flush` | the document flow, and most of the product: card, panel, table shell, row, form control. Separates by its `--panel` fill and its `--border` edge | none, and **no token**, see below | none |
-| `floating` | hovers over content, transient, no scrim: menu, dropdown, combobox and select popup, tooltip, hovercard, toast, and pinned page chrome once it is stuck | `shadow-floating` | `z-floating` for a popup; pinned chrome keeps `z-sticky` / `z-subbar` |
-| `modal` | covers the page behind a scrim: dialog, drawer, route-modal | **none, by decision**, see below | `z-scrim` on the backdrop, `z-modal` on the panel |
+| `flush` | the document flow, and most of the product: card, well, table shell, row, form control. A card separates by the ground under its edge, a well by its `--panel` fill inside the card, a control by its `--border` edge | none, and **no token**, see below | none |
+| `floating` | hovers over content, transient, no scrim: menu, dropdown, combobox and select popup, tooltip, hovercard, toast, and pinned page chrome once it is stuck. `bg-card` + `rounded-card`, no edge | `shadow-floating` | `z-floating` for a popup; pinned chrome keeps `z-sticky` / `z-subbar` |
+| `modal` | covers the page behind a scrim: dialog, drawer, route-modal. `bg-card` + `rounded-card` (the drawer is square: it is pinned to the edge) | **none, by decision**, see below | `z-scrim` on the backdrop, `z-modal` on the panel |
 | recessed track | a track a control sits *in*: slider track, progress bar, switch control | `inset-shadow-track` | none |
 | recessed fill | the fill that rides raised inside that track | `shadow-track-fill` | none |
 
@@ -964,9 +1003,28 @@ guarding them is its own change.
 
 Recorded so they are not "fixed" by someone reading them as oversights.
 
+- **`--background`, `--card` and `--surface` are all white, and that is three
+  jobs, not one value named thrice.** The page base sits under the blots; the
+  card is the container that reads off them; the field is a control that reads
+  by its `--border`. They share a value because the surface model puts the
+  separation in the ground and the edge, not in the fill ladder. Collapsing them
+  would lose which job a call site meant, and the embedded form already shows
+  why the names are worth keeping: its page is the host's, not ours.
+- **A card has no border, and colour shows under only part of its edge.** Not a
+  missing hairline. The four blots put colour behind some of each card's edge
+  and the eye completes the box; a border would grid the page. A card whose
+  whole edge falls on bare white is still a card. Lines go **inside** it
+  (`--hairline`), and the one surface that keeps an edge is a form control.
+- **`--hairline` measures Lc 0.0 on the card.** Under the Lc 15 a separator
+  needs, by design: it groups rows rather than gridding them. Copy that must be
+  found does not lean on it.
+- **`--wash-far` is a violet in a blue palette.** The only hue off the brand and
+  status ramps, decorative only (never text, fill, state or chart), and
+  unreachable from a utility. It is there so the ground is not one flat hue.
+
 - **A control's boundary is under its threshold, and the ring does not rescue it.**
-  `--border` is `gray-6` at **Lc 17.4** on the page and Lc 15.5 on `--panel`: a
-  separator, over the Lc 15 a separator needs. `--ring` is `blue-8` at
+  `--border` is `gray-6` at **Lc 17.4** on `gray-1`, Lc 19.3 on the white card
+  and Lc 15.5 on `--panel`: over the Lc 15 a separator needs. `--ring` is `blue-8` at
   **Lc 44.6** on the page, clear of the Lc 30 a focus indicator needs. A control
   boundary also needs Lc 30, and the shared recipes draw it in `gray-7` at
   **Lc 23.8** on the page and Lc 21.8 on `--panel`: under. **The ramp's border
@@ -977,12 +1035,12 @@ Recorded so they are not "fixed" by someone reading them as oversights.
   on focus. The fix inside the scale exists and is not taken: `gray-8` reads
   Lc 34.3 on the page and Lc 32.4 on `--panel`, both over Lc 30, and moving
   fields and secondary buttons to it was declined on 2026-09-13 to keep Radix's
-  element-border rung as generated. The `gray-7` boundary is an accepted miss. It compounds
-  with `--surface`, which is the page color (`gray-1`): a field **on the bare
-  page** is identified by its boundary alone, and that boundary is intentionally
-  faint. Inside a `--panel` the field also reads by fill, one rung lighter than
-  its container; that is separation, not contrast, and it does not rescue the
-  boundary. The 6 / 7 split is under "Which step each token points at";
+  element-border rung as generated. The `gray-7` boundary is an accepted miss
+  (Lc 25.6 on the white card, still under). It compounds with `--surface`, which
+  is the card's own white: a field **inside a card** is identified by its
+  boundary alone, and that boundary is intentionally faint. Inside a well
+  (`--panel`) the field also reads by fill, one rung lighter than the well; that
+  is separation, not contrast, and it does not rescue the boundary. The 6 / 7 split is under "Which step each token points at";
   change one rung and re-check the other;
   `colors.css` carries the short form of this at `--border`.
 - **`--destructive` is red-9 and clears every surface in the palette** (Lc 74.1 on
@@ -1066,8 +1124,9 @@ bug:
   a light band moves it toward its own dark ink, which is the failure a
   darkening ladder produces there and the reason these active rungs are steps.
 
-`--radius` is the one radius system; `--radius-xs…3xl` are computed from it in
-`index.css`. Don't author parallel values.
+Two corners and no third: `--radius` (6px) for a control or a well,
+`--radius-card` (12px) for a container or a floating layer. The `--radius-*`
+scale is reset, so don't author parallel values; see "Two corners".
 
 ## Which states each control carries
 
@@ -1217,7 +1276,7 @@ Four rules travel with it:
   on a button. A button that needs to be wider takes `w-full` inside a wrapper
   the caller sizes, or `w-fit`/`inline-flex`. If two buttons in one tier carry
   different `px`, one of them is spelling width as padding.
-- **The button radius is `var(--radius)` (4px), not `--radius-sm`.** See the
+- **The button radius is `var(--radius)` (6px), not `--radius-sm`.** See the
   decision below.
 - **A square icon-only button is `btn-icon`, a modifier, not a fourth tier.** It
   composes with all three sizes; see below.
@@ -1305,6 +1364,26 @@ Three rules travel with it:
 "`px` belongs to the tier, `width` belongs to the caller" rule above. Deliberate:
 here the width is not a layout choice, it is the shape of the control: a square
 button that a caller can stretch is not a square button.
+
+### Two corners: `--radius` and `--radius-card`
+
+The surface model has two corners, one per job, and the ladder stays closed
+around them:
+
+- **`--radius`, 6px (`0.375rem`)**: a control (button, field, checkbox box,
+  chip that is not a pill) and a well inside a card. `rounded` and its sides
+  (`rounded-t/-b/-l/-r`) read it.
+- **`--radius-card`, 12px (`0.75rem`)**: a container and every layer over the
+  page: card, `solo-card`, dialog, menu, popover, select and combobox list,
+  hovercard, toast. `rounded-card` reads it, bound by `@utility` in
+  `packages/ui/src/styles/utilities.css` because the theme scale it would
+  otherwise derive from is reset.
+
+The smaller corner nested inside the larger one is what reads as *inside*. A
+third corner is a decision to take back to the system, not a call-site class;
+`rounded-full` and `rounded-none` remain, emitted from literals. Both values
+were 4px (`0.25rem`) before the model; the history below records why the one
+corner was `var(--radius)` and is kept because the reasoning still holds at 6px.
 
 ### Why buttons are `var(--radius)` and not `--radius-sm`
 
@@ -1524,8 +1603,8 @@ What follows from it:
 - **The radius is set once, on the outermost thing that clips.** A child reaching
   for `rounded` inside an already-rounded shell is either drawing a corner nobody
   asked for, or standing in for the `overflow-hidden` its shell should carry.
-- **`solo-card` is the worked example.** It carries the fill, the border, the
-  corner and the inset, and its comment in
+- **`solo-card` is the worked example.** It carries the fill, the corner and
+  the inset (no border: see "Resting surfaces"), and its comment in
   `packages/ui/src/styles/utilities.css` records what it deliberately does *not*
   carry (no `gap`, no `justify-items`) because those are flow, and flow stays
   the caller's. That split is the rule restated: the box is the shell's, the
@@ -1539,21 +1618,22 @@ What follows from it:
 **The popup content shell is named, on the component.** A tooltip or
 hovercard body (the panel-shaped surface that *does* converge) is
 `popup_shell` in `packages/ui/src/components/popup.ts`, and `Content` in
-`tooltip.tsx` and `hover-card.tsx` carries it: `bg-panel`, an `outline-gray-6`
-hairline, `shadow-floating` + `z-floating` (the `floating` elevation row),
-`rounded`, and `p-4`.
-Its edge is `outline`,
-not `border`, on purpose: it pins the ramp step directly so that inside a
-`surface-primary` band it keeps drawing against the page it floats over while
-every other bordered surface redraws against the fill. A call site passes only
+`tooltip.tsx` and `hover-card.tsx` carries it: `bg-card`, `shadow-floating` +
+`z-floating` (the `floating` elevation row), `rounded-card`, and `p-4`. It has
+**no edge**: a floating layer is a card, told from the page by its shadow, and
+its arrow tip is filled from `--card` with no edge either. The select/combobox
+list (`popup_cls` in `select/classes.ts`) and the toast are the same box. A call
+site passes only
 what is its own: a width cap (`max-w-xs`, `w-80`), a type size, an alignment,
 a scroller. `shell-conformance.node.test.ts` fails a `Content` whose class
 string carries anything the shell owns: a fill, an edge, a shadow, a radius, a
 padding, a z-index, the ink.
 
 **The card is named: `card` in `packages/ui/src/styles/utilities.css`.** It is
-`bg-panel border rounded p-6`: the four things this rule assigns to a shell,
-and nothing else. The inset is **24px in every role and at every width**: no
+`bg-card rounded-card p-6`: the fill, the corner and the inset, and nothing
+else. **No edge**: in the surface model a container has none (see "Resting
+surfaces"), and the same white card serves the page and a `--band` alike: the
+retired `card-on-band` folded into it. The inset is **24px in every role and at every width**: no
 tier, no responsive step. A marketing card, a dashboard tile, a figure, a
 callout and a link tile are all the same box.
 
@@ -1574,18 +1654,17 @@ What `card` deliberately does not carry:
 - **No layout and no type.** `grid`, `flex`, a `gap`, a `divide-y`, a heading
   size are the arrangement of the contents, and the arrangement is the
   caller's, the same split `solo-card` records. So is the outer margin.
-- **The edge is `border`, not `border-gray-6`.** The bare utility reads
-  `--border` through the base `*` rule, so `surface-primary`'s rebind reaches
-  inside a card and its hairline is drawn against the brand fill rather than
-  against the page. gray-7 is the ELEMENT-BORDER rung `./components.css`
-  spells on controls; a card is a container, and takes the separator rung.
+- **No edge.** A line inside the card is the caller's `border-hairline` /
+  `divide-hairline`; a container itself has none.
 
 **What is not a card keeps its own shape.** A surface with no inset has
 delegated it (table shell, `divide-y` list, `overflow-hidden` media frame); a
 transient layer over the page is `floating`, not a card; a control's box is
-`components.css`'s. `shell-conformance.node.test.ts` fails the four spellings
-written out together, exempting nine surfaces by file with a reason each, and
-fails a second fill, edge, corner or inset written beside `card`. The small
+`components.css`'s. `shell-conformance.node.test.ts` fails the recipe written
+out by hand (`bg-card rounded-card` plus an inset, or the pre-model four:
+`bg-panel`, an edge, `rounded`, an inset), exempting surfaces by file with a
+reason each, fails a second fill, edge, corner or inset written beside `card`,
+and fails any `card-on-band`. The small
 inline chip is still unnamed and still the worse spread: 22 spellings, over two
 radii (`rounded` and `rounded-full`), top spelling under 20%.
 
@@ -2173,8 +2252,8 @@ Two seams this does **not** close, both deliberate:
 
 `colors.css` holds two kinds of name and they are adopted differently.
 
-**The 42 semantic tokens are live** and carry call sites in `apps/platform/src`,
-bar the five `--sidebar-*` aliases noted above. The palette is the whole
+**The 41 semantic tokens are live** and carry call sites in `apps/platform/src`
+(the three blots through the one ground rule in `src/index.css`). The palette is the whole
 contract: a semantic name that ships here is a name the app paints with.
 
 **The 60 ramp steps are reachable too**,

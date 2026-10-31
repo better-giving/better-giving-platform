@@ -27,9 +27,9 @@ export default function Filter({ classes = "" }: { classes?: string }) {
         <Dialog.Backdrop className="fixed z-scrim inset-0 bg-overlay" />
         <Dialog.Positioner className="contents">
           <Dialog.Content
-            className={`${classes} ${modal_box.panel} isolate border bg-background`}
+            className={`${classes} ${modal_box.panel} isolate bg-card`}
           >
-            <div className="bg-gray-3 flex items-center p-4 border-b">
+            <div className="bg-gray-3 flex items-center p-4 border-b border-hairline">
               <p className="font-bold  uppercase mr-auto">Filters</p>
               <button
                 type="button"
@@ -59,7 +59,7 @@ export default function Filter({ classes = "" }: { classes?: string }) {
               <Countries />
             </div>
 
-            <div className="px-2 divide-y divide-gray-6">
+            <div className="px-2 divide-y divide-hairline">
               <Designations />
               <KYCFilter classes="mt-2" />
               <Categories classes="mt-2" />

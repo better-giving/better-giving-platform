@@ -117,7 +117,7 @@ interface ISectionProps {
 
 function Section({ heading, children }: ISectionProps) {
   return (
-    <section className="mt-8 border-t border-gray-6 pt-6">
+    <section className="mt-8 border-t border-hairline pt-6">
       <h3 className="text-2xs font-semibold uppercase tracking-wider text-gray-11">
         {heading}
       </h3>

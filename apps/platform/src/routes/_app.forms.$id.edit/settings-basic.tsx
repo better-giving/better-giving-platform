@@ -62,7 +62,7 @@ export function SettingsBasic({
   return (
     <Form
       disabled={isSubmitting}
-      className={`${classes} @container/configurer bg-panel rounded p-4 self-start`}
+      className={`${classes} @container/configurer card self-start`}
       onSubmit={handleSubmit((x) => on_submit(x), console.error)}
       onReset={(e) => {
         e.preventDefault();

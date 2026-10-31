@@ -19,7 +19,7 @@ export default function Page() {
       size="lg"
       title="Log interest"
       busy={fetcher.state !== "idle"}
-      classes="bg-panel"
+      classes="bg-card"
     >
       <Content />
     </RouteModal>

@@ -22,7 +22,7 @@ export default function Page({ loaderData }: Route.ComponentProps) {
       }
       size="panel"
       title="View receipt"
-      classes="grid border bg-background"
+      classes="grid bg-card"
       busy={fetcher.state !== "idle"}
     >
       <Form user={loaderData} fetcher={fetcher} />
