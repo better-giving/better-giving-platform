@@ -37,7 +37,7 @@ export const Toggle = ({ children, ...props }: Props) => {
         className="contents"
       >
         {/* focus lands on the hidden input, so :focus-visible never matches here */}
-        <Switch.Control className="[--th:var(--toggle-h,1lh)] [--tw:var(--toggle-w,calc(var(--th)*2))] [--inset:calc(var(--th)*0.1)] relative inline-flex shrink-0 items-center h-(--th) w-(--tw) rounded-full bg-gray-3 inset-shadow-track inset-ring inset-ring-gray-7 transition-colors not-data-disabled:data-[state=checked]:bg-primary not-data-disabled:data-[state=checked]:inset-ring-primary data-focus-visible:outline-2 data-focus-visible:outline-ring data-disabled:cursor-default">
+        <Switch.Control className="[--th:var(--toggle-h,1lh)] [--tw:var(--toggle-w,calc(var(--th)*2))] [--inset:calc(var(--th)*0.1)] relative inline-flex shrink-0 items-center h-(--th) w-(--tw) rounded-full bg-gray-3 inset-shadow-track inset-ring inset-ring-gray-9 transition-colors not-data-disabled:data-[state=checked]:bg-primary not-data-disabled:data-[state=checked]:inset-ring-primary data-focus-visible:outline-2 data-focus-visible:outline-ring data-disabled:cursor-default">
           <Switch.Thumb className="pointer-events-none inline-block size-[calc(var(--th)-2*var(--inset))] translate-x-(--inset) data-[state=checked]:translate-x-[calc(var(--tw)-var(--th)+var(--inset))] rounded-full bg-background shadow-track-fill transition-transform" />
         </Switch.Control>
         <Switch.Label

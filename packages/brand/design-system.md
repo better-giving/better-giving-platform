@@ -162,7 +162,7 @@ last is the surface model's, the design's own rather than the ramp's):
 
 | pairing | measured | threshold | |
 | --- | --- | --- | --- |
-| control boundary `gray-7` on `gray-1` / `--card` / `--panel` | **Lc 23.8 / 25.6 / 21.8** | Lc 30 | the element-border rung the shared control recipes draw; `gray-8` would clear and was declined, see "Decisions that look like bugs" |
+| control boundary `gray-7` on `gray-1` / `--card` / `--panel` | **Lc 23.8 / 25.6 / 21.8** | Lc 30 | the element-border rung the field and button recipes draw; `gray-8` would clear and was declined, see "Decisions that look like bugs". Closed for switches: their off-state ring is `gray-9` |
 | `--destructive-subtle-fg` on `--destructive-subtle-active` (red-11 on red-5) | **Lc 51.7** | Lc 60 | the pressed rung of a subtle error control; transient |
 | `--warning-fg` on `--warning` (amber-12 on amber-9) | **Lc 52.1** | Lc 60 | the filled warning button's label and the checklist badge; white would be weaker still at Lc 46.4 |
 | `--warning` as a meaningful icon on `gray-1` / white | **Lc 39.9 / 41.8** | Lc 45 | a fill, not an icon ink: a meaningful amber glyph takes `--warning-subtle-fg` (Lc 69.3 / 71.2) |
@@ -1069,7 +1069,12 @@ Recorded so they are not "fixed" by someone reading them as oversights.
   Lc 34.3 on the page and Lc 32.4 on `--panel`, both over Lc 30, and moving
   fields and secondary buttons to it was declined on 2026-09-13 to keep Radix's
   element-border rung as generated. The `gray-7` boundary is an accepted miss
-  (Lc 25.6 on the white card, still under). It compounds with `--surface`, which
+  (Lc 25.6 on the white card, still under). **Closed for switches on 2026-10-31:** a switch's off
+  state is identified by its ring alone (the gray-3 track is 1.14:1 on white),
+  so WCAG 1.4.11 holds it to 3:1, and `gray-7` measures 1.56:1. Every switch —
+  the shared `Toggle` and the donation form's two hand-rolled ones — draws its
+  off-state ring in `gray-9`, 3.28:1 on white (`contrast.test.ts` pins it).
+  Fields and secondary buttons keep `gray-7` as above. It compounds with `--surface`, which
   is the card's own white: a field **inside a card** is identified by its
   boundary alone, and that boundary is intentionally faint. Inside a well
   (`--panel`) the field also reads by fill, one rung lighter than the well; that

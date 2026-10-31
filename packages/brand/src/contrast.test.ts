@@ -768,9 +768,9 @@ describe("the hero scrim composites to the recorded color", () => {
   });
 });
 
-// WCAG 2 ratio, for the one pairing an outside audit holds to 1.4.3 rather than
-// to APCA: the success pill's ink on its band, small text at 4.5:1.
-describe("the success pill clears WCAG 1.4.3", () => {
+// WCAG 2 ratio, for the pairings an outside audit holds to 1.4.3 / 1.4.11
+// rather than to APCA: the success pill's ink on its band, and a switch's ring.
+describe("the audited WCAG 2 pairings clear", () => {
   // wcag's piecewise relative luminance, not apca's sRGBtoY (a plain 2.4 power)
   const lum = (hex: string) => {
     const [r, g, b] = rgb(hex).map((n) => {
@@ -783,6 +783,10 @@ describe("the success pill clears WCAG 1.4.3", () => {
     const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
     return (hi + 0.05) / (lo + 0.05);
   };
+  // 1.4.11: a switch's off state reads by its ring alone
+  it("a switch's gray-9 off-state ring is at least 3:1 on --card", () => {
+    expect(ratio(colors.gray_9, colors.card)).toBeGreaterThanOrEqual(3);
+  });
   it("--success-subtle-fg on --success-subtle is at least 4.5:1", () => {
     expect(
       ratio(colors.success_subtle_fg, colors.success_subtle)
