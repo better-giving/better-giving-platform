@@ -26,7 +26,7 @@ export default function AllocationEdit() {
   return (
     <RouteModal
       busy={fetcher.state !== "idle"}
-      classes="grid gap-y-4 bg-panel p-6"
+      classes="grid gap-y-4 bg-card p-6"
     >
       <Content {...(data?.endow.allocation ?? default_allocation)} />
     </RouteModal>

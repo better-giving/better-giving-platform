@@ -126,7 +126,10 @@ export default function Page({ loaderData: d }: Route.ComponentProps) {
 
       {/* favorites — omitted when empty; divider separates it from orgs */}
       {d.bookmarks.length > 0 && (
-        <section aria-labelledby="hub-favorites" className="mb-8 pt-8 border-t">
+        <section
+          aria-labelledby="hub-favorites"
+          className="mb-8 pt-8 border-t border-hairline"
+        >
           <h2
             id="hub-favorites"
             className="uppercase text-xs text-gray-11 tracking-wide mb-3"

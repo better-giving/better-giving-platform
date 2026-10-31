@@ -28,7 +28,7 @@ export default function DeletePrompt({ loaderData }: Route.ComponentProps) {
     <RouteModal
       title="Delete payout method"
       busy={fetcher.state !== "idle"}
-      classes="grid content-start justify-items-center bg-panel"
+      classes="grid content-start justify-items-center bg-card"
     >
       <Content {...loaderData} />
     </RouteModal>
@@ -53,7 +53,7 @@ function Content({ is_default, is_guarded }: IContent) {
   return (
     <>
       <div className="relative w-full">
-        <p className="sm:text-xl font-bold text-center border-b bg-gray-3 p-5">
+        <p className="sm:text-xl font-bold text-center border-b border-hairline bg-gray-3 p-5">
           Delete payout method
         </p>
         <NavLink

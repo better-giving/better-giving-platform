@@ -134,7 +134,7 @@ function RecordsTabs({ preview }: { preview: ISettlementPreview }) {
         </TabPanel>
 
         <TabPanel value="json" className="mt-3">
-          <pre className="text-xs bg-gray-3 rounded p-3 overflow-x-auto max-h-60 overflow-y-auto scrollbars">
+          <pre className="text-xs bg-panel rounded p-3 overflow-x-auto max-h-60 overflow-y-auto scrollbars">
             {JSON.stringify(preview.txs, null, 2)}
           </pre>
         </TabPanel>

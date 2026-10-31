@@ -133,7 +133,7 @@ function MonthTooltip({ active, label, payload }: ITooltipProps) {
   if (billed === 0 && pending === 0 && cancelled === 0) return null;
   const fmt = (n: number) => `$${n.toFixed(2)}`;
   return (
-    <div className="rounded border border-gray-6 bg-panel p-2 text-xs">
+    <div className="bg-card rounded-card shadow-floating p-2 text-xs">
       <p className="mb-1 font-semibold">{label}</p>
       {billed > 0 && (
         <p>

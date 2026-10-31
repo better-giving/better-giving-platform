@@ -267,9 +267,6 @@ describe("the card shell", () => {
       // the registration layout: its inset is delegated to the two children
       // that fill its grid, and pt-8 is the shell's own top rule
       "apps/platform/src/routes/_app.register.$reg_id._steps/route.tsx",
-      // a recharts tooltip body: a floating layer that says so with neither a
-      // shadow nor a z-index
-      "apps/platform/src/routes/admin.$id.donors_.$email/stewardship.tsx",
       // a native <select>, and a control's box is components.css's
       "apps/platform/src/routes/dashboard.donations/route.tsx",
       "apps/platform/src/routes/platform.donation-settlements.create/form.tsx",

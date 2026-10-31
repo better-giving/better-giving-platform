@@ -47,7 +47,7 @@ export default function Page({ loaderData: d }: Route.ComponentProps) {
         </p>
       )}
 
-      <dl className="grid sm:grid-cols-[auto_auto_1fr] border rounded mt-2">
+      <dl className="grid sm:grid-cols-[auto_auto_1fr] bg-card rounded-card mt-2">
         {/* the wise half of the record; the row below it is our own and
             outlives an outage */}
         {!d.wacc_unavailable && (
@@ -114,14 +114,14 @@ function Row(props: Props) {
       </dt>
       <div
         aria-hidden={true}
-        className="max-sm:hidden w-px border-r last:border-none"
+        className="max-sm:hidden w-px border-r border-hairline last:border-none"
       />
       <dd className="px-3 max-sm:pb-3 sm:p-3 flex items-center text-sm">
         {props.children}
       </dd>
       <div
         aria-hidden={true}
-        className="h-px col-span-full border-b last:border-none"
+        className="h-px col-span-full border-b border-hairline last:border-none"
       />
     </>
   );

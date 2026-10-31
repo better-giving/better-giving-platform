@@ -21,7 +21,7 @@ function Page({ loaderData: { funds } }: Route.ComponentProps) {
     );
   return (
     <div className="grid px-6 py-4 md:px-10 md:py-8">
-      <div className="flex items-center justify-between mb-2 w-full border-b pb-4">
+      <div className="flex items-center justify-between mb-2 w-full border-b border-hairline pb-4">
         <h3 className="text-3xl">My campaigns</h3>
       </div>
       {items}

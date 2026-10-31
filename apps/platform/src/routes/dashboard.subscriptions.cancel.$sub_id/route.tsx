@@ -34,7 +34,7 @@ function Content({ recipient_name }: { recipient_name: string }) {
       className="contents"
     >
       <div className="relative w-full">
-        <p className="sm:text-xl font-bold text-center border-b bg-gray-3 p-5">
+        <p className="sm:text-xl font-bold text-center border-b border-hairline bg-gray-3 p-5">
           Cancel Recurring Donation
         </p>
         <Dialog.CloseTrigger asChild>
@@ -100,7 +100,7 @@ export default function CancelPrompt({
     <RouteModal
       title="Cancel recurring donation"
       busy={fetcher.state !== "idle"}
-      classes="grid content-start justify-items-center bg-panel"
+      classes="grid content-start justify-items-center bg-card"
     >
       <Content recipient_name={recipient_name} />
     </RouteModal>

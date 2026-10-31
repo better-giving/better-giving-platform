@@ -10,9 +10,7 @@ export function Program(props: IProgramDb) {
 
   return (
     <div
-      className={`p-6 rounded border ${
-        isDeleting ? "bg-gray-3" : "bg-panel"
-      } grid @lg:flex items-center gap-x-4 gap-y-4`}
+      className={`${isDeleting ? "bg-gray-3 rounded-card p-6" : "card"} grid @lg:flex items-center gap-x-4 gap-y-4`}
     >
       <div className="flex items-center gap-x-4 @lg:contents">
         <Image

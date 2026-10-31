@@ -21,7 +21,7 @@ export default function Page({ loaderData: data }: Route.ComponentProps) {
       size="lg"
       title="Rebalance investments"
       busy={fetcher.state !== "idle"}
-      classes="bg-panel"
+      classes="bg-card"
     >
       <Content {...data} />
     </RouteModal>

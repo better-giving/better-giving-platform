@@ -9,7 +9,7 @@ export { loader } from "./api";
 
 export default function Page({ loaderData: data }: Route.ComponentProps) {
   return (
-    <RouteModal classes="grid bg-panel text-gray-12 p-6 text-center">
+    <RouteModal classes="grid bg-card text-gray-12 p-6 text-center">
       <Content {...data} />
     </RouteModal>
   );

@@ -42,7 +42,7 @@ function Content() {
       className="contents"
     >
       <div className="relative w-full">
-        <p className="sm:text-xl font-bold text-center border-b bg-gray-3 p-5">
+        <p className="sm:text-xl font-bold text-center border-b border-hairline bg-gray-3 p-5">
           Changing Application Status
         </p>
         <Link
@@ -129,7 +129,7 @@ function Content() {
 
 export default function Prompt() {
   return (
-    <RouteModal classes="grid content-start justify-items-center bg-panel">
+    <RouteModal classes="grid content-start justify-items-center bg-card">
       <Content />
     </RouteModal>
   );

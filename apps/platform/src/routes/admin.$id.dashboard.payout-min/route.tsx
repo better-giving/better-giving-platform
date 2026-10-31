@@ -33,7 +33,7 @@ export default function PayoutMin() {
   const { min = min_payout_amount } = search(params);
 
   return (
-    <RouteModal classes="grid bg-panel text-gray-12 p-6">
+    <RouteModal classes="grid bg-card text-gray-12 p-6">
       <Content prev={+min} />
     </RouteModal>
   );

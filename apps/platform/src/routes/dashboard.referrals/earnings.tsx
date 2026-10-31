@@ -43,7 +43,7 @@ export function Earnings({
         )}
       </div>
 
-      <div className="bg-background rounded overflow-hidden">
+      <div>
         <div className="@container">
           <div className="flex flex-wrap items-center justify-between gap-x-2">
             <div className="flex items-center gap-x-2 flex-wrap">

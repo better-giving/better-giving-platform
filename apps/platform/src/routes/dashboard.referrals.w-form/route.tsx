@@ -6,7 +6,7 @@ export { ErrorModal as ErrorBoundary } from "#/components/error";
 
 export default function Page() {
   return (
-    <RouteModal classes="grid bg-panel text-gray-12 p-6">
+    <RouteModal classes="grid bg-card text-gray-12 p-6">
       <Content />
     </RouteModal>
   );

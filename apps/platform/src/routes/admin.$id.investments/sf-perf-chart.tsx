@@ -26,7 +26,7 @@ const CustomTooltip = ({
 }: TooltipProps<number, string>) => {
   if (active && payload?.length && label) {
     return (
-      <div className="bg-panel text-gray-12 rounded p-2 shadow-floating text-xs grid gap-y-1">
+      <div className="bg-card text-gray-12 rounded-card p-2 shadow-floating text-xs grid gap-y-1">
         <p className="font-medium">{date_fmt(label)}</p>
         {payload.map((entry, index: number) => (
           <p key={index} style={{ color: entry.color }}>
@@ -47,7 +47,7 @@ export function SfPerChart(
       open={props.open}
       onClose={props.onClose}
       size="md"
-      classes="h-96 p-4 border bg-background"
+      classes="h-96 p-4 bg-card"
     >
       <div className="flex flex-wrap gap-y-2 justify-between">
         <h4>Investment performance</h4>
