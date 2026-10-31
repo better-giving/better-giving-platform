@@ -19,7 +19,7 @@ export function Card({
     <div className="relative has-[.pending]:grayscale has-[.pending]:pointer-events-none grid grid-rows-subgrid row-span-4">
       <NavLink
         to={href("/campaigns/:fund_id", { fund_id: id })}
-        className="grid grid-rows-subgrid row-span-4 h-full overflow-clip bg-card rounded-card transition-colors hover:bg-panel"
+        className="grid grid-rows-subgrid row-span-4 h-full overflow-clip bg-card rounded-card shadow-card transition-colors hover:bg-panel"
       >
         <div className="aspect-4/1 w-full relative">
           <Image

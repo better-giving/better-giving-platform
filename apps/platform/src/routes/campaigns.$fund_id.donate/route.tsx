@@ -57,7 +57,7 @@ function Page({
         {/** small screen but space is still enough to render sidebar */}
         <div className="mx-0 md:contents xs:mx-4">
           {!is_open ? (
-            <Info classes="row-start-2 self-center bg-card rounded-card h-80 content-center justify-items-center grid">
+            <Info classes="row-start-2 self-center bg-card rounded-card shadow-card h-80 content-center justify-items-center grid">
               This campaign is already closed and can't accept any more
               donations
             </Info>
@@ -82,7 +82,7 @@ function Page({
               }}
               program={undefined}
               user={user}
-              classes="rounded-card row-start-2"
+              classes="rounded-card shadow-card row-start-2"
             />
           )}
         </div>

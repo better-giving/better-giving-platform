@@ -85,10 +85,7 @@ export default function Page() {
           </h2>
           <div className="grid gap-5 md:grid-cols-3 mt-11">
             {why.map((w) => (
-              <div
-                key={w.title}
-                className="card shadow-lift-card grid gap-2.5 content-start"
-              >
+              <div key={w.title} className="card grid gap-2.5 content-start">
                 <span className="text-xl font-bold">{w.title}</span>
                 <p className="text-sm/relaxed text-gray-11">{w.body}</p>
               </div>

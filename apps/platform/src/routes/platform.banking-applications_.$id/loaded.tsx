@@ -44,7 +44,7 @@ export function Loaded(props: LoaderData) {
         </span>
       </div>
 
-      <dl className="grid sm:grid-cols-[auto_auto_1fr] bg-card rounded-card">
+      <dl className="grid sm:grid-cols-[auto_auto_1fr] bg-card rounded-card shadow-card">
         {/* the wise half of the record; the rows below it are our own and
             outlive an outage */}
         {!props.wacc_unavailable && (

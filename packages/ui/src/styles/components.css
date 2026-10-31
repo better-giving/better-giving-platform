@@ -385,9 +385,9 @@
     color: var(--gray-11);
   }
 
-  /* a data table is a card with its inset delegated: the card's fill and
-     corner on the table itself, so a table on the ground needs no wrapper to
-     be one, and the corners travel with it inside a `table-scroll`. no outer
+  /* a data table is a card with its inset delegated: the card's fill, resting
+     shadow and corner on the table itself, so a table on the ground needs no
+     wrapper to be one, and they travel with it inside a `table-scroll`. no outer
      edge (a container has none), and its row and column lines are --hairline,
      the line inside a card. the table is the shell rather than its scroller
      because several tables have no scroller at all. `separate` borders are
@@ -395,12 +395,14 @@
   .table {
     --table-fill: var(--card);
     --table-corner: var(--radius-card);
+    --table-shadow: var(--shadow-card);
     min-width: 100%;
     border-collapse: separate;
     border-spacing: 0;
     font-feature-settings: "tnum", "zero";
     background-color: var(--table-fill);
     border-radius: var(--table-corner);
+    box-shadow: var(--table-shadow);
 
     /* on the cells, not the row group: a cell's own background clips to its
        corner, a thead's does not. */
@@ -470,10 +472,11 @@
   }
 
   /* a table already inside a card, or a dialog (which is a card), is content
-     of that card: no second fill, no second corner. same specificity as
+     of that card: no second fill, shadow or corner. same specificity as
      `.table`, so it has to stay after it. */
   :where(.card, [role="dialog"]) .table {
     --table-fill: transparent;
     --table-corner: 0;
+    --table-shadow: none;
   }
 }

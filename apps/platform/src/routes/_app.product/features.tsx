@@ -53,7 +53,7 @@ export function Features({ classes = "" }: IFeatures) {
         </h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-11">
           {features.map((f) => (
-            <div key={f.title} className="card shadow-lift-card">
+            <div key={f.title} className="card">
               <span className="block font-bold mb-1.5">{f.title}</span>
               <span className="text-sm/normal text-gray-11">{f.body}</span>
             </div>

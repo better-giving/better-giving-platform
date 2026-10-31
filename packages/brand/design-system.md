@@ -8,7 +8,7 @@ the face tokens, the size/weight/leading/tracking ladders, and the shadow and
 stacking sets all sit in `packages/ui/src/styles/theme.css`. They are recorded
 here because this is the one file that says what a token is *for*, and a second
 ledger would only be a second place to go stale. See "One face, two roles, and
-four closed ladders" and "Elevation: four levels, and one treatment that is not
+four closed ladders" and "Elevation: five levels, and one treatment that is not
 a rung".
 
 Contrast figures are **APCA Lc** values (`apca-w3` 0.1.9), measured on the
@@ -222,8 +222,11 @@ Three rules fall out of that test, and all three are load-bearing:
 2026-10-31 and rolled out to the whole app at once.
 
 - **Ground**: the page. White (`--background`) under four soft radial blots,
-  blue `--wash` at about 6% 6% and 30% 70%, the lighter, cyan-leaning blue
-  `--wash-far` at about 78% 22% and 98% 98%. The blots are **fixed to the window**: they stay put while the
+  two small blue `--wash` blots at about 4% 4% and 30% 72%, the lighter,
+  cyan-leaning blue `--wash-far` at about 78% 22% and 98% 98%. The two `--wash`
+  blots were shrunk 2026-10-31 (to 38%/34% and 32%/32% of the window): **more
+  white ground is deliberate**, so a card's blue-tinted `shadow-card` has white
+  to read against rather than a blot. The blots are **fixed to the window**: they stay put while the
   page scrolls. Painted once, as a fixed `body::before` in platform's
   `src/index.css` (not `background-attachment: fixed`, which iOS Safari
   ignores), never per screen. A screen holding a `solo-card` swaps the main
@@ -232,13 +235,14 @@ Three rules fall out of that test, and all three are load-bearing:
   product, the legal pages: every route `public-chrome.tsx` buckets as
   `marketing`) sit on plain white `--background`. `PublicLayout` marks its root
   `data-surfaces="marketing"` and `src/index.css` paints the ground there as
-  `--background` alone. On that white, a marketing card spends
-  `shadow-lift-card` (see "The marketing lift"): white on white with no blot
-  under its edge needs the glow to read as a card.
-- **Card**: white (`--card`), **no border, no shadow** (on a marketing page's
-  plain white it adds `shadow-lift-card`, above), 12px corners
-  (`rounded-card`). A card needs colour under only part of its edge; the eye
-  completes the box. That is the whole reason for the blots.
+  `--background` alone. A marketing card is the same card as everywhere else.
+- **Card**: white (`--card`), **no border**, **`shadow-card`** (the resting
+  rung, tinted `--primary`), 12px corners (`rounded-card`). Approved by the PM
+  2026-10-31, replacing "no border, no shadow": the faint brand-blue shadow
+  finds the box on any ground (blots, plain white, `--band`), and the retired
+  marketing card lift folded into it. `card`, `solo-card`, every
+  delegated-inset card shell and the `.table` shell carry it; a floating layer
+  takes `shadow-floating` instead and a dialog takes none.
 - **Well**: `--panel` (`gray-2`) inside a card, at the control corner
   (`rounded`). A recess that groups a figure, a meter track or a summary.
 - **Field**: white (`--surface`) with its full `--border` edge, inside a card or
@@ -249,10 +253,10 @@ Lines **inside** a card (table rows, a card's header strip, dividers between
 sections or list rows) are `--hairline`. A container has no edge at all.
 
 A **data table** is a card with its inset delegated: `.table`
-(`packages/ui/src/styles/components.css`) carries `--card` and `rounded-card`
-itself, so a table on the ground is its own card and needs no wrapper. Inside a
-`card` or a dialog it drops both and is that card's content: never a card in a
-card.
+(`packages/ui/src/styles/components.css`) carries `--card`, `shadow-card` and
+`rounded-card` itself, so a table on the ground is its own card and needs no
+wrapper. Inside a `card` or a dialog it drops all three and is that card's
+content: never a card in a card.
 
 Every token here is a **fill**, and its `-fg` is the only ink authored for it.
 The neutral surfaces are white or gray steps; `--band` (`blue-2`) and
@@ -681,7 +685,7 @@ Lc 60.9, which is a transient state and not a band.
 Neither tint carries brand hue as a resting fill beyond that. Brand action color
 is `--primary`.
 
-## Elevation: four levels, and one treatment that is not a rung
+## Elevation: five levels, and one treatment that is not a rung
 
 Its values are **not** in
 this package: the shadow tokens and the stacking steps live in
@@ -692,27 +696,29 @@ that is neither an `oklch()`, a `var()` alias, a `color-mix()` nor a plain
 length. A shadow there would take the email mirror down with it. Only the scrim
 color, `--overlay`, is a color and stays in the palette.
 
-**Depth is scarce here on purpose: the app is flat.** A card does not lift. It
-is white on a white ground, and what separates it is the colour of the blots
-under part of its edge (see "Resting surfaces"); a shadow would be a second
-signal for the same object, and an edge would grid the page the blots exist to
-soften. Depth is reserved for what genuinely hovers over content. Every level
-shares one fill: a floating layer and a dialog are `--card` too, and are told
-from the page by their shadow or their scrim, never by a different fill.
+**Depth is scarce here on purpose: the app is nearly flat.** A card rests on
+the lowest rung, `shadow-card`: white on a mostly white ground, with no border,
+the faint brand-blue shadow is what finds it (see "Resting surfaces"); an edge
+would grid the page. Real depth is reserved for what genuinely hovers over
+content, and `shadow-floating` stays deeper so a menu still reads above a card.
+Every level shares one fill: a card, a floating layer and a dialog are all
+`--card`, and are told apart by their shadow or their scrim, never by a
+different fill.
 
 The set is closed and small. `--shadow-*` and `--inset-shadow-*` are reset to
 `initial`, so a call site has these names and nothing else.
 
 | level | what sits here | shadow | stacking |
 | --- | --- | --- | --- |
-| `flush` | the document flow, and most of the product: card, well, table shell, row, form control. A card separates by the ground under its edge, a well by its `--panel` fill inside the card, a control by its `--border` edge | none, and **no token**, see below | none |
+| `flush` | the document flow inside a card: well, row, form control. A well separates by its `--panel` fill inside the card, a control by its `--border` edge | none, and **no token**, see below | none |
+| `card` | the in-flow container at rest: `card`, `solo-card`, the delegated-inset card shells, the `.table` shell. No border | `shadow-card` | none |
 | `floating` | hovers over content, transient, no scrim: menu, dropdown, combobox and select popup, tooltip, hovercard, toast, and pinned page chrome once it is stuck. `bg-card` + `rounded-card`, no edge | `shadow-floating` | `z-floating` for a popup; pinned chrome keeps `z-sticky` / `z-subbar` |
 | `modal` | covers the page behind a scrim: dialog, drawer, route-modal. `bg-card` + `rounded-card` (the drawer is square: it is pinned to the edge) | **none, by decision**, see below | `z-scrim` on the backdrop, `z-modal` on the panel |
 | recessed track | a track a control sits *in*: slider track, progress bar, switch control | `inset-shadow-track` | none |
 | recessed fill | the fill that rides raised inside that track | `shadow-track-fill` | none |
 
 Two names sit outside that table on purpose and are described below: the
-**marketing lift** (`shadow-lift-card` / `-cta` / `-media`), a treatment held
+**marketing lift** (`shadow-lift-cta` / `-media`), a treatment held
 apart from the rungs, and `shadow-handle`, a legibility affordance that is not a
 level at all.
 
@@ -749,15 +755,19 @@ puts copy over an image. Neither is reachable from the other's name.
 
 ### The marketing lift is named apart, and that is the point
 
-The blue-tinted glow on the marketing pages is deliberate and it stays, as its
-own name, outside the general set. Naming it apart is precisely what stops the
-app picking it up by accident: there is no rung of the elevation ladder it can
-be reached through, so an app card cannot acquire a brand glow by asking for
-depth.
+The glow on a hero call to action and on a photograph is deliberate and it
+stays, as its own name, outside the general set. Naming it apart is precisely
+what stops the app picking it up by accident: there is no rung of the
+elevation ladder it can be reached through.
+
+**A marketing card no longer lifts.** `shadow-lift-card` (`--primary` at 5%)
+was retired 2026-10-31, when every card took the blue-tinted `shadow-card`:
+the marketing cards now write `card` like every other card, and the token is
+deleted. With the namespace closed a stray `shadow-lift-card` compiles to
+nothing, so `elevation-conformance.node.test.ts` fails the name.
 
 | token | where it goes |
 | --- | --- |
-| `shadow-lift-card` | a marketing card: `--primary` at 5% |
 | `shadow-lift-cta` | a hero call to action: `--primary` at 25% |
 | `shadow-lift-media` | a photograph, or the skeleton or illustrative device standing in for one: `--color-black` at 10%, the one that is not blue |
 
@@ -842,27 +852,28 @@ migrating onto it moved pixels at the outliers only.
 
 | token | value | what it was |
 | --- | --- | --- |
+| `--shadow-card` | `0 1px 3px 0` at 8% + `0 6px 16px -4px` at 14%, both `--primary` | the PM's card decision, 2026-10-31: the resting rung, brand-blue tinted |
 | `--shadow-floating` | `0 10px 15px -3px` + `0 4px 6px -4px`, both `gray-12` at 10% | Tailwind's stock `shadow-lg`, already on most floating sites |
 | `--inset-shadow-track` | `inset 0 2px 4px 0`, `gray-12` at 5% | Tailwind's `shadow-inner`, on every track site |
 | `--shadow-track-fill` | `0 1px 2px 0`, `gray-12` at 5% | Tailwind's stock `shadow-xs` |
-| `--shadow-lift-card` | `shadow-floating`'s geometry, tinted `--primary` at 5% | `shadow-lg shadow-primary/5`, verbatim on the marketing cards |
 | `--shadow-lift-cta` | the same geometry, tinted `--primary` at 25% | `shadow-lg shadow-primary/25`, on every hero CTA |
 | `--shadow-lift-media` | `0 25px 50px -12px`, tinted `--color-black` at 10% | `shadow-2xl shadow-black/10` |
 | `--shadow-handle` | `0 1px 3px 0` + `0 1px 2px -1px`, both `gray-12` at 10% | the bare `shadow` on the crop handle, see above |
 
-The `color-mix()` in the three lift tokens is exactly what Tailwind compiles a
+The `color-mix()` in the two lift tokens and `--shadow-card` is exactly what Tailwind compiles a
 `/<alpha>` shadow modifier to, so each token paints identically to the pair it
 replaced. `--color-black` is `#000101`, not pure black: `shadow-black/10` always
 read that token and the named version reads the same one.
 
 One site spends `shadow-lift-media` on something that is not a photograph: the
 marketing terminal card (`pages/@sections/terminal-card.tsx`). It sits on a
-`surface-primary` ground, where `shadow-lift-card`'s primary-at-5% composites
-onto primary and paints nothing: the black-tinted rung is the only one of the
-three that reads there, and the card is a raised object on a coloured ground,
-which is what that rung names.
+`surface-primary` ground, where a primary-tinted shadow (`shadow-card`
+included) composites onto primary and paints nothing: the black-tinted rung is
+the one that reads there, and the card is a raised object on a coloured
+ground, which is what that rung names.
 
 **The geometry and the alphas are the transcription; the color is the ramp.**
+`--shadow-card` is the deliberate exception, tinted `--primary` like the lifts.
 Every neutral shadow mixes `gray-12` down to the alpha its stock Tailwind source
 carried, the same construction `--overlay` uses to reach a translucent value off
 a solid step. No rung of the ramp is an alpha black; the alpha is *made*, not
@@ -895,6 +906,8 @@ things the reset provably cannot reach:
 - a stripped utility is silent: `shadow-lg` after the reset renders flat with no
   error, so the reset stops the drift but cannot report that the class was
   written.
+- a deleted name is silent too: `shadow-lift-card` now renders flat, so the
+  sweep fails it by name.
 - `shadow-<color>/<alpha>` beside a named lift compiles fine and simply
   overwrites that lift's own tint, so the class string says one thing and the
   paint says another.
@@ -1024,11 +1037,11 @@ Recorded so they are not "fixed" by someone reading them as oversights.
   separation in the ground and the edge, not in the fill ladder. Collapsing them
   would lose which job a call site meant, and the embedded form already shows
   why the names are worth keeping: its page is the host's, not ours.
-- **A card has no border, and colour shows under only part of its edge.** Not a
-  missing hairline. The four blots put colour behind some of each card's edge
-  and the eye completes the box; a border would grid the page. A card whose
-  whole edge falls on bare white is still a card. Lines go **inside** it
-  (`--hairline`), and the one surface that keeps an edge is a form control.
+- **A card has no border; its shadow finds it.** Not a missing hairline.
+  `shadow-card` is a faint `--primary` tint, and the blue blots were made
+  smaller so most cards sit on white where that shadow reads; a border would
+  grid the page. Lines go **inside** a card (`--hairline`), and the one surface
+  that keeps an edge is a form control.
 - **`--hairline` measures Lc 0.0 on the card.** Under the Lc 15 a separator
   needs, by design: it groups rows rather than gridding them. Copy that must be
   found does not lean on it.
@@ -1619,7 +1632,7 @@ What follows from it:
   for `rounded` inside an already-rounded shell is either drawing a corner nobody
   asked for, or standing in for the `overflow-hidden` its shell should carry.
 - **`solo-card` is the worked example.** It carries the fill, the corner and
-  the inset (no border: see "Resting surfaces"), and its comment in
+  the inset, plus `shadow-card` (no border: see "Resting surfaces"), and its comment in
   `packages/ui/src/styles/utilities.css` records what it deliberately does *not*
   carry (no `gap`, no `justify-items`) because those are flow, and flow stays
   the caller's. That split is the rule restated: the box is the shell's, the
@@ -1645,10 +1658,11 @@ string carries anything the shell owns: a fill, an edge, a shadow, a radius, a
 padding, a z-index, the ink.
 
 **The card is named: `card` in `packages/ui/src/styles/utilities.css`.** It is
-`bg-card rounded-card p-6`: the fill, the corner and the inset, and nothing
-else. **No edge**: in the surface model a container has none (see "Resting
-surfaces"), and the same white card serves the page and a `--band` alike: the
-retired `card-on-band` folded into it. The inset is **24px in every role and at every width**: no
+`bg-card rounded-card shadow-card p-6`: the fill, the resting shadow, the
+corner and the inset, and nothing else. **No edge**: in the surface model a
+container has none (see "Resting surfaces"), and the same white card serves
+the page, a marketing page's plain white and a `--band` alike: the retired
+`card-on-band` and the retired marketing card lift both folded into it. The inset is **24px in every role and at every width**: no
 tier, no responsive step. A marketing card, a dashboard tile, a figure, a
 callout and a link tile are all the same box.
 
@@ -1661,11 +1675,8 @@ the one: it moves the fewest pixels.
 
 What `card` deliberately does not carry:
 
-- **No shadow.** `flush` is a card's elevation and is written by writing no
-  shadow at all. The marketing cards that lift spend `shadow-lift-card` beside
-  the name: one named level at one call site, rather than a level baked in
-  that every other caller would have to cancel with a `shadow-none` the closed
-  `--shadow-*` namespace does not leave available.
+- **No second shadow.** `shadow-card` is baked in, so a shadow written beside
+  `card` is a coin flip with it; the sweep fails one.
 - **No layout and no type.** `grid`, `flex`, a `gap`, a `divide-y`, a heading
   size are the arrangement of the contents, and the arrangement is the
   caller's, the same split `solo-card` records. So is the outer margin.
@@ -1678,7 +1689,7 @@ transient layer over the page is `floating`, not a card; a control's box is
 `components.css`'s. `shell-conformance.node.test.ts` fails the recipe written
 out by hand (`bg-card rounded-card` plus an inset, or the pre-model four:
 `bg-panel`, an edge, `rounded`, an inset), exempting surfaces by file with a
-reason each, fails a second fill, edge, corner or inset written beside `card`,
+reason each, fails a second fill, edge, shadow, corner or inset written beside `card`,
 and fails any `card-on-band`. The small
 inline chip is still unnamed and still the worse spread: 22 spellings, over two
 radii (`rounded` and `rounded-full`), top spelling under 20%.

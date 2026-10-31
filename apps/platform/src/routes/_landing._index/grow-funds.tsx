@@ -64,7 +64,7 @@ export function GrowFunds({ classes = "" }: IGrowFunds) {
           </p>
         </div>
 
-        <div className="card shadow-lift-card grid gap-6 justify-items-center">
+        <div className="card grid gap-6 justify-items-center">
           <span className="text-lg font-bold">
             Sustainability Fund target allocation as of 2026
           </span>

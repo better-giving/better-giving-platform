@@ -348,7 +348,7 @@ function Notice(props: ICampaignPage) {
   if (props.gift_failed) {
     return (
       <section className="order-1 lg:order-none">
-        <div className="bg-card rounded-card">
+        <div className="bg-card rounded-card shadow-card">
           <div className="flex flex-col gap-2 p-4">
             <h2 className="text-xl font-bold">This gift didn't go through</h2>
             {props.open ? (
@@ -372,7 +372,7 @@ function Notice(props: ICampaignPage) {
   if (!props.open && props.ended_body) {
     return (
       <section className="order-1 lg:order-none">
-        <div className="bg-card rounded-card">
+        <div className="bg-card rounded-card shadow-card">
           <div className="flex flex-col gap-2 p-4">
             <h2 className="text-xl font-bold">Giving has ended</h2>
             <p>{props.ended_body}</p>

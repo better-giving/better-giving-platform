@@ -80,7 +80,7 @@ function Page({ loaderData }: Route.ComponentProps) {
               program ? { id: program.id, name: program.title } : undefined
             }
             user={user}
-            classes="rounded-card row-start-2"
+            classes="rounded-card shadow-card row-start-2"
           />
         </div>
         <FAQ classes="max-md:px-4 md:col-start-2 md:row-span-5 md:w-75.5" />

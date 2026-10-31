@@ -2,7 +2,7 @@ export function Ethical({ classes = "" }) {
   return (
     <section className={classes}>
       <div className="page">
-        <div className="card shadow-lift-card max-w-3xl mx-auto">
+        <div className="card max-w-3xl mx-auto">
           <h2 className="article-heading">Ethical fundraising, verifiable</h2>
           <p className="text-base/relaxed text-gray-11 mt-3 text-pretty">
             We've endorsed the National Council of Nonprofits' Principles for

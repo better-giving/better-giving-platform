@@ -27,7 +27,7 @@ export function ProgramCard({
   const clear_chevron = item.goal == null ? "pr-6" : "";
   return (
     <article
-      className={`${CARD_LINK} relative grid h-full grid-rows-[auto_1fr] overflow-hidden bg-card rounded-card text-gray-12 has-[h3_a:focus-visible]:outline-2 has-[h3_a:focus-visible]:outline-ring has-[h3_a:focus-visible]:-outline-offset-2`}
+      className={`${CARD_LINK} relative grid h-full grid-rows-[auto_1fr] overflow-hidden bg-card rounded-card shadow-card text-gray-12 has-[h3_a:focus-visible]:outline-2 has-[h3_a:focus-visible]:outline-ring has-[h3_a:focus-visible]:-outline-offset-2`}
     >
       <ImageFrame src={item.image} />
       <div className="flex min-w-0 flex-col gap-2 p-4">

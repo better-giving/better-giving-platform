@@ -114,15 +114,15 @@
   /* the surface model, outside in: ground -> card -> well -> field.
      the GROUND is the page — --background under four soft radial blots
      (--wash / --wash-far, painted once in platform's index.css and fixed to the
-     window); a marketing page is --background alone. a CARD is white with no border and no shadow: it needs colour
-     under only part of its edge for the eye to complete the box, which is the
-     blots' job. a WELL (--panel) is a recess inside a card. a FIELD
+     window); a marketing page is --background alone. a CARD is white with no
+     border, found by the resting `shadow-card` (packages/ui theme.css), a
+     faint --primary tint, on any ground. a WELL (--panel) is a recess inside a card. a FIELD
      (--surface + --border) is white with its full edge, inside either. */
   --background: oklch(1 0 0); /* #ffffff */
   /* the resting container — `card`, `solo-card`, and the fill every dialog,
      menu, popover, select list, hovercard and toast carries. white, the same
-     value as the page base: a card reads off the blots under its edge, never
-     off a border. */
+     value as the page base: a card reads off its `shadow-card`, never off a
+     border. */
   --card: oklch(1 0 0); /* #ffffff */
   /* a WELL inside a card: a recessed block that groups a figure, a meter
      track, a payout summary. step 2, one rung under the card it sits in. it is

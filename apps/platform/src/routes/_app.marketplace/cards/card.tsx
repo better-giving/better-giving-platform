@@ -21,7 +21,7 @@ export function Card({
     <div className="relative has-[.pending]:grayscale has-[.pending]:pointer-events-none grid grid-rows-subgrid row-span-3 gap-y-0">
       <NavLink
         to={href("/org/:org", { org: id.toString() })}
-        className="grid grid-rows-subgrid row-span-3 h-full overflow-clip bg-card rounded-card hover:shadow-lift-card transition-shadow"
+        className="grid grid-rows-subgrid row-span-3 h-full overflow-clip bg-card rounded-card shadow-card transition-colors hover:bg-panel"
       >
         <div data-banner className="aspect-4/1 w-full relative bg-secondary">
           {/* no banner is a plain fill: `Image` without a src paints a placeholder glyph */}

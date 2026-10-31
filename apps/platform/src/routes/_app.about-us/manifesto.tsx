@@ -35,10 +35,7 @@ export function Manifesto({ classes = "" }: IManifesto) {
         </h2>
         <div className="grid gap-5 md:grid-cols-3 mt-11">
           {rights.map((r) => (
-            <div
-              key={r.num}
-              className="card shadow-lift-card grid gap-2.5 content-start"
-            >
+            <div key={r.num} className="card grid gap-2.5 content-start">
               <span className="text-3xl font-bold text-primary">{r.num}</span>
               <span className="text-xl font-bold">{r.title}</span>
               <p className="text-sm/relaxed text-gray-11">{r.body}</p>

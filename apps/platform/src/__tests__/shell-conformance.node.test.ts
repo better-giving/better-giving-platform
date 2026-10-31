@@ -153,30 +153,43 @@ describe("the dashboard shell", () => {
 });
 
 describe("the card shell", () => {
-  // a card is `card`: the fill, the corner and the inset, spelled once in
-  // packages/ui/src/styles/utilities.css. hand-assembling the three is how the
-  // inset reached 30 spellings across 131 sites — every value on both sides is
-  // on-system, so nothing but this sweep separates a card from a thirty-first
-  // spelling of one. the pre-model spelling (a `bg-panel` fill with an edge, a
-  // corner and an inset) is no longer a card at all: a container has no edge,
-  // and `the surface model` in surface-conformance.node.test.ts fails it on
-  // the edge alone, inset or not.
+  // a card is `card`: the fill, the resting shadow, the corner and the inset,
+  // spelled once in packages/ui/src/styles/utilities.css. hand-assembling
+  // them is how the inset reached 30 spellings across 131 sites — every value
+  // on both sides is on-system, so nothing but this sweep separates a card
+  // from a thirty-first spelling of one. the pre-model spelling (a `bg-panel`
+  // fill with an edge, a corner and an inset) is no longer a card at all: a
+  // container has no border, and `the surface model` in
+  // surface-conformance.node.test.ts fails it on the edge alone, inset or not.
   const utilities = sources.find(
     (x) => x.file === "packages/ui/src/styles/utilities.css"
   );
 
-  test("the recipe carries the fill, the corner and the inset", () => {
+  test("the recipe carries the fill, the shadow, the corner and the inset", () => {
     // and nothing else: no edge, because a container in the surface model has
-    // none (packages/brand/design-system.md, "Resting surfaces"); and a
-    // shadow, a layout, a gap or a type size baked in here is a decision every
-    // caller then has to cancel, and `shadow-none` is not a spelling the
-    // closed --shadow-* namespace leaves available.
+    // none, and the shadow is the card rung (packages/brand/design-system.md,
+    // "Resting surfaces"). a layout, a gap or a type size baked in here is a
+    // decision every caller then has to cancel.
     const recipe = utilities?.text.match(/@utility card \{\s*@apply ([^;]*);/);
     expect(tokens(recipe?.[1] ?? "")).toEqual([
       "bg-card",
       "rounded-card",
+      "shadow-card",
       "p-6",
     ]);
+  });
+
+  test("the single-purpose card carries the same shadow, and no edge", () => {
+    const recipe = utilities?.text.match(
+      /@utility solo-card \{\s*@apply ([^;]*);/
+    );
+    const t = tokens(recipe?.[1] ?? "");
+    expect({
+      missing: ["bg-card", "rounded-card", "shadow-card"].filter(
+        (c) => !t.includes(c)
+      ),
+      edge: t.filter((c) => c.startsWith("border")),
+    }).toEqual({ missing: [], edge: [] });
   });
 
   test("there is one card for every ground", () => {
@@ -186,15 +199,16 @@ describe("the card shell", () => {
     expect(files_with("card-on-band")).toEqual([]);
   });
 
-  // the edge and corner are still read beside `card` below: a second one there
-  // is a coin flip with the recipe's. the edge accepts the step spelling too
-  // (`border-gray-6`), and the corner a side, because a half-rounded panel is
-  // still a panel.
+  // the edge, shadow and corner are still read beside `card` below: a second
+  // one there is a coin flip with the recipe's. the edge accepts the step
+  // spelling too (`border-gray-6`), and the corner a side, because a
+  // half-rounded panel is still a panel.
   const is_fill = (c: string) => c === "bg-panel" || c === "bg-card";
   const is_edge = (c: string) =>
     c === "border" ||
     /^border-[xytblr]$/.test(c) ||
     /^border-gray-\d+$/.test(c);
+  const is_shadow = (c: string) => c.startsWith("shadow-");
   const is_corner = (c: string) =>
     c === "rounded" || c === "rounded-card" || /^rounded-[tblr]$/.test(c);
   const is_inset = (c: string) => /^p[xytblr]?-/.test(c);
@@ -219,21 +233,22 @@ describe("the card shell", () => {
     // with the shells that already have a name of their own.
     const cases: [string, boolean][] = [
       ["card flex items-center gap-x-3", false],
-      ["card shadow-lift-card grid gap-6", false],
+      ["card grid gap-6", false],
       [`\${classes} md:card grid gap-2 md:gap-4`, false],
       // the named shells' own recipes, as a call site writes them
       ["page grid gap-8", false],
       ["solo-card", false],
       ["actions-band actions", false],
       // delegated insets: a media frame, a divided list, a table shell
-      ["w-full bg-card rounded-card overflow-hidden", false],
-      ["bg-card rounded-card divide-y divide-hairline", false],
+      ["w-full bg-card rounded-card shadow-card overflow-hidden", false],
+      ["bg-card rounded-card shadow-card divide-y divide-hairline", false],
       // a floating layer
       ["bg-card rounded-card shadow-floating px-4 py-3", false],
       // a well: the control corner, not the card's
       ["bg-panel rounded p-4", false],
       // hand-assembled cards
       ["bg-card rounded-card p-6 grid gap-4", true],
+      ["bg-card rounded-card shadow-card p-6", true],
       [`\${classes} md:bg-card md:rounded-card md:p-4`, true],
     ];
     expect(cases.filter(([v, want]) => is_hand_assembled(v) !== want)).toEqual(
@@ -260,7 +275,7 @@ describe("the card shell", () => {
 
   test("nothing re-spells what the card owns", () => {
     // utilities of equal specificity resolve by stylesheet source order, so a
-    // second fill, edge, corner or inset beside `card` wins or loses by where
+    // second fill, edge, shadow, corner or inset beside `card` wins or loses by where
     // it landed in the emitted sheet rather than by intent — the drift the one
     // inset exists to end.
     const exempt = [
@@ -279,8 +294,8 @@ describe("the card shell", () => {
       if (!name) return [];
       // --surface counts as a fill here and only here: beside a card it is a
       // second fill, while on its own it is a control's box. `hover:bg-panel`
-      // is a card tile's hover — the card has no edge to firm, so the tile
-      // shifts its fill — and never applies at rest beside the card's own.
+      // is a card tile's hover — the tile shifts its fill rather than its
+      // edge — and never applies at rest beside the card's own.
       const bad = t
         .filter((x) => x !== "hover:bg-panel")
         .filter((x) => {
@@ -289,6 +304,7 @@ describe("the card shell", () => {
             is_fill(c) ||
             c === "bg-surface" ||
             is_edge(c) ||
+            is_shadow(c) ||
             is_corner(c) ||
             is_inset(c)
           );

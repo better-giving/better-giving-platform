@@ -177,15 +177,16 @@ the call site. `rounded-sm`, `-md`, `-lg`, `-xl`, `-xs` are reset to `initial` a
 compile** — writing one produces no rule at all, which is deliberate: it is how the two corners stay
 two. `rounded-full` and `rounded-none` still work. Nothing is a pill.
 
-**The app is flat, and the shadow namespace is closed.** The surface model, outside in: **ground** (the white page
-under four soft blue blots, fixed to the window — the app paints it, never a screen; marketing pages are plain white
-with no blots) → **card** (`card`: white, `rounded-card`, **no border, no shadow**; colour shows under part of its
-edge and the eye completes the box. on a marketing page's plain white a card adds `shadow-lift-card`)
-→ **well** (`bg-panel rounded`, inside a card) → **field** (white `bg-surface` with its full border). Lines inside a
+**The app is nearly flat, and the shadow namespace is closed.** The surface model, outside in: **ground** (the white page
+under four soft blots — the two blue ones small, so most of the ground is white — fixed to the window — the app paints it, never a screen; marketing pages are plain white
+with no blots) → **card** (`card`: white, `rounded-card`, **no border**, `shadow-card` — a faint brand-blue resting
+shadow, on every ground, marketing pages included) → **well** (`bg-panel rounded`, inside a card) → **field** (white `bg-surface` with its full border). Lines inside a
 card are `border-hairline` / `divide-hairline`; a container never has an edge. `shadow-xs`/`-sm`/`-md`/`-lg`/`-xl`/`-2xl`/`-inner` are reset to `initial` and **fail to
 compile**, so depth cannot be re-picked one call site at a time; `shadow-[…]` still compiles and is caught by a
 sweep instead. The whole set a call site may spend:
 
+- `shadow-card` — the resting rung for an in-flow container. `card` and `solo-card` already carry it; a
+  delegated-inset shell (`bg-card rounded-card` with no padding) writes it.
 - `shadow-floating` — the one shadow for things that genuinely hover with no scrim under them: menu, dropdown,
   combobox and select popup, tooltip, hovercard, toast, and a pinned header once it is stuck.
 - **no shadow at all on the modal level.** A dialog, drawer or route-modal is defined by its `bg-overlay` scrim and
@@ -195,8 +196,8 @@ sweep instead. The whole set a call site may spend:
   track and the fill riding raised inside it. Both halves or neither.
 - `shadow-handle` — a legibility affordance, not a rung: the white crop handle over a donor's own photograph. Never
   reach for it to raise something.
-- `shadow-lift-card` / `shadow-lift-cta` / `shadow-lift-media` — the **marketing lift**, a treatment held apart from
-  the levels on purpose. Marketing cards, hero CTAs and photographs only; an app surface must not reach for one, and
+- `shadow-lift-cta` / `shadow-lift-media` — the **marketing lift**, a treatment held apart from
+  the levels on purpose. Hero CTAs and photographs only (a marketing card takes `card`); an app surface must not reach for one, and
   there is no rung of the ladder that leads to it. The tint lives inside each token — never a `shadow-<color>/<alpha>`
   written beside a name.
 

@@ -15,7 +15,7 @@ export function GrowPlaces({ classes = "" }: IGrowPlaces) {
           Two places your money grows
         </h2>
         <div className="grid gap-6 md:grid-cols-2 mt-11">
-          <div className="card shadow-lift-card grid gap-3.5 content-start">
+          <div className="card grid gap-3.5 content-start">
             <Badge size="md" tone="secondary" className="justify-self-start">
               No market risk
             </Badge>

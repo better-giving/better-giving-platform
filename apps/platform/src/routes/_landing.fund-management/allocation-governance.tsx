@@ -36,7 +36,7 @@ export function AllocationGovernance({ classes = "" }: IAllocationGovernance) {
   return (
     <section className={classes} aria-labelledby="governance-heading">
       <div className="page grid gap-14 lg:grid-cols-2 items-center">
-        <div className="card shadow-lift-card grid gap-6 justify-items-center">
+        <div className="card grid gap-6 justify-items-center">
           <span className="text-lg font-bold">Target allocation</span>
           <div
             className="size-55 rounded-full grid place-items-center"

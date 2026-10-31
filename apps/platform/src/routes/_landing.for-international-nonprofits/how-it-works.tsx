@@ -22,7 +22,7 @@ export function HowItWorks({ classes = "" }) {
           Your donors give to Better Giving, a U.S. 501(c)(3), earmarked for
           your organization. They get a U.S. tax deduction. You get the funds.
         </p>
-        <ol className="bg-card rounded-card shadow-lift-card divide-y divide-hairline">
+        <ol className="bg-card rounded-card shadow-card divide-y divide-hairline">
           {steps.map((s, i) => (
             <li
               key={s.title}

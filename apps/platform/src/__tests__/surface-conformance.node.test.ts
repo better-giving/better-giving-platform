@@ -141,10 +141,11 @@ describe("a --primary fill declares its own ink", () => {
 
 /**
  * the surface model: ground -> card -> well -> field
- * (packages/brand/design-system.md, "Resting surfaces"). a container is
- * `bg-card` + `rounded-card` with no edge; a floating layer is that plus
- * `shadow-floating`; a well is `bg-panel` at the control corner, inside a
- * card; a field is the one surface that keeps its edge.
+ * (packages/brand/design-system.md, "Resting surfaces"). an in-flow
+ * container is `bg-card` + `rounded-card` + `shadow-card` with no edge —
+ * `card` and `solo-card` carry all three; a floating layer is that fill and
+ * corner with `shadow-floating`; a well is `bg-panel` at the control corner,
+ * inside a card; a field is the one surface that keeps its edge.
  *
  * these read every string literal, not only `className=` values: the
  * floating layers and the callouts are as often a `const` or a ternary branch
@@ -172,6 +173,9 @@ describe("a --primary fill declares its own ink", () => {
  * - **the embed's outer box keeps its border**, at its own call site
  *   (`donate-widget.$id`), on `rounded-card` with no container fill: it sits
  *   on a nonprofit's page, not on the ground.
+ * - **a photograph's frame is not a card.** a `bg-card rounded-card` box
+ *   carrying `shadow-lift-media` frames a hero image and spends the media
+ *   lift instead of the card rung.
  *
  * the named exemptions below are the shapes the predicate cannot tell apart
  * from a container by their classes alone.
@@ -228,8 +232,9 @@ describe("the surface model", () => {
 
   test("a well is not a container", () => {
     // `bg-panel` is gray-2, one rung under the card, and reads as a recess
-    // only inside one. at the container's corner, at the card's inset or
-    // with a card's lift it is the pre-model container spelling, which on the
+    // only inside one. at the container's corner, at the card's inset, or
+    // with the card's or a floating layer's shadow it is the pre-model
+    // container spelling, which on the
     // white ground paints a gray box where a card belongs. an image letterboxed
     // on it (`object-*`) and a slider thumb riding its track are not boxes.
     const offenders = literals.flatMap(({ file, n, t }) => {
@@ -238,20 +243,20 @@ describe("the surface model", () => {
       const container =
         t.includes("rounded-card") ||
         t.some((c) => /^p-([6-9]|1\d)$/.test(c)) ||
-        t.includes("shadow-lift-card") ||
+        t.includes("shadow-card") ||
         t.includes("shadow-floating");
       return container ? [`${file}:${n}`] : [];
     });
     expect(offenders).toEqual([]);
   });
 
-  test("a container has no edge", () => {
+  test("a container has no border", () => {
     // a container fill beside a full edge and a corner is the pre-model card,
     // inset or not: the four-class `bg-panel border rounded p-*` the card
     // sweep used to count, and its delegated-inset siblings (a bordered
     // media frame, a bordered collapsible, a bordered table shell). the
-    // surface model draws none of them: colour under part of a card's edge
-    // is what sets it off, and lines inside it are `--hairline`.
+    // surface model draws none of them: a card is found by `shadow-card`,
+    // and lines inside it are `--hairline`.
     const is_fill = (c: string) =>
       /^bg-(panel|card|background|gray-\d+)$/.test(c);
     const is_edge = (c: string) => c === "border" || /^border-\d$/.test(c);
@@ -277,6 +282,26 @@ describe("the surface model", () => {
         !t.some(is_corner) ||
         t.some((c) => c.startsWith("object-"));
       return ok ? [] : [`${file}:${n}`];
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  test("an in-flow container rests on the card shadow", () => {
+    // `bg-card rounded-card` with no inset is a card whose inset is delegated
+    // — a table shell, a divided list, a media frame, a collapsible. it is
+    // still a card, so it carries what `card` carries: `shadow-card`, the
+    // only thing that finds a borderless card on the ground. a floating layer spends
+    // `shadow-floating` instead, a dialog is `z-modal` behind a scrim with
+    // neither, and a photograph's frame spends `shadow-lift-media`; each is
+    // dropped by the predicate.
+    const offenders = literals.flatMap(({ file, n, t }) => {
+      if (!t.includes("bg-card") || !t.includes("rounded-card")) return [];
+      const other_level =
+        t.includes("shadow-floating") ||
+        t.includes("shadow-lift-media") ||
+        t.includes("z-modal");
+      if (other_level) return [];
+      return t.includes("shadow-card") ? [] : [`${file}:${n}`];
     });
     expect(offenders).toEqual([]);
   });

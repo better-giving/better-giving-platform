@@ -53,7 +53,7 @@ export default function Page({ loaderData: data }: Route.ComponentProps) {
       {/* the action refuses every write to a non-donor, so they get the page
           read-only: the public message if there is one, and nothing to submit */}
       {!widget_version && (data.is_donor || data.from_public_msg_to_npo) && (
-        <Collapsible.Root className="w-full bg-card rounded-card overflow-hidden">
+        <Collapsible.Root className="w-full bg-card rounded-card shadow-card overflow-hidden">
           <Collapsible.Trigger className="group flex w-full items-start gap-x-2 p-4 text-left">
             <span className="h-lh flex items-center shrink-0">
               <CheckCircle2Icon
@@ -83,7 +83,7 @@ export default function Page({ loaderData: data }: Route.ComponentProps) {
         </Collapsible.Root>
       )}
       {data.is_donor && data.to_type !== "fund" ? (
-        <Collapsible.Root className="w-full bg-card rounded-card overflow-hidden mt-2">
+        <Collapsible.Root className="w-full bg-card rounded-card shadow-card overflow-hidden mt-2">
           <Collapsible.Trigger className="group flex w-full items-start gap-x-2 p-4 text-left">
             <span className="h-lh flex items-center shrink-0">
               <CheckCircle2Icon
@@ -115,7 +115,7 @@ export default function Page({ loaderData: data }: Route.ComponentProps) {
         </Collapsible.Root>
       ) : null}
       {data.is_donor && data.to_type !== "fund" && (
-        <Collapsible.Root className="w-full bg-card rounded-card overflow-hidden mt-2">
+        <Collapsible.Root className="w-full bg-card rounded-card shadow-card overflow-hidden mt-2">
           <Collapsible.Trigger className="group flex w-full items-start gap-x-2 p-4 text-left">
             <span className="h-lh flex items-center shrink-0">
               <CheckCircle2Icon
@@ -159,7 +159,7 @@ export default function Page({ loaderData: data }: Route.ComponentProps) {
         />
       )}
       {!widget_version && (
-        <Collapsible.Root className="mt-2 w-full bg-card rounded-card overflow-hidden">
+        <Collapsible.Root className="mt-2 w-full bg-card rounded-card shadow-card overflow-hidden">
           <Collapsible.Trigger className="group flex w-full items-start gap-x-2 p-4 text-left">
             <span className="h-lh flex items-center shrink-0">
               <StarIcon className="stroke-warning fill-warning icon-sm" />

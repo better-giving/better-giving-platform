@@ -47,7 +47,7 @@ export default function Page({ loaderData: d }: Route.ComponentProps) {
         </p>
       )}
 
-      <dl className="grid sm:grid-cols-[auto_auto_1fr] bg-card rounded-card mt-2">
+      <dl className="grid sm:grid-cols-[auto_auto_1fr] bg-card rounded-card shadow-card mt-2">
         {/* the wise half of the record; the row below it is our own and
             outlives an outage */}
         {!d.wacc_unavailable && (

@@ -11,7 +11,7 @@ export function Container({ title, children, classes = "" }: Props) {
 
   return (
     <div
-      className={`w-full bg-card rounded-card divide-y divide-hairline ${classes}`}
+      className={`w-full bg-card rounded-card shadow-card divide-y divide-hairline ${classes}`}
     >
       <div className="flex items-center gap-x-3 p-3">
         <button

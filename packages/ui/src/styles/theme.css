@@ -308,9 +308,10 @@
      what closing them buys: every stock name (`shadow-md`, `shadow-2xl`,
      `shadow-inner`) and the deprecated bare `--shadow` key match no rule, so
      depth cannot be re-picked by eye one call site at a time. what a call site
-     is left with is exactly the ladder declared below — the four levels, the
-     recessed pair, the three marketing lifts and the one handle affordance —
-     and the flush level, which is written by not writing a shadow at all.
+     is left with is exactly the ladder declared below — the resting card
+     rung, the floating level, the recessed pair, the two marketing lifts and
+     the one handle affordance — and the flush level, which is written by not
+     writing a shadow at all.
      `shadow-none` survives — v4 emits it from a literal, not from this scale —
      so the sweep below is what keeps it out of a call site.
 
@@ -326,14 +327,14 @@
   --shadow-*: initial;
   --inset-shadow-*: initial;
 
-  /* the elevation set: four levels a thing can sit at, plus one treatment that
+  /* the elevation set: five levels a thing can sit at, plus one treatment that
      is deliberately not a rung of them. a call site spends ONE name — the tint
      lives inside the token, never as a `shadow-<color>` modifier written beside
      it, because a level paired with a hand-picked color is two decisions again.
 
-     flush — in the document flow, and most of the product. a card, panel,
-       table shell or form control separates by its fill (--panel is gray-2, one
-       rung BELOW the page) and its --border edge. it has NO token, on purpose:
+     flush — in the document flow: a well, a row, a form control. a well
+       separates by its fill (--panel is gray-2, one rung under the card it
+       sits in) and a control by its --border edge. it has NO token, on purpose:
        nothing would ever spend it, because flush is written by writing no
        shadow at all. `shadow-none` is not the spelling either — with the
        namespace closed there is nothing left for it to switch off but a named
@@ -341,6 +342,10 @@
        level there. the rule is the half of a level that goes missing, so it is
        written here and in the ledger rather than left implied by an absent
        name.
+     card — the in-flow container at rest: `card`, `solo-card`, the
+       delegated-inset card shells, the `.table` card shell. --shadow-card,
+       and no border: the shadow is what finds the card on the ground. lower
+       and softer than floating, so a menu still reads above a card.
      floating — hovers over content, transient, no scrim: menu, dropdown,
        combobox and select popup, tooltip, hovercard, toast, and a sticky header
        once it is stuck. --shadow-floating, and z-floating below.
@@ -370,6 +375,14 @@
      --shadow-*, and that is not cosmetic: the two are separate box-shadow slots
      that compose, while `shadow-inner` is a DEPRECATED alias v4 still carries in
      the --shadow-* namespace. same paint today, and it outlives the alias. */
+  /* the card rung, and the one neutral-set exception to the gray-12 rule
+     above: tinted --primary, so a white card on the white ground reads by a
+     faint brand-blue shadow instead of a border. a contact layer at 8% and a
+     soft spread at 14%. built the way the marketing lifts are — --primary
+     mixed down in oklab, which is what v4 compiles a `/<alpha>` modifier to. */
+  --shadow-card:
+    0 1px 3px 0 color-mix(in oklab, var(--primary) 8%, transparent),
+    0 6px 16px -4px color-mix(in oklab, var(--primary) 14%, transparent);
   --shadow-floating:
     0 10px 15px -3px color-mix(in oklch, var(--gray-12) 10%, transparent),
     0 4px 6px -4px color-mix(in oklch, var(--gray-12) 10%, transparent);
@@ -379,20 +392,17 @@
     color-mix(in oklch, var(--gray-12) 5%, transparent);
 
   /* the marketing lift — a treatment, not a rung, and named apart precisely so
-     the app cannot pick it up by reaching for a level. three surfaces on the
-     marketing pages carry a deliberate glow: a card, a hero CTA, and a
-     photograph (or the skeleton standing in for one). they are spelled today as
-     `shadow-lg shadow-primary/5`, `shadow-lg shadow-primary/25` and
-     `shadow-2xl shadow-black/10`; folding the tint into the token is what makes
-     each one class instead of two, and what stops a fourth opacity being picked
-     by eye.
+     the app cannot pick it up by reaching for a level. two surfaces on the
+     marketing pages carry a deliberate glow: a hero CTA, and a photograph (or
+     the skeleton standing in for one). a marketing card does not: it takes
+     the card rung like every other card. they were spelled
+     `shadow-lg shadow-primary/25` and `shadow-2xl shadow-black/10`; folding
+     the tint into the token is what makes each one class instead of two, and
+     what stops a third opacity being picked by eye.
      the color-mix() is exactly what v4 compiles a `/<alpha>` shadow modifier to,
      so these paint identically to the pairs they replace. --color-black is
      #000101, not pure black — `shadow-black/10` always read that token, and
      naming it here keeps it reading the same one. */
-  --shadow-lift-card:
-    0 10px 15px -3px color-mix(in oklab, var(--primary) 5%, transparent),
-    0 4px 6px -4px color-mix(in oklab, var(--primary) 5%, transparent);
   --shadow-lift-cta:
     0 10px 15px -3px color-mix(in oklab, var(--primary) 25%, transparent),
     0 4px 6px -4px color-mix(in oklab, var(--primary) 25%, transparent);

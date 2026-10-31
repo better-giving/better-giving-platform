@@ -137,7 +137,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
             </div>
           </div>
 
-          <div className="bg-card rounded-card overflow-hidden">
+          <div className="bg-card rounded-card shadow-card overflow-hidden">
             {fund.banner && (
               <img
                 src={fund.banner}

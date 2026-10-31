@@ -130,7 +130,7 @@ const Cards = (props: { posts: POSTS_QUERY_RESULT["items"] }) =>
       <NavLink
         key={post._id}
         to={path}
-        className="grid [.pending]:grayscale grid-rows-[auto_1fr] h-full bg-card rounded-card overflow-hidden hover:shadow-lift-card transition-shadow group"
+        className="grid [.pending]:grayscale grid-rows-[auto_1fr] h-full bg-card rounded-card shadow-card overflow-hidden group"
       >
         {img_src ? (
           <img

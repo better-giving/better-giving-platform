@@ -398,24 +398,19 @@
 }
 
 /* the in-flow container: a marketing card, a dashboard tile, a figure, a
-   callout, a link tile. the fill, the corner and the inset — the shell's half
-   of the ownership rule in packages/brand/design-system.md — and nothing else.
+   callout, a link tile. the fill, the resting shadow, the corner and the
+   inset — the shell's half of the ownership rule in
+   packages/brand/design-system.md — and nothing else.
 
-   no border. a card is white on a ground that is white under four soft blots,
-   so colour sits under part of its edge and the eye completes the box; an
-   edge would grid the page the blots exist to soften. a line INSIDE a card is
-   --hairline (`border-hairline`, `divide-hairline`), and the one surface that
-   keeps a full edge is a form control. the same white works on a `bg-band`
-   ground, so there is one card for both grounds.
+   no border. the shadow is the card rung, `shadow-card`, a faint brand-blue
+   tint: it finds the box on the blotted ground, on a marketing page's plain
+   white and on a `bg-band` alike, so there is one card for every ground. an
+   edge would grid the page; a line INSIDE a card is --hairline
+   (`border-hairline`, `divide-hairline`), and the one surface that keeps a
+   full edge is a form control.
 
    the inset is one value at every width and in every role — no tier, and no
    per-file variant.
-
-   no shadow: `flush` is the elevation a card sits at and it is written by
-   writing no shadow at all. a marketing card that lifts spends
-   `shadow-lift-card` BESIDE this name, which is one named level at one call
-   site rather than a level baked into the shell every caller then has to
-   cancel.
 
    no layout and no type. `grid`, `flex`, a `gap`, a `divide-y`, a heading size
    are the arrangement of the contents, and the arrangement stays the caller's
@@ -426,7 +421,7 @@
    shell, a `divide-y` list, an `overflow-hidden` media frame. it is not this
    one, and `shell-conformance.node.test.ts` is written to leave it alone. */
 @utility card {
-  @apply bg-card rounded-card p-6;
+  @apply bg-card rounded-card shadow-card p-6;
 }
 
 /* the card that is the whole of a single-purpose screen — login, signup,
@@ -442,7 +437,7 @@
    margins rather than replace them; and they split evenly on whether their
    content is centred, which makes alignment the caller's to say. */
 @utility solo-card {
-  @apply grid w-full max-w-md px-6 sm:px-7 py-7 sm:py-8 bg-card rounded-card;
+  @apply grid w-full max-w-md px-6 sm:px-7 py-7 sm:py-8 bg-card rounded-card shadow-card;
 }
 
 /* the scrollbar skin. tailwind 4.3 ships `scrollbar-width`/`scrollbar-color`

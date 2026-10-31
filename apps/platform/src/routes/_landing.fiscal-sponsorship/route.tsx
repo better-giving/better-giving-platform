@@ -133,10 +133,7 @@ export default function Page() {
           </h2>
           <div className="grid gap-6 md:grid-cols-2 mt-11">
             {audiences.map((a) => (
-              <div
-                key={a.title}
-                className="card shadow-lift-card grid gap-2.5 content-start"
-              >
+              <div key={a.title} className="card grid gap-2.5 content-start">
                 <span className="text-xl font-bold">{a.title}</span>
                 <p className="text-sm/relaxed text-gray-11">{a.body}</p>
               </div>

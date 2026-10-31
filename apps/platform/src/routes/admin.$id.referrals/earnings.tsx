@@ -41,7 +41,7 @@ export function Earnings({
         )}
       </div>
 
-      <div className="bg-card rounded-card overflow-hidden">
+      <div className="bg-card rounded-card shadow-card overflow-hidden">
         <div className="p-6 @container">
           <div className="flex flex-wrap items-center justify-between gap-x-2">
             <div className="flex items-center gap-x-2 flex-wrap">

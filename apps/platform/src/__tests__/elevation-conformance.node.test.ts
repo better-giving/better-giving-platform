@@ -4,8 +4,9 @@ import { sources_of } from "./conformance/walk";
 /**
  * the sweep for depth picked by eye rather than spent by name.
  *
- * the elevation set (`packages/ui/src/styles/theme.css`) is four levels, a
- * recessed pair, three marketing lifts and one handle affordance, and a call
+ * the elevation set (`packages/ui/src/styles/theme.css`) is the card rung, the
+ * floating level, a recessed pair, two marketing lifts and one handle
+ * affordance (flush and modal are written with no shadow), and a call
  * site spends exactly one of those names. `--shadow-*` and `--inset-shadow-*`
  * are reset to `initial` beside it, so `shadow-md` and `shadow-2xl` match no
  * rule — that is the structural half of the gate, and it ships with the app.
@@ -28,7 +29,7 @@ import { sources_of } from "./conformance/walk";
  * - **a color modifier is a second decision.** `shadow-lift-cta
  *   shadow-primary/40` compiles fine — the lift's own tint is simply
  *   overwritten by a hand-picked one. the tint lives inside the token; a
- *   `shadow-<color>/<alpha>` written beside a name is the pair the three lift
+ *   `shadow-<color>/<alpha>` written beside a name is the pair the lift
  *   tokens exist to retire.
  * - **the `z-*` namespace is deliberately NOT reset**, so `z-10` and every
  *   other sibling-stacking value still compiles, as it should. the six named
@@ -78,8 +79,8 @@ const findings = (needle: RegExp) =>
 describe("depth is spent by name", () => {
   test("no stock shadow utility", () => {
     // every one of these is a rung of a scale this system does not have. the
-    // named set is `shadow-floating`, the two recessed tokens, the three
-    // marketing lifts and `shadow-handle`; flush is written by writing no
+    // named set is `shadow-card`, `shadow-floating`, the two recessed tokens,
+    // the two marketing lifts and `shadow-handle`; flush is written by writing no
     // shadow at all, which is why `shadow-none` is in here rather than exempt
     // from it.
     expect(
@@ -95,8 +96,16 @@ describe("depth is spent by name", () => {
     expect(findings(/(?<![-\w])shadow-\[[^\]]*\]/g)).toEqual([]);
   });
 
+  test("the retired card lift is gone", () => {
+    // `--shadow-lift-card` was deleted when a card took the card rung on every
+    // ground. with the namespace closed a stray `shadow-lift-card` compiles to
+    // nothing, so a card would render with its edge and without its shadow
+    // and still look plausible — only reading the source reports it.
+    expect(findings(/(?<![-\w])shadow-lift-card(?![-\w])/g)).toEqual([]);
+  });
+
   test("no shadow color written beside a name", () => {
-    // `shadow-<color>/<alpha>` is the spelling the three lift tokens folded
+    // `shadow-<color>/<alpha>` is the spelling the lift tokens folded
     // in. written beside a named lift it silently replaces that lift's own
     // tint, so the class string says one thing and the paint says another —
     // and the second opacity is the one that drifts.

@@ -46,7 +46,9 @@
    scrolls. a fixed pseudo-element rather than `background-attachment: fixed`,
    which iOS Safari ignores. z-index -1 with no stacking context on body puts it
    over the canvas and under every in-flow box. the blots' sizes and stops are
-   the approved Surfaces spec's; the colours are the --wash set, which has no
+   the approved Surfaces spec's: the two --wash blots are small on purpose, so
+   most of the ground is white and a card's `shadow-card` has white to read
+   against. the colours are the --wash set, which has no
    utility anywhere else. a screen holding a `solo-card` swaps the main blue for
    --wash-strong — one card on an empty page needs more colour under its edge.
    the embedded donation form takes the card/field model but never the ground:
@@ -63,9 +65,9 @@
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(60% 55% at 6% 6%, var(--ground-main), transparent 75%),
+    radial-gradient(38% 34% at 4% 4%, var(--ground-main), transparent 75%),
     radial-gradient(50% 55% at 78% 22%, var(--wash-far), transparent 75%),
-    radial-gradient(50% 50% at 30% 70%, var(--wash), transparent 75%),
+    radial-gradient(32% 32% at 30% 72%, var(--wash), transparent 75%),
     radial-gradient(55% 55% at 98% 98%, var(--wash-far), transparent 75%),
     var(--background);
 }

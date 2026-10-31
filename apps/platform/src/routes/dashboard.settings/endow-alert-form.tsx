@@ -55,7 +55,7 @@ export function EndowAlertForm({ classes = "", user_npos }: Props) {
         e.preventDefault();
         reset();
       }}
-      className={`${classes} grid grid-cols-[auto_auto_auto] bg-card rounded-card divide-y divide-hairline`}
+      className={`${classes} grid grid-cols-[auto_auto_auto] bg-card rounded-card shadow-card divide-y divide-hairline`}
     >
       <div className="grid grid-cols-subgrid col-span-3 font-bold text-sm">
         <h5 className="p-3">Receive Email Alerts for</h5>

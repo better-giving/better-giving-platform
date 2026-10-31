@@ -64,7 +64,7 @@ export function Donate({ base_url, classes = "" }: IDonate) {
         <Steps
           {...donate_mount}
           base_url={base_url}
-          classes="mt-11 max-w-2xl rounded-card shadow-lift-card"
+          classes="mt-11 max-w-2xl rounded-card shadow-card"
         />
       </div>
     </section>
