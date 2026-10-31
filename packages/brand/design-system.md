@@ -104,9 +104,8 @@ Three properties of the generated set travel with it:
 
 ### Which step each token points at
 
-The values live in `colors.css`; this is the shape. Every one of the 41 semantic
-tokens resolves to a step, to `#ffffff`, to a `color-mix()` off one, or (the
-three blots, alone) to a decorative literal off the ramp.
+The values live in `colors.css`; this is the shape. Every one of the 39 semantic
+tokens resolves to a step, to `#ffffff`, or to a `color-mix()` off one.
 
 | step | blue | red | green | amber | gray |
 | --- | --- | --- | --- | --- | --- |
@@ -138,8 +137,7 @@ keeps step 6 and is a control's edge too, the one the base `*` rule hands a bare
 no edge. The split reaches the shared recipes only, so app call sites that spell
 `border-gray-6` on a control draw one rung fainter than the shared recipes do.
 
-`--wash` / `--wash-far` / `--wash-strong` are the only colors off the ramp
-besides the chart set: the blots under the ground, which no utility reaches.
+`--ground` is `gray-2`, the same step as `--panel`: the app page's fill.
 
 `--overlay` is the one token off the solid ramp on purpose: `gray-12` at 30%,
 via `color-mix()`, for a dialog scrim.
@@ -159,8 +157,8 @@ threshold on a pair *Radix itself assigns* (an own-scale step 11 or 12 on an
 own-scale surface, or a scale's own contrast ink on its step 9) is a known
 consequence of the scale, not a mistake in the mapping.
 
-Six pairings land under their threshold and are **accepted**, not defects (the
-last two are the surface model's, the design's own rather than the ramp's):
+Five pairings land under their threshold and are **accepted**, not defects (the
+last is the surface model's, the design's own rather than the ramp's):
 
 | pairing | measured | threshold | |
 | --- | --- | --- | --- |
@@ -169,7 +167,6 @@ last two are the surface model's, the design's own rather than the ramp's):
 | `--warning-fg` on `--warning` (amber-12 on amber-9) | **Lc 52.1** | Lc 60 | the filled warning button's label and the checklist badge; white would be weaker still at Lc 46.4 |
 | `--warning` as a meaningful icon on `gray-1` / white | **Lc 39.9 / 41.8** | Lc 45 | a fill, not an icon ink: a meaningful amber glyph takes `--warning-subtle-fg` (Lc 69.3 / 71.2) |
 | `--hairline` (`gray-3`) on `--card` | **Lc 0.0** | Lc 15 | a line inside a card groups rows rather than gridding them; a line that must be found is `--border` |
-| `gray-11` on `--wash-strong` | **Lc 58.2** | Lc 60 | the solo-card blot sits behind the card, not behind copy; de-emphasised copy on the bare blot takes `gray-12` (Lc 82.0). `gray-11` clears on `--wash` (63.7) and `--wash-far` (67.5) |
 
 Every own-scale band pairing clears: amber-11 is Lc 62.5 on amber-3 and Lc 67.2
 on amber-2, green-11 is Lc 66.1 on green-3, and white on green-9 is Lc 74.3.
@@ -207,8 +204,8 @@ Three rules fall out of that test, and all three are load-bearing:
 - **Adding a literal `oklch()` token to `:root` means adding its hex to
   `colors.ts` in the same commit**, or `colors.test.ts` fails: `packages/brand`
   has no build step, so the test is the whole gate. The mirror is mechanically
-  complete, not curated: that is why all 60 ramp steps, `chart_*` and the three
-  `wash*` blots are in it despite no email using them. The mail layouts paint
+  complete, not curated: that is why all 60 ramp steps, `chart_*` and
+  `ground` (an alias onto `gray_2`) are in it despite no email using them. The mail layouts paint
   `gray_1`, not `background`: the app's page went white with the surface model
   and mail kept its ground.
 - **The guard re-derives rather than imports.** `colors.test.ts` parses the CSS
@@ -221,31 +218,33 @@ Three rules fall out of that test, and all three are load-bearing:
 **The model, outside in: ground → card → well → field.** Approved by the PM
 2026-10-31 and rolled out to the whole app at once.
 
-- **Ground**: the page. White (`--background`) under four soft radial blots,
-  two small blue `--wash` blots at about 4% 4% and 30% 72%, the lighter,
-  cyan-leaning blue `--wash-far` at about 80% 20% and 98% 98%. All four blots
-  were shrunk 2026-10-31 (`--wash` to 38%/34% and 32%/32% of the window,
-  `--wash-far` to 34%/34% and 36%/36%): **more
-  white ground is deliberate**, so a card's blue-tinted `shadow-card` has white
-  to read against rather than a blot. The blots are **fixed to the window**: they stay put while the
-  page scrolls. Painted once, as a fixed `body::before` in platform's
-  `src/index.css` (not `background-attachment: fixed`, which iOS Safari
-  ignores), never per screen. A screen holding a `solo-card` swaps the main
-  blue blot for `--wash-strong`. **A marketing page has no blots**: the
-  `_landing*` pages and the marketing one-offs under `_app` (about-us, blog,
-  product, the legal pages: every route `public-chrome.tsx` buckets as
-  `marketing`) sit on plain white `--background`. `PublicLayout` marks its root
+- **Ground**: the page. An app page (dashboards, admin, platform admin,
+  the auth and other `solo-card` screens, donate, org, campaign and program
+  pages, the marketplace) sits on flat **`--ground`**: `gray-2`, Radix's
+  subtle-background step. A card lifts off it by being white plus
+  `shadow-card`; nothing else on the page carries a fill to tell them apart.
+  Painted once, as `body`'s background in platform's `src/index.css`, never
+  per screen, and no utility maps `--ground`. **A marketing page is plain
+  white**: the `_landing*` pages and the marketing one-offs under `_app`
+  (about-us, blog, product, the legal pages: every route `public-chrome.tsx`
+  buckets as `marketing`) sit on `--background`. `PublicLayout` marks its root
   `data-surfaces="marketing"` and `src/index.css` paints the ground there as
-  `--background` alone. A marketing card is the same card as everywhere else.
+  `--background`. A marketing card is the same card as everywhere else.
+  *Tried and removed 2026-10-31*: a white page under four fixed radial blots
+  (`--wash` / `--wash-far`, `--wash-strong` behind a `solo-card`). The PM
+  dropped them for the flat gray ground; the tokens, their email twins and
+  their contrast entries went with them.
 - **Card**: white (`--card`), **no border**, **`shadow-card`** (the resting
   rung, tinted `--primary`), 12px corners (`rounded-card`). Approved by the PM
   2026-10-31, replacing "no border, no shadow": the faint brand-blue shadow
-  finds the box on any ground (blots, plain white, `--band`), and the retired
+  finds the box on any ground (`--ground`, plain white, `--band`), and the retired
   marketing card lift folded into it. `card`, `solo-card`, every
   delegated-inset card shell and the `.table` shell carry it; a floating layer
   takes `shadow-floating` instead and a dialog takes none.
 - **Well**: `--panel` (`gray-2`) inside a card, at the control corner
-  (`rounded`). A recess that groups a figure, a meter track or a summary.
+  (`rounded`). A recess that groups a figure, a meter track or a summary. A
+  well is **the ground's own tone**, so it only ever appears inside a white
+  card: outside one it is no box at all.
 - **Field**: white (`--surface`) with its full `--border` edge, inside a card or
   a well. The one surface that keeps an edge, because WCAG 1.4.11 asks a
   control's boundary to be findable.
@@ -269,10 +268,10 @@ an element: see "the tint ladder" below.
 
 | token | what it is |
 | --- | --- |
-| `--background` | the page base under the blots: white, `oklch(1 0 0)`. Ink is `text-gray-12`; there is no `--fg`. The figures in this file recorded "on the page" were measured when it was `gray-1`; `gray-1` is still the ground of the emails, and white only raises a dark ink's Lc, so each is a floor for the white page. The white page's own figures are recorded as "on `--card`" |
-| `--card` | the resting container, in the flow or over it: `card`, `solo-card`, and the fill every dialog, menu, popover, combobox and select list, hovercard and toast carries. White, the same value as the page base, on purpose: a card reads off the blots under its edge, never off a border. One card for every ground: the same white reads on a `--band` |
+| `--background` | the marketing page's ground and the white base: `oklch(1 0 0)`. Ink is `text-gray-12`; there is no `--fg`. The figures in this file recorded "on the page" were measured when it was `gray-1`; `gray-1` is still the ground of the emails, and white only raises a dark ink's Lc, so each is a floor for the white page. The white page's own figures are recorded as "on `--card`" |
+| `--card` | the resting container, in the flow or over it: `card`, `solo-card`, and the fill every dialog, menu, popover, combobox and select list, hovercard and toast carries. White on purpose: on an app page it reads off the gray `--ground` and its `shadow-card`, on a marketing page off the shadow alone, never off a border. One card for every ground: the same white reads on a `--band` |
 | `--panel` | a **well** inside a card. `gray-2`, one rung under the card. Not a container fill any more; a hand-written `bg-panel` used as a container (at `rounded-card`, at the card's inset, with a lift, or beside an edge) is the pre-model spelling, and `surface-conformance.node.test.ts` fails it |
-| `--wash` / `--wash-far` / `--wash-strong` | the blots, and nothing else: never text, a fill, a state or a chart. **No utility maps them**, so a call site cannot reach one. `--wash` is the brand blue at blot strength; `--wash-far` is a second, lighter blue leaning cyan (hue 225 against `--wash`'s 247), there so the ground is not one flat hue; `--wash-strong` is the main blot on the single-card screens (login, signup, password reset, check-email, the connector consent screen). Literal `oklch()` rather than ramp steps: the ramp has no blue rung at these chromas. They have email twins because the mirror is mechanically complete, not because mail uses them |
+| `--ground` | the app page's fill: `gray-2`, an alias with an email twin only because the mirror resolves every `var()` alias. **No utility maps it**; `src/index.css` paints it on `body` once. Copy straight on the ground takes the well's figures (`gray-11` Lc 75.8, `gray-12` Lc 99.5), because it is the well's step |
 | `--hairline` | a line inside a card: `gray-3`. Lc 0.0 on the white card (under `apca-w3`'s low clip) and an accepted miss against the Lc 15 a separator needs: the design's, because a line inside a card groups rows rather than gridding them. A line that has to be **found** is a control's `--border`, not this. `border-hairline` / `divide-hairline` |
 | `--border` | a form control's edge: field, checkbox, radio, `.btn-secondary`, dropzone. `gray-6`, Lc 19.3 on the card. No longer the separator rung; see "Decisions that look like bugs" for the control-boundary miss |
 | `--surface` | the fill a form control carries: Radix's `--color-surface`. White, the same value as `--card`: inside a card a field is fill-identical and is found by its `--border` alone; inside a well it also lifts off by fill. Not fields only: `.btn-secondary` and the file dropzone rest here too |
@@ -295,7 +294,7 @@ white card vanishes on a white site. Our own pages render the same form
 borderless.
 
 **Emails keep `gray-1`.** The two mail layouts paint `flat_colors.gray_1`, not
-`flat_colors.background`: mail has no blots to complete a card's box, and the
+`flat_colors.background`: mail has no shadow to complete a card's box, and the
 template set was designed on that ground.
 
 ## Fill or ink: the distinction that causes the most drift
@@ -1034,24 +1033,24 @@ guarding them is its own change.
 Recorded so they are not "fixed" by someone reading them as oversights.
 
 - **`--background`, `--card` and `--surface` are all white, and that is three
-  jobs, not one value named thrice.** The page base sits under the blots; the
-  card is the container that reads off them; the field is a control that reads
+  jobs, not one value named thrice.** The page base is the marketing ground; the
+  card is the container that reads off any ground; the field is a control that reads
   by its `--border`. They share a value because the surface model puts the
   separation in the ground and the edge, not in the fill ladder. Collapsing them
   would lose which job a call site meant, and the embedded form already shows
   why the names are worth keeping: its page is the host's, not ours.
 - **A card has no border; its shadow finds it.** Not a missing hairline.
-  `shadow-card` is a faint `--primary` tint, and the blue blots were made
-  smaller so most cards sit on white where that shadow reads; a border would
-  grid the page. Lines go **inside** a card (`--hairline`), and the one surface
+  `shadow-card` is a faint `--primary` tint, and on an app page the white fill
+  against the gray `--ground` carries most of the lift; a border would grid
+  the page. Lines go **inside** a card (`--hairline`), and the one surface
   that keeps an edge is a form control.
 - **`--hairline` measures Lc 0.0 on the card.** Under the Lc 15 a separator
   needs, by design: it groups rows rather than gridding them. Copy that must be
   found does not lean on it.
-- **`--wash-far` is a second blue off the ramp.** Lighter and leaning cyan
-  (`oklch(0.935 0.045 225)`), decorative only (never text, fill, state or
-  chart), and unreachable from a utility. It is there so the ground is not one
-  flat hue.
+- **`--ground` and `--panel` are the same step.** Two names for `gray-2`
+  because they are two jobs: the page an app screen sits on, and a recess
+  inside a white card. A well therefore never appears outside a card, where it
+  would be the page's own tone.
 
 - **A control's boundary is under its threshold, and the ring does not rescue it.**
   `--border` is `gray-6` at **Lc 17.4** on `gray-1`, Lc 19.3 on the white card
@@ -2281,8 +2280,8 @@ Two seams this does **not** close, both deliberate:
 
 `colors.css` holds two kinds of name and they are adopted differently.
 
-**The 41 semantic tokens are live** and carry call sites in `apps/platform/src`
-(the three blots through the one ground rule in `src/index.css`). The palette is the whole
+**The 39 semantic tokens are live** and carry call sites in `apps/platform/src`
+(`--ground` through the one ground rule in `src/index.css`). The palette is the whole
 contract: a semantic name that ships here is a name the app paints with.
 
 **The 60 ramp steps are reachable too**,

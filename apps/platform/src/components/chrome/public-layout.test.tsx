@@ -117,16 +117,23 @@ describe("PublicLayout header", () => {
 
 describe("PublicLayout ground", () => {
   test.each([
-    ["marketing", "/about-us", false],
-    ["minimal", "/marketplace", true],
-  ])("blots on a %s route (%s): %s", async (_, path, blots) => {
+    ["marketing", "/about-us", "--background"],
+    ["minimal", "/marketplace", "--ground"],
+  ])("a %s route (%s) sits on %s", async (_, path, token) => {
     const Stub = layout_stub();
     const screen = await render(
       <Stub initialEntries={[path]} future={{ v8_middleware: true }} />
     );
     await expect.element(screen.getByText("section 299")).toBeInTheDocument();
 
-    const ground = getComputedStyle(document.body, "::before").backgroundImage;
-    expect(ground.includes("radial-gradient")).toBe(blots);
+    // resolve the token through a probe so the assertion names the token, not
+    // its value: --ground and --background differ, so a swapped seam fails.
+    const probe = document.createElement("div");
+    probe.style.backgroundColor = `var(${token})`;
+    document.body.append(probe);
+    const expected = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+
+    expect(getComputedStyle(document.body).backgroundColor).toBe(expected);
   });
 });

@@ -816,7 +816,7 @@ Cards, dialogs and floating layers went white, borderless and `rounded-card` (12
 - **previews**: every panel-shaped wrapper (`bg-panel border rounded`) moved to
   `bg-card rounded-card`, and `Modal`'s fills to `bg-card`.
 
-The **ground is not in this bundle**: the four radial blots are painted once by
-platform's `src/index.css` (a fixed `body::before`), not by `packages/ui`'s stylesheet,
-so a preview card renders white on the preview's own white. That is the model with its
+The **ground is not in this bundle**: the app page's flat gray `--ground` is painted once
+by platform's `src/index.css` (on `body`), not by `packages/ui`'s stylesheet, so a
+preview card renders white on the preview's own white. That is the model with its
 ground missing, not a broken card; don't add a border to make it show.

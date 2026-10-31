@@ -235,7 +235,8 @@ describe("the surface model", () => {
     // only inside one. at the container's corner, at the card's inset, or
     // with the card's or a floating layer's shadow it is the pre-model
     // container spelling, which on the
-    // white ground paints a gray box where a card belongs. an image letterboxed
+    // gray-2 ground is the page's own tone and paints nothing where a card
+    // belongs. an image letterboxed
     // on it (`object-*`) and a slider thumb riding its track are not boxes.
     const offenders = literals.flatMap(({ file, n, t }) => {
       if (!t.includes("bg-panel")) return [];

@@ -41,39 +41,18 @@
   --ring: var(--form-primary);
 }
 
-/* the ground: --background under four radial blots, painted once for every
-   screen and fixed to the window, so the blots stay put while the page
-   scrolls. a fixed pseudo-element rather than `background-attachment: fixed`,
-   which iOS Safari ignores. z-index -1 with no stacking context on body puts it
-   over the canvas and under every in-flow box. the blots' sizes and stops are
-   the approved Surfaces spec's: the two --wash blots are small on purpose, so
-   most of the ground is white and a card's `shadow-card` has white to read
-   against. the colours are the --wash set, which has no
-   utility anywhere else. a screen holding a `solo-card` swaps the main blue for
-   --wash-strong — one card on an empty page needs more colour under its edge.
-   the embedded donation form takes the card/field model but never the ground:
-   it sits in an iframe on a nonprofit's own page, so its two routes
-   (`donate-widget.$id`, `forms.$id`) mark their root `data-surfaces="embed"`
-   and the page behind them stays the host's. a marketing page has no blots
-   either: PublicLayout marks its root `data-surfaces="marketing"` from the
-   chrome bucket, and the ground there is --background alone. */
-:root:not(:has([data-surfaces="embed"])) body::before {
-  --ground-main: var(--wash);
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(38% 34% at 4% 4%, var(--ground-main), transparent 75%),
-    radial-gradient(34% 34% at 80% 20%, var(--wash-far), transparent 75%),
-    radial-gradient(32% 32% at 30% 72%, var(--wash), transparent 75%),
-    radial-gradient(36% 36% at 98% 98%, var(--wash-far), transparent 75%),
-    var(--background);
+/* the ground: the page fill, painted once here for every screen and never per
+   page. an app page sits on --ground (gray-2), so a white `card` lifts off it
+   by its fill and its `shadow-card`. a marketing page is plain --background:
+   PublicLayout marks its root `data-surfaces="marketing"` from the chrome
+   bucket. the embedded donation form never takes a ground: it sits in an
+   iframe on a nonprofit's own page, so its two routes (`donate-widget.$id`,
+   `forms.$id`) mark their root `data-surfaces="embed"` and the body stays
+   transparent to the host. on body, not html, so the fill propagates to the
+   canvas and covers overscroll. */
+:root:not(:has([data-surfaces="embed"])) body {
+  background: var(--ground);
 }
-:root:has(.solo-card) body::before {
-  --ground-main: var(--wash-strong);
-}
-:root:has([data-surfaces="marketing"]) body::before {
+:root:has([data-surfaces="marketing"]) body {
   background: var(--background);
 }

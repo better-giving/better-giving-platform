@@ -252,10 +252,9 @@
   --color-background: var(--background);
   --color-card: var(--card);
   --color-panel: var(--panel);
-  /* `border-hairline` / `divide-hairline`: a line inside a card. the blots
-     (--wash, --wash-far, --wash-strong) have NO utility on purpose — they are
-     painted once, by the ground in platform's index.css, and a `bg-wash` would
-     be the first decorative hue a call site could reach for as a fill. */
+  /* `border-hairline` / `divide-hairline`: a line inside a card. --ground has
+     NO utility on purpose — the page fill is painted once, by platform's
+     index.css, and a `bg-ground` strip on a screen would fight that seam. */
   --color-hairline: var(--hairline);
   --color-primary: var(--primary);
   --color-primary-fg: var(--primary-fg);

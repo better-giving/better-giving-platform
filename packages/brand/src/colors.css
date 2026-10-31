@@ -112,13 +112,17 @@
      because amber's step 9 sits light enough to need dark ink. they share a
      value by coincidence of the ramps, not by duplication. */
   /* the surface model, outside in: ground -> card -> well -> field.
-     the GROUND is the page — --background under four soft radial blots
-     (--wash / --wash-far, painted once in platform's index.css and fixed to the
-     window); a marketing page is --background alone. a CARD is white with no
+     the GROUND is the page — --ground (gray-2) on an app page, painted once
+     in platform's index.css; a marketing page is --background. a CARD is white with no
      border, found by the resting `shadow-card` (packages/ui theme.css), a
      faint --primary tint, on any ground. a WELL (--panel) is a recess inside a card. a FIELD
      (--surface + --border) is white with its full edge, inside either. */
   --background: oklch(1 0 0); /* #ffffff */
+  /* the app page's fill: radix's subtle-background step, under every
+     dashboard, form, org and auth screen. the same tone as a well (--panel),
+     which is why a well only ever sits inside a white card. no utility maps
+     it (theme.css): the ground is painted once, never by a call site. */
+  --ground: var(--gray-2);
   /* the resting container — `card`, `solo-card`, and the fill every dialog,
      menu, popover, select list, hovercard and toast carries. white, the same
      value as the page base: a card reads off its `shadow-card`, never off a
@@ -126,21 +130,9 @@
   --card: oklch(1 0 0); /* #ffffff */
   /* a WELL inside a card: a recessed block that groups a figure, a meter
      track, a payout summary. step 2, one rung under the card it sits in. it is
-     not a container fill any more — a container is --card. */
+     not a container fill any more — a container is --card. it equals
+     --ground, so outside a card it would vanish into the page. */
   --panel: var(--gray-2);
-  /* the blots under the ground, and nothing else: no text, no fill, no state,
-     no chart. no utility maps them (theme.css), so a call site cannot reach
-     one. --wash is the brand blue at blot strength; --wash-far is a second,
-     lighter blue leaning cyan, there so the ground is not one flat hue; and
-     --wash-strong is the main blot on the single-card screens (`solo-card`:
-     login, signup, password reset, check-email), where one card on an
-     otherwise empty page needs more colour behind it. literal oklch() rather
-     than ramp steps: the ramp has no blue rung at these chromas.
-     gray-12 and gray-11 ink measured on each in contrast.test.ts, for the
-     moment copy lands on a blot outside a card. */
-  --wash: oklch(0.92 0.05 247.3);
-  --wash-far: oklch(0.935 0.045 225);
-  --wash-strong: oklch(0.89 0.07 247.3);
   /* lines INSIDE a card: table rows, a card's header strip, dividers between
      sections or list rows. step 3 — quiet enough that a white card's content
      is grouped rather than gridded. not a control edge (that is --border) and

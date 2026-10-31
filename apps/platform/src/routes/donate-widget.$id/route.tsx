@@ -52,7 +52,7 @@ export default function Page({ loaderData }: Route.ComponentProps) {
   return (
     <div
       style={styles}
-      // no blot ground on a nonprofit's page (src/index.css)
+      // no ground on a nonprofit's page (src/index.css)
       data-surfaces="embed"
       className="grid grid-rows-[1fr_auto] justify-items-center gap-10"
     >

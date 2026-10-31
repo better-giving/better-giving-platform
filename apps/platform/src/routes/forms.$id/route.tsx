@@ -84,7 +84,7 @@ export default function Page({ loaderData, params }: Route.ComponentProps) {
     );
   }
 
-  // no blot ground on a nonprofit's page (src/index.css)
+  // no ground on a nonprofit's page (src/index.css)
   return (
     <div className="contents" data-surfaces="embed">
       {steps}

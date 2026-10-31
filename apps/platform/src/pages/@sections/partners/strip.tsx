@@ -26,7 +26,8 @@ export function PartnersStrip({ classes = "" }: IPartnersStrip) {
         className="group relative w-full mt-5"
       >
         {/* the edges fade by mask, not by a fill laid over them: a fill would
-            paint the page colour over the ground's blots */}
+            have to match the ground, which is white on a marketing page and
+            gray on an org page */}
         <Marquee.Viewport className="w-full overflow-hidden mask-x-from-90%">
           <Marquee.Content className="animate-marquee-x group-data-paused:[animation-play-state:paused] motion-reduce:animate-none">
             <Marquee.Item className="flex items-center gap-16 px-8">

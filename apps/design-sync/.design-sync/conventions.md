@@ -115,7 +115,7 @@ are the semantic tokens:
 
 | family | names |
 | --- | --- |
-| surfaces | `background` (the page base, white, under the blot ground the app paints once), `card` (white: a card, dialog, popover, menu, select list, hovercard or toast), `panel` (a **well** inside a card, gray-2), `surface` (a form control's fill, white), `overlay` (a dialog scrim) |
+| surfaces | `background` (white: the marketing page's ground; an app page sits on the gray-2 `--ground` the app paints once, which has no utility), `card` (white: a card, dialog, popover, menu, select list, hovercard or toast), `panel` (a **well** inside a card, gray-2), `surface` (a form control's fill, white), `overlay` (a dialog scrim) |
 | brand tint | `band` (a page-level ground), `secondary` (a ui element at rest, and the hover fill of anything resting transparent), `secondary-active` (that element selected) |
 | brand / state | `primary`, `success`, `warning`, `destructive` |
 | tinted band | `destructive-subtle` / `success-subtle` / `warning-subtle` (+ their `-fg`) |
@@ -177,9 +177,8 @@ the call site. `rounded-sm`, `-md`, `-lg`, `-xl`, `-xs` are reset to `initial` a
 compile** — writing one produces no rule at all, which is deliberate: it is how the two corners stay
 two. `rounded-full` and `rounded-none` still work. Nothing is a pill.
 
-**The app is nearly flat, and the shadow namespace is closed.** The surface model, outside in: **ground** (the white page
-under four soft blots — the two blue ones small, so most of the ground is white — fixed to the window — the app paints it, never a screen; marketing pages are plain white
-with no blots) → **card** (`card`: white, `rounded-card`, **no border**, `shadow-card` — a faint brand-blue resting
+**The app is nearly flat, and the shadow namespace is closed.** The surface model, outside in: **ground** (an app page is flat
+gray-2, `--ground`, which the app paints once, never a screen; marketing pages are plain white) → **card** (`card`: white, `rounded-card`, **no border**, `shadow-card` — a faint brand-blue resting
 shadow, on every ground, marketing pages included) → **well** (`bg-panel rounded`, inside a card) → **field** (white `bg-surface` with its full border). Lines inside a
 card are `border-hairline` / `divide-hairline`; a container never has an edge. `shadow-xs`/`-sm`/`-md`/`-lg`/`-xl`/`-2xl`/`-inner` are reset to `initial` and **fail to
 compile**, so depth cannot be re-picked one call site at a time; `shadow-[…]` still compiles and is caught by a

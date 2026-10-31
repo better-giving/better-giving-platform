@@ -112,47 +112,19 @@ const pairings: Pairing[] = [
   p("--ring on --card", colors.ring, card, 46.5, min.spot),
   p("--primary on --card", colors.primary, card, 76.9, min.content),
   p(
-    "gray-11 on --panel (a well)",
+    "gray-11 on --panel (a well) and --ground",
     colors.gray_11,
     colors.panel,
     75.8,
     min.content
   ),
   p(
-    "gray-12 on --panel (a well)",
+    "gray-12 on --panel (a well) and --ground",
     colors.gray_12,
     colors.panel,
     99.5,
     min.body_preferred
   ),
-
-  // --- the blots, for copy that lands on the ground outside a card
-  p("gray-12 on --wash", colors.gray_12, colors.wash, 87.5, min.body),
-  p("gray-11 on --wash", colors.gray_11, colors.wash, 63.7, min.content),
-  p("gray-12 on --wash-far", colors.gray_12, colors.wash_far, 91.3, min.body),
-  p(
-    "gray-11 on --wash-far",
-    colors.gray_11,
-    colors.wash_far,
-    67.5,
-    min.content
-  ),
-  p(
-    "gray-12 on --wash-strong",
-    colors.gray_12,
-    colors.wash_strong,
-    82,
-    min.body
-  ),
-  p(
-    "gray-11 on --wash-strong",
-    colors.gray_11,
-    colors.wash_strong,
-    58.2,
-    min.content,
-    "the solo-card blot is behind the card, not behind copy: de-emphasised copy on the bare blot takes gray-12"
-  ),
-  p("--primary on --wash", colors.primary, colors.wash, 61.1, min.content),
 
   // --- borders, the focus ring, neutral ink on the page
   p("gray-6 (--border) on gray-1", colors.gray_6, page, 17.4, min.hairline),

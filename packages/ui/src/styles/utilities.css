@@ -403,7 +403,7 @@
    packages/brand/design-system.md — and nothing else.
 
    no border. the shadow is the card rung, `shadow-card`, a faint brand-blue
-   tint: it finds the box on the blotted ground, on a marketing page's plain
+   tint: it finds the box on an app page's gray-2 ground, on a marketing page's plain
    white and on a `bg-band` alike, so there is one card for every ground. an
    edge would grid the page; a line INSIDE a card is --hairline
    (`border-hairline`, `divide-hairline`), and the one surface that keeps a
@@ -428,9 +428,7 @@
    check-email, and the five password-reset panels each sit alone on an
    otherwise empty page in exactly this shape. not a narrower `page`: that one
    is a width and a gutter for a full layout, this is one card with its own
-   fill. the ground behind it swaps its main blot for --wash-strong when one is
-   on the page (platform's index.css), because a lone card needs more colour
-   under its edge than a dashboard of them.
+   fill, on the same gray-2 ground as every other app page.
 
    no gap and no `justify-items`, both deliberately. the ten it collapsed
    space their children with per-child `mt-*`, so a gap here would add to those

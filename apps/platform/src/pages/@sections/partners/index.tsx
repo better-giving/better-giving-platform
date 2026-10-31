@@ -44,7 +44,8 @@ export function Partners({
         className="group justify-self-center relative w-full h-100"
       >
         {/* the edges fade by mask, not by a fill laid over them: a fill would
-            paint the page colour over the ground's blots */}
+            have to match the ground, which is white on a marketing page and
+            gray on an org page */}
         <Marquee.Viewport className="w-full h-full overflow-hidden mask-y-from-85%">
           <Marquee.Content className="animate-marquee-y group-data-paused:[animation-play-state:paused] motion-reduce:animate-none">
             <Marquee.Item className="flex flex-wrap gap-8 py-4 justify-center">

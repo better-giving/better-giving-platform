@@ -36,8 +36,9 @@ export function PublicLayout() {
     // set on the scroller (<html>) while this shell is mounted, so a `#id` jump
     // lands below the pinned header instead of under it. the banner scrolls
     // away and needs no padding.
-    // a marketing page sits on plain white: index.css drops the blots for a
-    // root holding `data-surfaces="marketing"`.
+    // a marketing page sits on plain white: index.css paints --background
+    // instead of the gray --ground for a root holding
+    // `data-surfaces="marketing"`.
     <div
       data-surfaces={marketing ? "marketing" : undefined}
       className={`grid grid-cols-[minmax(0,1fr)] [html:has(&)]:scroll-pt-16 print:block ${
