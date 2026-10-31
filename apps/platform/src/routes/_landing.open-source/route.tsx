@@ -47,9 +47,6 @@ export default function Page() {
       <div className="surface-primary pt-20 pb-24">
         <div className="page grid gap-14 lg:grid-cols-[1.05fr_0.95fr] items-center">
           <div className="grid gap-5 justify-items-start">
-            <p className="text-xs font-bold uppercase tracking-wider text-secondary">
-              Open Source
-            </p>
             <h1 className="hero-heading text-primary-fg">Trust you can read</h1>
             <p className="text-lg/relaxed text-primary-fg/90 max-w-lg text-pretty">
               Every part of Better Giving is public code: the donation form, the

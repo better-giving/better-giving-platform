@@ -14,9 +14,6 @@ export function Hero({ classes = "" }: IHero) {
     >
       <div className="page grid gap-12 lg:grid-cols-[minmax(22rem,1fr)_minmax(18rem,32.5rem)] items-center">
         <div className="grid gap-5 justify-items-start">
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">
-            Product
-          </p>
           <h1 className="hero-heading">
             One form that turns visitors into donors, and donors into monthly
             givers

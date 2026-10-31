@@ -36,7 +36,7 @@ const group1: LinkGroup = {
       },
     },
     {
-      title: "Donation Forms",
+      title: "Donation forms",
       to: sidebar_routes.forms,
       icon: {
         fn: Blocks,

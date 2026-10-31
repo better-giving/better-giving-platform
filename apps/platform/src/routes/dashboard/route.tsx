@@ -20,7 +20,6 @@ export default function Layout() {
     <DashboardLayout
       rootRoute={`${href("/dashboard")}/`}
       linkGroups={linkGroups}
-      headerVariant="bare"
     />
   );
 }

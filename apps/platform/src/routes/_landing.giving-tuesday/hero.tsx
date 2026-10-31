@@ -9,9 +9,9 @@ export function Hero({ classes = "" }) {
       className={`${classes} grid content-start justify-items-center gap-10 xl:justify-items-start xl:grid-cols-2 pt-20 xl:pt-40  pb-24`}
     >
       <div className="max-w-2xl order-2 xl:order-1">
-        <h4 className="pre-heading text-primary text-center xl:text-left  uppercase mb-5">
+        <p className="pre-heading text-primary text-center xl:text-left mb-5">
           Giving Tuesday is one day.
-        </h4>
+        </p>
         <h1 className="text-center xl:text-left mb-4 hero-heading">
           {app_name} <br /> Lasts All Year.
         </h1>

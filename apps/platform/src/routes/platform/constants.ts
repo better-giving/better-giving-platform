@@ -25,7 +25,7 @@ const fund_management: LinkGroup = {
       },
     },
     {
-      title: "Redeem Requests",
+      title: "Redeem requests",
       to: routes.redeem_requests,
       icon: {
         fn: BookOpenCheckIcon,
@@ -45,12 +45,12 @@ export const link_groups: LinkGroup[] = [
   {
     links: [
       {
-        title: "NPO Applications",
+        title: "NPO applications",
         to: routes.applications,
         icon: { fn: Building2Icon },
       },
       {
-        title: "Banking Applications",
+        title: "Banking applications",
         to: routes.banking_applications,
         icon: { fn: LandmarkIcon },
       },
@@ -60,7 +60,7 @@ export const link_groups: LinkGroup[] = [
         icon: { fn: ReceiptIcon },
       },
       {
-        title: "Settle Donations",
+        title: "Settle donations",
         to: routes.donation_settlements,
         icon: { fn: BanknoteIcon },
       },

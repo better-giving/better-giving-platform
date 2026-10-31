@@ -22,10 +22,7 @@ export default function Page() {
     <main>
       <div className="bg-linear-to-b from-background to-band pt-20 pb-16 text-center">
         <div className="page">
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">
-            Pricing
-          </p>
-          <h1 className="hero-heading mt-4 max-w-3xl mx-auto">
+          <h1 className="hero-heading max-w-3xl mx-auto">
             Free. Forever. <span className="text-primary">Really.</span>
           </h1>
           <p className="mt-5 text-lg text-gray-11 max-w-2xl mx-auto text-pretty">

@@ -45,9 +45,7 @@ export function Steps({ classes = "" }: ISteps) {
               className="grid gap-3 justify-items-center text-center content-start"
             >
               <Image src={s.img} className="h-35 w-auto" alt={s.alt} />
-              <span className="text-xs font-bold uppercase tracking-wider text-primary">
-                {s.step}
-              </span>
+              <span className="text-sm font-bold text-primary">{s.step}</span>
               <span className="text-2xl font-bold">{s.title}</span>
               <p className="text-sm/relaxed text-gray-11 max-w-72">{s.body}</p>
             </div>

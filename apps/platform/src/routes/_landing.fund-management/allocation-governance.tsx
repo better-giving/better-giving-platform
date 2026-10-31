@@ -64,9 +64,6 @@ export function AllocationGovernance({ classes = "" }: IAllocationGovernance) {
         </div>
 
         <div className="grid gap-5 content-start">
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">
-            Governance
-          </p>
           <h2 id="governance-heading" className="section-heading">
             Managed like an endowment, open like a commons
           </h2>

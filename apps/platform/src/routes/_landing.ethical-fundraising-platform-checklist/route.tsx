@@ -27,10 +27,7 @@ export default function Page() {
           is just a shorter first page */}
       <header className="border-b border-hairline px-6 py-14 md:py-16 print:border-0 print:pt-4 print:pb-0">
         <div className="mx-auto max-w-3xl">
-          <p className="eyebrow text-primary">
-            Member-powered ethical fundraising
-          </p>
-          <h1 className="hero-heading mt-4">
+          <h1 className="hero-heading">
             Does your donation platform pass the ethics test?
           </h1>
           <p className="mt-5 text-base/relaxed text-gray-11 text-pretty">

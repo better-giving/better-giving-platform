@@ -59,9 +59,6 @@ export default function Page() {
       <div className="bg-linear-to-b from-background to-band pt-16 pb-20">
         <div className="page grid gap-12 lg:grid-cols-[1.1fr_0.9fr] items-center">
           <div className="grid gap-5 justify-items-start">
-            <p className="text-xs font-bold uppercase tracking-wider text-primary">
-              Fiscal Sponsorship
-            </p>
             <h1 className="hero-heading">
               Unlock U.S. donors, wherever you are
             </h1>

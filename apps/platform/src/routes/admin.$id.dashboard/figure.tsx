@@ -20,8 +20,8 @@ export function Figure(props: Props) {
 
   return (
     <div className="card @container">
-      <div className="flex items-center mb-4">
-        <h4 className="">{props.title}</h4>
+      <div className="flex items-center mb-2">
+        <h4 className="text-sm font-medium text-gray-11">{props.title}</h4>
         {props.hover_content ? (
           <HoverCard tip={props.hover_content}>{icon}</HoverCard>
         ) : (
@@ -36,7 +36,7 @@ export function Figure(props: Props) {
           <ArrowRightIcon className="icon-lg" />
         </NavLink>
       </div>
-      <div className="text-lg font-medium ">{props.amount}</div>
+      <div className="figures text-3xl font-bold">{props.amount}</div>
     </div>
   );
 }

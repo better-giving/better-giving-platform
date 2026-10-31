@@ -24,9 +24,6 @@ export function GrowFunds({ classes = "" }: IGrowFunds) {
     <section className={classes} aria-labelledby="grow-funds-heading">
       <div className="page grid gap-14 lg:grid-cols-2 items-center">
         <div className="grid gap-5 content-start">
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">
-            Grow your funds
-          </p>
           <h2 id="grow-funds-heading" className="section-heading">
             This quarter's gifts, next decade's reserves
           </h2>

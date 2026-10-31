@@ -32,7 +32,7 @@ describe("admin sidebar", () => {
 
   it("has no Public Profile group or Media; Manage opens with Organization, Programs", () => {
     expect(linkGroups.map((g) => g.title)).not.toContain("Public Profile");
-    expect(link("Edit Profile")).toBeUndefined();
+    expect(link("Edit profile")).toBeUndefined();
     const manage = linkGroups.find((g) => g.title === "Manage");
     expect(manage?.links.slice(0, 2).map((l) => l.title)).toEqual([
       "Organization",

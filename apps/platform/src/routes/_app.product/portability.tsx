@@ -26,12 +26,9 @@ export function Portability({ classes = "" }: IPortability) {
   return (
     <section className={classes} aria-labelledby="portability-heading">
       <div className="page">
-        <p className="text-xs font-bold uppercase tracking-wider text-primary text-center">
-          No lock-in
-        </p>
         <h2
           id="portability-heading"
-          className="section-heading text-center mt-3 max-w-3xl mx-auto"
+          className="section-heading text-center max-w-3xl mx-auto"
         >
           Your donors are yours, including your recurring donors
         </h2>

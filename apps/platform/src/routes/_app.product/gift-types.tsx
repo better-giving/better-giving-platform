@@ -17,12 +17,9 @@ export function GiftTypes({ classes = "" }: IGiftTypes) {
   return (
     <section className={classes} aria-labelledby="gift-types-heading">
       <div className="page">
-        <p className="text-xs font-bold uppercase tracking-wider text-primary text-center">
-          Payment aggregation
-        </p>
         <h2
           id="gift-types-heading"
-          className="section-heading text-center mt-3 max-w-2xl mx-auto"
+          className="section-heading text-center max-w-2xl mx-auto"
         >
           Every way to give, in one flow
         </h2>

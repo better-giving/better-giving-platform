@@ -23,9 +23,6 @@ const form_embeds: FormEmbed[] = [
 export function Members({ classes = "" }) {
   return (
     <div className={`${classes} grid content-start py-24`}>
-      <h4 className="mb-4 col-span-full text-primary pre-heading uppercase text-center">
-        Members
-      </h4>
       <h2 className="col-span-full text-center section-heading mb-16">
         All-In-One Donation Form in Action
       </h2>

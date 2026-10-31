@@ -34,21 +34,21 @@ export const linkGroups: LinkGroup[] = [
         },
       },
       {
-        title: "My Donations",
+        title: "My donations",
         to: routes.donations,
         icon: {
           fn: CircleDollarSign,
         },
       },
       {
-        title: "Recurring Donations",
+        title: "Recurring donations",
         to: routes.subscriptions,
         icon: {
           fn: RefreshCw,
         },
       },
       {
-        title: "Edit Profile",
+        title: "Edit profile",
         to: routes.edit_profile,
         icon: {
           fn: CircleUserRound,
@@ -69,14 +69,14 @@ export const linkGroups: LinkGroup[] = [
         },
       },
       {
-        title: "My Referrals",
+        title: "My referrals",
         to: routes.referrals,
         icon: {
           fn: MegaphoneIcon,
         },
       },
       {
-        title: "My Donation Forms",
+        title: "My donation forms",
         to: routes.forms,
         icon: {
           fn: BlocksIcon,
