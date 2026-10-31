@@ -50,7 +50,9 @@ export function Nonprofits({ classes = "", npos }: Props) {
           </table>
         </div>
       ) : (
-        <EmptyState>No nonprofits onboarded yet</EmptyState>
+        <div className="card">
+          <EmptyState>No nonprofits onboarded yet</EmptyState>
+        </div>
       )}
     </div>
   );
