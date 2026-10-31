@@ -1475,7 +1475,7 @@ describe("find_nonprofit IRS fallback", () => {
 
     const skipped = await find_nonprofit({ query: "denied" }, req);
     expect(skipped.external_lookup).toBe("skipped");
-    expect(skipped.items).toEqual(local_hits);
+    expect(skipped.items).toEqual(listed_hits);
     expect(fetch).not.toHaveBeenCalled();
     expect(mocks.reserve_shared).toHaveBeenCalledWith(
       expect.stringMatching(/^nonprofits:ip:[0-9a-f]{64}$/),
