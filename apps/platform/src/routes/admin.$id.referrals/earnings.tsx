@@ -84,7 +84,7 @@ export function Earnings({
               </Link>
             </div>
           ) : (
-            <div className="flex items-center mt-4">
+            <div className="flex flex-wrap items-center gap-x-2 mt-4">
               <Info>No default payout method</Info>
               <Link to="../banking" className="text-sm link">
                 Setup

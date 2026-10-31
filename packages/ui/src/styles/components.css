@@ -387,11 +387,11 @@
 
   /* a data table is a card with its inset delegated: the card's fill, resting
      shadow and corner on the table itself, so a table on the ground needs no
-     wrapper to be one, and they travel with it inside a `table-scroll`. no outer
-     edge (a container has none), and its row and column lines are --hairline,
-     the line inside a card. the table is the shell rather than its scroller
-     because several tables have no scroller at all. `separate` borders are
-     what let a table take a border-radius. */
+     wrapper to be one. no outer edge (a container has none), and its row and
+     column lines are --hairline, the line inside a card. the table is the shell
+     rather than its scroller because several tables have no scroller at all;
+     inside a `table-scroll` the shell moves to the scroller (below).
+     `separate` borders are what let a table take a border-radius. */
   .table {
     --table-fill: var(--card);
     --table-corner: var(--radius-card);
@@ -478,5 +478,29 @@
     --table-fill: transparent;
     --table-corner: 0;
     --table-shadow: none;
+  }
+
+  /* a table in a `table-scroll` hands its shell to the scroller. the scroller's
+     box is the table's box and its overflow clips at that edge, so a shadow on
+     the table is cut off on every side and only shows as a square in the
+     corners. the scroller's own shadow sits outside its clip, and its overflow
+     rounds the table's corners for it. `>` so only the scroller directly
+     around the table takes it, never an outer wrapper. */
+  .table-scroll:has(> .table) {
+    background-color: var(--card);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+  .table-scroll > .table {
+    --table-fill: transparent;
+    --table-corner: 0;
+    --table-shadow: none;
+  }
+  /* in a card or dialog the scroller is content too. after the rule above,
+     same specificity. */
+  :where(.card, [role="dialog"]) .table-scroll:has(> .table) {
+    background-color: transparent;
+    border-radius: 0;
+    box-shadow: none;
   }
 }

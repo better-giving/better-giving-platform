@@ -255,8 +255,10 @@ sections or list rows) are `--hairline`. A container has no edge at all.
 A **data table** is a card with its inset delegated: `.table`
 (`packages/ui/src/styles/components.css`) carries `--card`, `shadow-card` and
 `rounded-card` itself, so a table on the ground is its own card and needs no
-wrapper. Inside a `card` or a dialog it drops all three and is that card's
-content: never a card in a card.
+wrapper. In a `table-scroll` the scroller carries all three instead and the
+table none, because the scroller's overflow would clip a shadow on the table.
+Inside a `card` or a dialog both drop all three and are that card's content:
+never a card in a card.
 
 Every token here is a **fill**, and its `-fg` is the only ink authored for it.
 The neutral surfaces are white or gray steps; `--band` (`blue-2`) and

@@ -457,8 +457,9 @@
    36 files spelled it out identically; it carried the same three skin classes
    every time and the axis every time. structure stays the caller's: a `grid`,
    a `col-span-full`, a background or a margin on the same element are all
-   fine, and none of them competes with what this sets. the fill and the
-   corner are the table's own (`.table` in components.css), not this box's.
+   fine, and none of them competes with what this sets. the fill, corner and
+   shadow around a `.table` directly inside are drawn on this box, by
+   components.css, because its overflow would clip them on the table.
 
    it is also the inline-size container `EmptyRow` measures, so a table's one
    empty line centres in the visible width rather than across the full scroll
