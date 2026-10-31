@@ -240,7 +240,6 @@ export function CampaignPage(props: ICampaignPage) {
         }}
         size="donate"
         classes="bg-card"
-        scrim="bg-gray-12/56"
         title="Donate"
         adoptStripeChallenge
         initialFocusEl={() => {

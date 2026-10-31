@@ -45,7 +45,7 @@ export function Portability({ classes = "" }: IPortability) {
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-11">
           {promises.map((p) => (
-            <div key={p.n} className="card">
+            <div key={p.n} className="card shadow-lift-card">
               <span className="block text-3xl font-bold text-primary">
                 {p.n}
               </span>

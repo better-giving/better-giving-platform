@@ -50,7 +50,10 @@ export function Pillars({ classes = "" }: IPillars) {
         </h2>
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 mt-12">
           {pillars.map((p) => (
-            <div key={p.title} className="card flex flex-col gap-2.5">
+            <div
+              key={p.title}
+              className="card shadow-lift-card flex flex-col gap-2.5"
+            >
               <span className="text-xl font-bold">{p.title}</span>
               <p className="text-sm/relaxed">{p.body}</p>
               <Link

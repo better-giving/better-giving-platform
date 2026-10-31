@@ -70,7 +70,7 @@ export const colors = {
   card: "#ffffff",
   panel: "#f6f9fd",
   wash: "#cbe8ff",
-  wash_far: "#ede1ff",
+  wash_far: "#cbf1ff",
   wash_strong: "#b6e0ff",
   hairline: "#ecf1f7",
   primary: "#1e6dab",

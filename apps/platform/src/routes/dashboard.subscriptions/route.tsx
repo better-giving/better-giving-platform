@@ -144,13 +144,15 @@ function Page({ loaderData: { subs } }: Route.ComponentProps) {
           </table>
         </div>
       ) : (
-        <EmptyState classes="mt-6">
-          {filter === "inactive"
-            ? "No cancelled donations found"
-            : filter === "active"
-              ? "No active recurring donations found"
-              : "No recurring donations found"}
-        </EmptyState>
+        <div className="card mt-6">
+          <EmptyState>
+            {filter === "inactive"
+              ? "No cancelled donations found"
+              : filter === "active"
+                ? "No active recurring donations found"
+                : "No recurring donations found"}
+          </EmptyState>
+        </div>
       )}
       {/** cancel prompt */}
       <Outlet />

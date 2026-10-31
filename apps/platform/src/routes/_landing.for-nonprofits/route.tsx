@@ -41,7 +41,7 @@ export default function Page() {
 
   return (
     <main>
-      <header className="border-b border-gray-6 py-14 md:py-16">
+      <header className="border-b border-hairline py-14 md:py-16">
         <div className="page grid gap-10 lg:gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
           <Hero />
           <CtaForm
@@ -55,26 +55,26 @@ export default function Page() {
         </div>
       </header>
 
-      <TrustStrip classes="border-b border-gray-6 py-5" />
+      <TrustStrip classes="border-b border-hairline py-5" />
 
       <TrustBar
         variant="band"
         label="Better Giving by the numbers"
         items={np_stats}
-        classes="bg-gray-3 border-b border-gray-6 py-12"
+        classes="bg-gray-3 border-b border-hairline py-12"
       />
 
-      <PartnersStrip classes="border-b border-gray-6" />
+      <PartnersStrip classes="border-b border-hairline" />
 
-      <Proof classes="border-b border-gray-6 py-16 md:py-20" />
+      <Proof classes="border-b border-hairline py-16 md:py-20" />
 
-      <GiftTypes classes="bg-gray-3 border-b border-gray-6 py-16 md:py-20" />
+      <GiftTypes classes="bg-gray-3 border-b border-hairline py-16 md:py-20" />
 
-      <Grow classes="border-b border-gray-6 py-16 md:py-20" />
+      <Grow classes="border-b border-hairline py-16 md:py-20" />
 
-      <Portability classes="border-b border-gray-6 py-16 md:py-20" />
+      <Portability classes="border-b border-hairline py-16 md:py-20" />
 
-      <div className="bg-gray-3 border-b border-gray-6 py-16 md:py-20">
+      <div className="bg-gray-3 border-b border-hairline py-16 md:py-20">
         <div className="page">
           <FAQ
             items={np_faqs}

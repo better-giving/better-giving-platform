@@ -162,7 +162,7 @@ export function Checklist({ classes = "" }: IChecklist) {
         </button>
       </div>
 
-      <p className="mb-6 flex flex-wrap items-start gap-2 card text-sm text-gray-11">
+      <p className="mb-6 flex flex-wrap items-start gap-2 card shadow-lift-card text-sm text-gray-11">
         <Badge tone="warning">Flashpoint</Badge>
         <span className="min-w-64 flex-1">
           A practice named in the Alaska, multi-state GoFundMe, or California
@@ -175,7 +175,7 @@ export function Checklist({ classes = "" }: IChecklist) {
           <section
             key={section.id}
             aria-labelledby={`${section.id}-heading`}
-            className="card"
+            className="card shadow-lift-card"
           >
             <h2 id={`${section.id}-heading`} className="article-heading">
               {section.title}

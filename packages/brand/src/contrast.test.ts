@@ -129,12 +129,12 @@ const pairings: Pairing[] = [
   // --- the blots, for copy that lands on the ground outside a card
   p("gray-12 on --wash", colors.gray_12, colors.wash, 87.5, min.body),
   p("gray-11 on --wash", colors.gray_11, colors.wash, 63.7, min.content),
-  p("gray-12 on --wash-far", colors.gray_12, colors.wash_far, 88.5, min.body),
+  p("gray-12 on --wash-far", colors.gray_12, colors.wash_far, 91.3, min.body),
   p(
     "gray-11 on --wash-far",
     colors.gray_11,
     colors.wash_far,
-    64.8,
+    67.5,
     min.content
   ),
   p(

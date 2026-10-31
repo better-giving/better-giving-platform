@@ -114,3 +114,19 @@ describe("PublicLayout header", () => {
     );
   });
 });
+
+describe("PublicLayout ground", () => {
+  test.each([
+    ["marketing", "/about-us", false],
+    ["minimal", "/marketplace", true],
+  ])("blots on a %s route (%s): %s", async (_, path, blots) => {
+    const Stub = layout_stub();
+    const screen = await render(
+      <Stub initialEntries={[path]} future={{ v8_middleware: true }} />
+    );
+    await expect.element(screen.getByText("section 299")).toBeInTheDocument();
+
+    const ground = getComputedStyle(document.body, "::before").backgroundImage;
+    expect(ground.includes("radial-gradient")).toBe(blots);
+  });
+});

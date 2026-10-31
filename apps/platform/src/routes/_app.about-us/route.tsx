@@ -32,7 +32,7 @@ export const meta: Route.MetaFunction = () =>
 export default function Page({ loaderData }: Route.ComponentProps) {
   return (
     <main>
-      <div className="pt-20 pb-20 text-center">
+      <div className="bg-linear-to-b from-background to-band pt-20 pb-20 text-center">
         <div className="page">
           <p className="text-xs font-bold uppercase tracking-wider text-primary">
             About Better Giving

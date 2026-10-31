@@ -178,8 +178,9 @@ compile** — writing one produces no rule at all, which is deliberate: it is ho
 two. `rounded-full` and `rounded-none` still work. Nothing is a pill.
 
 **The app is flat, and the shadow namespace is closed.** The surface model, outside in: **ground** (the white page
-under four soft blue and violet blots, fixed to the window — the app paints it, never a screen) → **card** (`card`:
-white, `rounded-card`, **no border, no shadow**; colour shows under part of its edge and the eye completes the box)
+under four soft blue blots, fixed to the window — the app paints it, never a screen; marketing pages are plain white
+with no blots) → **card** (`card`: white, `rounded-card`, **no border, no shadow**; colour shows under part of its
+edge and the eye completes the box. on a marketing page's plain white a card adds `shadow-lift-card`)
 → **well** (`bg-panel rounded`, inside a card) → **field** (white `bg-surface` with its full border). Lines inside a
 card are `border-hairline` / `divide-hairline`; a container never has an edge. `shadow-xs`/`-sm`/`-md`/`-lg`/`-xl`/`-2xl`/`-inner` are reset to `initial` and **fail to
 compile**, so depth cannot be re-picked one call site at a time; `shadow-[…]` still compiles and is caught by a

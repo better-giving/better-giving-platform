@@ -20,7 +20,7 @@ export const meta: Route.MetaFunction = () =>
 export default function Page() {
   return (
     <main>
-      <div className="pt-20 pb-16 text-center">
+      <div className="bg-linear-to-b from-background to-band pt-20 pb-16 text-center">
         <div className="page">
           <p className="text-xs font-bold uppercase tracking-wider text-primary">
             Pricing
@@ -53,7 +53,7 @@ export default function Page() {
             processing fees? Most donors choose to cover them, so the vast
             majority of every gift reaches you.
           </p>
-          <div className="card max-w-xl">
+          <div className="card shadow-lift-card max-w-xl">
             <p className="text-sm/relaxed text-gray-11 text-pretty">
               <strong className="text-gray-12">
                 Prefer no contribution ask on your form?

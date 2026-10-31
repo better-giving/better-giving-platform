@@ -64,15 +64,12 @@ interface Props extends PropsWithChildren {
    * live element left to return to, so it lands on `<body>`.
    */
   returnFocusFallback?: () => HTMLElement | null;
-  /** backdrop fill. the default is the system overlay. */
-  scrim?: string;
   /** element focused when the dialog opens. zag's trap uses it when trap focus is on. */
   initialFocusEl?: () => HTMLElement | null;
 }
 export function Modal({
   size = "sm",
   busy = false,
-  scrim = "bg-overlay",
   adoptStripeChallenge = false,
   ...props
 }: Props) {
@@ -116,9 +113,7 @@ export function Modal({
       onExitComplete={props.onExitComplete}
     >
       <Portal>
-        <Dialog.Backdrop
-          className={`fixed inset-0 ${scrim} z-scrim data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out`}
-        />
+        <Dialog.Backdrop className="fixed inset-0 bg-overlay z-scrim data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out" />
         <Dialog.Positioner className="contents">
           <Dialog.Content
             ref={props.title ? undefined : name_ref}

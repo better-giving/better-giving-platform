@@ -32,7 +32,7 @@ export function GiftTypes({ classes = "" }: IGiftTypes) {
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mt-11">
           {gift_types.map((g) => (
-            <div key={g.title} className="card">
+            <div key={g.title} className="card shadow-lift-card">
               <span className="block font-bold">{g.title}</span>
               <span className="text-sm/normal text-gray-11">{g.body}</span>
             </div>

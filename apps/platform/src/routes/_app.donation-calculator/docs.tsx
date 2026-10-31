@@ -7,7 +7,7 @@ export function Docs({ classes = "" }) {
   const details_id = useId();
 
   return (
-    <div className={`card ${classes}`}>
+    <div className={`card shadow-lift-card ${classes}`}>
       <button
         type="button"
         className="flex items-center gap-x-4 w-full"

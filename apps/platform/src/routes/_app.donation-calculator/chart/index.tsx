@@ -28,7 +28,9 @@ export function Chart({ classes = "", ...v }: Props) {
   });
 
   return (
-    <div className={`${classes} card grid content-start @container`}>
+    <div
+      className={`${classes} card shadow-lift-card grid content-start @container`}
+    >
       <h2 className="text-lg sm:text-xl font-bold mb-4 text-primary">
         {yrs}-Year Financial Advantage
       </h2>

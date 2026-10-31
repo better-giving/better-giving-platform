@@ -52,7 +52,9 @@
    the embedded donation form takes the card/field model but never the ground:
    it sits in an iframe on a nonprofit's own page, so its two routes
    (`donate-widget.$id`, `forms.$id`) mark their root `data-surfaces="embed"`
-   and the page behind them stays the host's. */
+   and the page behind them stays the host's. a marketing page has no blots
+   either: PublicLayout marks its root `data-surfaces="marketing"` from the
+   chrome bucket, and the ground there is --background alone. */
 :root:not(:has([data-surfaces="embed"])) body::before {
   --ground-main: var(--wash);
   content: "";
@@ -69,4 +71,7 @@
 }
 :root:has(.solo-card) body::before {
   --ground-main: var(--wash-strong);
+}
+:root:has([data-surfaces="marketing"]) body::before {
+  background: var(--background);
 }

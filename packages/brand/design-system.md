@@ -169,7 +169,7 @@ last two are the surface model's, the design's own rather than the ramp's):
 | `--warning-fg` on `--warning` (amber-12 on amber-9) | **Lc 52.1** | Lc 60 | the filled warning button's label and the checklist badge; white would be weaker still at Lc 46.4 |
 | `--warning` as a meaningful icon on `gray-1` / white | **Lc 39.9 / 41.8** | Lc 45 | a fill, not an icon ink: a meaningful amber glyph takes `--warning-subtle-fg` (Lc 69.3 / 71.2) |
 | `--hairline` (`gray-3`) on `--card` | **Lc 0.0** | Lc 15 | a line inside a card groups rows rather than gridding them; a line that must be found is `--border` |
-| `gray-11` on `--wash-strong` | **Lc 58.2** | Lc 60 | the solo-card blot sits behind the card, not behind copy; de-emphasised copy on the bare blot takes `gray-12` (Lc 82.0). `gray-11` clears on `--wash` (63.7) and `--wash-far` (64.8) |
+| `gray-11` on `--wash-strong` | **Lc 58.2** | Lc 60 | the solo-card blot sits behind the card, not behind copy; de-emphasised copy on the bare blot takes `gray-12` (Lc 82.0). `gray-11` clears on `--wash` (63.7) and `--wash-far` (67.5) |
 
 Every own-scale band pairing clears: amber-11 is Lc 62.5 on amber-3 and Lc 67.2
 on amber-2, green-11 is Lc 66.1 on green-3, and white on green-9 is Lc 74.3.
@@ -222,13 +222,21 @@ Three rules fall out of that test, and all three are load-bearing:
 2026-10-31 and rolled out to the whole app at once.
 
 - **Ground**: the page. White (`--background`) under four soft radial blots,
-  blue `--wash` at about 6% 6% and 30% 70%, violet `--wash-far` at about 78% 22%
-  and 98% 98%. The blots are **fixed to the window**: they stay put while the
+  blue `--wash` at about 6% 6% and 30% 70%, the lighter, cyan-leaning blue
+  `--wash-far` at about 78% 22% and 98% 98%. The blots are **fixed to the window**: they stay put while the
   page scrolls. Painted once, as a fixed `body::before` in platform's
   `src/index.css` (not `background-attachment: fixed`, which iOS Safari
   ignores), never per screen. A screen holding a `solo-card` swaps the main
-  blue blot for `--wash-strong`.
-- **Card**: white (`--card`), **no border, no shadow**, 12px corners
+  blue blot for `--wash-strong`. **A marketing page has no blots**: the
+  `_landing*` pages and the marketing one-offs under `_app` (about-us, blog,
+  product, the legal pages: every route `public-chrome.tsx` buckets as
+  `marketing`) sit on plain white `--background`. `PublicLayout` marks its root
+  `data-surfaces="marketing"` and `src/index.css` paints the ground there as
+  `--background` alone. On that white, a marketing card spends
+  `shadow-lift-card` (see "The marketing lift"): white on white with no blot
+  under its edge needs the glow to read as a card.
+- **Card**: white (`--card`), **no border, no shadow** (on a marketing page's
+  plain white it adds `shadow-lift-card`, above), 12px corners
   (`rounded-card`). A card needs colour under only part of its edge; the eye
   completes the box. That is the whole reason for the blots.
 - **Well**: `--panel` (`gray-2`) inside a card, at the control corner
@@ -257,13 +265,13 @@ an element: see "the tint ladder" below.
 | `--background` | the page base under the blots: white, `oklch(1 0 0)`. Ink is `text-gray-12`; there is no `--fg`. The figures in this file recorded "on the page" were measured when it was `gray-1`; `gray-1` is still the ground of the emails, and white only raises a dark ink's Lc, so each is a floor for the white page. The white page's own figures are recorded as "on `--card`" |
 | `--card` | the resting container, in the flow or over it: `card`, `solo-card`, and the fill every dialog, menu, popover, combobox and select list, hovercard and toast carries. White, the same value as the page base, on purpose: a card reads off the blots under its edge, never off a border. One card for every ground: the same white reads on a `--band` |
 | `--panel` | a **well** inside a card. `gray-2`, one rung under the card. Not a container fill any more; a hand-written `bg-panel` used as a container (at `rounded-card`, at the card's inset, with a lift, or beside an edge) is the pre-model spelling, and `surface-conformance.node.test.ts` fails it |
-| `--wash` / `--wash-far` / `--wash-strong` | the blots, and nothing else: never text, a fill, a state or a chart. **No utility maps them**, so a call site cannot reach one. `--wash` is the brand blue at blot strength; `--wash-far` is the palette's **only violet**, there so the ground is not one flat hue; `--wash-strong` is the main blot on the single-card screens (login, signup, password reset, check-email, the connector consent screen). Literal `oklch()` rather than ramp steps: the ramp has no violet and no blue rung at this chroma. They have email twins because the mirror is mechanically complete, not because mail uses them |
+| `--wash` / `--wash-far` / `--wash-strong` | the blots, and nothing else: never text, a fill, a state or a chart. **No utility maps them**, so a call site cannot reach one. `--wash` is the brand blue at blot strength; `--wash-far` is a second, lighter blue leaning cyan (hue 225 against `--wash`'s 247), there so the ground is not one flat hue; `--wash-strong` is the main blot on the single-card screens (login, signup, password reset, check-email, the connector consent screen). Literal `oklch()` rather than ramp steps: the ramp has no blue rung at these chromas. They have email twins because the mirror is mechanically complete, not because mail uses them |
 | `--hairline` | a line inside a card: `gray-3`. Lc 0.0 on the white card (under `apca-w3`'s low clip) and an accepted miss against the Lc 15 a separator needs: the design's, because a line inside a card groups rows rather than gridding them. A line that has to be **found** is a control's `--border`, not this. `border-hairline` / `divide-hairline` |
 | `--border` | a form control's edge: field, checkbox, radio, `.btn-secondary`, dropzone. `gray-6`, Lc 19.3 on the card. No longer the separator rung; see "Decisions that look like bugs" for the control-boundary miss |
 | `--surface` | the fill a form control carries: Radix's `--color-surface`. White, the same value as `--card`: inside a card a field is fill-identical and is found by its `--border` alone; inside a well it also lifts off by fill. Not fields only: `.btn-secondary` and the file dropzone rest here too |
 | `--overlay` | the scrim a dialog lays over the page: `gray-12` at 30%, via `color-mix()`. The token is what stops a backdrop being picked by eye. It is the whole of the `modal` level's color: that level carries no shadow, so the scrim and the stacking step are what define it; see "Elevation". **Every backdrop in the app spells it** (the sites are listed under "Dialogs carry no shadow"). `apps/docs` spells it too, in the embed playground's `<dialog>`: that page is our own docs chrome around an embedded form, not a stand-in for a customer's site. The one backdrop outside this token is `demo-nonprofit`'s, and only because that whole page impersonates a fictional nonprofit's website: a system token there would stop it demonstrating the one thing it is for |
 | `--secondary` | second-tier action, plus chips and tags. The button does **not** rest on it: `.btn-secondary` rests on `--surface` with a `--border` (it is a control, and `--surface` is the fill a control carries) and takes `--secondary` (`blue-3`) on hover and `--secondary-active` (`blue-5`) pressed. So `--secondary` is a *state* fill for the button and a *resting* fill for chips: check which one you are in before assuming its ink. Ink is `text-gray-12` |
-| `--band` | the alternating full-bleed section on the marketing pages. A hero is not a band: it sits on the ground, with nothing laid over the blots. `blue-2`, the ramp's page-level subtle ground: **not** a UI element, and nothing hovers it. It is a *lighter* rung than `--secondary`, so every ink figure recorded below against `blue-3` is a floor for this band, not a ceiling. A card on it is the plain white `card` |
+| `--band` | the alternating full-bleed section on the marketing pages, and the far stop of the hero's `--background` → tint gradient. `blue-2`, the ramp's page-level subtle ground: **not** a UI element, and nothing hovers it. It is a *lighter* rung than `--secondary`, so every ink figure recorded below against `blue-3` is a floor for this band, not a ceiling. A card on it is the plain white `card` |
 
 **The dashboard nav paints nothing.** `--sidebar` was deleted with the model:
 the desktop sidebar's links sit on the ground with no fill and no edge. The
@@ -654,7 +662,7 @@ value):
 
 | rung | token | job |
 | --- | --- | --- |
-| `blue-2` | `--band` | a page-level GROUND: the full-bleed marketing section. Nothing hovers it |
+| `blue-2` | `--band` | a page-level GROUND: the full-bleed marketing section, the hero gradient's far stop. Nothing hovers it |
 | `blue-3` | `--secondary` | a UI ELEMENT: a tinted panel or chip at rest, and the hover fill of an element whose resting state is transparent (`.btn-ghost:hover`, a toolbar button, a list row) |
 | `blue-5` | `--secondary-active` | that element SELECTED or pressed (`.selector-opt[data-state="checked"]`) |
 
@@ -1024,9 +1032,10 @@ Recorded so they are not "fixed" by someone reading them as oversights.
 - **`--hairline` measures Lc 0.0 on the card.** Under the Lc 15 a separator
   needs, by design: it groups rows rather than gridding them. Copy that must be
   found does not lean on it.
-- **`--wash-far` is a violet in a blue palette.** The only hue off the brand and
-  status ramps, decorative only (never text, fill, state or chart), and
-  unreachable from a utility. It is there so the ground is not one flat hue.
+- **`--wash-far` is a second blue off the ramp.** Lighter and leaning cyan
+  (`oklch(0.935 0.045 225)`), decorative only (never text, fill, state or
+  chart), and unreachable from a utility. It is there so the ground is not one
+  flat hue.
 
 - **A control's boundary is under its threshold, and the ring does not rescue it.**
   `--border` is `gray-6` at **Lc 17.4** on `gray-1`, Lc 19.3 on the white card

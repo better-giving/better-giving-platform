@@ -47,7 +47,7 @@ export default function Page() {
   return (
     <main>
       <Hero
-        classes="border-b border-gray-6 pt-9 md:pt-14 pb-9 md:pb-12"
+        classes="border-b border-hairline pt-9 md:pt-14 pb-9 md:pb-12"
         errors={result?.errors}
         values={result?.values}
         signed_in_as={result?.signed_in_as}
@@ -55,14 +55,17 @@ export default function Page() {
         pending={nav.state === "submitting"}
       />
       <Credentials classes="bg-panel py-4" />
-      <TrustBar classes="bg-gray-3 border-y border-gray-6 py-7" items={stats} />
-      <PartnersStrip classes="border-b border-gray-6" />
-      <FeeGap classes="bg-gray-3 border-b border-gray-6 py-10 md:py-16" />
-      <RateComparison classes="border-b border-gray-6 py-10 md:py-16" />
-      <HowItWorks classes="border-b border-gray-6 py-10 md:py-16" />
-      <Paperwork classes="bg-gray-3 border-b border-gray-6 py-10 md:py-16" />
-      <Ethical classes="border-b border-gray-6 py-10 md:py-14" />
-      <Quote classes="bg-gray-3 border-b border-gray-6 py-10 md:py-16" />
+      <TrustBar
+        classes="bg-gray-3 border-y border-hairline py-7"
+        items={stats}
+      />
+      <PartnersStrip classes="border-b border-hairline" />
+      <FeeGap classes="bg-gray-3 border-b border-hairline py-10 md:py-16" />
+      <RateComparison classes="border-b border-hairline py-10 md:py-16" />
+      <HowItWorks classes="border-b border-hairline py-10 md:py-16" />
+      <Paperwork classes="bg-gray-3 border-b border-hairline py-10 md:py-16" />
+      <Ethical classes="border-b border-hairline py-10 md:py-14" />
+      <Quote classes="bg-gray-3 border-b border-hairline py-10 md:py-16" />
       <CtaBand
         title="Your mission. U.S. donors. 2.9%."
         subtitle="One short application, reviewed in 3 business days, is all that stands between your organization and tax-deductible U.S. fundraising."

@@ -80,7 +80,7 @@ function PostList({ firstPage }: IPostList) {
 
   return (
     <main>
-      <section className="pt-16 pb-14 text-center">
+      <section className="pt-16 pb-14 text-center bg-linear-to-b from-background to-band">
         <div className="page">
           <p className="pre-heading">Blog &amp; Resources</p>
           <h1 className="hero-heading max-w-3xl mx-auto mt-3">

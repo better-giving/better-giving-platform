@@ -25,7 +25,7 @@ export default function Page() {
     <main>
       {/* paper has its own margin — the screen's breathing room above the fold
           is just a shorter first page */}
-      <header className="border-b border-gray-6 px-6 py-14 md:py-16 print:border-0 print:pt-4 print:pb-0">
+      <header className="border-b border-hairline px-6 py-14 md:py-16 print:border-0 print:pt-4 print:pb-0">
         <div className="mx-auto max-w-3xl">
           <p className="eyebrow text-primary">
             Member-powered ethical fundraising
@@ -53,7 +53,7 @@ export default function Page() {
       <div className="px-6 py-10 md:py-12 print:px-0 print:py-4">
         <Checklist classes="mx-auto max-w-3xl" />
 
-        <footer className="card mx-auto mt-6 max-w-3xl break-inside-avoid text-sm/relaxed text-gray-11">
+        <footer className="card shadow-lift-card mx-auto mt-6 max-w-3xl break-inside-avoid text-sm/relaxed text-gray-11">
           <p>
             <strong className="font-bold text-gray-12">How to use this.</strong>{" "}
             Send unchecked items to your platform's support or account team in

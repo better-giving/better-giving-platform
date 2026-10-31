@@ -167,7 +167,8 @@ describe("a --primary fill declares its own ink", () => {
  * - **an image keeps its frame.** a logo's border on an `object-*` box is the
  *   picture's edge, not a container's.
  * - **a line is not a container's edge.** a side border (`border-b`,
- *   `border-t`) is a divider, and dividers are `border-hairline`.
+ *   `border-t`) is a divider, and dividers are `border-hairline` — which the
+ *   divider test below holds to, with its own two named exemptions.
  * - **the embed's outer box keeps its border**, at its own call site
  *   (`donate-widget.$id`), on `rounded-card` with no container fill: it sits
  *   on a nonprofit's page, not on the ground.
@@ -276,6 +277,33 @@ describe("the surface model", () => {
         !t.some(is_corner) ||
         t.some((c) => c.startsWith("object-"));
       return ok ? [] : [`${file}:${n}`];
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  test("a divider is a hairline", () => {
+    // `gray-6` is a control's edge (`--border`), not a separator. a line that
+    // divides — `divide-*`, or a side border with no full edge beside it — is
+    // `border-hairline` / `divide-hairline`, inside a card and between the
+    // full-width sections of a marketing page alike. a full `border` in
+    // `gray-6` is a control's box and stays out by the predicate.
+    const bare = (c: string) => c.slice(c.lastIndexOf(":") + 1);
+    const is_side = (c: string) => /^border-[tblrxy](-\d)?$/.test(c);
+    const exempt = [
+      // a `bg-gray-3` fill, where a gray-3 hairline would vanish into it
+      "apps/platform/src/routes/_app.forms.$id.edit/snippet.tsx",
+      // a divider inside a control, which takes the control's own edge colour
+      "apps/platform/src/components/token-field/token-field.tsx",
+    ];
+    const offenders = literals.flatMap(({ file, n, t }) => {
+      if (exempt.includes(file)) return [];
+      const b = t.map(bare);
+      if (b.includes("divide-gray-6")) return [`${file}:${n}`];
+      const side_line =
+        b.includes("border-gray-6") &&
+        b.some(is_side) &&
+        !b.some((c) => c === "border" || /^border-\d$/.test(c));
+      return side_line ? [`${file}:${n}`] : [];
     });
     expect(offenders).toEqual([]);
   });

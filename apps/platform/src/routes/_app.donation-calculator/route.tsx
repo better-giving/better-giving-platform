@@ -70,7 +70,7 @@ export default function Page() {
           Export to pdf
         </Link>
 
-        <div className="grid sm:grid-cols-subgrid col-span-2 card">
+        <div className="grid sm:grid-cols-subgrid col-span-2 card shadow-lift-card">
           <Form1
             state={state}
             setState={setState}
@@ -121,7 +121,7 @@ export default function Page() {
           Savings & Investment Calculator
         </h2>
 
-        <div className="grid sm:grid-cols-subgrid col-span-2 card">
+        <div className="grid sm:grid-cols-subgrid col-span-2 card shadow-lift-card">
           <Form2
             state={state}
             setState={setState}

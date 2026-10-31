@@ -12,9 +12,8 @@ const BANNER_TARGET = href("/blog/:slug", { slug: BANNER_POST_SLUG });
 // seam (see public-chrome.tsx).
 export function PublicLayout() {
   const { pathname } = useLocation();
-  const banner =
-    chrome_for(pathname) === "marketing" &&
-    pathname.replace(/\/+$/, "") !== BANNER_TARGET;
+  const marketing = chrome_for(pathname) === "marketing";
+  const banner = marketing && pathname.replace(/\/+$/, "") !== BANNER_TARGET;
 
   return (
     // the row template tracks whether the banner renders: grid auto-placement
@@ -37,7 +36,10 @@ export function PublicLayout() {
     // set on the scroller (<html>) while this shell is mounted, so a `#id` jump
     // lands below the pinned header instead of under it. the banner scrolls
     // away and needs no padding.
+    // a marketing page sits on plain white: index.css drops the blots for a
+    // root holding `data-surfaces="marketing"`.
     <div
+      data-surfaces={marketing ? "marketing" : undefined}
       className={`grid grid-cols-[minmax(0,1fr)] [html:has(&)]:scroll-pt-16 print:block ${
         banner
           ? "grid-rows-[auto_4rem_minmax(calc(100dvh-4rem),1fr)_auto]"

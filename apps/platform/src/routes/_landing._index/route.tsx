@@ -76,7 +76,7 @@ export default function Page() {
   return (
     <main>
       <Hero />
-      <TrustBar classes="border-y border-gray-6 py-7" />
+      <TrustBar classes="border-y border-hairline py-7" />
       <PartnersStrip classes="border-b border-secondary" />
       <Steps classes="py-24" />
       <OwnGrow classes="bg-band py-24" />

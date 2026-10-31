@@ -21,7 +21,9 @@ interface IHero {
 
 export function Hero({ classes = "" }: IHero) {
   return (
-    <div className={`${classes} pt-16 pb-20`}>
+    <div
+      className={`${classes} bg-linear-to-b from-background to-band pt-16 pb-20`}
+    >
       <div className="page grid gap-12 lg:grid-cols-[minmax(22rem,1fr)_minmax(18rem,33rem)] items-center">
         <div className="grid gap-5 justify-items-start">
           <div className="flex flex-wrap gap-2">
