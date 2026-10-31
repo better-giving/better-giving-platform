@@ -133,7 +133,7 @@ export function Table({
                       currency={row.currency}
                       amount_usd={row.usd_value}
                     />
-                    <p className="text-2xs uppercase">{row.frequency}</p>
+                    <p className="text-xs uppercase">{row.frequency}</p>
                   </td>
                   <td className="capitalize">{row.payment_method}</td>
                   <td>

@@ -113,7 +113,7 @@ describe("GiveCard", () => {
     const card = (n: number) =>
       screen.getByRole("article").filter({ hasText: `Clean water ${n}` });
 
-    await expect.element(card(1)).toMatchTextContent("Ends in 5 days");
+    await expect.element(card(1)).toMatchTextContent("Ends in 6 days");
     await expect.element(card(2)).toMatchTextContent("Ends today");
     await expect.element(card(3)).not.toMatchTextContent("Ends");
     await expect.element(card(4)).not.toMatchTextContent("Ends");

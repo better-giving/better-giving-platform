@@ -28,8 +28,8 @@ function Page({ loaderData }: Route.ComponentProps) {
   const total = ltd_total(ltd);
 
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8 w-full max-w-4xl grid content-start">
-      <h3 className="font-bold text-2xl mb-4">Revenue</h3>
+    <div className="px-6 py-4 md:px-10 md:py-8 w-full max-w-[1400px] grid content-start">
+      <h1 className="text-3xl font-bold mb-4">Revenue</h1>
 
       {/* summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -40,7 +40,7 @@ function Page({ loaderData }: Route.ComponentProps) {
       </div>
 
       {/* per-npo breakdown */}
-      <h4 className="font-bold text-lg mt-8 mb-1">Revenue per nonprofit</h4>
+      <h2 className="font-bold text-lg mt-8 mb-1">Revenue per nonprofit</h2>
       <div className="table-scroll">
         <table className="table w-full">
           <thead>
@@ -86,7 +86,7 @@ function Page({ loaderData }: Route.ComponentProps) {
 
       {/* audit trail */}
       <div className="flex items-center justify-between mt-8">
-        <h4 className="font-bold text-lg mb-1">Recent revenues</h4>
+        <h2 className="font-bold text-lg mb-1">Recent revenues</h2>
         {logs_next && (
           <Link to="logs" className="text-sm link">
             See All

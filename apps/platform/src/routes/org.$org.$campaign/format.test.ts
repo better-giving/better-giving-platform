@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   closed_body,
+  days_left,
   donor_label,
   ended_label,
   goal_amount,
@@ -50,6 +51,15 @@ describe("campaign page copy", () => {
     expect(donor_label(0)).toBe("0 donors");
     expect(donor_label(1)).toBe("1 donor");
     expect(donor_label(1284)).toBe("1,284 donors");
+  });
+
+  it("counts a partial day as a whole day left, and nothing once ended", () => {
+    const now = Date.parse("2026-10-18T12:00:00.000Z");
+    expect(days_left("2026-10-23T13:00:00.000Z", now)).toBe(6);
+    expect(days_left("2026-10-23T12:00:00.000Z", now)).toBe(5);
+    expect(days_left("2026-10-18T15:00:00.000Z", now)).toBe(1);
+    expect(days_left("2026-10-18T12:00:00.000Z", now)).toBeNull();
+    expect(days_left("2026-10-17T12:00:00.000Z", now)).toBeNull();
   });
 
   it("counts down in days, then hours, then under an hour", () => {

@@ -19,7 +19,7 @@ export const Diff = ({ el, classes, formatter, a, b }: Props) => {
       { className: `${classes} text-success-subtle-fg` },
       formatter(b),
       " ",
-      <span className="text-2xs">(+{formatter(diff)})</span>
+      <span className="text-xs">(+{formatter(diff)})</span>
     );
   }
 
@@ -28,6 +28,6 @@ export const Diff = ({ el, classes, formatter, a, b }: Props) => {
     { className: `${classes} text-destructive-subtle-fg` },
     formatter(b),
     " ",
-    <span className="text-2xs">(-{formatter(Math.abs(diff))})</span>
+    <span className="text-xs">(-{formatter(Math.abs(diff))})</span>
   );
 };

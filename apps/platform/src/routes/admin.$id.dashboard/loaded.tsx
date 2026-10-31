@@ -1,4 +1,5 @@
 import { EmptyState } from "@better-giving/ui";
+import { to_usd } from "@better-giving/ui/helpers";
 import {
   Arrow as HoverArrow,
   Content as HoverContent,
@@ -13,7 +14,6 @@ import { NavLink } from "react-router";
 import { Cell, Pie, PieChart } from "recharts";
 import { category_colors } from "#/pages/admin/ticker-category-colors";
 import { use_admin_data } from "#/pages/admin/use-admin-data";
-import { humanize } from "@/helpers/decimal";
 import type { TickerCategory } from "@/nav/interfaces";
 import { group_by_category } from "@/nav/interfaces";
 import { min_payout_amount } from "@/npo/schema";
@@ -44,7 +44,7 @@ export function Loaded({ classes = "", ...props }: Props) {
               <Arrow />
             </Content>
           }
-          amount={`$${humanize(props.bal_liq, 2)}`}
+          amount={to_usd(props.bal_liq, 2)}
         />
         <Figure
           title="Investments"
@@ -112,7 +112,7 @@ export function Loaded({ classes = "", ...props }: Props) {
               <HoverArrow />
             </HoverContent>
           }
-          amount={`$ ${humanize(props.bal_lock, 2)}`}
+          amount={to_usd(props.bal_lock, 2)}
         />
       </div>
       <div className="grid grid-cols-3 gap-3 mt-4">

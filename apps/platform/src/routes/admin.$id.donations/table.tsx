@@ -17,9 +17,9 @@ export function Table({ items, load_next, loading, disabled }: Props) {
           <th>Program</th>
           <th>Origin</th>
           <th>Method</th>
-          <th>Amount</th>
-          <th>
-            <div className="flex items-center gap-x-1">
+          <th className="num">Amount</th>
+          <th className="num">
+            <div className="flex items-center justify-end gap-x-1">
               <span>Fees </span>
               <Tooltip
                 tip={
@@ -56,7 +56,7 @@ export function Table({ items, load_next, loading, disabled }: Props) {
               </Tooltip>
             </div>
           </th>
-          <th>Net</th>
+          <th className="num">Net</th>
           <th>Allocation</th>
           <th>Donor</th>
         </tr>

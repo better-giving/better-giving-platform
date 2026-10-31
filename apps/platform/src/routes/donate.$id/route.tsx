@@ -31,15 +31,19 @@ function Page({ loaderData }: Route.ComponentProps) {
   const { endow, program, user, base_url } = loaderData;
   return (
     <div className="w-full">
-      <div className="bg-card h-14.75 w-full flex items-center justify-between px-10 mb-4">
-        <DappLogo classes="h-12" />
-        <Link
-          to={href("/org/:org", { org: endow.id.toString() })}
-          className="font-semibold link"
-        >
-          Cancel
-        </Link>
-      </div>
+      <h1 className="sr-only">Donate to {endow.name}</h1>
+      {/* inner box repeats the content column below so logo and Cancel share its edges */}
+      <header className="bg-card mb-4">
+        <div className="max-w-274.5 mx-auto px-4 py-2 flex items-center justify-between">
+          <DappLogo classes="h-12" />
+          <Link
+            to={href("/org/:org", { org: endow.id.toString() })}
+            className="font-semibold link"
+          >
+            Cancel
+          </Link>
+        </div>
+      </header>
       <div className="md:px-4 max-w-274.5 mx-auto grid md:grid-cols-[1fr_auto] items-start content-start gap-4">
         <div className="@container/org-card col-start-1 row-start-1">
           <OrgCard

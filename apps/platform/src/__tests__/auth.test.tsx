@@ -486,8 +486,11 @@ describe("login flow", () => {
     const Stub = login_stub();
     const screen = await render(<Stub initialEntries={["/login"]} />);
 
-    await screen.getByPlaceholder(/email address/i).fill(TEST_EMAIL);
-    await screen.getByPlaceholder(/password/i).fill(TEST_PW);
+    await expect
+      .element(screen.getByRole("heading", { level: 1 }))
+      .toHaveTextContent("Philanthropy for Everyone");
+    await screen.getByLabelText("Email", { exact: true }).fill(TEST_EMAIL);
+    await screen.getByLabelText("Password", { exact: true }).fill(TEST_PW);
     await screen.getByRole("button", { name: /log in/i }).click();
 
     await expect.element(screen.getByTestId("marketplace")).toBeVisible();

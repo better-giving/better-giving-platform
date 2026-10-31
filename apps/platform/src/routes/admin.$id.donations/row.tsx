@@ -1,10 +1,10 @@
+import { to_usd } from "@better-giving/ui/helpers";
 import { Arrow, Content, Tooltip } from "@better-giving/ui/tooltip";
 import { InfoIcon, TagIcon } from "lucide-react";
 import { href, Link } from "react-router";
 import { Money } from "#/components/money";
 import { default_allocation } from "@/constants/common";
 import { toPP } from "@/helpers/date";
-import { humanize } from "@/helpers/decimal";
 import { AmountFlow } from "./amount-flow";
 import { Fees } from "./fees";
 import { type IRow, origin_text } from "./helpers";
@@ -13,7 +13,7 @@ export function Row(props: IRow) {
   return (
     <>
       <td className="whitespace-nowrap">
-        {props.date ? toPP(props.date) : "--"}
+        {props.date ? toPP(props.date) : <Missing />}
       </td>
       <td>
         {props.program_id ? (
@@ -27,7 +27,7 @@ export function Row(props: IRow) {
             {props.program_name}
           </Link>
         ) : (
-          "--"
+          <Missing />
         )}
       </td>
       <td>
@@ -43,19 +43,19 @@ export function Row(props: IRow) {
           origin_text(props.donation_origin)
         )}
       </td>
-      <td>{props.payment_method ?? "--"}</td>
-      <td>
+      <td>{props.payment_method ?? <Missing />}</td>
+      <td className="num">
         <Money
           amount={+props.amount}
           currency={props.currency}
           amount_usd={+props.amount_usd}
         />
-        <p className="text-2xs uppercase">{props.frequency}</p>
+        <p className="text-xs uppercase">{props.frequency}</p>
       </td>
-      <td>
+      <td className="num">
         <Fees {...props.fees} />
       </td>
-      <td>
+      <td className="num whitespace-nowrap">
         <span
           className={
             props.status === "refunded"
@@ -63,7 +63,7 @@ export function Row(props: IRow) {
               : ""
           }
         >
-          ${humanize(props.net_usd, 2)}
+          {to_usd(props.net_usd, 2)}
         </span>
         {props.status === "refunded" && (
           <Tooltip
@@ -85,7 +85,7 @@ export function Row(props: IRow) {
         />
       </td>
       <td>
-        <div>{props?.donor_name ?? "--"}</div>
+        <div>{props?.donor_name ?? <Missing />}</div>
         <div className="text-xs">{props.donor_email}</div>
         <p className="text-xs mt-0.5">
           {[
@@ -102,4 +102,8 @@ export function Row(props: IRow) {
       </td>
     </>
   );
+}
+
+function Missing() {
+  return <span className="text-gray-11">—</span>;
 }

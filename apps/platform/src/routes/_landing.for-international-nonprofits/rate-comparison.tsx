@@ -22,7 +22,7 @@ const bg: Row = {
   on_100k: { amount: "$2,900", effective: "2.9% effective" },
   on_250k: { amount: "$7,250", effective: "2.9% effective" },
   minimum: (
-    <span className="inline-block text-2xs uppercase tracking-badge font-bold text-warning-fg bg-warning rounded px-1.5 py-0.5">
+    <span className="inline-block text-xs uppercase tracking-badge font-bold text-warning-fg bg-warning rounded px-1.5 py-0.5">
       Confirm
     </span>
   ),

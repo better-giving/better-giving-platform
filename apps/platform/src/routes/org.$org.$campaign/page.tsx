@@ -1,4 +1,4 @@
-import { ExtLink, Image, Modal } from "@better-giving/ui";
+import { ExtLink, GoalBar, Image, Modal } from "@better-giving/ui";
 import { XIcon } from "lucide-react";
 import {
   type ReactNode,
@@ -209,9 +209,8 @@ export function CampaignPage(props: ICampaignPage) {
               />
             </div>
           </div>
-          <footer className="mt-10 flex w-full items-center gap-3 border-t border-hairline py-6 lg:mt-16">
+          <footer className="mt-10 flex w-full items-center py-6 lg:mt-16">
             <DappLogo classes="h-8" />
-            <span className="text-sm font-semibold">Better Giving</span>
           </footer>
         </div>
         {sticky_bar && (
@@ -391,32 +390,9 @@ function Progress(props: ICampaignPage) {
   return (
     <div className="order-3 flex flex-col gap-2 lg:order-none">
       <p className="text-base">{props.raised_line}</p>
-      {props.bar && (
-        <RaisedBar raised={props.bar.raised} goal={props.bar.goal} />
-      )}
+      {props.bar && <GoalBar raised={props.bar.raised} goal={props.bar.goal} />}
       <p className="text-base">{props.donor_line}</p>
       {props.no_gifts && <p className="text-base">No gifts yet</p>}
-    </div>
-  );
-}
-
-function RaisedBar({ raised, goal }: { raised: number; goal: number }) {
-  const percent = goal > 0 ? Math.min(100, (raised / goal) * 100) : 0;
-  const square = percent < 1;
-  const fill = raised <= 0 ? "0px" : `max(4px, ${percent}%)`;
-  return (
-    <div
-      role="progressbar"
-      aria-valuemin={0}
-      aria-valuemax={goal}
-      aria-valuenow={Math.min(raised, goal)}
-      aria-label="Amount raised"
-      className={`h-2 w-full bg-gray-3 inset-shadow-track ${square ? "rounded-none" : "rounded"}`}
-    >
-      <div
-        className={`h-full bg-success shadow-track-fill ${square ? "rounded-none" : "rounded"}`}
-        style={{ width: fill }}
-      />
     </div>
   );
 }

@@ -53,7 +53,7 @@ function Applications({ loaderData: page1 }: Route.ComponentProps) {
 
   return (
     <div className="@container grid content-start gap-y-4 px-6 py-4 md:px-10 md:py-8 w-full">
-      <h3 className="font-bold text-2xl">NPO Applications</h3>
+      <h1 className="text-3xl font-bold">NPO Applications</h1>
       <div className="flex flex-wrap gap-3">
         <form
           onSubmit={handle_search}

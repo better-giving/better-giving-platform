@@ -129,6 +129,14 @@ export function shown_totals(input: {
   };
 }
 
+/** whole days to the end, a partial day counting as one; null once ended.
+ * elapsed time, not calendar days, so server and browser agree in any zone. */
+export function days_left(ends_at: string, now: number): number | null {
+  const ms = Date.parse(ends_at) - now;
+  if (!(ms > 0)) return null;
+  return Math.ceil(ms / DAY);
+}
+
 /** null once the end has passed. the caller shows the ended label instead. */
 export function time_left(ends_at: string, now: Date): string | null {
   const ms = new Date(ends_at).getTime() - now.getTime();
@@ -138,6 +146,6 @@ export function time_left(ends_at: string, now: Date): string | null {
     const hours = Math.ceil(ms / HOUR);
     return hours === 1 ? "1 hour left" : `${hours} hours left`;
   }
-  const days = Math.ceil(ms / DAY);
+  const days = days_left(ends_at, now.getTime());
   return days === 1 ? "1 day left" : `${days} days left`;
 }

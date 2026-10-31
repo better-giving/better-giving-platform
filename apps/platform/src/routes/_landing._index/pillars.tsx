@@ -44,7 +44,7 @@ export function Pillars({ classes = "" }: IPillars) {
       <div className="page">
         <h2
           id="pillars-heading"
-          className="section-heading text-center max-w-2xl mx-auto"
+          className="section-heading text-center text-balance max-w-2xl mx-auto"
         >
           Everything a nonprofit needs to raise, keep, and grow
         </h2>

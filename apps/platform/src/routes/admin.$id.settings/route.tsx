@@ -37,7 +37,7 @@ function Page({ loaderData: endow }: Route.ComponentProps) {
   const [params, set_params] = useSearchParams();
   const tab = shown_tab(params.get("tab"));
   return (
-    <div className="w-full max-w-[1112px] px-6 md:px-10">
+    <div className="w-full max-w-[1400px] px-6 md:px-10">
       <h1 className="pt-4 md:pt-8 mb-6 text-3xl font-bold">Settings</h1>
       <Tabs
         items={TABS.map((item) => ({ value: item.id, label: item.name }))}

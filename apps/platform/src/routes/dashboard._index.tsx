@@ -52,7 +52,7 @@ export default function Page({ loaderData: d }: Route.ComponentProps) {
       <div className="flex items-center gap-x-4 mb-8">
         <UserAvatar avatar={d.avatar_url} classes="size-16" />
         <div className="grid">
-          <h1 className="text-lg font-bold">{d.name}</h1>
+          <h1 className="text-3xl font-bold">{d.name}</h1>
           <span className="text-sm text-gray-11">{d.email}</span>
         </div>
         <Form

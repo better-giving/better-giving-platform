@@ -34,7 +34,7 @@ export function Hero({ classes = "" }: IHero) {
               Open source
             </Badge>
           </div>
-          <h1 className="hero-heading">
+          <h1 className="hero-heading text-balance">
             Every way to give.
             <br />
             One form. <span className="text-primary">Free forever.</span>
