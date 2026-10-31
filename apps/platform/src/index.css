@@ -66,9 +66,9 @@
   pointer-events: none;
   background:
     radial-gradient(38% 34% at 4% 4%, var(--ground-main), transparent 75%),
-    radial-gradient(50% 55% at 78% 22%, var(--wash-far), transparent 75%),
+    radial-gradient(34% 34% at 80% 20%, var(--wash-far), transparent 75%),
     radial-gradient(32% 32% at 30% 72%, var(--wash), transparent 75%),
-    radial-gradient(55% 55% at 98% 98%, var(--wash-far), transparent 75%),
+    radial-gradient(36% 36% at 98% 98%, var(--wash-far), transparent 75%),
     var(--background);
 }
 :root:has(.solo-card) body::before {
