@@ -385,17 +385,33 @@
     color: var(--gray-11);
   }
 
-  /* a table is content inside a card, so it draws no outer edge of its own —
-     the card is the container — and its row and column lines are --hairline,
-     the line inside a card. */
+  /* a data table is a card with its inset delegated: the card's fill and
+     corner on the table itself, so a table on the ground needs no wrapper to
+     be one, and the corners travel with it inside a `table-scroll`. no outer
+     edge (a container has none), and its row and column lines are --hairline,
+     the line inside a card. the table is the shell rather than its scroller
+     because several tables have no scroller at all. `separate` borders are
+     what let a table take a border-radius. */
   .table {
+    --table-fill: var(--card);
+    --table-corner: var(--radius-card);
     min-width: 100%;
     border-collapse: separate;
     border-spacing: 0;
     font-feature-settings: "tnum", "zero";
+    background-color: var(--table-fill);
+    border-radius: var(--table-corner);
 
-    & thead {
+    /* on the cells, not the row group: a cell's own background clips to its
+       corner, a thead's does not. */
+    & thead th {
       background-color: var(--gray-3);
+    }
+    & thead tr:first-child > :first-child {
+      border-start-start-radius: var(--table-corner);
+    }
+    & thead tr:first-child > :last-child {
+      border-start-end-radius: var(--table-corner);
     }
 
     & th {
@@ -429,6 +445,9 @@
       font-size: var(--text-xs);
       font-weight: var(--font-weight-semibold);
       width: 100%;
+      /* the load-more row is the table's last: its hover fill keeps the corner */
+      border-end-start-radius: var(--table-corner);
+      border-end-end-radius: var(--table-corner);
       padding: calc(var(--spacing) * 2);
       display: flex;
       align-items: center;
@@ -448,5 +467,13 @@
         color: var(--gray-11);
       }
     }
+  }
+
+  /* a table already inside a card, or a dialog (which is a card), is content
+     of that card: no second fill, no second corner. same specificity as
+     `.table`, so it has to stay after it. */
+  :where(.card, [role="dialog"]) .table {
+    --table-fill: transparent;
+    --table-corner: 0;
   }
 }

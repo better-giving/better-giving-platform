@@ -462,9 +462,15 @@
    36 files spelled it out identically; it carried the same three skin classes
    every time and the axis every time. structure stays the caller's: a `grid`,
    a `col-span-full`, a background or a margin on the same element are all
-   fine, and none of them competes with what this sets. */
+   fine, and none of them competes with what this sets. the fill and the
+   corner are the table's own (`.table` in components.css), not this box's.
+
+   it is also the inline-size container `EmptyRow` measures, so a table's one
+   empty line centres in the visible width rather than across the full scroll
+   width, where a narrow screen cuts it off. */
 @utility table-scroll {
   @apply overflow-x-auto scrollbars;
+  container-type: inline-size;
 }
 
 /* position only. the corner is the layer's: a dialog box takes `rounded-card`

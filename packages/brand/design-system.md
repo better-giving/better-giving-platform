@@ -240,6 +240,12 @@ Three rules fall out of that test, and all three are load-bearing:
 Lines **inside** a card (table rows, a card's header strip, dividers between
 sections or list rows) are `--hairline`. A container has no edge at all.
 
+A **data table** is a card with its inset delegated: `.table`
+(`packages/ui/src/styles/components.css`) carries `--card` and `rounded-card`
+itself, so a table on the ground is its own card and needs no wrapper. Inside a
+`card` or a dialog it drops both and is that card's content: never a card in a
+card.
+
 Every token here is a **fill**, and its `-fg` is the only ink authored for it.
 The neutral surfaces are white or gray steps; `--band` (`blue-2`) and
 `--secondary` (`blue-3`) are tints of the brand hue and not the brand color
@@ -257,7 +263,7 @@ an element: see "the tint ladder" below.
 | `--surface` | the fill a form control carries: Radix's `--color-surface`. White, the same value as `--card`: inside a card a field is fill-identical and is found by its `--border` alone; inside a well it also lifts off by fill. Not fields only: `.btn-secondary` and the file dropzone rest here too |
 | `--overlay` | the scrim a dialog lays over the page: `gray-12` at 30%, via `color-mix()`. The token is what stops a backdrop being picked by eye. It is the whole of the `modal` level's color: that level carries no shadow, so the scrim and the stacking step are what define it; see "Elevation". **Every backdrop in the app spells it** (the sites are listed under "Dialogs carry no shadow"). `apps/docs` spells it too, in the embed playground's `<dialog>`: that page is our own docs chrome around an embedded form, not a stand-in for a customer's site. The one backdrop outside this token is `demo-nonprofit`'s, and only because that whole page impersonates a fictional nonprofit's website: a system token there would stop it demonstrating the one thing it is for |
 | `--secondary` | second-tier action, plus chips and tags. The button does **not** rest on it: `.btn-secondary` rests on `--surface` with a `--border` (it is a control, and `--surface` is the fill a control carries) and takes `--secondary` (`blue-3`) on hover and `--secondary-active` (`blue-5`) pressed. So `--secondary` is a *state* fill for the button and a *resting* fill for chips: check which one you are in before assuming its ink. Ink is `text-gray-12` |
-| `--band` | the alternating full-bleed section on the marketing pages, and the far stop of the hero's `--background` → tint gradient. `blue-2`, the ramp's page-level subtle ground: **not** a UI element, and nothing hovers it. It is a *lighter* rung than `--secondary`, so every ink figure recorded below against `blue-3` is a floor for this band, not a ceiling. A card on it is the plain white `card` |
+| `--band` | the alternating full-bleed section on the marketing pages. A hero is not a band: it sits on the ground, with nothing laid over the blots. `blue-2`, the ramp's page-level subtle ground: **not** a UI element, and nothing hovers it. It is a *lighter* rung than `--secondary`, so every ink figure recorded below against `blue-3` is a floor for this band, not a ceiling. A card on it is the plain white `card` |
 
 **The dashboard nav paints nothing.** `--sidebar` was deleted with the model:
 the desktop sidebar's links sit on the ground with no fill and no edge. The
@@ -648,7 +654,7 @@ value):
 
 | rung | token | job |
 | --- | --- | --- |
-| `blue-2` | `--band` | a page-level GROUND: the full-bleed marketing section, the hero gradient's far stop. Nothing hovers it |
+| `blue-2` | `--band` | a page-level GROUND: the full-bleed marketing section. Nothing hovers it |
 | `blue-3` | `--secondary` | a UI ELEMENT: a tinted panel or chip at rest, and the hover fill of an element whose resting state is transparent (`.btn-ghost:hover`, a toolbar button, a list row) |
 | `blue-5` | `--secondary-active` | that element SELECTED or pressed (`.selector-opt[data-state="checked"]`) |
 

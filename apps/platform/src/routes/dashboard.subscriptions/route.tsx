@@ -129,7 +129,7 @@ function Page({ loaderData: { subs } }: Route.ComponentProps) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-scroll bg-card rounded-card mt-6">
+        <div className="table-scroll mt-6">
           <table className="table">
             <thead>
               <tr>
