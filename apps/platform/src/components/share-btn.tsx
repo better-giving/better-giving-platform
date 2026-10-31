@@ -71,7 +71,7 @@ export function ShareButton({ classes = "", ...p }: IShareButton) {
         <Portal>
           <Menu.Positioner>
             <Menu.Content
-              className={`z-floating grid grid-cols-2 w-max p-3 rounded bg-panel text-gray-12 shadow-floating ${popup_anim}`}
+              className={`z-floating grid grid-cols-2 w-max p-3 rounded-card bg-card text-gray-12 shadow-floating ${popup_anim}`}
             >
               {menuItems.map((item) => (
                 <Menu.Item key={item.name} value={item.name} asChild>
@@ -98,7 +98,7 @@ export function ShareButton({ classes = "", ...p }: IShareButton) {
                     navigator.clipboard.writeText(p.url);
                   }}
                   className={
-                    "hover:bg-gray-3 data-highlighted:bg-gray-3 data-highlighted:text-gray-12 data-highlighted:outline-2 data-highlighted:outline-ring data-highlighted:-outline-offset-2 border-t text-sm col-span-full flex items-center gap-3 w-full px-3 py-2 rounded hover:text-gray-12"
+                    "hover:bg-gray-3 data-highlighted:bg-gray-3 data-highlighted:text-gray-12 data-highlighted:outline-2 data-highlighted:outline-ring data-highlighted:-outline-offset-2 border-t border-hairline text-sm col-span-full flex items-center gap-3 w-full px-3 py-2 rounded hover:text-gray-12"
                   }
                 >
                   <LinkIcon className="icon-md" />

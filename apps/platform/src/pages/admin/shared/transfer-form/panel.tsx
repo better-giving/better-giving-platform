@@ -62,7 +62,7 @@ export function Panel(props: Props) {
           </p>
         </div>
       ) : (
-        <div className="grid items-center grid-cols-[1fr_auto_1fr] gap-x-4 border-y py-4">
+        <div className="grid items-center grid-cols-[1fr_auto_1fr] gap-x-4 border-y border-hairline py-4">
           <p className=" justify-self-end">
             <span className="text-gray-11 text-xs mr-1">from</span>
             {source.value === "liq" ? (

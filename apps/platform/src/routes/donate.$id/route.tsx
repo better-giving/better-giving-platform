@@ -31,7 +31,7 @@ function Page({ loaderData }: Route.ComponentProps) {
   const { endow, program, user, base_url } = loaderData;
   return (
     <div className="w-full">
-      <div className="bg-panel h-14.75 w-full flex items-center justify-between px-10 mb-4">
+      <div className="bg-card h-14.75 w-full flex items-center justify-between px-10 mb-4">
         <DappLogo classes="h-12" />
         <Link
           to={href("/org/:org", { org: endow.id.toString() })}
@@ -53,7 +53,7 @@ function Page({ loaderData }: Route.ComponentProps) {
         </div>
 
         {/** small screen but space is still enough to render sidebar */}
-        <div className="mx-0 border-b md:contents xs:border xs:mx-4 rounded">
+        <div className="mx-0 md:contents xs:mx-4">
           <Steps
             base_url={base_url}
             source="bg-marketplace"
@@ -80,7 +80,7 @@ function Page({ loaderData }: Route.ComponentProps) {
               program ? { id: program.id, name: program.title } : undefined
             }
             user={user}
-            classes="md:border rounded row-start-2"
+            classes="rounded-card row-start-2"
           />
         </div>
         <FAQ classes="max-md:px-4 md:col-start-2 md:row-span-5 md:w-75.5" />

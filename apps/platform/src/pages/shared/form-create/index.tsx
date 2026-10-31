@@ -20,7 +20,7 @@ export default function Page() {
       }
       size="panel"
       title="Create donation form"
-      classes="grid isolate border bg-background"
+      classes="grid isolate bg-card"
     >
       <Form {...loaderData} />
     </Modal>

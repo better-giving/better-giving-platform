@@ -53,7 +53,7 @@ export default function Page({ loaderData: data }: Route.ComponentProps) {
       {/* the action refuses every write to a non-donor, so they get the page
           read-only: the public message if there is one, and nothing to submit */}
       {!widget_version && (data.is_donor || data.from_public_msg_to_npo) && (
-        <Collapsible.Root className="w-full border bg-panel rounded overflow-hidden">
+        <Collapsible.Root className="w-full bg-card rounded-card overflow-hidden">
           <Collapsible.Trigger className="group flex w-full items-start gap-x-2 p-4 text-left">
             <span className="h-lh flex items-center shrink-0">
               <CheckCircle2Icon
@@ -77,13 +77,13 @@ export default function Page({ loaderData: data }: Route.ComponentProps) {
               <ChevronDownIcon className="icon-xl group-data-[state=open]:rotate-180 transition-transform" />
             </span>
           </Collapsible.Trigger>
-          <Collapsible.Content className="p-4 border-t">
+          <Collapsible.Content className="p-4 border-t border-hairline">
             <PublicMsgForm init={data.from_public_msg_to_npo} />
           </Collapsible.Content>
         </Collapsible.Root>
       )}
       {data.is_donor && data.to_type !== "fund" ? (
-        <Collapsible.Root className="w-full border bg-panel rounded overflow-hidden mt-2">
+        <Collapsible.Root className="w-full bg-card rounded-card overflow-hidden mt-2">
           <Collapsible.Trigger className="group flex w-full items-start gap-x-2 p-4 text-left">
             <span className="h-lh flex items-center shrink-0">
               <CheckCircle2Icon
@@ -109,13 +109,13 @@ export default function Page({ loaderData: data }: Route.ComponentProps) {
               <ChevronDownIcon className="icon-xl group-data-[state=open]:rotate-180 transition-transform" />
             </span>
           </Collapsible.Trigger>
-          <Collapsible.Content className="p-4 border-t">
+          <Collapsible.Content className="p-4 border-t border-hairline">
             <PrivateMsgForm init={data.from_private_msg_to_npo} />
           </Collapsible.Content>
         </Collapsible.Root>
       ) : null}
       {data.is_donor && data.to_type !== "fund" && (
-        <Collapsible.Root className="w-full border bg-panel rounded overflow-hidden mt-2">
+        <Collapsible.Root className="w-full bg-card rounded-card overflow-hidden mt-2">
           <Collapsible.Trigger className="group flex w-full items-start gap-x-2 p-4 text-left">
             <span className="h-lh flex items-center shrink-0">
               <CheckCircle2Icon
@@ -131,7 +131,7 @@ export default function Page({ loaderData: data }: Route.ComponentProps) {
               <ChevronDownIcon className="icon-xl group-data-[state=open]:rotate-180 transition-transform" />
             </span>
           </Collapsible.Trigger>
-          <Collapsible.Content className="p-4 border-t">
+          <Collapsible.Content className="p-4 border-t border-hairline">
             <TributeForm init={data.tribute} />
           </Collapsible.Content>
         </Collapsible.Root>
@@ -159,7 +159,7 @@ export default function Page({ loaderData: data }: Route.ComponentProps) {
         />
       )}
       {!widget_version && (
-        <Collapsible.Root className="mt-2 w-full border bg-panel rounded overflow-hidden">
+        <Collapsible.Root className="mt-2 w-full bg-card rounded-card overflow-hidden">
           <Collapsible.Trigger className="group flex w-full items-start gap-x-2 p-4 text-left">
             <span className="h-lh flex items-center shrink-0">
               <StarIcon className="stroke-warning fill-warning icon-sm" />
@@ -169,7 +169,7 @@ export default function Page({ loaderData: data }: Route.ComponentProps) {
               <ChevronDownIcon className="icon-xl group-data-[state=open]:rotate-180 transition-transform" />
             </span>
           </Collapsible.Trigger>
-          <Collapsible.Content className="p-4 border-t">
+          <Collapsible.Content className="p-4 border-t border-hairline">
             <p className="text-gray-11">
               Encourage your friends to join in and contribute, making a
               collective impact through donations.

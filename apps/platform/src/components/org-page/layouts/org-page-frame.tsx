@@ -22,7 +22,7 @@ export function OrgPageFrame({
 }: IOrgPageFrame) {
   const { npo } = page;
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-background text-gray-12">
+    <div className="flex min-h-[100dvh] flex-col text-gray-12">
       <OrgHeader
         name={npo.name}
         logo={npo.logo}

@@ -79,10 +79,7 @@ export function OrgHeader({
   const donate_in = !waits || (donate_after !== null && gone === donate_after);
 
   return (
-    <header
-      className="sticky -top-px z-sticky border-b bg-background"
-      ref={lift_when_stuck}
-    >
+    <header className="sticky -top-px z-sticky bg-card" ref={lift_when_stuck}>
       <div
         ref={bar}
         className="page flex items-center gap-1 py-1 sm:gap-4 sm:py-2"

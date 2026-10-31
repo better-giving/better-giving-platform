@@ -14,7 +14,7 @@ export function AlreadyRegistered({ name, onClose }: Props) {
       open
       onClose={onClose}
       size="panel"
-      classes="p-8 bg-panel text-gray-12 text-center"
+      classes="p-8 bg-card text-gray-12 text-center"
     >
       <div className="bg-warning grid place-items-center size-14 rounded-full mx-auto mb-5">
         <CircleAlert className="text-warning-fg pictogram-sm" />

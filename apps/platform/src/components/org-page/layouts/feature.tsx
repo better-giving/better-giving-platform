@@ -87,7 +87,7 @@ export function Feature(props: IOrgLayout) {
       <div className="flex flex-col md:grid md:grid-rows-[auto_auto_1fr]">
         <FeatureHero page={props} />
         <div
-          className={`page max-md:border-b max-md:bg-band max-md:pb-8 md:pointer-events-none md:col-start-1 md:row-span-full md:row-start-1 md:pt-10 ${COLUMNS}`}
+          className={`page max-md:border-b max-md:border-hairline max-md:bg-band max-md:pb-8 md:pointer-events-none md:col-start-1 md:row-span-full md:row-start-1 md:pt-10 ${COLUMNS}`}
         >
           <GivePanel
             name={npo.name}
@@ -148,7 +148,7 @@ function FeatureHero({ page }: IFeatureHero) {
   return (
     <BrandBand
       tone="tint"
-      classes="pt-8 pb-6 md:col-start-1 md:row-start-1 md:border-b md:py-10"
+      classes="pt-8 pb-6 md:col-start-1 md:row-start-1 md:border-b md:border-hairline md:py-10"
     >
       <div className={`page ${COLUMNS}`}>
         <div className="flex flex-col gap-4">
@@ -175,7 +175,7 @@ function SectionStrip({ sections }: ISectionStrip) {
   return (
     <nav
       aria-label="Sections"
-      className="border-b md:col-start-1 md:row-start-2 lg:hidden"
+      className="border-b border-hairline md:col-start-1 md:row-start-2 lg:hidden"
     >
       <div className={`page ${COLUMNS}`}>
         {/* the first label's text, not its target, on the page's edge */}

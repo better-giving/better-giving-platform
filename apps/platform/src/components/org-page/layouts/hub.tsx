@@ -142,7 +142,7 @@ function HubHero({ page, donate_ref }: IHubHero) {
   const tagline = npo.tagline?.trim();
   const has_story = !!to_text(npo.overview_pt).trim();
   return (
-    <BrandBand tone="tint" classes="border-b py-6 md:py-10">
+    <BrandBand tone="tint" classes="border-b border-hairline py-6 md:py-10">
       <div className="page grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3.5 md:grid-cols-[auto_minmax(0,1fr)_18rem] md:grid-rows-[auto_auto_auto_auto_1fr] md:items-start md:gap-x-6 md:gap-y-0 lg:grid-cols-[auto_minmax(0,1fr)_24rem] lg:gap-x-8">
         <OrgMark
           name={npo.name}

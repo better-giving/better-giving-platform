@@ -6,7 +6,7 @@ import { RouteModal } from "./route-modal";
 
 function Modal() {
   return (
-    <RouteModal classes="bg-panel p-4">
+    <RouteModal classes="bg-card p-4">
       <h3>Refund preview</h3>
       <p>modal body</p>
     </RouteModal>

@@ -40,7 +40,7 @@ export function ErrorModal() {
   }
 
   return (
-    <Modal open={true} onClose={close} classes="grid bg-panel text-gray-12">
+    <Modal open={true} onClose={close} classes="grid bg-card text-gray-12">
       <div className="px-6 pb-4 text-center mt-6">
         <CircleAlert className="text-destructive mx-auto pictogram-md" />
         <Dialog.Title className="font-bold mt-3">{TITLE}</Dialog.Title>

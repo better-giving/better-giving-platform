@@ -64,7 +64,7 @@ export function Steps({ classes = "" }) {
         Easy as 1-2-3
       </motion.h3>
 
-      <ul className="mt-20 lg:divide-x divide-gray-6 grid gap-y-20 lg:gap-y-0 lg:grid-cols-3">
+      <ul className="mt-20 lg:divide-x divide-hairline grid gap-y-20 lg:gap-y-0 lg:grid-cols-3">
         {items.map((item, idx) => (
           <ListItem {...item} key={idx} index={idx} />
         ))}

@@ -77,7 +77,7 @@ export function AllowScreen({
         </h2>
       </header>
 
-      <div className="flex items-center gap-3 rounded border bg-surface px-4 py-3.5">
+      <div className="flex items-center gap-3 rounded bg-panel px-4 py-3.5">
         <span
           aria-hidden
           className="flex-center size-10 shrink-0 rounded-full bg-primary text-lg font-bold text-primary-fg"

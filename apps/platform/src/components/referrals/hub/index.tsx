@@ -52,7 +52,7 @@ export const Hub = ({ classes = "" }: Props) => {
   return (
     <div className={classes}>
       <h3 className="text-2xl mb-2">Referral Hub</h3>
-      <div className={" bg-gray-3 p-6 rounded border"}>
+      <div className="card">
         <p className="mb-6">
           Your all-in-one resource for sharing Better Giving, equipping you to
           refer nonprofits, grow your network, and earn rewards smoothly.

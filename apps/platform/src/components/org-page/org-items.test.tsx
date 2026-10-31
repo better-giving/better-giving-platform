@@ -194,7 +194,7 @@ describe("card image", () => {
         expect(Math.abs(slot.width / slot.height - 4) / 4).toBeLessThan(0.01);
         // across the top of the card, edge to edge, at every count: the
         // feature card, the halves, the thirds and the program alike
-        expect(slot.top).toBeCloseTo(box.top + 1, 0);
+        expect(slot.top).toBeCloseTo(box.top, 0);
         expect(slot.width).toBeCloseTo(card.clientWidth, 0);
         const img = card.querySelector("img") as HTMLImageElement;
         await expect.poll(() => img.complete).toBe(true);
@@ -440,9 +440,10 @@ describe("ItemsByCount", () => {
     expect(bars).toHaveLength(2);
     const [a, b] = bars.map((x) => x.getBoundingClientRect());
     expect(a.top).toBeCloseTo(b.top, 0);
-    // the figures' line sits on the column's bottom padding plus the border;
+    // the figures' line sits on the column's bottom padding (a card has no
+    // edge);
     // the articles' own bottoms match whatever happens, the grid stretches them
-    const edge = 16 + 1; // p-4 below the column, inside the 1px border
+    const edge = 16; // p-4 below the column
     const articles = screen.getByRole("article").elements();
     expect(articles).toHaveLength(2);
     for (const [i, figures] of ["$1,200 of $5,000", "$300 of $900"].entries()) {

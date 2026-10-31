@@ -95,9 +95,9 @@ function Prompt({
       onClose={() => set_open(false)}
       title={`Share on ${social.title}`}
       size="md"
-      classes="grid content-start border bg-background"
+      classes="grid content-start bg-card"
     >
-      <div className="grid place-items-center relative h-16  font-bold bg-gray-3 border-b">
+      <div className="grid place-items-center relative h-16  font-bold bg-gray-3 border-b border-hairline">
         Share on {social.title}
         <button
           type="button"
@@ -113,7 +113,7 @@ function Prompt({
           if (!node) return;
           set_share_txt(node.innerText);
         }}
-        className="my-6 sm:my-10 mx-4 sm:mx-12 text-sm leading-normal p-3 border rounded"
+        className="my-6 sm:my-10 mx-4 sm:mx-12 text-sm leading-normal p-3 bg-panel rounded"
       >
         I just donated to <span className="font-bold">{recipient.name}</span> on{" "}
         <span className="font-bold">@BetterDotGiving</span>!{" "}

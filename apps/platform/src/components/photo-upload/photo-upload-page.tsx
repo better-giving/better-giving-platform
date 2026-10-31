@@ -174,7 +174,7 @@ export function PhotoUploadPage({
               </>
             }
           >
-            <figure className="border rounded overflow-hidden bg-gray-3 aspect-video">
+            <figure className="rounded overflow-hidden bg-gray-3 aspect-video">
               <img
                 src={view.photo}
                 alt={`The new banner for ${view.campaign}`}
@@ -223,7 +223,7 @@ function Shell({ chip, foot, status, children }: IShell) {
   return (
     <div className="min-h-dvh flex flex-col">
       {/* logo only: the visitor has no account here, so no auth slot */}
-      <header className="border-b bg-surface">
+      <header>
         <div className="page flex items-center justify-between h-18">
           <DappLogo classes="h-10" />
           {chip && (
@@ -505,7 +505,7 @@ function Progress({
       ? Math.min(100, Math.max(0, Math.round((loaded / total) * 100)))
       : 0;
   return (
-    <div className="grid grid-cols-[auto_1fr] items-center gap-4 rounded border border-gray-7 bg-surface p-3">
+    <div className="grid grid-cols-[auto_1fr] items-center gap-4 rounded bg-panel p-3">
       <div className="w-18 h-12 rounded overflow-hidden bg-gray-3">
         <img src={preview_url} alt="" className="size-full object-cover" />
       </div>

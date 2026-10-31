@@ -143,10 +143,37 @@ describe("a --primary fill declares its own ink", () => {
  * the surface model: ground -> card -> well -> field
  * (packages/brand/design-system.md, "Resting surfaces"). a container is
  * `bg-card` + `rounded-card` with no edge; a floating layer is that plus
- * `shadow-floating`. the shared shells in packages/ui are held to it here.
- * the app's own hand-written floating layers still spell the pre-model
- * `bg-panel … border rounded` and are a later sweep's; the rule widens to
- * apps/platform/src once they move.
+ * `shadow-floating`; a well is `bg-panel` at the control corner, inside a
+ * card; a field is the one surface that keeps its edge.
+ *
+ * these read every string literal, not only `className=` values: the
+ * floating layers and the callouts are as often a `const` or a ternary branch
+ * as an attribute.
+ *
+ * ## what stays out, and why
+ *
+ * each of these is dropped by the predicate, not by a list, because each one
+ * is right on its own merits:
+ *
+ * - **a control keeps its edge.** a field, a dropzone, a copy button and a
+ *   `.btn-secondary` rest on `bg-surface`, the control fill, which is not a
+ *   container fill here — WCAG 1.4.11 wants a control's boundary findable.
+ * - **a semantic callout keeps its edge.** `bg-warning-subtle` /
+ *   `bg-destructive-subtle` / the green success notice name a state, and
+ *   their tinted fills are not container fills.
+ * - **a dashed slot keeps its edge.** a dashed border with no fill is an
+ *   empty slot to drop or create into; with no container fill it never meets
+ *   the predicate.
+ * - **an image keeps its frame.** a logo's border on an `object-*` box is the
+ *   picture's edge, not a container's.
+ * - **a line is not a container's edge.** a side border (`border-b`,
+ *   `border-t`) is a divider, and dividers are `border-hairline`.
+ * - **the embed's outer box keeps its border**, at its own call site
+ *   (`donate-widget.$id`), on `rounded-card` with no container fill: it sits
+ *   on a nonprofit's page, not on the ground.
+ *
+ * the named exemptions below are the shapes the predicate cannot tell apart
+ * from a container by their classes alone.
  */
 describe("the surface model", () => {
   // comments blanked first, newlines kept: prose quotes class names in
@@ -162,20 +189,97 @@ describe("the surface model", () => {
       value: m[1] ?? m[2] ?? "",
     }));
 
-  test("a shared floating layer is a card with no edge", () => {
-    const offenders = sources
-      .filter((x) => x.file.startsWith("packages/ui/src/"))
-      .flatMap(({ file, text }) =>
-        string_literals(text).flatMap(({ i, value }) => {
-          const t = raw_tokens(value);
-          if (!t.includes("shadow-floating")) return [];
-          const ok =
-            t.includes("bg-card") &&
-            t.includes("rounded-card") &&
-            !t.some((c) => /^(border|outline)(-[\w-]+)?$/.test(c));
-          return ok ? [] : [`${file}:${line_of(text, i)}`];
-        })
-      );
+  // the sweeps spell their own needles out, in cases and exemption notes.
+  const literals = sources
+    .filter(({ file }) => !file.includes("/__tests__/"))
+    .flatMap(({ file, text }) =>
+      string_literals(text).map(({ i, value }) => ({
+        file,
+        n: line_of(text, i),
+        t: raw_tokens(value),
+      }))
+    );
+
+  test("a floating layer is a card with no edge", () => {
+    // a lone `shadow-floating` is a pinned header's IntersectionObserver
+    // toggling the lift once it sticks; the element's own class string is
+    // read where it is written. pinned chrome, and a panel dropped from it
+    // across the full width, is square: it meets the window's edge, so the
+    // corner is asked only of a layer that floats free.
+    const exempt = [
+      // the hero Donate button lifted over the org banner: a control with a
+      // shadow, not a layer
+      "apps/platform/src/components/org-page/give-panel.tsx",
+    ];
+    const offenders = literals.flatMap(({ file, n, t }) => {
+      if (exempt.includes(file)) return [];
+      if (!t.includes("shadow-floating") || t.length === 1) return [];
+      const pinned =
+        t.includes("sticky") || t.includes("fixed") || t.includes("inset-x-0");
+      const ok =
+        t.includes("bg-card") &&
+        (pinned || t.includes("rounded-card")) &&
+        !t.some((c) => /^(border|outline)(-[\w-]+)?$/.test(c));
+      return ok ? [] : [`${file}:${n}`];
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  test("a well is not a container", () => {
+    // `bg-panel` is gray-2, one rung under the card, and reads as a recess
+    // only inside one. at the container's corner, at the card's inset or
+    // with a card's lift it is the pre-model container spelling, which on the
+    // white ground paints a gray box where a card belongs. an image letterboxed
+    // on it (`object-*`) and a slider thumb riding its track are not boxes.
+    const offenders = literals.flatMap(({ file, n, t }) => {
+      if (!t.includes("bg-panel")) return [];
+      if (t.some((c) => c.startsWith("object-"))) return [];
+      const container =
+        t.includes("rounded-card") ||
+        t.some((c) => /^p-([6-9]|1\d)$/.test(c)) ||
+        t.includes("shadow-lift-card") ||
+        t.includes("shadow-floating");
+      return container ? [`${file}:${n}`] : [];
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  test("a container has no edge", () => {
+    // a container fill beside a full edge and a corner is the pre-model card,
+    // inset or not: the four-class `bg-panel border rounded p-*` the card
+    // sweep used to count, and its delegated-inset siblings (a bordered
+    // media frame, a bordered collapsible, a bordered table shell). the
+    // surface model draws none of them: colour under part of a card's edge
+    // is what sets it off, and lines inside it are `--hairline`.
+    const is_fill = (c: string) =>
+      /^bg-(panel|card|background|gray-\d+)$/.test(c);
+    const is_edge = (c: string) => c === "border" || /^border-\d$/.test(c);
+    const is_corner = (c: string) =>
+      c === "rounded" || c === "rounded-card" || /^rounded-[tblr]$/.test(c);
+    const exempt = [
+      // a warning-edged alert block. its edge is semantic, not a container's
+      "apps/platform/src/pages/admin/shared/deposit-form/panel.tsx",
+      // a native color input sized with --field-size: a control's box
+      "apps/platform/src/routes/admin.$id.assets/qr-code.tsx",
+      // a native <select>, and a control's box is components.css's
+      "apps/platform/src/routes/dashboard.donations/route.tsx",
+      // a role="tablist" holding its tabs at a 4px inset: a control group
+      "apps/platform/src/routes/dashboard.subscriptions/route.tsx",
+      // a subscription chip, whose dashed edge marks it cancelled
+      "apps/platform/src/routes/admin.$id.donors_.$email/route.tsx",
+      // the campaign feed's compact supporter row: a 12px inset the card has
+      // no rung for. an open design question, not a settled shape
+      "apps/platform/src/components/donor-msgs.tsx",
+    ];
+    const offenders = literals.flatMap(({ file, n, t }) => {
+      if (exempt.includes(file)) return [];
+      const ok =
+        !t.some(is_fill) ||
+        !t.some(is_edge) ||
+        !t.some(is_corner) ||
+        t.some((c) => c.startsWith("object-"));
+      return ok ? [] : [`${file}:${n}`];
+    });
     expect(offenders).toEqual([]);
   });
 

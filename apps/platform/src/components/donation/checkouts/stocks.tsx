@@ -143,7 +143,10 @@ export function Stocks(props: StocksDonationDetails) {
         </button>
       )}
 
-      <DonationTerms endowName={grantee} classes="mt-5 border-t pt-4" />
+      <DonationTerms
+        endowName={grantee}
+        classes="mt-5 border-t border-hairline pt-4"
+      />
     </div>
   );
 }

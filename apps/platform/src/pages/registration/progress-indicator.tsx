@@ -52,7 +52,7 @@ export function ProgressIndicator({ step, o_type, classes = "" }: Props) {
   return (
     <div
       style={{ "--gutter": "2.5rem" } as React.CSSProperties}
-      className={`pb-4 pt-4 md:pt-2 max-md:pr-(--gutter) pl-12 md:pl-14 max-md:border-b border-gray-6 ${classes}`}
+      className={`pb-4 pt-4 md:pt-2 max-md:pr-(--gutter) pl-12 md:pl-14 max-md:border-b border-hairline ${classes}`}
     >
       <Steps.Root
         step={Math.max(active_index, 0)}

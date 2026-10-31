@@ -159,7 +159,7 @@ function ReplaceConfirm({
       open={open}
       onClose={() => resolve()}
       onExitComplete={on_closed}
-      classes="bg-panel text-gray-12"
+      classes="bg-card text-gray-12"
     >
       <div className="p-6 sm:p-8 grid gap-2">
         <h3 className="text-lg font-bold">

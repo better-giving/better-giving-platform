@@ -339,7 +339,7 @@ export function ChariotCheckout(props: DafDonationDetails) {
       )}
       <DonationTerms
         endowName={don.recipient.name}
-        classes="border-t mt-5 pt-4 "
+        classes="border-t border-hairline mt-5 pt-4 "
       />
     </Summary>
   );

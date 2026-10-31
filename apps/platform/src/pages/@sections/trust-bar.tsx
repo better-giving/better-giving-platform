@@ -40,11 +40,11 @@ export function TrustBar({
         {items.map((s, i) => (
           <div
             key={s.value}
-            className={`grid gap-0.5 content-start ${band ? "text-center" : ""} ${i > 0 ? `md:border-l md:border-gray-6 ${band ? "" : "md:pl-9"}` : ""} ${
+            className={`grid gap-0.5 content-start ${band ? "text-center" : ""} ${i > 0 ? `md:border-l md:border-hairline ${band ? "" : "md:pl-9"}` : ""} ${
               // a centered 2-up pair reads as a block; a rule between the two
               // halves only fights the centering
               !band && i % 2 === 1
-                ? "max-md:border-l max-md:border-gray-6 max-md:pl-6"
+                ? "max-md:border-l max-md:border-hairline max-md:pl-6"
                 : ""
             }`}
           >

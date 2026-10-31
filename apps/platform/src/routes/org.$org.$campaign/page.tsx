@@ -123,12 +123,12 @@ export function CampaignPage(props: ICampaignPage) {
     <>
       <div
         inert={dialog ? true : undefined}
-        className="min-h-[100dvh] bg-background text-gray-12"
+        className="min-h-[100dvh] text-gray-12"
       >
         {sticky_header && (
           <header
             data-sticky="header"
-            className="fixed inset-x-0 top-0 z-sticky hidden h-14 border-b border-gray-6 bg-gray-1 lg:flex"
+            className="fixed inset-x-0 top-0 z-sticky hidden h-14 bg-card shadow-floating lg:flex"
           >
             <div
               className={`mx-auto flex h-full w-full max-w-[1224px] items-center justify-between gap-3 ${gutter}`}
@@ -209,7 +209,7 @@ export function CampaignPage(props: ICampaignPage) {
               />
             </div>
           </div>
-          <footer className="mt-10 flex w-full items-center gap-3 border-t py-6 lg:mt-16">
+          <footer className="mt-10 flex w-full items-center gap-3 border-t border-hairline py-6 lg:mt-16">
             <DappLogo classes="h-8" />
             <span className="text-sm font-semibold">Better Giving</span>
           </footer>
@@ -217,7 +217,7 @@ export function CampaignPage(props: ICampaignPage) {
         {sticky_bar && (
           <div
             data-sticky="bar"
-            className="fixed inset-x-0 bottom-0 z-sticky flex gap-2 border-t border-gray-6 bg-gray-1 px-5 py-3 lg:hidden"
+            className="fixed inset-x-0 bottom-0 z-sticky flex gap-2 bg-card shadow-floating px-5 py-3 lg:hidden"
           >
             <Share
               trigger="button"
@@ -239,7 +239,7 @@ export function CampaignPage(props: ICampaignPage) {
           set_dialog(false);
         }}
         size="donate"
-        classes="bg-surface"
+        classes="bg-card"
         scrim="bg-gray-12/56"
         title="Donate"
         adoptStripeChallenge
@@ -349,7 +349,7 @@ function Notice(props: ICampaignPage) {
   if (props.gift_failed) {
     return (
       <section className="order-1 lg:order-none">
-        <div className="rounded border border-gray-6 bg-panel">
+        <div className="bg-card rounded-card">
           <div className="flex flex-col gap-2 p-4">
             <h2 className="text-xl font-bold">This gift didn't go through</h2>
             {props.open ? (
@@ -373,7 +373,7 @@ function Notice(props: ICampaignPage) {
   if (!props.open && props.ended_body) {
     return (
       <section className="order-1 lg:order-none">
-        <div className="rounded border border-gray-6 bg-panel">
+        <div className="bg-card rounded-card">
           <div className="flex flex-col gap-2 p-4">
             <h2 className="text-xl font-bold">Giving has ended</h2>
             <p>{props.ended_body}</p>

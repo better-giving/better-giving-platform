@@ -33,7 +33,7 @@ function Page({
   const is_open = fund_is_open(fund, now);
   return (
     <div className="w-full">
-      <div className="bg-panel h-14.75 w-full flex items-center justify-between px-10 mb-4">
+      <div className="bg-card h-14.75 w-full flex items-center justify-between px-10 mb-4">
         <DappLogo classes="h-12" />
         <Link
           to={href("/campaigns/:fund_id", { fund_id: fund.id })}
@@ -55,9 +55,9 @@ function Page({
           />
         </div>
         {/** small screen but space is still enough to render sidebar */}
-        <div className="mx-0 border-b md:contents xs:border xs:mx-4 rounded">
+        <div className="mx-0 md:contents xs:mx-4">
           {!is_open ? (
-            <Info classes="row-start-2 self-center bg-panel rounded h-80 content-center justify-items-center grid">
+            <Info classes="row-start-2 self-center bg-card rounded-card h-80 content-center justify-items-center grid">
               This campaign is already closed and can't accept any more
               donations
             </Info>
@@ -82,7 +82,7 @@ function Page({
               }}
               program={undefined}
               user={user}
-              classes="md:border rounded row-start-2"
+              classes="rounded-card row-start-2"
             />
           )}
         </div>

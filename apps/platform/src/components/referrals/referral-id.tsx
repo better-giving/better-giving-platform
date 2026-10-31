@@ -9,7 +9,7 @@ interface Props {
 
 export function ReferralId({ classes = "", ...p }: Props) {
   return (
-    <div className={`bg-gray-3 p-6 rounded border ${classes}`}>
+    <div className={`card ${classes}`}>
       <div className="mb-4">
         <div className="text-sm font-medium text-gray-11 mb-1">REFERRAL ID</div>
         <div className="flex items-center">

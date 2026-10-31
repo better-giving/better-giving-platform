@@ -30,9 +30,7 @@ export function MarketingHeader({ classes = "" }: IMarketingHeader) {
   const is_signed_in = !!session?.signed_in;
 
   return (
-    <header
-      className={`${classes} relative bg-panel/95 backdrop-blur-md border-b`}
-    >
+    <header className={`${classes} relative bg-card/95 backdrop-blur-md`}>
       {/* the row carries a logo, six labels and two ctas — 944px of intrinsic
           width before a single gap, which is why the nav collapses at 75rem
           rather than at a breakpoint name. the row sits on the same `page`
@@ -108,7 +106,7 @@ export function MarketingHeader({ classes = "" }: IMarketingHeader) {
             onClick={close}
             className="nav:hidden absolute inset-x-0 top-full h-[calc(100dvh_-_100%)] cursor-default bg-gray-12/40 backdrop-blur-sm"
           />
-          <div className="nav:hidden absolute inset-x-0 top-full bg-panel border-b border-secondary shadow-floating">
+          <div className="nav:hidden absolute inset-x-0 top-full bg-card shadow-floating">
             <nav aria-label="Marketing" className="grid gap-1 p-4">
               {links.map((l) => (
                 <NavLink
@@ -122,7 +120,7 @@ export function MarketingHeader({ classes = "" }: IMarketingHeader) {
                   {l.label}
                 </NavLink>
               ))}
-              <div className="my-2 h-px bg-gray-6" />
+              <div className="my-2 h-px bg-hairline" />
               {is_signed_in ? (
                 <Link
                   to={href("/dashboard")}

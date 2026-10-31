@@ -27,7 +27,7 @@ export function Card(props: IOrgLayout) {
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
           {/* a media frame, not `card`: the banner runs edge to edge, so the
               inset is the body's */}
-          <article className="overflow-hidden rounded border bg-panel">
+          <article className="overflow-hidden bg-card rounded-card">
             <OrgBanner src={npo.image} />
             <div className="flex flex-col items-center gap-4 p-6 text-center md:gap-5">
               <OrgMark name={npo.name} logo={npo.logo} size="lg" />

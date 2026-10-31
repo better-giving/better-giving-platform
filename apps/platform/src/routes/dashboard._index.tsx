@@ -75,7 +75,7 @@ export default function Page({ loaderData: d }: Route.ComponentProps) {
       {d.is_admin && (
         <Link
           to={href("/platform")}
-          className="card flex items-center gap-x-3 mb-8 transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+          className="card flex items-center gap-x-3 mb-8 transition-colors hover:bg-panel hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
         >
           <span className="size-8 rounded-full bg-primary/10 text-primary grid place-items-center shrink-0">
             <ShieldIcon className="icon-lg" />
@@ -97,7 +97,7 @@ export default function Page({ loaderData: d }: Route.ComponentProps) {
             <Link
               key={org.id}
               to={href("/admin/:id", { id: org.id.toString() })}
-              className="card flex items-center gap-x-3 transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+              className="card flex items-center gap-x-3 transition-colors hover:bg-panel hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
             >
               <Image
                 loading="lazy"
@@ -162,7 +162,7 @@ function FavoriteCard({ fav }: { fav: IFavorite }) {
     <div className="relative">
       <Link
         to={href("/org/:org", { org: fav.id.toString() })}
-        className="card pr-11 flex items-center gap-x-3 transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+        className="card pr-11 flex items-center gap-x-3 transition-colors hover:bg-panel hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
       >
         <Image
           loading="lazy"

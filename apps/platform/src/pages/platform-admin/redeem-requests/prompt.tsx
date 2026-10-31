@@ -18,7 +18,7 @@ export function Prompt(props: Props) {
   const fetcher_key = `tx-request-${tx_id}-${props.verdict}`;
   const in_flight = useFetcher({ key: fetcher_key }).state !== "idle";
   return (
-    <RouteModal classes="bg-panel" busy={in_flight}>
+    <RouteModal classes="bg-card" busy={in_flight}>
       {/* keyed: the route stays mounted across requests, and the latch from
           one must not swallow the first press on the next */}
       <Content key={tx_id} fetcher_key={fetcher_key} {...props} />
@@ -57,7 +57,7 @@ function Content({ verdict, fetcher_key }: IContent) {
     >
       <input type="hidden" value={verdict} name="verdict" />
       <div className="relative w-full">
-        <h2 className="sm:text-xl font-bold text-center border-b bg-gray-3 p-5">
+        <h2 className="sm:text-xl font-bold text-center border-b border-hairline bg-gray-3 p-5">
           Redeem units request
         </h2>
         <Link

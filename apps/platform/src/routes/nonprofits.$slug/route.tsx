@@ -78,7 +78,7 @@ export default function Page({ loaderData: ctx }: Route.ComponentProps) {
           const observer = new IntersectionObserver(
             ([e]) => {
               const isIntersecting = e.intersectionRatio < 1;
-              e.target.classList.toggle("bg-panel", isIntersecting);
+              e.target.classList.toggle("bg-card", isIntersecting);
               e.target.classList.toggle("shadow-floating", isIntersecting);
             },
             { threshold: [1] }

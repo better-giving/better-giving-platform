@@ -36,7 +36,7 @@ export function OrgFooter({
       ].filter((f) => f.value)
     : [];
   return (
-    <footer className={`border-t bg-panel ${classes}`}>
+    <footer className={`border-t border-hairline bg-panel ${classes}`}>
       {/* a phone reads name, details, then the accounts, each its own row;
           wider screens put the accounts right of the name and the details,
           their heading kept for assistive tech only, on the row under */}
@@ -76,7 +76,7 @@ export function OrgFooter({
         />
       </div>
       <div className="page">
-        <div className="flex border-t py-1">
+        <div className="flex border-t border-hairline py-1">
           <Link
             to="/"
             className="inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-gray-11"
@@ -93,7 +93,7 @@ export function OrgFooter({
 /** the platform credit alone, for a page whose header already names the org */
 export function OrgFooterMinimal() {
   return (
-    <footer className="border-t bg-panel">
+    <footer className="border-t border-hairline bg-panel">
       <div className="page flex justify-center py-3">
         <Link
           to="/"

@@ -24,7 +24,7 @@ export function Loader({ name, logo = flying_character }: IEndow) {
 
   return (
     <Menu.Root positioning={{ placement: "bottom", gutter: 4 }}>
-      <Menu.Trigger className="group flex items-center gap-2 w-full py-4 px-5 border-b text-left focus-visible:outline-2 focus-visible:outline-ring">
+      <Menu.Trigger className="group flex items-center gap-2 w-full py-4 px-5 border-b border-hairline text-left focus-visible:outline-2 focus-visible:outline-ring">
         <Image className="size-14 shrink-0" src={logo || flying_character} />
         <h5 className="text-sm font-bold truncate flex-1">{name}</h5>
         <ChevronsUpDownIcon className="shrink-0 text-gray-11 group-hover:text-gray-12 icon-md" />

@@ -23,7 +23,7 @@ export function Prompt(props: Props) {
   const in_flight =
     useFetcher({ key: fetcher_key(props.verdict) }).state !== "idle";
   return (
-    <RouteModal classes="bg-panel" busy={in_flight}>
+    <RouteModal classes="bg-card" busy={in_flight}>
       <Content {...props} />
     </RouteModal>
   );
@@ -63,7 +63,7 @@ function Content({ verdict }: Props) {
     >
       <input type="hidden" value={verdict} name="type" />
       <div className="relative w-full">
-        <h2 className="sm:text-xl font-bold text-center border-b bg-gray-3 p-5">
+        <h2 className="sm:text-xl font-bold text-center border-b border-hairline bg-gray-3 p-5">
           Banking application
         </h2>
         <Link

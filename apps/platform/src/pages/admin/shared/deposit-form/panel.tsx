@@ -71,7 +71,7 @@ export function Panel({
 
   return (
     <>
-      <div className="p-6 md:p-8 border-b relative">
+      <div className="p-6 md:p-8 border-b border-hairline relative">
         <h2 className="text-2xl font-bold mb-2">Deposit Funds</h2>
         <p className="text-sm text-gray-11">
           Transfer funds to your Better Giving account
@@ -215,7 +215,7 @@ function InfoRow({ label, value, copyable = true }: InfoRowProps) {
             text={value}
             classes={{
               container:
-                "shrink-0 px-2.5 py-1.5 text-xs text-gray-11 bg-panel border rounded hover:bg-gray-3 transition-colors",
+                "shrink-0 px-2.5 py-1.5 text-xs text-gray-11 bg-surface border rounded hover:bg-gray-3 transition-colors",
             }}
           />
         )}
@@ -238,7 +238,7 @@ function InfoRowWithDetails({
           text={value}
           classes={{
             container:
-              "shrink-0 px-2.5 py-1.5 text-xs text-gray-11 bg-panel border rounded hover:bg-gray-3 transition-colors",
+              "shrink-0 px-2.5 py-1.5 text-xs text-gray-11 bg-surface border rounded hover:bg-gray-3 transition-colors",
           }}
         />
       </div>

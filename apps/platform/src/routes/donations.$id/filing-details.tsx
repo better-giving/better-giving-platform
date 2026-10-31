@@ -58,7 +58,7 @@ export function FilingDetails({ classes = "", ...p }: IFilingDetails) {
   if (p.voided) {
     return (
       <section
-        className={`w-full border bg-panel rounded overflow-hidden ${classes}`}
+        className={`w-full bg-card rounded-card overflow-hidden ${classes}`}
       >
         <div className="flex items-start gap-x-2 p-4">
           <span className="h-lh flex items-center shrink-0">
@@ -86,7 +86,7 @@ export function FilingDetails({ classes = "", ...p }: IFilingDetails) {
   if (p.matched) {
     return (
       <section
-        className={`w-full border bg-panel rounded overflow-hidden ${classes}`}
+        className={`w-full bg-card rounded-card overflow-hidden ${classes}`}
       >
         <div className="flex items-start gap-x-2 p-4">
           <span className="h-lh flex items-center shrink-0">
@@ -114,7 +114,7 @@ export function FilingDetails({ classes = "", ...p }: IFilingDetails) {
 
   return (
     <section
-      className={`w-full border bg-panel rounded overflow-hidden ${classes}`}
+      className={`w-full bg-card rounded-card overflow-hidden ${classes}`}
     >
       <div className="flex items-start gap-x-2 p-4">
         <span className="h-lh flex items-center shrink-0">
@@ -134,10 +134,10 @@ export function FilingDetails({ classes = "", ...p }: IFilingDetails) {
       {/* above the table, not below it: the table is seven rows and a donor who
           scrolls past it has left the page. this is the cheaper of the two
           paths out of here and the only one that reaches them later. */}
-      <div className="p-4 border-t">
+      <div className="p-4 border-t border-hairline">
         <EmployerForm init={p.employer} filed={p.filed} />
       </div>
-      <dl className="grid sm:grid-cols-[auto_auto_1fr] border-t">
+      <dl className="grid sm:grid-cols-[auto_auto_1fr] border-t border-hairline">
         <Row label="Recipient legal name" value={LEGAL_NAME} />
         <Row label="EIN (tax ID)" value={EIN} />
         <Row label="Mailing address" value={ADDRESS} />
@@ -156,7 +156,7 @@ export function FilingDetails({ classes = "", ...p }: IFilingDetails) {
           nonprofit reads a form full of Better Giving's details as wrong and
           stops. the second sentence answers the question that raises — where a
           match ends up — before it costs us the filing. */}
-      <p className="text-xs text-gray-11 p-4 border-t">
+      <p className="text-xs text-gray-11 p-4 border-t border-hairline">
         {LEGAL_NAME} granted your gift on to {p.recipient}, and a match works
         the same way: your employer pays {LEGAL_NAME}, and we forward it on to{" "}
         {p.recipient}.
@@ -165,7 +165,7 @@ export function FilingDetails({ classes = "", ...p }: IFilingDetails) {
           an employer's form asks, and an employer who pays us directly asks
           something else entirely. no bank details — this page is public to
           anyone holding its url, so check and mail only. */}
-      <div className="p-4 border-t">
+      <div className="p-4 border-t border-hairline">
         <h3 className="text-sm font-semibold">
           If your employer sends the match directly
         </h3>
@@ -174,7 +174,7 @@ export function FilingDetails({ classes = "", ...p }: IFilingDetails) {
           our details. If yours mails a check instead, this is what they need.
         </p>
       </div>
-      <dl className="grid sm:grid-cols-[auto_auto_1fr] border-t">
+      <dl className="grid sm:grid-cols-[auto_auto_1fr] border-t border-hairline">
         <Row label="Make checks payable to" value={LEGAL_NAME} />
         <Row label="Mail to" value={ADDRESS} />
         {/* the only thing tying an arriving payment back to the gift it
@@ -182,12 +182,12 @@ export function FilingDetails({ classes = "", ...p }: IFilingDetails) {
         <Row label="Reference" value={`Donation ${p.id}`} />
         <Row label="Employer questions" value={emails.hi} last />
       </dl>
-      <p className="text-sm text-gray-11 p-4 border-t">
+      <p className="text-sm text-gray-11 p-4 border-t border-hairline">
         Not sure where to file? Check your employer's giving portal, or forward
         these details to your HR team. They can reach us at {emails.hi} with any
         questions.
       </p>
-      <div className="p-4 border-t">
+      <div className="p-4 border-t border-hairline">
         <FiledBtn filed={p.filed} />
       </div>
     </section>
@@ -264,7 +264,7 @@ function Row({ label, value, children, last }: IRow) {
       </dt>
       <div
         aria-hidden={true}
-        className="max-sm:hidden w-px border-r last:border-none"
+        className="max-sm:hidden w-px border-r border-hairline last:border-none"
       />
       <dd className="px-4 max-sm:pb-3 sm:p-3 flex items-center gap-x-2 text-sm">
         {children ?? value}
@@ -277,7 +277,10 @@ function Row({ label, value, children, last }: IRow) {
         />
       </dd>
       {!last && (
-        <div aria-hidden={true} className="h-px col-span-full border-b" />
+        <div
+          aria-hidden={true}
+          className="h-px col-span-full border-b border-hairline"
+        />
       )}
     </>
   );

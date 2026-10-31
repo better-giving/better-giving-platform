@@ -17,7 +17,7 @@ export function SidebarOpener({ classes = "", linkGroups, rootRoute }: Props) {
       <button
         type="button"
         onClick={() => set_open(true)}
-        className={`flex items-center gap-2 py-5 px-6 border-b font-bold text-sm text-primary ${classes}`}
+        className={`flex items-center gap-2 py-5 px-6 border-b border-hairline font-bold text-sm text-primary ${classes}`}
       >
         <Ico {...active_link.icon} />
         {active_link.title}

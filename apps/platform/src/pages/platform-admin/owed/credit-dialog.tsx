@@ -64,7 +64,7 @@ export function CreditDialog({
       onClose={on_close}
       busy={submitting}
       returnFocusFallback={return_focus_fallback}
-      classes="bg-panel"
+      classes="bg-card"
     >
       {row && (
         <Body

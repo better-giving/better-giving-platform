@@ -111,7 +111,7 @@ export function DonateMethods(props: TDonation) {
         className={
           props.pin
             ? "grid @md/steps:grid-cols-2 gap-2 px-5 sm:px-6 py-4 content-start"
-            : "grid @md/steps:grid-cols-2 gap-2 @xl/steps:gap-0 p-4 @xl/steps:p-0 @xl/steps:grid-cols-[auto_1fr] @2xl/steps:min-w-48 content-start @xl/steps:divide-y @xl/steps:divide-background @xl/steps:border-r"
+            : "grid @md/steps:grid-cols-2 gap-2 @xl/steps:gap-0 p-4 @xl/steps:p-0 @xl/steps:grid-cols-[auto_1fr] @2xl/steps:min-w-48 content-start @xl/steps:divide-y @xl/steps:divide-hairline @xl/steps:border-r @xl/steps:border-hairline"
         }
       >
         {tabs.map((tab) => (

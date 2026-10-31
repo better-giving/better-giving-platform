@@ -44,7 +44,7 @@ function Page({ loaderData: d }: Route.ComponentProps) {
   const profile = org_href(npo);
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-background text-gray-12">
+    <div className="flex min-h-[100dvh] flex-col text-gray-12">
       <OrgHeader
         name={npo.name}
         logo={npo.logo}
@@ -60,7 +60,7 @@ function Page({ loaderData: d }: Route.ComponentProps) {
           <ArrowLeft aria-hidden className="icon-sm" />
           Back to {npo.name}
         </Link>
-        <section className="flex flex-col overflow-hidden rounded border bg-panel">
+        <section className="flex flex-col overflow-hidden bg-card rounded-card">
           {prog.banner && (
             <Image
               src={prog.banner}
@@ -164,7 +164,7 @@ function Campaigns({ campaigns }: ICampaigns) {
 function CampaignCard(c: TCampaign) {
   const goal = goal_amount(c.target, c.raised);
   return (
-    <article className="relative flex h-full flex-col overflow-hidden rounded border bg-panel has-focus-visible:outline-2 has-focus-visible:outline-ring has-focus-visible:-outline-offset-2">
+    <article className="relative flex h-full flex-col overflow-hidden bg-card rounded-card has-focus-visible:outline-2 has-focus-visible:outline-ring has-focus-visible:-outline-offset-2">
       {/* stacked in one grid cell, not positioned, so the card stays the
           box the link's ::after covers. grid-rows-1 makes the row the
           definite 160px, which size-full resolves against; an auto row
