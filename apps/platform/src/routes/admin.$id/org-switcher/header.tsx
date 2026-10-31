@@ -11,7 +11,7 @@ interface IEndow {
   logo?: string | null;
 }
 
-export function Loader({ name, logo = flying_character }: IEndow) {
+export function OrgSwitcher({ name, logo = flying_character }: IEndow) {
   const { user } = use_user();
   const { id: current_id } = useParams();
 
@@ -23,10 +23,17 @@ export function Loader({ name, logo = flying_character }: IEndow) {
     : [{ id: Number(current_id), name, logo: logo || undefined }];
 
   return (
-    <Menu.Root positioning={{ placement: "bottom", gutter: 4 }}>
-      <Menu.Trigger className="group flex items-center gap-2 w-full py-4 px-5 border-b border-hairline text-left focus-visible:outline-2 focus-visible:outline-ring">
-        <Image className="size-14 shrink-0" src={logo || flying_character} />
-        <h5 className="text-sm font-bold truncate flex-1">{name}</h5>
+    <Menu.Root positioning={{ placement: "bottom-start", gutter: 4 }}>
+      {/* the app header's slot from md up, capped so a long name truncates
+          beside the logo; below md the drawer's first row, full width */}
+      <Menu.Trigger className="group flex items-center gap-2 min-w-0 max-md:w-full md:max-w-80 p-2 rounded text-left hover:bg-gray-3 transition-colors focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2">
+        <Image
+          className="size-8 shrink-0 rounded object-cover"
+          src={logo || flying_character}
+        />
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+          {name}
+        </span>
         <ChevronsUpDownIcon className="shrink-0 text-gray-11 group-hover:text-gray-12 icon-md" />
       </Menu.Trigger>
       <Portal>

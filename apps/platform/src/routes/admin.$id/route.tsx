@@ -8,8 +8,8 @@ import { Layout } from "#/layout/dashboard";
 import { npo_get } from "$/pg/queries/npo";
 import type { Route } from "./+types/route";
 import { linkGroups } from "./constants";
+import { OrgSwitcher } from "./org-switcher";
 import { admin_title } from "./page-meta";
-import { Loader as SidebarHeader } from "./sidebar-header";
 import type { LoaderData } from "./types";
 
 export { ErrorBoundary } from "#/components/error";
@@ -45,7 +45,7 @@ export default function AdminLayout({
     <Layout
       rootRoute="/admin/:id/"
       linkGroups={linkGroups}
-      sidebarHeader={<SidebarHeader {...data.endow} />}
+      headerContext={<OrgSwitcher {...data.endow} />}
     />
   );
 }

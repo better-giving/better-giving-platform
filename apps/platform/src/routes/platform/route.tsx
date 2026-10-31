@@ -14,11 +14,6 @@ export const middleware = [auth_mdlwr, admin_mdlwr];
 
 export default function Page() {
   return (
-    <Layout
-      rootRoute={`${href("/platform")}/`}
-      linkGroups={link_groups}
-      // dummy header
-      sidebarHeader={<div className="h-5" />}
-    />
+    <Layout rootRoute={`${href("/platform")}/`} linkGroups={link_groups} />
   );
 }
