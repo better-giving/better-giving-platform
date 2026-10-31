@@ -33,6 +33,8 @@ beforeEach(async () => {
   // Date only: pglite keeps its own timers
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2027-01-01T00:00:00.000Z"));
+  // a take samples Math.random to sweep; unsampled unless a test says otherwise
+  vi.spyOn(Math, "random").mockReturnValue(0.5);
 });
 
 afterEach(() => {

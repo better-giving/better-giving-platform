@@ -63,6 +63,38 @@ describe("rate_limit_release", () => {
   });
 });
 
+describe("rate_limit_release keys", () => {
+  const counts = async () =>
+    Object.fromEntries(
+      (await test_db.db.select().from(rate_limit_windows)).map((r) => [
+        r.key,
+        r.count,
+      ])
+    );
+
+  test("hands back only the named key's use", async () => {
+    const conn = as_db(test_db.db);
+    await rate_limit_take("a", W1, 5, conn);
+    await rate_limit_take("a", W1, 5, conn);
+    await rate_limit_take("b", W1, 5, conn);
+    await rate_limit_take("b", W1, 5, conn);
+
+    await rate_limit_release("a", W1.start, conn);
+
+    expect(await counts()).toEqual({ a: 1, b: 2 });
+  });
+
+  test("a missing row is a no-op", async () => {
+    const conn = as_db(test_db.db);
+    await rate_limit_take("a", W1, 5, conn);
+
+    await rate_limit_release("ghost", W1.start, conn);
+    await rate_limit_release("a", "2027-01-01T00:10:00.000Z", conn);
+
+    expect(await counts()).toEqual({ a: 1 });
+  });
+});
+
 describe("rate_limit_sweep", () => {
   const W2 = {
     start: "2027-01-01T00:10:00.000Z",

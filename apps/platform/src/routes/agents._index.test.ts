@@ -108,6 +108,8 @@ afterAll(async () => {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  // a take samples Math.random to sweep ended windows; unsampled unless a test says
+  vi.spyOn(Math, "random").mockReturnValue(0.5);
   await test_db.current!.db.delete(rate_limit_windows);
   // Date only: pglite keeps its own timers
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -235,6 +237,12 @@ describe("/agents MCP endpoint", () => {
   });
 });
 
+/** takes one use through the endpoint, then fills the window it opened */
+async function fill_window(ip?: string) {
+  await ping(ip);
+  await test_db.current!.db.update(rate_limit_windows).set({ count: 60 });
+}
+
 describe("per-address request limit", () => {
   test("the 61st request in a minute is refused before any tool runs", async () => {
     for (let i = 0; i < 60; i++) {
@@ -264,14 +272,14 @@ describe("per-address request limit", () => {
   });
 
   test("another address keeps its own allowance", async () => {
-    for (let i = 0; i < 60; i++) await ping("192.0.2.1");
+    await fill_window("192.0.2.1");
     expect((await ping("192.0.2.1")).status).toBe(429);
 
     expect((await ping("198.51.100.7")).status).toBe(200);
   });
 
   test("the next minute starts a fresh allowance", async () => {
-    for (let i = 0; i < 60; i++) await ping();
+    await fill_window();
     expect((await ping()).status).toBe(429);
 
     vi.setSystemTime(new Date("2027-01-01T00:01:00.000Z"));
