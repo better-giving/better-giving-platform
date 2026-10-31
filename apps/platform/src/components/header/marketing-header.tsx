@@ -3,7 +3,7 @@ import { useState } from "react";
 import { href, Link, NavLink } from "react-router";
 import { DappLogo } from "#/components/image";
 import { use_session } from "#/hooks/use-session";
-import { UserAvatar } from "./user-avatar";
+import { AccountMenu } from "./account-menu";
 
 const links = [
   { label: "Donation Processing", to: href("/product") },
@@ -56,13 +56,7 @@ export function MarketingHeader({ classes = "" }: IMarketingHeader) {
         {/* fixed cta/avatar slot: anon->avatar swap doesn't shift the nav */}
         <div className="hidden nav:flex items-center justify-end gap-3">
           {is_signed_in ? (
-            <Link
-              to={href("/dashboard")}
-              aria-label="Your dashboard"
-              className="contents"
-            >
-              <UserAvatar avatar={session?.avatar_url} classes="size-7" />
-            </Link>
+            <AccountMenu avatar={session?.avatar_url} />
           ) : (
             <>
               <Link

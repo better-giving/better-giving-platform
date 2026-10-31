@@ -2,7 +2,7 @@ import { Menu } from "@ark-ui/react/menu";
 import { Portal } from "@ark-ui/react/portal";
 import { Image, popup_anim } from "@better-giving/ui";
 import { CheckIcon, ChevronsUpDownIcon } from "lucide-react";
-import { href, Link, useParams } from "react-router";
+import { href, Link, useNavigate, useParams } from "react-router";
 import flying_character from "#/assets/images/flying-character.webp";
 import { use_user } from "#/hooks/use-user";
 
@@ -14,6 +14,7 @@ interface IEndow {
 export function OrgSwitcher({ name, logo = flying_character }: IEndow) {
   const { user } = use_user();
   const { id: current_id } = useParams();
+  const navigate = useNavigate();
 
   const orgs = user && user !== "loading" ? user.orgs : [];
   // trigger always reflects the SSR-loaded current org; fall back to it as the
@@ -42,7 +43,11 @@ export function OrgSwitcher({ name, logo = flying_character }: IEndow) {
   }
 
   return (
-    <Menu.Root positioning={{ placement: "bottom-start", gutter: 4 }}>
+    <Menu.Root
+      positioning={{ placement: "bottom-start", gutter: 4 }}
+      // keyboard selection of a link item navigates client-side, not by a reload
+      navigate={({ node }) => navigate(node.getAttribute("href") ?? "/")}
+    >
       {/* the app header's leading slot, in the logo's place; capped so a long
           name truncates */}
       <Menu.Trigger className="group flex items-center gap-2 min-w-0 max-w-80 p-2 rounded text-left hover:bg-gray-3 transition-colors focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2">
