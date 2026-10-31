@@ -132,8 +132,10 @@ export function AllowScreen({
           </fieldset>
         )}
         <p id={disclosure_id} className="text-sm text-gray-11">
-          This connection can read donors' names and emails, donations,
-          campaigns and forms, and start draft campaigns. It cannot move money.
+          The connection can read donors' names and email addresses, donations,
+          campaigns, and forms. It can create, edit, publish, and end campaigns
+          and add photos to them. It can create, edit, and publish donation
+          forms. It cannot move money.
         </p>
         <div className="grid">
           <div

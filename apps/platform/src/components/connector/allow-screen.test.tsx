@@ -4,7 +4,7 @@ import { render } from "vitest-browser-react";
 import { AllowScreen, type IAllowScreen } from "./allow-screen";
 
 const disclosure =
-  "This connection can read donors' names and emails, donations, campaigns and forms, and start draft campaigns. It cannot move money.";
+  "The connection can read donors' names and email addresses, donations, campaigns, and forms. It can create, edit, publish, and end campaigns and add photos to them. It can create, edit, and publish donation forms. It cannot move money.";
 
 const CONSENT_URL = "/admin/connector/allow?state=oauth-state&client=chatgpt";
 
