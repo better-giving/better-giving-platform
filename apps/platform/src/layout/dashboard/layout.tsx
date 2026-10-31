@@ -32,7 +32,7 @@ export function Layout({
   headerVariant = "default",
 }: DashboardLayoutProps) {
   return (
-    <div className="grid">
+    <div className="grid grid-cols-[minmax(0,1fr)]">
       <AppHeader
         variant={headerVariant}
         classes="sticky z-sticky -top-px"

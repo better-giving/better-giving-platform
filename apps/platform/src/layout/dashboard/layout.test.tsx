@@ -104,6 +104,21 @@ describe("dashboard Layout", () => {
     ).toBeNull();
   });
 
+  test("at phone width a long header context truncates instead of widening the page", async () => {
+    await page.viewport(390, 844);
+    const Stub = stub(
+      <div className="flex items-center gap-2 min-w-0 max-w-80 p-2">
+        <span className="min-w-0 truncate">
+          A Very Long Nonprofit Organization Name For The Greater Riverside Area
+        </span>
+      </div>
+    );
+    await render(<Stub initialEntries={["/dashboard"]} />);
+    await expect
+      .poll(() => document.documentElement.scrollWidth)
+      .toBeLessThanOrEqual(390);
+  });
+
   test("without a header context the logo stands alone", async () => {
     await page.viewport(1440, 900);
     const Stub = stub();
