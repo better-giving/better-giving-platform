@@ -57,7 +57,7 @@ async function rate_limited(request: Request): Promise<Response | null> {
   return rpc_error(
     null,
     -32029,
-    `Request limit reached. Try again in ${s} seconds.`,
+    `Request limit reached. Try again in ${s} ${s === 1 ? "second" : "seconds"}.`,
     { retry_after_s: s },
     { status: 429, headers: { "retry-after": String(s) } }
   );
