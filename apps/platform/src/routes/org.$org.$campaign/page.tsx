@@ -412,10 +412,10 @@ function RaisedBar({ raised, goal }: { raised: number; goal: number }) {
       aria-valuemax={goal}
       aria-valuenow={Math.min(raised, goal)}
       aria-label="Amount raised"
-      className={`h-2 w-full bg-gray-3 ${square ? "rounded-none" : "rounded"}`}
+      className={`h-2 w-full bg-gray-3 inset-shadow-track ${square ? "rounded-none" : "rounded"}`}
     >
       <div
-        className={`h-full bg-success ${square ? "rounded-none" : "rounded"}`}
+        className={`h-full bg-success shadow-track-fill ${square ? "rounded-none" : "rounded"}`}
         style={{ width: fill }}
       />
     </div>

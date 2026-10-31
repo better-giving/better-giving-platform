@@ -20,7 +20,7 @@ export const meta: Route.MetaFunction = () =>
 export default function Page() {
   return (
     <main>
-      <div className="bg-linear-to-b from-background to-band pt-20 pb-16 text-center">
+      <div className="pt-20 pb-16 text-center">
         <div className="page">
           <p className="text-xs font-bold uppercase tracking-wider text-primary">
             Pricing

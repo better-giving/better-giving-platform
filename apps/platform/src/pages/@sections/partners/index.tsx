@@ -43,7 +43,9 @@ export function Partners({
         pauseOnInteraction
         className="group justify-self-center relative w-full h-100"
       >
-        <Marquee.Viewport className="w-full h-full overflow-hidden">
+        {/* the edges fade by mask, not by a fill laid over them: a fill would
+            paint the page colour over the ground's blots */}
+        <Marquee.Viewport className="w-full h-full overflow-hidden mask-y-from-85%">
           <Marquee.Content className="animate-marquee-y group-data-paused:[animation-play-state:paused] motion-reduce:animate-none">
             <Marquee.Item className="flex flex-wrap gap-8 py-4 justify-center">
               {partners.map((partner) => (
@@ -61,14 +63,6 @@ export function Partners({
             </Marquee.Item>
           </Marquee.Content>
         </Marquee.Viewport>
-        <Marquee.Edge
-          side="top"
-          className="absolute top-0 left-0 right-0 h-16 z-10 pointer-events-none bg-linear-to-b from-background to-transparent"
-        />
-        <Marquee.Edge
-          side="bottom"
-          className="absolute bottom-0 left-0 right-0 h-16 z-10 pointer-events-none bg-linear-to-t from-background to-transparent"
-        />
       </Marquee.Root>
       <Stats classes="mt-16" />
     </section>

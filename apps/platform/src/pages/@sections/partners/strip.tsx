@@ -25,7 +25,9 @@ export function PartnersStrip({ classes = "" }: IPartnersStrip) {
         pauseOnInteraction
         className="group relative w-full mt-5"
       >
-        <Marquee.Viewport className="w-full overflow-hidden">
+        {/* the edges fade by mask, not by a fill laid over them: a fill would
+            paint the page colour over the ground's blots */}
+        <Marquee.Viewport className="w-full overflow-hidden mask-x-from-90%">
           <Marquee.Content className="animate-marquee-x group-data-paused:[animation-play-state:paused] motion-reduce:animate-none">
             <Marquee.Item className="flex items-center gap-16 px-8">
               {partners.map((p) => (
@@ -41,14 +43,6 @@ export function PartnersStrip({ classes = "" }: IPartnersStrip) {
             </Marquee.Item>
           </Marquee.Content>
         </Marquee.Viewport>
-        <Marquee.Edge
-          side="start"
-          className="absolute left-0 top-0 bottom-0 w-24 z-10 pointer-events-none bg-linear-to-r from-background to-transparent"
-        />
-        <Marquee.Edge
-          side="end"
-          className="absolute right-0 top-0 bottom-0 w-24 z-10 pointer-events-none bg-linear-to-l from-background to-transparent"
-        />
       </Marquee.Root>
     </section>
   );

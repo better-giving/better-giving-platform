@@ -267,9 +267,6 @@ describe("the surface model", () => {
       "apps/platform/src/routes/dashboard.subscriptions/route.tsx",
       // a subscription chip, whose dashed edge marks it cancelled
       "apps/platform/src/routes/admin.$id.donors_.$email/route.tsx",
-      // the campaign feed's compact supporter row: a 12px inset the card has
-      // no rung for. an open design question, not a settled shape
-      "apps/platform/src/components/donor-msgs.tsx",
     ];
     const offenders = literals.flatMap(({ file, n, t }) => {
       if (exempt.includes(file)) return [];

@@ -131,60 +131,64 @@ export function Loaded({ classes = "", ...props }: Props) {
       </div>
 
       {/** div scopes when the sticky header ends */}
-      <div className="@container/period mt-10">
-        <div className="flex items-center gap-x-2 mb-2">
-          <h4 className="text-lg">Grant items</h4>
-          {props.recent_payouts.items.length > 0 && (
-            <NavLink to="payouts" className="text-primary text-sm">
-              see all
-            </NavLink>
-          )}
-        </div>
-
-        {props.recent_payouts.items.length > 0 ? (
-          <PayoutsTable
-            classes="mt-2 mb-3"
-            items={props.recent_payouts.items}
-          />
-        ) : (
-          <EmptyState
-            classes="mt-2 mb-3"
-            heading="No grant items yet"
-            icon={<ArrowUpFromLineIcon className="icon-xl" />}
-          >
-            Grant items will show up here.
-          </EmptyState>
-        )}
-
-        {props.recent_payouts.items.length > 0 && (
-          <Payout
-            next_payout={props.next_payout}
-            bal_cash={props.bal_cash}
-            threshold={payout_min}
-            pm={props.pm}
-            classes=""
-          />
-        )}
-
-        <div className="flex items-center gap-x-2 mb-2 mt-8">
-          <h4 className="text-lg">Payout history</h4>
-          {props.recent_settlements.next &&
-            props.recent_settlements.items.length > 0 && (
-              <NavLink to="grants" className="text-primary text-sm">
+      <div className="@container/period mt-10 grid gap-6">
+        <section className="card">
+          <div className="flex items-center gap-x-2 mb-2">
+            <h4 className="text-lg">Grant items</h4>
+            {props.recent_payouts.items.length > 0 && (
+              <NavLink to="payouts" className="text-primary text-sm">
                 see all
               </NavLink>
             )}
-        </div>
-        {props.recent_settlements.items.length > 0 ? (
-          <GrantsTable items={props.recent_settlements.items} />
-        ) : (
-          <EmptyState
-            heading="No payout records yet"
-            icon={<ArrowDownToLineIcon className="icon-xl" />}
-          >
-            Payout records will show up here.
-          </EmptyState>
-        )}
+          </div>
+
+          {props.recent_payouts.items.length > 0 ? (
+            <PayoutsTable
+              classes="mt-2 mb-3"
+              items={props.recent_payouts.items}
+            />
+          ) : (
+            <EmptyState
+              classes="mt-2 mb-3"
+              heading="No grant items yet"
+              icon={<ArrowUpFromLineIcon className="icon-xl" />}
+            >
+              Grant items will show up here.
+            </EmptyState>
+          )}
+
+          {props.recent_payouts.items.length > 0 && (
+            <Payout
+              next_payout={props.next_payout}
+              bal_cash={props.bal_cash}
+              threshold={payout_min}
+              pm={props.pm}
+              classes=""
+            />
+          )}
+        </section>
+
+        <section className="card">
+          <div className="flex items-center gap-x-2 mb-2">
+            <h4 className="text-lg">Payout history</h4>
+            {props.recent_settlements.next &&
+              props.recent_settlements.items.length > 0 && (
+                <NavLink to="grants" className="text-primary text-sm">
+                  see all
+                </NavLink>
+              )}
+          </div>
+          {props.recent_settlements.items.length > 0 ? (
+            <GrantsTable items={props.recent_settlements.items} />
+          ) : (
+            <EmptyState
+              heading="No payout records yet"
+              icon={<ArrowDownToLineIcon className="icon-xl" />}
+            >
+              Payout records will show up here.
+            </EmptyState>
+          )}
+        </section>
       </div>
     </div>
   );

@@ -20,10 +20,10 @@ export function GoalBar({
       aria-valuemax={goal}
       aria-valuenow={Math.min(raised, goal)}
       aria-label={label}
-      className={`h-2 w-full overflow-hidden rounded-full bg-gray-3 ${classes}`}
+      className={`h-2 w-full overflow-hidden rounded-full bg-gray-3 inset-shadow-track ${classes}`}
     >
       <div
-        className="h-full rounded-full bg-primary"
+        className="h-full rounded-full bg-primary shadow-track-fill"
         style={{ width: `${percent}%` }}
       />
     </div>
