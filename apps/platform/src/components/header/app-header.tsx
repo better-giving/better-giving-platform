@@ -10,8 +10,8 @@ import { UserAvatar } from "./user-avatar";
 interface IAppHeader {
   variant?: "default" | "minimal" | "bare";
   classes?: string;
-  /** rendered right of the logo from `md` up; below it the dashboard drawer
-   *  carries it instead, since a phone header has no room beside the logo */
+  /** takes the logo's place at every width: the npo admin's header leads with
+   *  the org it is working in (its switcher), not with our brand */
   context?: ReactNode;
 }
 
@@ -46,11 +46,10 @@ export function AppHeader({
     >
       <div className={`${inner} flex items-center gap-4 py-2`}>
         <div className="flex-1 flex items-center gap-4 min-w-0">
-          <DappLogo classes="h-12 w-auto inline-block" />
-          {context && (
-            <div className="max-md:hidden flex items-center min-w-0">
-              {context}
-            </div>
+          {context ? (
+            <div className="flex items-center min-w-0 min-h-12">{context}</div>
+          ) : (
+            <DappLogo classes="h-12 w-auto inline-block" />
           )}
         </div>
         {variant !== "bare" && (

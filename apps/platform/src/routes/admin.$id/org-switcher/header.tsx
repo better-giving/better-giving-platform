@@ -1,7 +1,7 @@
 import { Menu } from "@ark-ui/react/menu";
 import { Portal } from "@ark-ui/react/portal";
 import { Image, popup_anim } from "@better-giving/ui";
-import { CheckIcon, ChevronsUpDownIcon, PlusIcon } from "lucide-react";
+import { CheckIcon, ChevronsUpDownIcon } from "lucide-react";
 import { href, Link, useParams } from "react-router";
 import flying_character from "#/assets/images/flying-character.webp";
 import { use_user } from "#/hooks/use-user";
@@ -22,18 +22,31 @@ export function OrgSwitcher({ name, logo = flying_character }: IEndow) {
     ? orgs
     : [{ id: Number(current_id), name, logo: logo || undefined }];
 
+  const face = (
+    <>
+      <Image
+        className="size-8 shrink-0 rounded object-cover"
+        src={logo || flying_character}
+      />
+      <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+        {name}
+      </span>
+    </>
+  );
+
+  // one org is nothing to switch between: show it, offer no control
+  if (list.length < 2) {
+    return (
+      <div className="flex items-center gap-2 min-w-0 max-w-80 p-2">{face}</div>
+    );
+  }
+
   return (
     <Menu.Root positioning={{ placement: "bottom-start", gutter: 4 }}>
-      {/* the app header's slot from md up, capped so a long name truncates
-          beside the logo; below md the drawer's first row, full width */}
-      <Menu.Trigger className="group flex items-center gap-2 min-w-0 max-md:w-full md:max-w-80 p-2 max-md:px-3 rounded text-left hover:bg-gray-3 transition-colors focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2">
-        <Image
-          className="size-8 shrink-0 rounded object-cover"
-          src={logo || flying_character}
-        />
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-          {name}
-        </span>
+      {/* the app header's leading slot, in the logo's place; capped so a long
+          name truncates */}
+      <Menu.Trigger className="group flex items-center gap-2 min-w-0 max-w-80 p-2 rounded text-left hover:bg-gray-3 transition-colors focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2">
+        {face}
         <ChevronsUpDownIcon className="shrink-0 text-gray-11 group-hover:text-gray-12 icon-md" />
       </Menu.Trigger>
       <Portal>
@@ -61,15 +74,6 @@ export function OrgSwitcher({ name, logo = flying_character }: IEndow) {
                 </Menu.Item>
               );
             })}
-            <Menu.Item value="register" asChild>
-              <Link
-                to={href("/register")}
-                className="hover:bg-gray-3 data-highlighted:bg-gray-3 data-highlighted:text-gray-12 data-highlighted:outline-2 data-highlighted:outline-ring data-highlighted:-outline-offset-2 border-t border-hairline mt-1 flex items-center gap-2 px-2 py-2 rounded text-gray-11 hover:text-gray-12"
-              >
-                <PlusIcon className="shrink-0 icon-md" />
-                <span className="text-sm">Register another org</span>
-              </Link>
-            </Menu.Item>
           </Menu.Content>
         </Menu.Positioner>
       </Portal>

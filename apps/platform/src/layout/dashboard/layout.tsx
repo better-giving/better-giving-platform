@@ -20,7 +20,7 @@ type DashboardLayoutProps = {
 /** the whole dashboard page, not just the sidebar: sticky header, the
  *  sidebar/views grid, minimal footer. all three sidebar surfaces (donor, npo
  *  admin, platform admin) render this and differ only in their links, their
- *  sidebar header, the header context beside the logo, and whether the app
+ *  sidebar header, the header context in the logo's place, and whether the app
  *  header carries an auth slot. the route module keeps its own middleware,
  *  loader and meta — those are route-module contracts and cannot be lifted
  *  into a component. */
@@ -43,7 +43,6 @@ export function Layout({
           classes="md:hidden"
           linkGroups={linkGroups}
           rootRoute={rootRoute}
-          header={headerContext}
         />
         <Sidebar
           classes="max-md:hidden"

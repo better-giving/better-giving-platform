@@ -75,7 +75,7 @@ describe("dashboard Layout", () => {
     ]);
   }
 
-  test("from md up, the header context sits in the app header beside the logo", async () => {
+  test("the header context takes the logo's place in the app header", async () => {
     await page.viewport(1440, 900);
     const Stub = stub(<button type="button">Switch organization</button>);
     const screen = await render(<Stub initialEntries={["/dashboard"]} />);
@@ -84,25 +84,24 @@ describe("dashboard Layout", () => {
     await expect.element(ctx).toBeVisible();
     const banner = screen.getByRole("banner");
     expect(banner.element().contains(ctx.element())).toBe(true);
-    // one row: the slot's wrapper is the logo link's next sibling
-    const logo = banner.getByTitle("Go to Home page").element();
-    expect(logo.nextElementSibling?.contains(ctx.element())).toBe(true);
+    expect(banner.getByTitle("Go to Home page").query()).toBeNull();
   });
 
-  test("at phone width, the header context moves to the top of the drawer", async () => {
+  test("at phone width the header context stays in the header, not the drawer", async () => {
     await page.viewport(390, 844);
     const Stub = stub(<button type="button">Switch organization</button>);
     const screen = await render(<Stub initialEntries={["/dashboard"]} />);
 
-    await expect
-      .element(screen.getByRole("button", { name: "Switch organization" }))
-      .not.toBeInTheDocument();
-    // the stub's link paths sit outside rootRoute, so the opener shows its default
+    const ctx = screen.getByRole("button", { name: "Switch organization" });
+    await expect.element(ctx).toBeVisible();
+    expect(screen.getByRole("banner").element().contains(ctx.element())).toBe(
+      true
+    );
     await screen.getByRole("button", { name: "Open Menu" }).click();
     const drawer = screen.getByRole("dialog", { name: "Dashboard menu" });
-    await expect
-      .element(drawer.getByRole("button", { name: "Switch organization" }))
-      .toBeVisible();
+    expect(
+      drawer.getByRole("button", { name: "Switch organization" }).query()
+    ).toBeNull();
   });
 
   test("without a header context the logo stands alone", async () => {
@@ -112,6 +111,5 @@ describe("dashboard Layout", () => {
 
     const logo = screen.getByRole("banner").getByTitle("Go to Home page");
     await expect.element(logo).toBeInTheDocument();
-    expect(logo.element().nextElementSibling).toBeNull();
   });
 });

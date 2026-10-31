@@ -18,15 +18,13 @@ vi.mock("#/hooks/use-session", () => ({
     revalidate: vi.fn(),
   }),
 }));
+const two_orgs = [
+  { id: 11, name: "Current Org", logo: undefined },
+  { id: 22, name: "Second Org", logo: undefined },
+];
+const user_orgs = vi.hoisted(() => ({ list: [] as unknown[] }));
 vi.mock("#/hooks/use-user", () => ({
-  use_user: () => ({
-    user: {
-      orgs: [
-        { id: 11, name: "Current Org", logo: undefined },
-        { id: 22, name: "Second Org", logo: undefined },
-      ],
-    },
-  }),
+  use_user: () => ({ user: { orgs: user_orgs.list } }),
 }));
 
 import AdminLayout from "./route";
@@ -58,7 +56,8 @@ const Stub = createRoutesStub([
 ]);
 
 describe("npo admin org switcher", () => {
-  test("sits in the app header beside the logo, lists the orgs, and switching navigates", async () => {
+  test("leads the app header in the logo's place, lists the orgs, and switching navigates", async () => {
+    user_orgs.list = two_orgs;
     await page.viewport(1440, 900);
     const screen = await render(<Stub initialEntries={["/admin/11"]} />);
 
@@ -66,14 +65,31 @@ describe("npo admin org switcher", () => {
     const trigger = banner.getByRole("button", { name: "Current Org" });
     await expect.element(trigger).toBeVisible();
 
+    expect(banner.getByTitle("Go to Home page").query()).toBeNull();
+
     await trigger.click();
-    await expect
-      .element(screen.getByRole("menuitem", { name: "Register another org" }))
-      .toBeVisible();
-    await screen.getByRole("menuitem", { name: "Second Org" }).click();
+    const second = screen.getByRole("menuitem", { name: "Second Org" });
+    await expect.element(second).toBeVisible();
+    // registering is a long process, not a menu shortcut
+    expect(
+      screen.getByRole("menuitem", { name: "Register another org" }).query()
+    ).toBeNull();
+    await second.click();
 
     await expect
       .element(screen.getByRole("heading", { name: "viewing org 22" }))
       .toBeVisible();
+  });
+
+  test("with one org the header shows it with no switcher", async () => {
+    user_orgs.list = [two_orgs[0]];
+    await page.viewport(1440, 900);
+    const screen = await render(<Stub initialEntries={["/admin/11"]} />);
+
+    const banner = screen.getByRole("banner");
+    await expect.element(banner.getByText("Current Org")).toBeVisible();
+    expect(
+      banner.getByRole("button", { name: "Current Org" }).query()
+    ).toBeNull();
   });
 });

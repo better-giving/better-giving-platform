@@ -1,4 +1,4 @@
-import React, { type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { NavLink } from "react-router";
 import type { LinkGroup } from "./types";
 
@@ -18,11 +18,13 @@ export function Sidebar({
   return (
     <div className={`flex flex-col w-72 md:w-64 h-full ${classes}`}>
       {sidebarHeader}
-      <nav aria-label="Dashboard" className="grid px-3 py-4">
+      {/* rows within a group sit close; groups sit apart, so the eye reads
+          the groups before the rows */}
+      <nav aria-label="Dashboard" className="grid gap-6 px-3 py-4">
         {linkGroups.map((group) => (
-          <React.Fragment key={`link_group-${group.title}`}>
+          <div key={`link_group-${group.title}`} className="grid gap-0.5">
             {group.title && (
-              <h6 className="pt-5 px-3 pb-1 font-bold text-xs uppercase text-gray-11 tracking-wide">
+              <h6 className="px-3 pb-1 font-bold text-xs uppercase text-gray-11 tracking-wide">
                 {group.title}
               </h6>
             )}
@@ -32,7 +34,7 @@ export function Sidebar({
                 key={`nav_link-${link.to}`}
                 to={link.to}
                 className={({ isActive, isPending }) =>
-                  `flex items-center gap-3 py-3 px-3 rounded font-medium text-sm hover:bg-gray-3 transition-colors focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2 aria-disabled:text-gray-11 aria-disabled:pointer-events-none
+                  `flex items-center gap-3 py-2 px-3 rounded font-medium text-sm hover:bg-gray-3 transition-colors focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2 aria-disabled:text-gray-11 aria-disabled:pointer-events-none
                 ${isActive ? "pointer-events-none text-primary" : ""} ${isPending ? "pointer-events-none text-gray-11" : ""}`
                 }
                 onClick={onChange}
@@ -46,7 +48,7 @@ export function Sidebar({
                 </span>
               </NavLink>
             ))}
-          </React.Fragment>
+          </div>
         ))}
       </nav>
     </div>
