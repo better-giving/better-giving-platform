@@ -32,7 +32,7 @@ describe("donor dashboard shell", () => {
 
     const banner = screen.getByRole("banner");
     await expect
-      .element(banner.getByRole("link", { name: "Your dashboard" }))
+      .element(banner.getByRole("button", { name: "Account menu" }))
       .toBeVisible();
   });
 });

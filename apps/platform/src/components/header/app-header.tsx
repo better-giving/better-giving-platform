@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
-import { href, Link, useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
 import { DappLogo } from "#/components/image";
 import { auth_routes } from "#/constants/routes";
 import { login_url } from "#/helpers/login-url";
 import { use_session } from "#/hooks/use-session";
+import { AccountMenu } from "./account-menu";
 import { AuthBtns } from "./auth-btns";
-import { UserAvatar } from "./user-avatar";
 
 interface IAppHeader {
   variant?: "default" | "minimal" | "bare";
@@ -25,7 +25,7 @@ export function AppHeader({
   const to = auth_routes.includes(p) ? undefined : p + s;
 
   // browse pages (minimal) center their body in page — align the header
-  // content to it. sidebar layouts (default/bare) stay flush-wide.
+  // content to it. every other variant stays flush-wide.
   const inner = variant === "minimal" ? "page" : "px-6";
 
   return (
@@ -78,15 +78,7 @@ function AuthSlot({ variant, signed_in, avatar, is_loading, to }: IAuthSlot) {
   // fixed width reserves the slot so resolving SWR state doesn't reflow the header
   return (
     <div className="flex-none flex items-center justify-end w-48">
-      {!is_loading && signed_in && (
-        <Link
-          to={href("/dashboard")}
-          aria-label="Your dashboard"
-          className="contents"
-        >
-          <UserAvatar avatar={avatar} classes="size-7" />
-        </Link>
-      )}
+      {!is_loading && signed_in && <AccountMenu avatar={avatar} />}
       {/* loading: render nothing visible; correct control appears when SWR resolves */}
       {!is_loading && !signed_in && to && variant === "default" && (
         <AuthBtns to={to} />

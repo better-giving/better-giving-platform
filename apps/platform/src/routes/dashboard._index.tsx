@@ -1,6 +1,6 @@
 import { Image } from "@better-giving/ui";
-import { LogOutIcon, PlusIcon, ShieldIcon, XIcon } from "lucide-react";
-import { Form, href, Link, useFetcher } from "react-router";
+import { PlusIcon, ShieldIcon, XIcon } from "lucide-react";
+import { href, Link, useFetcher } from "react-router";
 import { safeParse } from "valibot";
 import { user_ctx } from "#/.server/auth";
 import { user_bookmarks, user_npos } from "#/.server/user";
@@ -55,20 +55,6 @@ export default function Page({ loaderData: d }: Route.ComponentProps) {
           <h1 className="text-3xl font-bold">{d.name}</h1>
           <span className="text-sm text-gray-11">{d.email}</span>
         </div>
-        <Form
-          method="POST"
-          action={href("/logout")}
-          className="ml-auto shrink-0"
-        >
-          <button
-            type="submit"
-            aria-label="Log Out"
-            className="flex items-center gap-x-2 text-sm text-gray-11 transition-colors hover:text-destructive-subtle-fg focus-visible:outline-2 focus-visible:outline-ring rounded"
-          >
-            <LogOutIcon className="icon-lg shrink-0" />
-            <span className="max-sm:sr-only">Log Out</span>
-          </button>
-        </Form>
       </div>
 
       {/* platform admin — surfaced first for the few users who have it */}

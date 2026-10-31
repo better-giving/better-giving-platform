@@ -13,8 +13,6 @@ interface IFaq {
 interface Props {
   classes?: string;
   items: IFaq[];
-  /** eyebrow above the heading — omitted, nothing renders in its place */
-  pre_heading?: string;
   heading?: string;
   /** lead paragraph between the heading and the first question */
   sub?: string;
@@ -244,17 +242,11 @@ export const faqs = [
 export function FAQ({
   classes = "",
   items,
-  pre_heading,
   heading = "Got questions? We've got answers.",
   sub,
 }: Props) {
   return (
     <section className={`${classes} grid`} aria-labelledby="faq-heading">
-      {pre_heading && (
-        <p className="col-span-full text-center eyebrow text-primary mb-4">
-          {pre_heading}
-        </p>
-      )}
       <h2
         id="faq-heading"
         className="col-span-full text-center section-heading mb-10 border-b-0"

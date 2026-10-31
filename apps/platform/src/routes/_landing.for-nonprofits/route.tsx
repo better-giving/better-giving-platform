@@ -69,7 +69,6 @@ export default function Page() {
         <div className="page">
           <FAQ
             items={np_faqs}
-            pre_heading="Fair questions"
             heading="So how is it actually free?"
             sub="Skepticism is healthy. It's why our answers are verifiable, not just written here."
             classes="max-w-3xl mx-auto"
