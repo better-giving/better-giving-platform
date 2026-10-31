@@ -45,6 +45,8 @@ const { create_test_db } = await import("$/pg/test-utils/pglite");
 const { npo_donors } = await import("#/.server/npo-donors");
 const { headers, loader } = await import("./api");
 const { shown_totals } = await import("./format");
+const { meta } = await import("./route");
+const { base_url } = await import("#/constants/env");
 
 const USER = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
@@ -467,7 +469,8 @@ describe("public campaign page", () => {
     const data = await load("https://x/org/acme/winter");
     expect(data.npo.ein).toBe("22-2222222");
     expect(data.npo.url).toBe("https://acme.example/give");
-    expect(data.npo).not.toHaveProperty("registration_number");
+    // the profile's public credential, carried for the page's structured data
+    expect(data.npo.registration_number).toBe("EIN-PUBLIC");
     expect(data.npo).not.toHaveProperty("tagline");
   });
 
@@ -1144,5 +1147,232 @@ describe("public campaign page", () => {
     const past = await load("https://x/org/acme/past");
     expect(ended.closed).toBe(true);
     expect(past.closed).toBe(true);
+  });
+});
+
+describe("campaign page structured data", () => {
+  type Descriptor = Record<string, any>;
+  async function meta_of(url: string) {
+    const u = new URL(url);
+    const params = {
+      org: u.pathname.split("/")[2]!,
+      campaign: u.pathname.split("/")[3]!,
+    };
+    const loaderData = await load(url);
+    return (meta as any)({ loaderData, params }) as Descriptor[];
+  }
+  const lds_of = (ds: Descriptor[]) =>
+    ds.filter((d) => "script:ld+json" in d).map((d) => d["script:ld+json"]);
+
+  it("describes a public campaign as a project of its 501(c)(3) owner", async () => {
+    const npo = await org(true, "https://acme.example");
+    await test_db
+      .current!.db.update(npos)
+      .set({ logo: "https://cdn.example/org-logo.png" })
+      .where(eq(npos.id, npo.id));
+    await campaign(npo.id);
+    await test_db
+      .current!.db.update(campaigns)
+      .set({
+        target_number: 5000,
+        banner: "https://cdn.example/hero.png",
+        logo: "https://cdn.example/mark.png",
+        description_pt: JSON.stringify([
+          {
+            _type: "block",
+            _key: "a",
+            style: "normal",
+            markDefs: [],
+            children: [
+              { _type: "span", _key: "b", text: "Coats for kids.", marks: [] },
+            ],
+          },
+        ]),
+      })
+      .where(eq(campaigns.id, "camp-public"));
+    await test_db.current!.db.insert(registrations).values({
+      id: "approved-ld",
+      r_id: "approved-ld@test.com",
+      status: "03",
+      o_type: "501c3",
+      o_ein: "22-2222222",
+      status_approved_npo_id: npo.id,
+    });
+
+    const ds = await meta_of("https://x/org/acme/winter");
+    const page = "https://x/org/acme/winter";
+    const org_url = `${base_url}/org/acme`;
+
+    expect(lds_of(ds)).toEqual([
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        url: page,
+        name: "Winter drive",
+        about: {
+          "@type": "Project",
+          "@id": `${page}#campaign`,
+          name: "Winter drive",
+          description: "Coats for kids.",
+          image: "https://cdn.example/hero.png",
+          url: page,
+          parentOrganization: {
+            "@type": "NGO",
+            "@id": `${org_url}#org`,
+            name: "Acme",
+            url: org_url,
+            logo: "https://cdn.example/org-logo.png",
+            address: {
+              "@type": "PostalAddress",
+              addressCountry: "United States",
+            },
+            sameAs: ["https://acme.example"],
+            taxID: "22-2222222",
+            nonprofitStatus: "Nonprofit501c3",
+          },
+          additionalProperty: [
+            {
+              "@type": "PropertyValue",
+              name: "Fundraising goal",
+              value: {
+                "@type": "MonetaryAmount",
+                currency: "USD",
+                value: 5000,
+              },
+            },
+            {
+              "@type": "PropertyValue",
+              name: "Amount raised",
+              value: { "@type": "MonetaryAmount", currency: "USD", value: 0 },
+            },
+          ],
+          potentialAction: {
+            "@type": "DonateAction",
+            recipient: { "@id": `${org_url}#org` },
+            target: [{ "@type": "EntryPoint", urlTemplate: page }],
+          },
+        },
+        subjectOf: [
+          {
+            "@type": "WebPage",
+            name: "Better Giving agent guide",
+            url: `${base_url}/agents`,
+          },
+          {
+            "@type": "CreativeWork",
+            name: "llms.txt",
+            url: `${base_url}/llms.txt`,
+            encodingFormat: "text/plain",
+          },
+        ],
+      },
+    ]);
+    expect(ds.filter((d) => d.rel === "describedby")).toEqual([
+      {
+        tagName: "link",
+        rel: "describedby",
+        type: "text/plain",
+        href: `${base_url}/llms.txt`,
+      },
+    ]);
+  });
+
+  it("names a us owner's registration number as its tax id when no approved 501(c)(3) backs it", async () => {
+    const npo = await org();
+    await campaign(npo.id);
+
+    const ds = await meta_of("https://x/org/acme/winter");
+    const [page] = lds_of(ds);
+
+    expect(page.about.parentOrganization.taxID).toBe("EIN-PUBLIC");
+    expect(page.about.parentOrganization).not.toHaveProperty("nonprofitStatus");
+  });
+
+  it("states what the campaign raised, to the cent, against its smart goal", async () => {
+    const npo = await org();
+    await campaign(npo.id);
+    const db = test_db.current!.db;
+    await db
+      .update(campaigns)
+      .set({ target_smart: true })
+      .where(eq(campaigns.id, "camp-public"));
+    await gift({
+      id: "raised-1",
+      email: "a@test.com",
+      status: "settled",
+      name: "A",
+    });
+    await db.insert(dists).values({
+      id: "dist-raised-1",
+      donation_id: "raised-1",
+      status: "settled",
+      date_created: "2026-02-01T00:00:00.000Z",
+      to_id: npo.id,
+      amount_denom: "USD",
+      net: 1234.567,
+    });
+
+    const [page] = lds_of(await meta_of("https://x/org/acme/winter"));
+
+    expect(page.about.additionalProperty).toEqual([
+      expect.objectContaining({
+        name: "Fundraising goal",
+        value: expect.objectContaining({ value: 1600 }),
+      }),
+      expect.objectContaining({
+        name: "Amount raised",
+        value: expect.objectContaining({ value: 1234.57 }),
+      }),
+    ]);
+  });
+
+  it.each([
+    { case: "ended", o: { status: "ended" as const } },
+    { case: "past its end date", o: { ends_at: "2020-01-01T00:00:00.000Z" } },
+  ])(
+    "describes a campaign $case but offers no way to donate to it",
+    async ({ o }) => {
+      const npo = await org();
+      await campaign(npo.id, o);
+
+      const ds = await meta_of("https://x/org/acme/winter");
+      const [page] = lds_of(ds);
+
+      expect(page.about).toMatchObject({
+        "@type": "Project",
+        name: "Winter drive",
+        parentOrganization: { name: "Acme" },
+      });
+      expect(page.about).not.toHaveProperty("potentialAction");
+      expect(ds.filter((d) => d.rel === "describedby")).toHaveLength(1);
+    }
+  );
+
+  it("joins the owner's profile node whatever case the link was typed in", async () => {
+    const npo = await org();
+    await campaign(npo.id);
+
+    const [page] = lds_of(await meta_of("https://x/org/ACME/winter"));
+
+    expect(page.about.parentOrganization).toMatchObject({
+      "@id": `${base_url}/org/acme#org`,
+      url: `${base_url}/org/acme`,
+    });
+  });
+
+  it("gives a preview of an unpublished owner's campaign no structured data", async () => {
+    const npo = await org();
+    await test_db
+      .current!.db.update(npos)
+      .set({ published: false })
+      .where(eq(npos.id, npo.id));
+    await campaign(npo.id);
+    get_session.mockResolvedValue({ user: { id: USER, role: "admin" } });
+
+    const ds = await meta_of("https://x/org/acme/winter");
+
+    expect(ds[0]).toEqual({ title: "Winter drive - Better Giving" });
+    expect(lds_of(ds)).toEqual([]);
+    expect(ds.filter((d) => d.rel === "describedby")).toEqual([]);
   });
 });

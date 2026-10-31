@@ -72,7 +72,9 @@ beforeEach(async () => {
   await db().delete(user);
 });
 
-const context_for = (user_row: { id: string; role: string }) => {
+type UserRow = { id: string; role: string; email?: string };
+
+const context_for = (user_row: UserRow) => {
   const context = new RouterContextProvider();
   context.set(user_ctx, user_row as AuthUser);
   return context;
@@ -109,7 +111,7 @@ const post = (
     params: {},
   } as any) as Promise<Response>;
 
-const load = (url: string, user_row: { id: string; role: string }) =>
+const load = (url: string, user_row: UserRow) =>
   loader({
     request: new Request(url),
     context: context_for(user_row),
@@ -126,10 +128,12 @@ const refusal = {
 describe("connector allow", () => {
   test("allow for a member's nonprofit redirects with a hashed code", async () => {
     const { npo_a, member } = await seed();
-    const user_row = { id: member.id, role: "user" };
+    const user_row = { id: member.id, role: "user", email: member.email };
 
     const loaded = await load(`${ALLOW_URL}?state=${STATE}`, user_row);
     expect(loaded).toEqual({
+      email: "ada@test.com",
+      client: null,
       nonprofits: [{ id: npo_a.id, name: "Alpha" }],
       state: STATE,
       blocked: false,
@@ -226,15 +230,17 @@ describe("connector allow", () => {
 
   test("a state of ../x is refused and stores no code", async () => {
     const { npo_a, member } = await seed();
-    const user_row = { id: member.id, role: "user" };
+    const user_row = { id: member.id, role: "user", email: member.email };
 
     const loaded = await load(
-      `${ALLOW_URL}?state=${encodeURIComponent("../x")}`,
+      `${ALLOW_URL}?state=${encodeURIComponent("../x")}&client=claude`,
       user_row
     );
     expect(loaded).not.toBeInstanceOf(Response);
     expect(loaded).toMatchObject({
       data: {
+        email: "ada@test.com",
+        client: "claude",
         nonprofits: [],
         state: "",
         error: CONNECTION_REFUSED,
@@ -262,8 +268,30 @@ describe("connector allow", () => {
     const loaded = await load(`${ALLOW_URL}?state=${STATE}`, {
       id: admin.id,
       role: "admin",
+      email: admin.email,
     });
 
-    expect(loaded).toEqual({ nonprofits: [], state: STATE, blocked: false });
+    expect(loaded).toEqual({
+      email: "admin@test.com",
+      client: null,
+      nonprofits: [],
+      state: STATE,
+      blocked: false,
+    });
+  });
+
+  test.each([
+    ["chatgpt", "chatgpt"],
+    ["claude", "claude"],
+    ["ChatGPT", null],
+    ["gemini", null],
+    ["", null],
+  ])("a client of %j loads as %j", async (raw, expected) => {
+    const { member } = await seed();
+    const loaded = await load(
+      `${ALLOW_URL}?state=${STATE}&client=${encodeURIComponent(raw)}`,
+      { id: member.id, role: "user", email: member.email }
+    );
+    expect(loaded).toMatchObject({ client: expected });
   });
 });

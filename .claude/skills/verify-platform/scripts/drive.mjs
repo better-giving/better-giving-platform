@@ -50,6 +50,26 @@ const expect_ok = (cond, msg) => {
   if (!cond) throw new Error(msg);
 };
 
+/** a JSON-RPC `tools/call` on the agent MCP endpoint, recorded as a direct load */
+const agents_rpc = (page, entry) => async (id, name, args) => {
+  const response = await page.request.post(`${BASE}/agents/mcp`, {
+    timeout: 120_000,
+    headers: { "content-type": "application/json" },
+    data: {
+      jsonrpc: "2.0",
+      id,
+      method: "tools/call",
+      params: { name, arguments: args },
+    },
+  });
+  entry.loaded.push(`POST /agents/mcp tools/call ${name}`);
+  expect_ok(
+    response.status() === 200,
+    `POST /agents/mcp ${name} → ${response.status()}`
+  );
+  return response.json();
+};
+
 // A cold `react-router dev` full-reloads the first time the footer scrolls
 // into view, because that prefetches `/donate/1` and Vite optimizes new
 // dependencies. The reload cancels the click and leaves the browser on `/`.
@@ -615,26 +635,9 @@ const FLOWS = {
     },
   },
   "agents-find": {
-    desc: "MCP find_nonprofit returns the seeded nonprofit and a flagged off-marketplace EIN; quote_donation refuses that EIN",
+    desc: "MCP find_nonprofit returns the seeded nonprofit with increments [] and a flagged off-marketplace EIN without increments; quote_donation refuses that EIN",
     async run({ page, entry }) {
-      const rpc = async (id, name, args) => {
-        const response = await page.request.post(`${BASE}/agents/mcp`, {
-          timeout: 120_000,
-          headers: { "content-type": "application/json" },
-          data: {
-            jsonrpc: "2.0",
-            id,
-            method: "tools/call",
-            params: { name, arguments: args },
-          },
-        });
-        entry.loaded.push(`POST /agents/mcp tools/call ${name}`);
-        expect_ok(
-          response.status() === 200,
-          `POST /agents/mcp ${name} → ${response.status()}`
-        );
-        return response.json();
-      };
+      const rpc = agents_rpc(page, entry);
 
       const found = await rpc(1, "find_nonprofit", {
         query: "Verify Test Nonprofit",
@@ -645,6 +648,13 @@ const FLOWS = {
       expect_ok(
         names.includes("Verify Test Nonprofit"),
         `items missing the seeded nonprofit: ${JSON.stringify(names)}`
+      );
+      const seeded = body.items.find(
+        (item) => item.name === "Verify Test Nonprofit"
+      );
+      expect_ok(
+        Array.isArray(seeded.increments) && seeded.increments.length === 0,
+        `seeded nonprofit increments ${JSON.stringify(seeded.increments)}`
       );
       const flagged = (body.not_on_better_giving ?? []).find(
         (row) => row.ein === "990000001"
@@ -662,6 +672,10 @@ const FLOWS = {
       expect_ok(
         !("id" in flagged) && !("recipient_id" in flagged),
         "flagged entry carries an id"
+      );
+      expect_ok(
+        !("increments" in flagged),
+        `flagged entry carries increments ${JSON.stringify(flagged.increments)}`
       );
       const dumped = JSON.stringify(body);
       expect_ok(!dumped.includes("990000002"), "revoked EIN was returned");
@@ -691,11 +705,68 @@ const FLOWS = {
         "nonprofits stub did not see a search"
       );
       return [
-        "POST /agents/mcp find_nonprofit query → Verify Test Nonprofit in items",
-        "990000001 in not_on_better_giving, donatable false, onboarding_url ends /register, no id",
+        "POST /agents/mcp find_nonprofit query → Verify Test Nonprofit in items, increments []",
+        "990000001 in not_on_better_giving, donatable false, onboarding_url ends /register, no id, no increments key",
         "revoked EIN 990000002 absent",
         "POST /agents/mcp quote_donation 990000001 → invalid_input",
         "nonprofits stub logged /v1/search",
+      ];
+    },
+  },
+  "agents-quote": {
+    desc: "MCP find_nonprofit lists a nonprofit's own increments; quote_donation labels an amount that is one of them",
+    async run({ page, entry }) {
+      const rpc = agents_rpc(page, entry);
+      const found = await rpc(1, "find_nonprofit", {
+        query: "Verify Campaign Nonprofit",
+      });
+      const npo = (found.result?.structuredContent?.items ?? []).find(
+        (item) => item.name === "Verify Campaign Nonprofit"
+      );
+      expect_ok(npo, "items missing Verify Campaign Nonprofit");
+      const want = [
+        { amount: 25, label: "Fixture: feed a child" },
+        { amount: 50, label: "" },
+        { amount: 100, label: "Fixture: plant a grove" },
+      ];
+      expect_ok(
+        JSON.stringify(npo.increments) === JSON.stringify(want),
+        `increments ${JSON.stringify(npo.increments)}`
+      );
+
+      const label_of = async (id, amount) => {
+        const quoted = await rpc(id, "quote_donation", {
+          recipient_id: npo.id,
+          amount,
+        });
+        const body = quoted.result?.structuredContent;
+        expect_ok(
+          quoted.result?.isError !== true && body?.quote_token,
+          `quote ${amount} refused: ${JSON.stringify(body)}`
+        );
+        return body.increment_label;
+      };
+      // 100 is the largest and stored first; 50 matches a blank label.
+      const expected_labels = [
+        [25, "Fixture: feed a child"],
+        [100, "Fixture: plant a grove"],
+        [50, null],
+        [30, null],
+      ];
+      const observed = [];
+      for (const [i, [amount, want_label]] of expected_labels.entries()) {
+        const label = await label_of(i + 2, amount);
+        expect_ok(
+          label === want_label,
+          `quote ${amount} increment_label ${JSON.stringify(label)}`
+        );
+        observed.push(
+          `POST /agents/mcp quote_donation ${amount} → increment_label ${label ?? "null"}`
+        );
+      }
+      return [
+        'POST /agents/mcp find_nonprofit Verify Campaign Nonprofit → increments 25 "Fixture: feed a child", 50 "", 100 "Fixture: plant a grove" (stored 100, 25, abc, 0, 1, 50)',
+        ...observed,
       ];
     },
   },

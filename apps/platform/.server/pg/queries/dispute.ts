@@ -104,6 +104,17 @@ export async function dispute_mark_loss_reversed(
     );
 }
 
+/** the gift's disputes on record, open or closed */
+export async function disputes_of_donation(
+  donation_id: string,
+  tx: DbOrTx = db
+): Promise<Pick<IDispute, "id" | "status">[]> {
+  return tx
+    .select({ id: donation_disputes.id, status: donation_disputes.status })
+    .from(donation_disputes)
+    .where(eq(donation_disputes.donation_id, donation_id));
+}
+
 export async function dispute_get(
   id: string,
   tx: DbOrTx = db

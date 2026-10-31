@@ -10,16 +10,22 @@ export interface IPage<T> {
   next?: string;
 }
 
+// base64url over utf-8 without `Buffer`: loaders also run in the browser
+// test project, which has no node globals
 export function encode_cursor(
   key: Record<string, unknown> | undefined
 ): string | undefined {
   if (!key) return undefined;
-  return Buffer.from(JSON.stringify(key)).toString("base64url");
+  const bytes = new TextEncoder().encode(JSON.stringify(key));
+  const bin = Array.from(bytes, (b) => String.fromCharCode(b)).join("");
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 export function decode_cursor(c?: string): Record<string, unknown> | undefined {
   if (!c) return undefined;
-  return JSON.parse(Buffer.from(c, "base64url").toString());
+  const bin = atob(c.replace(/-/g, "+").replace(/_/g, "/"));
+  const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
 }
 
 export function encode_date_cursor(

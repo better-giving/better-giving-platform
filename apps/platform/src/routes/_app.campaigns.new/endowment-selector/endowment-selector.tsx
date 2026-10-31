@@ -23,7 +23,7 @@ type SearchState =
   | { status: "error"; msg: string }
   | { status: "ok"; data: EndowOption[] };
 
-async function fetch_endows(
+export async function fetch_endows(
   query: string,
   signal: AbortSignal
 ): Promise<EndowOption[]> {
@@ -31,7 +31,7 @@ async function fetch_endows(
     query,
     page: "1",
     fund_opt_in: "true",
-    fields: "id,name,card_img",
+    fields: "id,name,logo,card_img",
   });
   const res = await fetch(`/api/npos?${params}`, { signal });
   if (!res.ok) throw res;
@@ -39,7 +39,7 @@ async function fetch_endows(
   return data.items.map((o) => ({
     id: o.id,
     name: o.name,
-    logo: o.card_img ?? undefined,
+    logo: o.logo || o.card_img || undefined,
   }));
 }
 

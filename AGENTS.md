@@ -105,7 +105,7 @@ Also present: `jobs/` (one-off jobs), `scripts/` (dev tooling), `plugins/`, `uti
 
 ## Git
 
-- **`main` takes direct pushes** — no PR requirement, no required status check on merge. The only rules are `deletion` + `non_fast_forward` (GitHub ruleset `default`, no bypass actors, admins included), so history can't be rewritten or the branch dropped. Gating happens at release, not at merge. Ask before adding a PR or status-check rule.
+- **`main` takes changes only through a pull request** (GitHub ruleset on `main`: pull request required, plus `deletion` + `non_fast_forward`), so a direct push is refused with GH013. Greptile does not review automatically; a PR comment `@greptileai` asks for one. Ask before adding a status-check rule.
 - Base PRs on the current working branch, not a hardcoded `main`, when the work already has a branch.
 
 ## Never

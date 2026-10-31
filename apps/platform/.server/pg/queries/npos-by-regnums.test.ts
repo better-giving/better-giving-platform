@@ -100,3 +100,23 @@ describe("npos_by_regnums", () => {
     expect(rows.map((row) => row.name).sort()).toEqual(["First", "Second"]);
   });
 });
+
+describe("npos_by_regnums increments", () => {
+  test("a match carries the npo's stored increments, null when unset", async () => {
+    const increments = [{ value: "25", label: "Feed a child" }];
+    await test_db.db.insert(npos).values({
+      registration_number: "12-3456789",
+      name: "With",
+      endow_designation: "Charity",
+      overview_pt: "[]",
+      hq_country: "United States",
+      increments,
+    });
+    await seed("98-7654321", "United States", "Without");
+
+    const rows = await npos_by_regnums(["123456789", "987654321"]);
+    const by_name = Object.fromEntries(rows.map((r) => [r.name, r.increments]));
+
+    expect(by_name).toEqual({ With: increments, Without: null });
+  });
+});

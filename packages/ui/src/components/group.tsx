@@ -9,16 +9,21 @@ export function Group({
   description,
   title,
   hide_title,
+  heading_level = 3,
   children,
 }: PropsWithChildren<{
   title?: string;
   /** keeps the section named for screen readers when the page heading already
    *  says what it holds */
   hide_title?: boolean;
+  /** the title's rank in the screen's outline: 2 when the group sits directly
+   *  under the page's h1, 3 when a section heading sits above it */
+  heading_level?: 2 | 3;
   description?: string;
   classes?: string;
 }>) {
   const id = useId();
+  const Heading = `h${heading_level}` as const;
   return (
     <section
       aria-labelledby={title ? id : undefined}
@@ -28,16 +33,16 @@ export function Group({
           own `gap-6` falls between title and description, and closing it back
           up pins their spacing to whatever that gap happens to be. */}
       {title && hide_title && !description && (
-        <h3 id={id} className="sr-only">
+        <Heading id={id} className="sr-only">
           {title}
-        </h3>
+        </Heading>
       )}
       {((title && !hide_title) || description) && (
         <div className="grid gap-2">
           {title && (
-            <h3 id={id} className={hide_title ? "sr-only" : "text-2xl"}>
+            <Heading id={id} className={hide_title ? "sr-only" : "text-2xl"}>
               {title}
-            </h3>
+            </Heading>
           )}
           {description && (
             <p className="text-lg font-semibold">{description}</p>

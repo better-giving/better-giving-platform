@@ -6,6 +6,7 @@ import type { IInput, IParts } from "../types/donation-dist";
 import {
   calc_settlement_plan,
   type NpoSettlementContext,
+  settled_parts,
   shared_parts,
 } from "./plan";
 
@@ -395,6 +396,118 @@ describe("calc_settlement_plan routed to a connected account", () => {
     expectTypeOf(routed).not.toHaveProperty("balance_deltas");
     // @ts-expect-error a routed plan cannot name a payout
     routed.payout;
+  });
+});
+
+// a $100 card gift to a fiscally sponsored npo, settled at stripe's 2.2% + $0.30
+// on the whole charge. the base and fsa fees are on the full $100 gift whether
+// or not the donor covers the card fee
+describe("calc_settlement_plan fee base", () => {
+  const card = (base: number, tip: number, fee_allowance: number) => {
+    const total = base + tip + fee_allowance;
+    const fee = Math.round((total * 0.022 + 0.3) * 100) / 100;
+    return make_input({
+      ps: settled_parts(amt(base, tip, fee_allowance), 1, {
+        net: total - fee,
+        fee,
+      }),
+    });
+  };
+  const fsa = make_ctx({ fiscal_sponsored: true });
+  const fee_logs = (plan: { revenue_logs: IRevenueLog[] }) =>
+    plan.revenue_logs
+      .filter((r) => r.type !== "tip")
+      .map((r) => [r.type, r.gross]);
+
+  test("no tip, uncovered: fsa on $100, npo still absorbs the $2.50 card fee", () => {
+    const plan = calc_settlement_plan(card(100, 0, 0), fsa, null);
+    expect(plan.dist.fees.fsa).toBeCloseTo(2.9, 10);
+    expect(plan.dist.fees.processing).toBeCloseTo(2.5, 10);
+    expect(plan.dist.net).toBeCloseTo(100 - 2.5 - 2.9, 10);
+    expect(fee_logs(plan)).toEqual([["fsa-fee", expect.closeTo(2.9, 10)]]);
+  });
+
+  test("covered: fsa on $100, net $97.10", () => {
+    // $2.56 allowance on $102.56 is a $2.56 card fee
+    const plan = calc_settlement_plan(card(100, 0, 2.56), fsa, null);
+    expect(plan.dist.fees.fsa).toBeCloseTo(2.9, 10);
+    expect(plan.dist.net).toBeCloseTo(97.1, 10);
+  });
+
+  test("$10 tip, uncovered: tip carries no fee, fsa on the $100 gift", () => {
+    const plan = calc_settlement_plan(card(100, 10, 0), fsa, null);
+    // $2.72 card fee on $110, split 100:10
+    expect(plan.dist.fees.fsa).toBeCloseTo(2.9, 10);
+    expect(plan.dist.fees.processing).toBeCloseTo(2.72 * (100 / 110), 10);
+    expect(plan.dist.net).toBeCloseTo(107.28 * (100 / 110) - 2.9, 10);
+    const tip = plan.revenue_logs.find((r) => r.type === "tip")!;
+    expect(tip.gross).toBeCloseTo(107.28 * (10 / 110), 10);
+    expect(fee_logs(plan)).toEqual([["fsa-fee", expect.closeTo(2.9, 10)]]);
+  });
+
+  test("$10 tip, covered: fsa on the $100 gift, net $97.10", () => {
+    // $2.78 allowance on $112.78 is a $2.78 card fee
+    const plan = calc_settlement_plan(card(100, 10, 2.78), fsa, null);
+    expect(plan.dist.fees.fsa).toBeCloseTo(2.9, 10);
+    expect(plan.dist.net).toBeCloseTo(97.1, 10);
+    const tip = plan.revenue_logs.find((r) => r.type === "tip")!;
+    // $2.78 card fee on $112.78 leaves $110; the tip's 10/112.78 of that, plus
+    // the same share of the card fee the allowance covered, is the $10 tip
+    expect(tip.gross).toBeCloseTo(10, 10);
+    expect(fee_logs(plan)).toEqual([["fsa-fee", expect.closeTo(2.9, 10)]]);
+  });
+
+  test("tip turned off, uncovered: base fee is 1.5% of $100", () => {
+    const plan = calc_settlement_plan(
+      card(100, 0, 0),
+      make_ctx({ hide_bg_tip: true }),
+      null
+    );
+    expect(plan.dist.fees.base).toBeCloseTo(1.5, 10);
+    expect(plan.dist.fees.fsa).toBe(0);
+    expect(plan.dist.net).toBeCloseTo(100 - 2.5 - 1.5, 10);
+    expect(fee_logs(plan)).toEqual([["base-fee", expect.closeTo(1.5, 10)]]);
+  });
+
+  test("referral commission is 30% of the fees on the full gift", () => {
+    const plan = calc_settlement_plan(
+      card(100, 0, 0),
+      make_ctx({
+        fiscal_sponsored: true,
+        hide_bg_tip: true,
+        referrer_npo: "npo-2",
+        referrer_expiry: "2099-01-01T00:00:00.000Z",
+      }),
+      null
+    );
+    expect(fee_logs(plan)).toEqual([
+      ["base-fee", expect.closeTo(1.5, 10)],
+      ["fsa-fee", expect.closeTo(2.9, 10)],
+    ]);
+    expect(plan.commission?.amount).toBeCloseTo((1.5 + 2.9) * 0.3, 10);
+  });
+
+  test("crypto: fees on the settled value plus its fee share", () => {
+    // 0.05 ETH at $2,000, settled to $99 after a $1 processor fee
+    const plan = calc_settlement_plan(
+      make_input({
+        ps: settled_parts(amt(0.05), 0.0005, { net: 99, fee: 1 }),
+      }),
+      fsa,
+      null
+    );
+    expect(plan.dist.fees.fsa).toBeCloseTo(2.9, 10);
+    expect(plan.dist.net).toBeCloseTo(99 - 2.9, 10);
+  });
+
+  test("a share with no processor fee, as a manual settlement books, stays on net", () => {
+    const plan = calc_settlement_plan(
+      make_input({ ps: parts({ sttl: amt(97.5) }) }),
+      make_ctx({ fiscal_sponsored: true, hide_bg_tip: true }),
+      null
+    );
+    expect(plan.dist.fees.fsa).toBeCloseTo(97.5 * 0.029, 10);
+    expect(plan.dist.fees.base).toBeCloseTo(97.5 * 0.015, 10);
   });
 });
 

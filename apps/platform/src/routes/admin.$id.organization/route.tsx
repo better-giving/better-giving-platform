@@ -1,5 +1,4 @@
 import type { LinksFunction } from "react-router";
-import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { richtext_styles, to_content } from "#/components/rich-text";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
 import { sans_https } from "@/helpers/https";
@@ -11,12 +10,12 @@ export { action, loader } from "./api";
 
 export const meta: Route.MetaFunction = ({ matches }) =>
   admin_page_meta("Organization", matches);
-export const clientLoader = createClientLoaderCache<Route.ClientLoaderArgs>();
 export const links: LinksFunction = () => [...richtext_styles];
 export { ErrorBoundary } from "#/components/error";
 
-export default CacheRoute(Page);
-function Page({ loaderData: endow }: Route.ComponentProps) {
+// no client cache: a stale-while-revalidate read would settle every video
+// write on the pre-write rows, re-arming their controls
+export default function Page({ loaderData: endow }: Route.ComponentProps) {
   const defaults: FV = {
     logo: endow.logo ?? "",
     name: endow.name,
@@ -41,7 +40,6 @@ function Page({ loaderData: endow }: Route.ComponentProps) {
     },
     tagline: endow.tagline ?? "",
     image: endow.image ?? "",
-    card_img: endow.card_img ?? "",
     overview: to_content(endow.overview_pt),
   };
 
@@ -53,6 +51,7 @@ function Page({ loaderData: endow }: Route.ComponentProps) {
       profile={profile}
       id={endow.id}
       base_url={endow.base_url}
+      videos={endow.videos}
     />
   );
 }

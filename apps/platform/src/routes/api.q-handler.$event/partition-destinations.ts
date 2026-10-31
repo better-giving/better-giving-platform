@@ -1,7 +1,6 @@
 import type { IDonationSettled, IParent, TToType } from "@/donations";
-import { amnt_sum, partition } from "@/donations/helpers";
 import { is_funded_member } from "@/settlement/funded-members";
-import { shared_parts } from "@/settlement/plan";
+import { settled_parts, shared_parts } from "@/settlement/plan";
 import type { IInput, IParts, ISource, ISttlmnt } from "@/types/donation-dist";
 import { form_get } from "$/pg/queries/form";
 import { nav_ltd } from "$/pg/queries/nav";
@@ -32,28 +31,13 @@ export const partition_destinations = async (b: IDonationSettled) => {
     type: parent_to_type,
   };
 
-  const total = amnt_sum(parent_amount);
-  const total_usd = total / tx.upusd;
-
-  // partition settlement amounts base on original partition of amount
-  const parts = partition(parent_amount);
-  const p_amnt = parts(total);
-  /** in usd/usdc */
-  const p_sttl_net = parts(parent_settlement.net);
-
   const sttl: ISttlmnt = {
     id: parent_settlement.id,
     date: parent_settlement.date,
     currency: parent_settlement.currency,
   };
-  const ps: IParts = {
-    amnt: p_amnt,
-    amnt_usd: parts(total_usd),
-    fa: parts(p_amnt.fee_allowance),
-    sttl: p_sttl_net,
-    sttl_fee: parts(parent_settlement.fee),
-    sttl_fa: parts(p_sttl_net.fee_allowance),
-  };
+  /** `sttl*` parts in usd/usdc; `amnt` in the donation's currency */
+  const ps: IParts = settled_parts(parent_amount, tx.upusd, parent_settlement);
 
   const source_p = form_id
     ? form_get(form_id).then(

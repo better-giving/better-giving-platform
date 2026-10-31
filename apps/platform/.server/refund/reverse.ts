@@ -34,8 +34,8 @@ interface RailAdapter {
   subscription_end(
     source: ReversalSource
   ): ((payment_id: string) => Promise<void>) | null;
-  /** takes back the refunds' share of what the gift's routed dists were
-   * transferred, or null when the rail routes none */
+  /** takes back the refunds' and lost disputes' share of what the gift's
+   * routed dists were transferred, or null when the rail routes none */
   routed_refunds:
     | ((donation_id: string, c: RoutedRefunds) => Promise<void>)
     | null;
@@ -156,7 +156,8 @@ export interface RoutedRefunds {
   of: number;
   /** its live refunds, sent or not */
   refunds: NonNullable<ChargeReversal["refunds"]>;
-  /** of them, the ones not yet sent: while any is, nothing is reversed */
+  /** of them, the ones not yet sent: any can still fail, so each is left out
+   * of the cuts until an event sees it sent */
   unsent: string[];
 }
 
@@ -330,9 +331,9 @@ export async function reverse_charge(
     }
   }
   // ahead of the gift's reversal, whose redelivery stops at the guard above,
-  // so a transfer reversal that throws here is retried with the event. it
-  // holds on an unsent refund itself. a dispute reverses no transfer: stripe
-  // debits it from us, and what the npo owes for it is on its row
+  // so a transfer reversal that throws here is retried with the event. an
+  // unsent refund is left out of its cuts. a lost dispute's close handler
+  // reverses its cut before calling this, so it isn't asked twice
   const routed_refunds = rail_adapters[r.rail].routed_refunds;
   if (routed_refunds && r.source !== "dispute" && r.refunds && r.share) {
     await routed_refunds(don.id, {

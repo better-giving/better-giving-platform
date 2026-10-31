@@ -6,13 +6,20 @@ import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import flying_character from "#/assets/images/flying-character.webp";
 import { FundCreator, FundStatus, status_fn } from "#/components/campaign";
 import { DonorMsgs } from "#/components/donor-msgs";
-import { RichText, richtext_styles, to_text } from "#/components/rich-text";
+import {
+  RichText,
+  richtext_styles,
+  to_excerpt,
+  to_text,
+} from "#/components/rich-text";
 import { app_name, base_url } from "#/constants/env";
 import { metas } from "#/helpers/seo";
 import { use_now } from "#/hooks/use-now";
+import { goal_amount } from "#/routes/org.$org.$campaign/format";
 import type { IFund } from "#/types/fund";
 import { fund_closes_at } from "@/campaign/is-open";
 import { MAX_EXPIRATION_ISO } from "@/campaign/schema";
+import { agents_link, fund_jsonld } from "@/structured-data/schema-org";
 import type { Route } from "./+types/route";
 import { Share } from "./share";
 import { Video } from "./video";
@@ -24,16 +31,44 @@ export const links: Route.LinksFunction = () => [...richtext_styles];
 
 export const meta: Route.MetaFunction = ({ loaderData: d, location: l }) => {
   if (!d) return [];
-  return metas({
+  const url = `${base_url}${l.pathname}`;
+  const shared = {
     title: `${d.name} - ${app_name}`,
     description: to_text(d.description_pt).slice(0, 140),
     name: d.name,
     image: d.banner || flying_character,
-    url: `${base_url}${l.pathname}`,
+    url,
+  };
+  // a hidden or deactivated fund stays out of every index
+  if (!(d.published && d.active)) return metas(shared);
+  const goal = goal_amount(d.target, d.donation_total_usd);
+  const project = fund_jsonld({
+    base_url,
+    url,
+    donate_url: `${base_url}${href("/campaigns/:fund_id/donate", { fund_id: d.id })}`,
+    // an expired fund keeps its description but loses its DonateAction, as
+    // `Fund` shows it closed
+    closed: !fund_status(d, new Date(d.now)).active,
+    name: d.name,
+    description: to_excerpt(d.description_pt),
+    image: d.banner,
+    // the page shows the raised figure only inside `<Target>`, which needs a goal
+    raised: goal == null ? undefined : d.donation_total_usd,
+    goal,
+    members: d.members,
   });
+  return [...metas({ ...shared, jsonld: project }), agents_link(base_url)];
 };
 export { ErrorBoundary } from "#/components/error";
 export default CacheRoute(Fund);
+
+const fund_status = (fund: IFund, now: Date) =>
+  status_fn(
+    fund.expiration ?? MAX_EXPIRATION_ISO,
+    fund.active,
+    fund.donation_total_usd,
+    now
+  );
 
 function Fund({ loaderData }: Route.ComponentProps) {
   const { url, now: loader_now, ...fund } = loaderData;
@@ -42,12 +77,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
     fund.expiration ? fund_closes_at(fund.expiration) : undefined
   );
 
-  const status = status_fn(
-    fund.expiration ?? MAX_EXPIRATION_ISO,
-    fund.active,
-    fund.donation_total_usd,
-    now
-  );
+  const status = fund_status(fund, now);
 
   return (
     <section className="grid pb-10 bg-gray-3">

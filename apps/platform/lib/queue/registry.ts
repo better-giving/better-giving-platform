@@ -61,6 +61,9 @@ export interface IConnectTransferPayload {
   donation_id: string;
   /** the payment intent the donation settled on; its charge funds the transfer */
   intent_id: string;
+  /** the dispute whose close released the transfer it held: a message of its
+   * own, past the dedupe of the settlement's send */
+  release?: string;
 }
 
 export interface IDonMatchPayload {
@@ -250,7 +253,8 @@ const dedupe: { [K in Kind]: (p: Payloads[K]) => string } = {
   "banking-default": (p) => `banking.default_${p.npo_id}`,
   "banking-new": (p) => `banking.new_${p.npo_id}`,
   "banking-rejected": (p) => `banking.rejected_${p.npo_id}`,
-  "connect-transfer": (p) => `connect.transfer_${p.dist_id}`,
+  "connect-transfer": (p) =>
+    `connect.transfer_${p.dist_id}${p.release ? `_${p.release}` : ""}`,
   "don-dist": (p) => `don.dist_${p.id}_${p.to_id}`,
   // receive-only, and so no delivery entry: nothing sends it. kept so a wait
   // scheduled by the build that made fund receipts wait on their split still

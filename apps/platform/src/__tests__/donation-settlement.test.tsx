@@ -316,10 +316,11 @@ function fire_webhook(order_id = INTENT.order_id) {
 
 const GROSS = 95 * (100 / 105); // base portion of settlement net: ~90.476
 const TIP = 95 * (5 / 105); // tip portion: ~4.524
-// fees: base=1.5%, fsa=2.9% of gross
-const BASE_FEE = GROSS * 0.015; // ~1.357
-const FSA_FEE = GROSS * 0.029; // ~2.624
-const NET = GROSS - BASE_FEE - FSA_FEE; // ~86.495
+// fees: base=1.5%, fsa=2.9% of the full gift, its fee share included
+const FULL = (95 + 5) * (100 / 105); // ~95.238
+const BASE_FEE = FULL * 0.015; // ~1.429
+const FSA_FEE = FULL * 0.029; // ~2.762
+const NET = GROSS - BASE_FEE - FSA_FEE; // ~86.286
 
 const P = 2; // precision digits for toBeCloseTo
 
@@ -592,7 +593,7 @@ describe("payment_intent.succeeded → settlement → UI", () => {
     await expect
       .element(screen.getByRole("heading", { name: "Test Program" }))
       .toBeInTheDocument();
-    // target_raise=500; total_donations ≈ NET (86.495) is the raised figure
+    // target_raise=500; total_donations ≈ NET (86.286) is the raised figure
     await expect
       .element(screen.getByText("$86", { exact: true }))
       .toBeInTheDocument();

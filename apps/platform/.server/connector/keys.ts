@@ -28,6 +28,7 @@ const membership_gone = (err: unknown): boolean => {
 const CODE_TTL_MS = 10 * 60 * 1000;
 const USED_TOUCH_MS = 60_000;
 const IDLE_MS = 90 * 24 * 60 * 60 * 1000;
+const REVOKED_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 const IDEM_MS = 24 * 60 * 60 * 1000;
 const CODE_RE = /^[A-Za-z0-9_-]{43}$/;
 const KEY_RE = /^bgc_[A-Za-z0-9_-]{43}$/;
@@ -255,6 +256,7 @@ export async function sweep(
   db: DbOrTx,
   now = new Date()
 ): Promise<{
+  keys_deleted: number;
   keys_revoked: number;
   codes_deleted: number;
   idempotency_deleted: number;
@@ -266,6 +268,15 @@ export async function sweep(
   const photo_before = new Date(
     now.getTime() - PHOTO_LINK_KEEP_MS
   ).toISOString();
+  const revoked_before = new Date(
+    now.getTime() - REVOKED_KEEP_MS
+  ).toISOString();
+  // keys the idle revoke below stamps with `now` sit inside the window, so
+  // the statement order doesn't matter
+  const deleted = await db
+    .delete(connector_keys)
+    .where(lt(connector_keys.revoked_at, revoked_before))
+    .returning({ id: connector_keys.id });
   const revoked = await db
     .update(connector_keys)
     .set({ revoked_at: now_iso, revoked_by: null })
@@ -297,6 +308,7 @@ export async function sweep(
     )
     .returning({ id: connector_photo_links.id });
   return {
+    keys_deleted: deleted.length,
     keys_revoked: revoked.length,
     codes_deleted: codes.length,
     idempotency_deleted: idem.length,

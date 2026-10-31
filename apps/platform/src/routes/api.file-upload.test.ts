@@ -11,11 +11,7 @@ import { sources_of } from "#/__tests__/conformance/walk";
 import { img_spec as funds_img_spec } from "#/pages/funds/common";
 import { upload_limits } from "@/constants/upload";
 import { fileSpec as fsa_spec } from "./_app.register.$reg_id._steps.3/fsa/types";
-import {
-  bannerSpec,
-  cardImgSpec,
-  logoSpec,
-} from "./admin.$id.organization/schema";
+import { bannerSpec, logoSpec } from "./admin.$id.organization/schema";
 import { img_spec as program_img_spec } from "./admin.$id.program-editor.$program_id/common";
 import { action } from "./api.file-upload";
 import { avatar_spec } from "./dashboard.edit-profile/use-rhf";
@@ -195,7 +191,6 @@ describe("client upload limits", () => {
     ["funds img_spec", funds_img_spec([1, 1])],
     ["avatar_spec", avatar_spec],
     ["logoSpec", logoSpec],
-    ["cardImgSpec", cardImgSpec],
     ["bannerSpec", bannerSpec],
     ["program img_spec", program_img_spec([1, 1])],
   ])("the %s image editor limit fits under the server cap", (_, spec) => {
