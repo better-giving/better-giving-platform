@@ -12,7 +12,7 @@ export const links: LinksFunction = () => [
   {
     rel: "service-desc",
     href: "/openapi.json",
-    type: "application/openapi+json",
+    type: "application/json",
   },
 ];
 

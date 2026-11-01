@@ -68,16 +68,20 @@ describe("GET /api/npos/:id", () => {
     } as any) as Promise<Response>;
 
   // before: a thrown text/plain 400 carrying the issue message
-  it("answers a malformed id with an invalid_request json error", async () => {
-    const res = await get("!!bad");
+  it.each(["!!bad", "0", "a..b"])(
+    "answers the malformed id %s with an invalid_request json error that says what an id is",
+    async (id) => {
+      const res = await get(id);
 
-    expect(res.status).toBe(400);
-    expect(res.headers.get("content-type")).toBe("application/json");
-    const body = await res.json();
-    expect(body.error.code).toBe("invalid_request");
-    expect(body.error.message).toEqual(expect.any(String));
-    expect(body.error.message.length).toBeGreaterThan(0);
-  });
+      expect(res.status).toBe(400);
+      expect(res.headers.get("content-type")).toBe("application/json");
+      const body = await res.json();
+      expect(body.error.code).toBe("invalid_request");
+      expect(body.error.message).toBe(
+        "must be a nonprofit id: a positive integer, or a slug of letters, numbers, -, ., _ and ~"
+      );
+    }
+  );
 
   // before: an empty-bodied 404
   it("answers an unknown or inactive npo with a not_found json error", async () => {

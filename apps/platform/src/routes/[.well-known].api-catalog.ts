@@ -9,9 +9,9 @@ export function loader({ request }: LoaderFunctionArgs) {
   const { origin } = new URL(request.url);
   const links = {
     "service-desc": [
-      { href: `${origin}/openapi.json`, type: "application/openapi+json" },
+      { href: `${origin}/openapi.json`, type: "application/json" },
     ],
-    "service-doc": [{ href: `${origin}/agents`, type: "text/html" }],
+    "service-doc": [{ href: `${origin}/agents`, type: "text/markdown" }],
   };
   return Response.json(
     {

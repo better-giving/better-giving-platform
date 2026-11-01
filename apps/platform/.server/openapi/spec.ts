@@ -6,6 +6,7 @@ import { CONNECTOR_ACTIONS } from "../connector/actions";
 import {
   BODY_KEYS,
   type BodyKey,
+  EXPECTED_VERSION,
   exchange_body,
   QUERY_PARAMS,
   type QueryParam,
@@ -152,7 +153,7 @@ const ESTIMATE = {
   },
 };
 
-const PUBLIC_OPS: IOperation[] = [
+const public_ops = (): IOperation[] => [
   {
     route: "api.npos._index",
     path: "/api/npos",
@@ -337,6 +338,7 @@ const FIELD_SCHEMA: Record<BodyKey, Json> = {
   sharing: { description: "As read; it can't be changed here." },
   expected_version: {
     type: "string",
+    pattern: EXPECTED_VERSION.source,
     description: "The `version` read; a newer one is a 409 `stale_read`.",
   },
   blocks: { type: "array", items: { type: "object" } },
@@ -380,10 +382,14 @@ function query_of(action: keyof typeof QUERY_PARAMS) {
   }));
 }
 
-function body_of(action: keyof typeof BODY_KEYS, required: string[] = []) {
+function body_of(
+  action: keyof typeof BODY_KEYS,
+  required: string[] = [],
+  optional = false
+) {
   const keys: readonly BodyKey[] = BODY_KEYS[action];
   return {
-    required: true,
+    required: !optional,
     content: {
       "application/json": {
         schema: {
@@ -435,7 +441,15 @@ const keyed_write = (
   method: Method,
   action: keyof typeof BODY_KEYS,
   summary: string,
-  extra: { id_of?: string; idem?: boolean; required?: string[]; created?: Json }
+  extra: {
+    id_of?: string;
+    /** the Idempotency-Key header: required, optional, or not read */
+    idem?: boolean;
+    required?: string[];
+    created?: Json;
+    /** no body at all reads as `{}` */
+    body_optional?: boolean;
+  }
 ): IOperation => ({
   route,
   path,
@@ -448,17 +462,30 @@ const keyed_write = (
       ...(extra.id_of ? [id_param(extra.id_of)] : []),
       ...(extra.idem === undefined ? [] : [idempotency_key(extra.idem)]),
     ],
-    requestBody: body_of(action, extra.required),
+    requestBody: body_of(action, extra.required, extra.body_optional),
     responses: {
       ...(extra.created
-        ? { 201: ok("Created.", extra.created) }
+        ? {
+            ...(extra.idem === undefined
+              ? {}
+              : { 200: ok("A retry's replay of the first answer.") }),
+            201: ok("Created.", extra.created),
+          }
         : { 200: ok("The resource after the change.") }),
-      ...problems(...(extra.idem ? [400] : []), 401, 404, 409, 422, 429, 500),
+      ...problems(
+        ...(extra.idem === undefined ? [] : [400]),
+        401,
+        404,
+        409,
+        422,
+        429,
+        500
+      ),
     },
   },
 });
 
-const CONNECTOR_OPS: IOperation[] = [
+const connector_ops = (): IOperation[] => [
   {
     route: "connector.v1.hello",
     path: "/connector/v1/hello",
@@ -567,7 +594,7 @@ const CONNECTOR_OPS: IOperation[] = [
     "post",
     "publish_campaign",
     "Publish a campaign",
-    { id_of: "campaign" }
+    { id_of: "campaign", body_optional: true }
   ),
   keyed_write(
     "connector.v1.campaigns.$id.end",
@@ -575,7 +602,7 @@ const CONNECTOR_OPS: IOperation[] = [
     "post",
     "end_campaign",
     "End a campaign",
-    { id_of: "campaign" }
+    { id_of: "campaign", body_optional: true }
   ),
   keyed_read(
     "connector.v1.donation-page",
@@ -669,13 +696,23 @@ const CONNECTOR_OPS: IOperation[] = [
   ),
 ];
 
-export const OPERATIONS: readonly IOperation[] = [
-  ...PUBLIC_OPS.map((o) => ({
-    ...o,
-    op: { ...o.op, tags: ["public"], security: [] },
-  })),
-  ...CONNECTOR_OPS.map((o) => ({ ...o, op: { ...o.op, tags: ["connector"] } })),
-];
+let built: readonly IOperation[] | undefined;
+
+/** built on first use, not at import: [openapi.json] is imported at server
+ * boot, and a schema `wire_schema` can't convert throws */
+export function operations(): readonly IOperation[] {
+  built ??= [
+    ...public_ops().map((o) => ({
+      ...o,
+      op: { ...o.op, tags: ["public"], security: [] },
+    })),
+    ...connector_ops().map((o) => ({
+      ...o,
+      op: { ...o.op, tags: ["connector"] },
+    })),
+  ];
+  return built;
+}
 
 const API_ERROR = {
   type: "object",
@@ -727,7 +764,7 @@ const PROBLEM_STATUSES = [400, 401, 404, 409, 422, 429, 500];
  * `origin` as its server */
 export function openapi_doc(origin: string) {
   const paths: Record<string, Record<string, Json>> = {};
-  for (const { path, method, op } of OPERATIONS) {
+  for (const { path, method, op } of operations()) {
     paths[path] = { ...paths[path], [method]: op };
   }
   return {

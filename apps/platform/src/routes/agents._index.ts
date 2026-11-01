@@ -9,30 +9,13 @@ import {
   donation_status,
   find_nonprofit,
 } from "./agents/engine";
+import { jsonrpc, method_not_allowed, rpc_error } from "./agents/rpc";
 import {
   GUIDE,
   MCP_PROTOCOL_VERSION,
   MCP_SERVER_INFO,
   tools,
 } from "./agents/tools";
-
-function jsonrpc(id: unknown, result: unknown) {
-  return Response.json({ jsonrpc: "2.0", id, result });
-}
-
-/** `data.code` is the stable, machine-readable name; `message` is for people */
-function rpc_error(
-  id: unknown,
-  code: number,
-  message: string,
-  data: { code: string; [detail: string]: unknown },
-  init?: ResponseInit
-) {
-  return Response.json(
-    { jsonrpc: "2.0", id, error: { code, message, data } },
-    init
-  );
-}
 
 /** a tool result the model reads and can act on, not a protocol failure */
 function tool_error(id: unknown, code: string, message: string) {
@@ -95,13 +78,7 @@ export const loader: LoaderFunction = () =>
 
 export const action: ActionFunction = async ({ request }) => {
   if (request.method !== "POST") {
-    return rpc_error(
-      null,
-      -32600,
-      `Method ${request.method} not allowed. Send JSON-RPC requests with POST.`,
-      { code: "method_not_allowed" },
-      { status: 405, headers: { allow: "GET, POST" } }
-    );
+    return method_not_allowed(request.method, "GET, POST");
   }
   const refused = await rate_limited(request);
   if (refused) return refused;
@@ -133,8 +110,8 @@ async function respond(body: any, request: Request): Promise<Response> {
     });
   }
 
-  if (body.method === "notifications/initialized") {
-    return new Response(null, { status: 204 });
+  if (body.method.startsWith("notifications/") && !Object.hasOwn(body, "id")) {
+    return new Response(null, { status: 202 });
   }
   if (body.method === "ping") return jsonrpc(body.id, {});
   if (body.method === "initialize") {

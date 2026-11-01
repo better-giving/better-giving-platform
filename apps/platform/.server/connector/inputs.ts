@@ -61,6 +61,9 @@ export const BODY_KEYS = {
   create_photo_upload_link: ["target", "slot"],
 } as const satisfies Partial<Record<Action, readonly string[]>>;
 
+/** a campaign `version` as `expected_version` sends it back */
+export const EXPECTED_VERSION = /^\d{1,19}$/;
+
 export type BodyKey = (typeof BODY_KEYS)[keyof typeof BODY_KEYS][number];
 
 export const exchange_body = v.object({ code: v.string() });

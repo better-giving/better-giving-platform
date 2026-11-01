@@ -1,7 +1,14 @@
 import { describe, expect, test, vi } from "vitest";
 
 const page = { items: [{ id: 1, name: "A" }], page: 1, pages: 1 };
-vi.mock("#/.server/npos", () => ({ get_npos: async () => page }));
+const search = vi.hoisted(() => ({ fails: false }));
+vi.mock("#/.server/npos", () => ({
+  search_npos: async () => {
+    if (search.fails) throw new Error("db unreachable");
+    return page;
+  },
+}));
+vi.mock("#/errors/report", () => ({ report_error: vi.fn() }));
 
 const { action, loader } = await import("./api.npos._index");
 
@@ -31,6 +38,19 @@ describe("GET /api/npos", () => {
       "public, s-maxage=60, stale-while-revalidate=300"
     );
     await expect(res.text()).resolves.toBe(JSON.stringify(page));
+  });
+
+  // before: a cacheable `200 {"items": []}`, read as "nothing matches"
+  test("answers a database failure with an uncached internal_error", async () => {
+    search.fails = true;
+    const res = await list("page=1").finally(() => {
+      search.fails = false;
+    });
+
+    expect(res.status).toBe(500);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    const { error } = await res.json();
+    expect(error.code).toBe("internal_error");
   });
 
   test("answers a write method with method_not_allowed", async () => {

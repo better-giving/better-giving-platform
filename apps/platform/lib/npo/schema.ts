@@ -51,8 +51,13 @@ const csv_strs = v.pipe(
   v.filterItems((x) => x.length > 0)
 );
 
+// v.message, not union's message argument: a union answers with the issues
+// of the one option whose type matched, so "0" would report the integer's `>=1`
 /** a nonprofit's numeric id or its slug, as `/api/npos/{id}` reads it */
-export const npo_ref = v.union([$int_gte1, segment_shape]);
+export const npo_ref = v.message(
+  v.union([$int_gte1, segment_shape]),
+  "must be a nonprofit id: a positive integer, or a slug of letters, numbers, -, ., _ and ~"
+);
 
 export const reg_number = v.pipe(
   $,

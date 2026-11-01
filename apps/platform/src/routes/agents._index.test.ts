@@ -401,7 +401,7 @@ describe("MCP errors", () => {
     "%s is refused with a JSON-RPC error",
     async (method) => {
       const response = (await action({
-        request: new Request("https://better.giving/agents/mcp", {
+        request: new Request("https://better.giving/agents", {
           method,
           headers: { "x-forwarded-for": "192.0.2.1" },
         }),
@@ -460,6 +460,23 @@ describe("MCP errors", () => {
         data: { code: "invalid_request" },
       },
     });
+  });
+
+  // MCP 2025-06-18 Streamable HTTP: an accepted notification is a 202 with no
+  // body, and JSON-RPC never answers one
+  test.each([
+    "notifications/initialized",
+    "notifications/cancelled",
+    "notifications/unheard-of",
+  ])("the notification %s is accepted with an empty 202", async (method) => {
+    const response = await post({
+      jsonrpc: "2.0",
+      method,
+      params: { requestId: 1 },
+    });
+
+    expect(response.status).toBe(202);
+    await expect(response.text()).resolves.toBe("");
   });
 
   test("an unknown method is method-not-found", async () => {

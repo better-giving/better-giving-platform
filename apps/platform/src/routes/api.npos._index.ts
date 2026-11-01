@@ -1,5 +1,5 @@
 import { safeParse } from "valibot";
-import { get_npos } from "#/.server/npos";
+import { search_npos } from "#/.server/npos";
 import { api_error } from "@/helpers/api-error";
 import { resp, search } from "@/helpers/https";
 import { npos_search } from "@/npo/schema";
@@ -15,7 +15,7 @@ export const loader = public_api_route(
       return api_error("invalid_request", params.issues[0].message);
     }
 
-    const page = await get_npos(params.output);
+    const page = await search_npos(params.output);
 
     return resp.json(page, 200, { "cache-control": cache });
   }

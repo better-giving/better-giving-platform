@@ -4,10 +4,15 @@ import { reset_rate_limits } from "#/.server/auth/rate-limit";
 import { API_ERROR_STATUS } from "@/helpers/api-error";
 import { npo_ref, npos_search, reg_number } from "@/npo/schema";
 import { CONNECTOR_ACTIONS } from "../connector/actions";
-import { BODY_KEYS, exchange_body, QUERY_PARAMS } from "../connector/inputs";
+import {
+  BODY_KEYS,
+  EXPECTED_VERSION,
+  exchange_body,
+  QUERY_PARAMS,
+} from "../connector/inputs";
 import { PROBLEM_CODES } from "../connector/problem";
 import { read_only } from "../public-api";
-import { EXCLUDED, type IOperation, OPERATIONS, openapi_doc } from "./spec";
+import { EXCLUDED, type IOperation, openapi_doc, operations } from "./spec";
 import { wire_schema } from "./wire-schema";
 
 const ROUTES_DIR = new URL("../../src/routes/", import.meta.url);
@@ -21,6 +26,8 @@ const modules = import.meta.glob<RouteModule>([
   "!**/*.test.ts",
 ]);
 const route_module = (id: string) => modules[`/src/routes/${id}.ts`]();
+const route_source_of = (path: string) =>
+  readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 const route_source = (id: string) =>
   readFileSync(new URL(`${id}.ts`, ROUTES_DIR), "utf8");
 
@@ -35,11 +42,13 @@ const api_route_ids = () =>
 const doc = openapi_doc("https://better.giving");
 type Param = { name: string; in: string; schema: unknown };
 const op_of = (id: string) => {
-  const found = OPERATIONS.find((o) => o.op.operationId === id);
+  const found = operations().find((o) => o.op.operationId === id);
   if (!found) throw new Error(`no operation ${id}`);
   return found.op as {
     parameters?: Param[];
+    responses?: Record<string, unknown>;
     requestBody?: {
+      required: boolean;
       content: Record<string, { schema: { properties?: object } }>;
     };
   };
@@ -62,7 +71,7 @@ beforeEach(() => reset_rate_limits());
 
 describe("openapi drift", () => {
   test("every api.* and connector.v1.* route is documented or excluded", () => {
-    const documented = new Set(OPERATIONS.map((o) => o.route));
+    const documented = new Set(operations().map((o) => o.route));
     const ids = api_route_ids();
     expect(
       ids.filter((id) => !documented.has(id) && !(id in EXCLUDED))
@@ -75,14 +84,14 @@ describe("openapi drift", () => {
   });
 
   test("every connector action is one operation", () => {
-    const connector_ids = OPERATIONS.filter((o) =>
-      o.route.startsWith("connector.v1.")
-    ).map((o) => o.op.operationId);
+    const connector_ids = operations()
+      .filter((o) => o.route.startsWith("connector.v1."))
+      .map((o) => o.op.operationId);
     expect([...connector_ids].sort()).toEqual([...CONNECTOR_ACTIONS].sort());
   });
 
   test("each public operation is a GET its route's loader serves", async () => {
-    for (const o of OPERATIONS.filter((x) => x.route.startsWith("api."))) {
+    for (const o of operations().filter((x) => x.route.startsWith("api."))) {
       const mod = await route_module(o.route);
       expect(o.method, o.route).toBe("get");
       expect(mod.loader, o.route).toBeTypeOf("function");
@@ -92,7 +101,7 @@ describe("openapi drift", () => {
 
   test("a connector route serves exactly its documented methods", async () => {
     const by_route = new Map<string, IOperation[]>();
-    for (const o of OPERATIONS) {
+    for (const o of operations()) {
       if (!o.route.startsWith("connector.v1.")) continue;
       by_route.set(o.route, [...(by_route.get(o.route) ?? []), o]);
     }
@@ -170,6 +179,62 @@ describe("openapi drift", () => {
         new RegExp(`_keys\\((parsed\\.)?body, BODY_KEYS\\.${action},`)
       );
     }
+  });
+
+  test("a create replayed under its Idempotency-Key documents the replay's 200", () => {
+    for (const id of ["create_campaign", "create_form"]) {
+      expect(Object.keys(op_of(id).responses ?? {}), id).toEqual(
+        expect.arrayContaining(["200", "201"])
+      );
+    }
+    // no idempotency record: every call issues a fresh link
+    expect(op_of("create_photo_upload_link").responses).not.toHaveProperty(
+      "200"
+    );
+  });
+
+  test("an Idempotency-Key header that's sent can be refused with a 400", () => {
+    for (const o of operations()) {
+      const sends = (o.op.parameters as Param[] | undefined)?.some(
+        (p) => p.name === "Idempotency-Key"
+      );
+      if (sends)
+        expect(
+          op_of(o.op.operationId).responses,
+          o.op.operationId
+        ).toHaveProperty("400");
+    }
+  });
+
+  test("a write that reads no body at all as {} doesn't require one", () => {
+    for (const o of operations()) {
+      const body = op_of(o.op.operationId).requestBody;
+      if (!body || o.route === "connector.v1.exchange") continue;
+      const optional = ["end_campaign", "publish_campaign"].includes(
+        o.op.operationId
+      );
+      expect(body.required, o.op.operationId).toBe(!optional);
+    }
+    for (const action of ["end_campaign", "publish_campaign"]) {
+      expect(route_source_of(".server/connector/campaign-writes.ts")).toMatch(
+        new RegExp(
+          `function ${action}\\([\\s\\S]*?read_body\\(request, \\{ allow_empty: true \\}\\)`
+        )
+      );
+    }
+  });
+
+  test("expected_version carries the pattern the route enforces", () => {
+    for (const id of ["update_campaign_settings", "update_campaign_blocks"]) {
+      const schema = op_of(id).requestBody?.content["application/json"]
+        .schema as { properties: Record<string, { pattern?: string }> };
+      expect(schema.properties.expected_version.pattern, id).toBe(
+        EXPECTED_VERSION.source
+      );
+    }
+    expect(route_source_of(".server/connector/campaign-writes.ts")).toContain(
+      "EXPECTED_VERSION.test("
+    );
   });
 
   test("error code enums are the codes the routes send", () => {
