@@ -29,22 +29,46 @@ const RED = 13041721;
 const BLUE = 2856675;
 
 const POST_MESSAGE = "https://slack.com/api/chat.postMessage";
+// https://docs.slack.dev/reference/methods/chat.postMessage#errors
+const CREDENTIAL_ERRORS = new Set([
+  "not_authed",
+  "invalid_auth",
+  "account_inactive",
+  "token_revoked",
+  "token_expired",
+]);
 // https://docs.slack.dev/reference/block-kit/blocks/section-block
 const SECTION_TEXT_MAX = 3000;
 
 export class Slack {
   private channel_id: string;
   private bot_token: string | undefined;
+  private skip_bad_credential: boolean;
 
-  constructor(channel_id: string, bot_token: string | undefined) {
+  /** `skip_bad_credential`: a missing or refused token resolves with a
+   * warning instead of throwing. the server turns it on off production only */
+  constructor(
+    channel_id: string,
+    bot_token: string | undefined,
+    skip_bad_credential = false
+  ) {
     this.channel_id = channel_id;
     this.bot_token = bot_token;
+    this.skip_bad_credential = skip_bad_credential;
+  }
+
+  private skipped(reason: string, title: string): Response {
+    console.warn(`slack post not sent (${reason}): ${title}`);
+    return Response.json({ ok: true, skipped: reason });
   }
 
   async send_alert({ type = "NOTICE", ...alert }: Alert) {
     const visible = escape_mrkdwn(
       type === "NOTICE" ? alert.title : `ERROR:${alert.title}`
     );
+    if (!this.bot_token && this.skip_bad_credential) {
+      return this.skipped("no bot token", visible);
+    }
     const color = type === "NOTICE" ? BLUE : RED;
     const blocks: Block[] = [
       {
@@ -91,8 +115,14 @@ export class Slack {
       }),
     });
     const failure = await refusal(res);
-    if (failure) throw failure;
-    return res;
+    if (!failure) return res;
+    if (
+      this.skip_bad_credential &&
+      (res.status === 401 || CREDENTIAL_ERRORS.has(failure.code ?? ""))
+    ) {
+      return this.skipped(failure.message, visible);
+    }
+    throw failure;
   }
 }
 
@@ -129,13 +159,23 @@ function is_record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+class SlackRefusal extends Error {
+  /** slack's `error` string, when it sent one */
+  code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
 /** `chat.postMessage` answers HTTP 200 with `{ ok: false }` for a refused post. */
-async function refusal(res: Response): Promise<Error | undefined> {
+async function refusal(res: Response): Promise<SlackRefusal | undefined> {
   let json: unknown;
   try {
     json = await res.json();
   } catch {
-    return new Error(
+    return new SlackRefusal(
       res.ok
         ? "slack: response was not json"
         : `slack ${res.status}: response was not json`
@@ -147,5 +187,5 @@ async function refusal(res: Response): Promise<Error | undefined> {
   const detail = [!res.ok ? String(res.status) : undefined, error]
     .filter((part): part is string => part !== undefined)
     .join(": ");
-  return new Error(detail ? `slack ${detail}` : "slack: not ok");
+  return new SlackRefusal(detail ? `slack ${detail}` : "slack: not ok", error);
 }

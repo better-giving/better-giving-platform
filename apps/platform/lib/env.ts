@@ -114,9 +114,19 @@ export const OPTIONAL_KEYS = [
   // list may be empty
   "CONNECTOR_RETURN_URL",
   "CONNECTOR_ORIGINS",
-  // ops alerts: production sets the bot token; preview and dev leave it blank
+  // ops alerts, mail and crm: off production each sender skips without its
+  // credential; production requires them (PRODUCTION_KEYS)
   "SLACK_BOT_TOKEN",
+  "SMTP_PASSWORD",
+  "HUBSPOT_ACCESS_TOKEN",
 ] as const satisfies readonly ServerKey[];
+
+// optional keys check_env still requires when STAGE is production
+export const PRODUCTION_KEYS = [
+  "SLACK_BOT_TOKEN",
+  "SMTP_PASSWORD",
+  "HUBSPOT_ACCESS_TOKEN",
+] as const satisfies readonly OptionalKey[];
 
 export type OptionalKey = (typeof OPTIONAL_KEYS)[number];
 
