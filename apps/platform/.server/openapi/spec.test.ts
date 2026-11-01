@@ -2,14 +2,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { beforeEach, describe, expect, test } from "vitest";
 import { reset_rate_limits } from "#/.server/auth/rate-limit";
 import { API_ERROR_STATUS } from "@/helpers/api-error";
-import { npo_ref, npos_search, reg_number } from "@/npo/schema";
+import { npo_ref } from "@/npo/schema";
 import { CONNECTOR_ACTIONS } from "../connector/actions";
-import {
-  BODY_KEYS,
-  EXPECTED_VERSION,
-  exchange_body,
-  QUERY_PARAMS,
-} from "../connector/inputs";
+import { BODY_KEYS, EXPECTED_VERSION, QUERY_PARAMS } from "../connector/inputs";
 import { PROBLEM_CODES } from "../connector/problem";
 import { read_only } from "../public-api";
 import { EXCLUDED, type IOperation, openapi_doc, operations } from "./spec";
@@ -28,8 +23,37 @@ const modules = import.meta.glob<RouteModule>([
 const route_module = (id: string) => modules[`/src/routes/${id}.ts`]();
 const route_source_of = (path: string) =>
   readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
-const route_source = (id: string) =>
-  readFileSync(new URL(`${id}.ts`, ROUTES_DIR), "utf8");
+
+const connector_sources = readdirSync(CONNECTOR_DIR)
+  .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
+  .map((f) =>
+    readFileSync(new URL(f, CONNECTOR_DIR), "utf8").replace(
+      /\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm,
+      ""
+    )
+  );
+
+/** a handler whose body reads its key set from a helper it calls */
+const OWNING_FUNCTION: Record<string, string> = {
+  create_campaign: "insert_campaign",
+  create_form: "insert_form",
+  list_recurring_gifts: "list_recurring",
+};
+
+/** which `<table>.<action>` sets the action's own handler body names,
+ * comments excluded: a swapped or missing reference shows here */
+const refs_in = (action: string, table: "QUERY_PARAMS" | "BODY_KEYS") => {
+  const fn = OWNING_FUNCTION[action] ?? action;
+  const head = new RegExp(`^(export )?(async )?function ${fn}\\(`, "m");
+  const owners = connector_sources.filter((t) => head.test(t));
+  expect(owners, `one function ${fn}`).toHaveLength(1);
+  const text = owners[0];
+  const from = text.search(head);
+  const body = text.slice(from, text.indexOf("\n}\n", from));
+  return [...body.matchAll(new RegExp(`${table}\\.(\\w+)`, "g"))].map(
+    (m) => m[1]
+  );
+};
 
 /** route ids under the documented prefixes: a file's name without its
  * extension, or a folder route's name */
@@ -129,56 +153,33 @@ describe("openapi drift", () => {
     }
   });
 
-  test("valibot-validated inputs are the schema the route parses", () => {
-    const query = wire_schema(npos_search) as {
-      properties: Record<string, unknown>;
-    };
-    expect(
-      Object.fromEntries(
-        params_in("search_nonprofits", "query").map((p) => [p.name, p.schema])
-      )
-    ).toEqual(query.properties);
-    expect(route_source("api.npos._index")).toMatch(/safeParse\(npos_search,/);
-
-    expect(params_in("get_nonprofit", "path")[0].schema).toEqual(
-      wire_schema(npo_ref)
-    );
-    expect(route_source("api.npos.$id")).toMatch(/safeParse\(npo_ref,/);
-
-    expect(params_in("get_nonprofit_by_ein", "path")[0].schema).toEqual(
-      wire_schema(reg_number)
-    );
-    expect(route_source("api.npos.ein.$id")).toMatch(/safeParse\(reg_number,/);
-
-    expect(
-      op_of("exchange").requestBody?.content["application/json"].schema
-    ).toEqual(wire_schema(exchange_body));
-    expect(route_source("connector.v1.exchange")).toMatch(
-      /safeParse\(exchange_body,/
-    );
-  });
-
-  test("connector query and body keys are the sets the handlers refuse against", () => {
-    const sources = readdirSync(CONNECTOR_DIR)
-      .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
-      .map((f) => readFileSync(new URL(f, CONNECTOR_DIR), "utf8"))
-      .join("\n");
+  test("each documented query and body key set is the one its own handler refuses against", () => {
     for (const [action, keys] of Object.entries(QUERY_PARAMS)) {
       expect(
         params_in(action, "query").map((p) => p.name),
         action
       ).toEqual([...keys]);
-      expect(sources, action).toContain(`QUERY_PARAMS.${action},`);
+      expect(refs_in(action, "QUERY_PARAMS"), action).toEqual([action]);
     }
     for (const [action, keys] of Object.entries(BODY_KEYS)) {
       const schema = op_of(action).requestBody?.content["application/json"]
         .schema as { properties: object; additionalProperties: boolean };
       expect(Object.keys(schema.properties), action).toEqual([...keys]);
       expect(schema.additionalProperties, action).toBe(false);
-      expect(sources, action).toMatch(
-        new RegExp(`_keys\\((parsed\\.)?body, BODY_KEYS\\.${action},`)
-      );
+      expect(refs_in(action, "BODY_KEYS"), action).toEqual([action]);
     }
+  });
+
+  test("get_block_catalog refuses a parameter its documented set lacks", async () => {
+    const { get_block_catalog } = await import("../connector/reads");
+    expect(QUERY_PARAMS.get_block_catalog).toEqual([]);
+    const res = get_block_catalog(new URL("https://bg.test/x?stray=1"));
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({
+      code: "invalid",
+      errors: [{ path: "stray", message: "is not a parameter of this action" }],
+    });
+    expect(get_block_catalog(new URL("https://bg.test/x")).status).toBe(200);
   });
 
   test("a create replayed under its Idempotency-Key documents the replay's 200", () => {

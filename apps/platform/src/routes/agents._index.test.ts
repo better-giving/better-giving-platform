@@ -10,6 +10,7 @@ import {
 } from "vitest";
 import { rate_limit_windows } from "$/pg/schema/rate-limit";
 import type { TestDb } from "$/pg/test-utils/pglite";
+import { RPC_ERROR_CODES } from "./agents/rpc";
 
 const test_db = vi.hoisted(() => ({
   current: null as TestDb | null,
@@ -139,8 +140,12 @@ describe("/agents MCP endpoint", () => {
     expect(text).toContain("Stripe-hosted checkout link");
     expect(text).toContain("not_on_better_giving");
     expect(text).toContain("onboarding_url");
-    for (const code of ["error.data.code", "tool_not_found", "invalid_input"]) {
-      expect(text).toContain(code);
+    expect(text).toContain("error.data.code");
+    expect(text).toContain("invalid_input");
+    const errors = text.slice(text.indexOf("## Errors")).split("\n## ")[0];
+    expect(errors).toContain("## Errors");
+    for (const code of RPC_ERROR_CODES) {
+      expect(errors, code).toContain(`\`${code}\``);
     }
   });
 

@@ -9,7 +9,8 @@ vi.mock("$/connector/reads", () => ({
     throw new Error("db down");
   },
 }));
-vi.mock("#/errors/report", () => ({ report_error: vi.fn() }));
+const report_error = vi.hoisted(() => vi.fn());
+vi.mock("#/errors/report", () => ({ report_error }));
 
 const { loader } = await import("./connector.v1.donation-page");
 
@@ -23,6 +24,22 @@ describe("GET /connector/v1/donation-page", () => {
 
     expect(res.status).toBe(500);
     expect(res.headers.get("content-type")).toBe("application/problem+json");
-    expect(await res.json()).toMatchObject({ code: "internal_error" });
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(await res.json()).toEqual({
+      code: "internal_error",
+      status: 500,
+      detail: "Better Giving hit an error and could not complete this request.",
+      error: {
+        code: "internal_error",
+        message:
+          "Better Giving hit an error and could not complete this request.",
+      },
+    });
+    expect(report_error).toHaveBeenCalledOnce();
+    expect(report_error).toHaveBeenCalledWith(new Error("db down"), {
+      where: "connector",
+      method: "GET",
+      path: "/connector/v1/donation-page",
+    });
   });
 });
