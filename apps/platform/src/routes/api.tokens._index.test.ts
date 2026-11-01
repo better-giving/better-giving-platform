@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 
 const fuse = vi.hoisted(() => ({ fails: false }));
 vi.mock("fuse.js", async (actual) => {
@@ -20,7 +21,7 @@ vi.mock("#/errors/report", () => ({ report_error: reported }));
 const { loader } = await import("./api.tokens._index");
 
 const list = (qs = "") =>
-  loader({ request: new Request(`https://x/api/tokens${qs}`) } as any);
+  loader(doc_args(new Request(`https://x/api/tokens${qs}`)) as any);
 
 describe("GET /api/tokens", () => {
   test("answers the first ten tokens when no query is sent, cached for an hour", async () => {

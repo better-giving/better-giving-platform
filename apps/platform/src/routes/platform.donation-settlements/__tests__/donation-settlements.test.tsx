@@ -157,7 +157,9 @@ function render_app(initial = "/platform/donation-settlements") {
   // pglite the loaders read
   mswWorker.use(
     http.get(href("/api/npos"), async ({ request }) =>
-      HttpResponse.json(await get_npos(parse(npos_search, search(request))))
+      HttpResponse.json(
+        await get_npos(parse(npos_search, search(new URL(request.url))))
+      )
     )
   );
 

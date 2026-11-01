@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { loader } from "./[openapi.json]";
 
 describe("/openapi.json", () => {
   test("serves an OpenAPI 3.1 document for the request origin", async () => {
     const res = (await loader({
-      request: new Request("https://preview.better.giving/openapi.json"),
+      ...doc_args(new Request("https://preview.better.giving/openapi.json")),
       params: {},
       context: {},
     } as never)) as Response;

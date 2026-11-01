@@ -347,6 +347,7 @@ describe("handle_reg_created", () => {
 
     const res = await new_application(
       new Request("https://bg.test/register", { method: "POST" }),
+      new URL("https://bg.test/register"),
       createFormData({ o_type: "501c3", o_ein: "12-3456789" })
     );
     expect((res as Response).headers.get("location")).toMatch(/^\/register\//);

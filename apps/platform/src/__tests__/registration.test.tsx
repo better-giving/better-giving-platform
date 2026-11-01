@@ -1243,8 +1243,9 @@ async function seed_member(npo_id: number) {
     .onConflictDoNothing();
 }
 
-function start_request(url = "https://bg.test/register") {
-  return new Request(url, { method: "POST" });
+/** the request and the normalized url an action receives alongside it */
+function start_args(url = "https://bg.test/register") {
+  return [new Request(url, { method: "POST" }), new URL(url)] as const;
 }
 
 async function all_regs() {
@@ -1260,7 +1261,7 @@ describe("new_application", () => {
 
   it("writes o_type, o_ein and hq country together on the US branch", async () => {
     const res = await new_application(
-      start_request(),
+      ...start_args(),
       createFormData({ o_type: "501c3", o_ein: "12-3456789" })
     );
 
@@ -1280,7 +1281,7 @@ describe("new_application", () => {
     // an identity written without either silently caps the application at a
     // step nobody can pass, with no error anywhere.
     await new_application(
-      start_request(),
+      ...start_args(),
       createFormData({ o_type: "501c3", o_ein: "123456789" })
     );
     const [created] = await all_regs();
@@ -1295,7 +1296,7 @@ describe("new_application", () => {
 
   it("writes o_type together with country + registration number on the international branch", async () => {
     await new_application(
-      start_request(),
+      ...start_args(),
       createFormData({
         o_type: "other",
         o_hq_country: "Kenya",
@@ -1312,7 +1313,7 @@ describe("new_application", () => {
 
   it("keeps the referrer query as a referral code", async () => {
     await new_application(
-      start_request("https://bg.test/register?referrer=ABC123"),
+      ...start_args("https://bg.test/register?referrer=ABC123"),
       createFormData({ o_type: "501c3", o_ein: "123456789" })
     );
 
@@ -1323,7 +1324,7 @@ describe("new_application", () => {
 
   it("rejects an EIN that is not 9 digits without creating anything", async () => {
     const res = await new_application(
-      start_request(),
+      ...start_args(),
       createFormData({ o_type: "501c3", o_ein: "12345" })
     );
 
@@ -1336,7 +1337,7 @@ describe("new_application", () => {
   // carry a message that stands on its own
   it("faults a blank registration number under its own field", async () => {
     const res = await new_application(
-      start_request(),
+      ...start_args(),
       createFormData({ o_type: "other", o_hq_country: "Kenya" })
     );
 
@@ -1350,7 +1351,7 @@ describe("new_application", () => {
 
   it("faults a blank country under its own field", async () => {
     const res = await new_application(
-      start_request(),
+      ...start_args(),
       createFormData({ o_type: "other", o_registration_number: "KE-99" })
     );
 
@@ -1367,7 +1368,7 @@ describe("new_application", () => {
     await seed_member(npo.id);
 
     const res = await new_application(
-      start_request(),
+      ...start_args(),
       createFormData({ o_type: "501c3", o_ein: "123456789" })
     );
 
@@ -1383,7 +1384,7 @@ describe("new_application", () => {
     await seed_member(npo.id);
 
     const res = await new_application(
-      start_request(),
+      ...start_args(),
       createFormData({
         o_type: "other",
         o_hq_country: "Kenya",
@@ -1400,7 +1401,7 @@ describe("new_application", () => {
     await seed_npo({ registration_number: "123456789" });
 
     const res = await new_application(
-      start_request(),
+      ...start_args(),
       createFormData({ o_type: "501c3", o_ein: "123456789" })
     );
 
@@ -1423,7 +1424,7 @@ describe("new_application", () => {
     await seed_member(npo.id);
 
     await new_application(
-      start_request(),
+      ...start_args(),
       createFormData({
         o_type: "other",
         o_hq_country: "Uganda",

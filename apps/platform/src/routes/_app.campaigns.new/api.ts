@@ -7,15 +7,15 @@ import { user_npo_memberships } from "$/pg/schema/user";
 import type { Route } from "./+types/route";
 
 /** signed-in nonprofit admins land on Campaigns → New; everyone else is sent on */
-export async function campaign_new_target(request: Request) {
+export async function campaign_new_target(request: Request, url: URL) {
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
   const rows = await db
     .select({ npo_id: user_npo_memberships.npo_id })
     .from(user_npo_memberships)
     .where(eq(user_npo_memberships.user_id, user.id))
     .orderBy(asc(user_npo_memberships.npo_id));
-  const { npo } = search(request);
+  const { npo } = search(url);
   const requested = Number(npo);
   const match = rows.find((r) => r.npo_id === requested);
   const id = match?.npo_id ?? rows[0]?.npo_id;
@@ -23,8 +23,8 @@ export async function campaign_new_target(request: Request) {
   return redirect(href("/admin/:id/campaigns/new", { id: String(id) }), 302);
 }
 
-export const loader = ({ request }: Route.LoaderArgs) =>
-  campaign_new_target(request);
+export const loader = ({ request, url }: Route.LoaderArgs) =>
+  campaign_new_target(request, url);
 
-export const action = ({ request }: Route.ActionArgs) =>
-  campaign_new_target(request);
+export const action = ({ request, url }: Route.ActionArgs) =>
+  campaign_new_target(request, url);

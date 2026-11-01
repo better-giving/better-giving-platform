@@ -57,10 +57,9 @@ function thanks_from(url: URL): {
   };
 }
 
-export const loader = async ({ params, request }: Route.LoaderArgs) => {
+export const loader = async ({ params, request, url }: Route.LoaderArgs) => {
   const campaign = await campaign_public(params.org, params.campaign);
   if (!campaign || campaign.owner_npo_id == null) throw resp.status(404);
-  const url = new URL(request.url);
   // a published owner with a slug lives at it; its id url is an alias. an
   // unpublished owner's slug stays out of this public, cached redirect
   if (

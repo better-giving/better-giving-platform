@@ -4,15 +4,15 @@ import { login_url } from "#/helpers/login-url";
 import { safe_redirect } from "@/helpers/safe-redirect";
 
 /** `redirect` from the form, else the query: where to sign back in to */
-const asked_return = async (request: Request) => {
+const asked_return = async (request: Request, url: URL) => {
   const form = await request.formData().catch(() => null);
   const field = form?.get("redirect");
   if (typeof field === "string") return field;
-  return new URL(request.url).searchParams.get("redirect");
+  return url.searchParams.get("redirect");
 };
 
-export const action: ActionFunction = async ({ request }) => {
-  const back = safe_redirect(await asked_return(request), null);
+export const action: ActionFunction = async ({ request, url }) => {
+  const back = safe_redirect(await asked_return(request, url), null);
   const to = back ? login_url(back) : href("/marketplace");
   const session = await auth.api.getSession({ headers: request.headers });
   // already signed out (another tab): same destination, no cookie to clear

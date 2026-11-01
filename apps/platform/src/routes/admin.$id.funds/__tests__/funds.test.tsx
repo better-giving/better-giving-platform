@@ -10,6 +10,7 @@ import {
   vi,
 } from "vitest";
 import { cleanup, render } from "vitest-browser-react";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { user } from "$/pg/schema/auth";
 import { campaigns as campaign_table } from "$/pg/schema/campaign";
 import { funds as fund_table } from "$/pg/schema/fund";
@@ -228,7 +229,7 @@ describe("funds — filter and display", () => {
   it("redirects a funds GET onto the supporter tab", async () => {
     const call = (search: string) =>
       loader({
-        request: new Request(`http://x/admin/7/funds${search}`),
+        ...doc_args(new Request(`http://x/admin/7/funds${search}`)),
         params: { id: "7" },
         context: { get: (k: unknown) => (k === admin_ctx ? 7 : undefined) },
       } as any);
@@ -835,10 +836,12 @@ describe("funds — stale opt out", () => {
     const fd = new FormData();
     fd.set("fund_id", fund_id);
     return (action as any)({
-      request: new Request(`http://x/admin/${npo_id}/funds`, {
-        method: "POST",
-        body: fd,
-      }),
+      ...doc_args(
+        new Request(`http://x/admin/${npo_id}/funds`, {
+          method: "POST",
+          body: fd,
+        })
+      ),
       params: { id: String(npo_id) },
       context: { get: (k: unknown) => (k === admin_ctx ? npo_id : undefined) },
     });

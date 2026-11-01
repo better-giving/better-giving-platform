@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { seed_npo } from "#/__tests__/fixtures/funds";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
@@ -32,7 +33,7 @@ const MOVED = "public, max-age=3600, s-maxage=86400";
 const call = (fn: unknown, path: string, params: object) =>
   (fn as (a: unknown) => Promise<Response>)({
     params,
-    request: new Request(`https://x${path}`),
+    ...doc_args(new Request(`https://x${path}`)),
   });
 
 describe("old marketplace urls", () => {

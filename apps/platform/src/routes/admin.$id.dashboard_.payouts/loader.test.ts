@@ -9,6 +9,7 @@ import {
   test,
   vi,
 } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
@@ -136,8 +137,8 @@ async function transfer(id: string, net: number, date: string, rec: IRecord) {
 
 async function load(search = "") {
   return loader({
-    request: new Request(
-      `https://app.test/admin/${npo_id}/dashboard/payouts${search}`
+    ...doc_args(
+      new Request(`https://app.test/admin/${npo_id}/dashboard/payouts${search}`)
     ),
     context: { get: (k: unknown) => (k === admin_ctx ? npo_id : undefined) },
   } as any);

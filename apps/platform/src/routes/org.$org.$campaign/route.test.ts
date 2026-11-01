@@ -8,6 +8,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { user } from "$/pg/schema/auth";
 import { npos } from "$/pg/schema/npo";
 import { registrations } from "$/pg/schema/registration";
@@ -182,7 +183,7 @@ function email_keys(value: unknown): string[] {
 function respond(url: string) {
   const u = new URL(url);
   return loader({
-    request: new Request(url),
+    ...doc_args(new Request(url)),
     params: {
       org: u.pathname.split("/")[2],
       campaign: u.pathname.split("/")[3],

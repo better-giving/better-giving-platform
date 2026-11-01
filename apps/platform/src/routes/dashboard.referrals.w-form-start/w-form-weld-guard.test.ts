@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 
 // --- mocks (hoisted) ---
 
@@ -57,8 +58,8 @@ beforeEach(() => {
 const signed = (weld_data_eid?: string) => {
   const q = weld_data_eid ? `?weldDataEid=${weld_data_eid}` : "";
   return (loader as any)({
-    request: new Request(
-      `https://app.test/dashboard/referrals/w-form-signed${q}`
+    ...doc_args(
+      new Request(`https://app.test/dashboard/referrals/w-form-signed${q}`)
     ),
     params: {},
     context: { get: () => session.user },
@@ -140,10 +141,12 @@ describe("w-9 callback", () => {
 
 const start = (tax_form?: string) =>
   (action as any)({
-    request: new Request("https://app.test/dashboard/referrals/w-form-start", {
-      method: "POST",
-      body: new URLSearchParams(tax_form ? { tax_form } : {}),
-    }),
+    ...doc_args(
+      new Request("https://app.test/dashboard/referrals/w-form-start", {
+        method: "POST",
+        body: new URLSearchParams(tax_form ? { tax_form } : {}),
+      })
+    ),
     params: {},
     context: { get: () => session.user },
   });

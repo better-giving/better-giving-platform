@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 // --- mocks (hoisted) ---
@@ -92,7 +93,7 @@ const attempt = (email: string, password: string, ip = "203.0.113.7") => {
     body: fv,
     headers: { "x-forwarded-for": ip },
   });
-  return (action as any)({ request, params: {}, context: {} });
+  return (action as any)({ ...doc_args(request), params: {}, context: {} });
 };
 
 /** the password-field error the action returns instead of a redirect */

@@ -5,9 +5,9 @@ import { npo_interest_shares } from "#/.server/npos-interest-share";
 import { resp } from "@/helpers/https";
 import { interest_log } from "@/liquid/schemas";
 
-export const action: ActionFunction = async ({ request }) => {
+export const action: ActionFunction = async ({ request, url }) => {
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
   if (user.role !== "admin") return resp.status(403);
 
   const body = await request.json().catch(() => undefined);

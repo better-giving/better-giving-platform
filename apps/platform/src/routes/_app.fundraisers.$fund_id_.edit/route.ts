@@ -8,8 +8,8 @@ import type { Route } from "./+types/route";
 export { action } from "../_app.campaigns.$fund_id_.edit/api";
 
 /** the editor moved to /campaigns/:fund_id/edit; old links and indexed urls follow */
-export const loader = ({ params, request }: Route.LoaderArgs) => {
-  const { search } = new URL(request.url);
+export const loader = ({ params, url }: Route.LoaderArgs) => {
+  const { search } = url;
   return moved(
     `${href("/campaigns/:fund_id/edit", { fund_id: params.fund_id })}${search}`
   );

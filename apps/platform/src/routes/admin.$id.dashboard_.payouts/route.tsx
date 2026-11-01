@@ -12,7 +12,7 @@ import { PayoutsTable } from "./common/payouts-table";
 import { SentToStripe } from "./sent";
 
 export const loader = async (x: Route.LoaderArgs) => {
-  const { next } = search(x.request);
+  const { next } = search(x.url);
   const id = x.context.get(admin_ctx);
 
   const page = await npo_payouts(id, {

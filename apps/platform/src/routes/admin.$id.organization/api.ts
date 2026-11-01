@@ -25,13 +25,13 @@ export interface LoaderData extends INpo {
   videos: IVideos;
 }
 
-export const loader = async ({ params, request }: Route.LoaderArgs) => {
+export const loader = async ({ params, url }: Route.LoaderArgs) => {
   const p = safeParse($int_gte1, params.id);
   if (p.issues) throw resp.status(400, p.issues[0].message);
   const id = p.output;
   // "Load more" widens the read rather than paging it, so a revalidation after
   // a video write refreshes every row on screen
-  const limit = videos_shown(search(request)[VIDEOS_PAGE]);
+  const limit = videos_shown(search(url)[VIDEOS_PAGE]);
   const [npo, featured, all] = await Promise.all([
     npo_get(id),
     npo_media_list(id, { type: "video", featured: true, limit: MAX_VIDEOS }),
@@ -41,7 +41,7 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
 
   return {
     ...npo,
-    base_url: new URL(request.url).origin,
+    base_url: url.origin,
     videos: {
       featured: featured.items,
       items: all.items,

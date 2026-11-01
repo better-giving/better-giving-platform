@@ -11,6 +11,7 @@ import {
 } from "vitest";
 import { type AuthUser, user_ctx } from "#/.server/auth";
 import { seed_npo, seed_user } from "#/__tests__/fixtures/funds";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
@@ -102,18 +103,20 @@ const post = (
   user_row: { id: string; role: string }
 ) =>
   action({
-    request: new Request(url, {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(fields),
-    }),
+    ...doc_args(
+      new Request(url, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(fields),
+      })
+    ),
     context: context_for(user_row),
     params: {},
   } as any) as Promise<Response>;
 
 const load = (url: string, user_row: UserRow) =>
   loader({
-    request: new Request(url),
+    ...doc_args(new Request(url)),
     context: context_for(user_row),
     params: {},
   } as any);
@@ -180,11 +183,13 @@ describe("connector allow", () => {
     const { member } = await seed();
 
     const result = await action({
-      request: new Request(ALLOW_URL, {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ decision: "allow", state: STATE }),
-      }),
+      ...doc_args(
+        new Request(ALLOW_URL, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ decision: "allow", state: STATE }),
+        })
+      ),
       context: context_for({ id: member.id, role: "user" }),
       params: {},
     } as any);

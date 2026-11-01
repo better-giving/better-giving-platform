@@ -10,6 +10,7 @@ import {
   test,
   vi,
 } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
@@ -108,8 +109,10 @@ const npo_row = async (id: number) => {
 
 const call = async (q: Record<string, string>) =>
   (await (loader as any)({
-    request: new Request(
-      `https://app.test/api/stripe-connect/callback?${new URLSearchParams(q)}`
+    ...doc_args(
+      new Request(
+        `https://app.test/api/stripe-connect/callback?${new URLSearchParams(q)}`
+      )
     ),
     params: {},
     context: {},

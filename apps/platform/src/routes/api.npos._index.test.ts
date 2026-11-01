@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 
 const page = { items: [{ id: 1, name: "A" }], page: 1, pages: 1 };
 const search = vi.hoisted(() => ({ fails: false }));
@@ -14,7 +15,7 @@ const { action, loader } = await import("./api.npos._index");
 
 const list = (qs: string) =>
   loader({
-    request: new Request(`https://x/api/npos?${qs}`),
+    ...doc_args(new Request(`https://x/api/npos?${qs}`)),
   } as any) as Promise<Response>;
 
 describe("GET /api/npos", () => {

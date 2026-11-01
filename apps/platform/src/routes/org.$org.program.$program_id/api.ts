@@ -16,7 +16,7 @@ export const headers: Route.HeadersFunction = () => ({
   "cache-control": "public, s-maxage=60, stale-while-revalidate=300",
 });
 
-export const loader = async ({ params, request }: Route.LoaderArgs) => {
+export const loader = async ({ params, url }: Route.LoaderArgs) => {
   const p = safeParse(program_id, params.program_id);
   if (p.issues) throw resp.status(400, p.issues[0].message);
   const pid = p.output;
@@ -27,7 +27,7 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
   // a published org with a slug lives at it; its id url is an alias. an
   // unpublished org's slug stays out of this public, cached redirect
   if (typeof id === "number" && npo.slug && npo.published) {
-    throw moved(`${program_href(npo, pid)}${new URL(request.url).search}`);
+    throw moved(`${program_href(npo, pid)}${url.search}`);
   }
 
   const prog = await npo_program_get(pid, npo.id);
@@ -76,7 +76,7 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
       social_media_urls: npo.social_media_urls,
     },
     prog,
-    url: new URL(program_href(npo, pid), request.url).toString(),
+    url: new URL(program_href(npo, pid), url).toString(),
     donors,
     campaigns,
   };

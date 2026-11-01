@@ -8,6 +8,7 @@ import {
   vi,
 } from "vitest";
 import { seed_fund, seed_npo, seed_user } from "#/__tests__/fixtures/funds";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { user } from "$/pg/schema/auth";
 import { campaigns } from "$/pg/schema/campaign";
 import { fund_members, funds } from "$/pg/schema/fund";
@@ -54,18 +55,20 @@ const url = `https://app.test/campaigns/${FUND_ID}/edit`;
 
 const call_action = (body: object) =>
   (action as any)({
-    request: new Request(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    }),
+    ...doc_args(
+      new Request(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      })
+    ),
     params: { fund_id: FUND_ID },
     context: {},
   });
 
 const call_loader = () =>
   (loader as any)({
-    request: new Request(url),
+    ...doc_args(new Request(url)),
     params: { fund_id: FUND_ID },
     context: {},
   });

@@ -5,10 +5,10 @@ import { get_donation_page } from "$/connector/reads";
 import { db } from "$/pg/db";
 
 export const loader = connector_route(
-  async ({ request }: LoaderFunctionArgs) => {
+  async ({ request, url }: LoaderFunctionArgs) => {
     const live = await open_key(db, request);
     if (live instanceof Response) return live;
-    return get_donation_page(db, live.npo_id, new URL(request.url));
+    return get_donation_page(db, live.npo_id, url);
   }
 );
 

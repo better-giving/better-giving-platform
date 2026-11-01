@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 
 const sign_in_email = vi.hoisted(() => vi.fn());
 const select = vi.hoisted(() =>
@@ -45,7 +46,7 @@ const password_sign_in = (redirect?: string) => {
     ? `https://app.test/login?redirect=${encodeURIComponent(redirect)}`
     : "https://app.test/login";
   return action({
-    request: new Request(url, { method: "POST", body }),
+    ...doc_args(new Request(url, { method: "POST", body })),
   } as any);
 };
 

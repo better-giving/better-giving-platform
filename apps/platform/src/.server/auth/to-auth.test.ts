@@ -4,7 +4,7 @@ import { to_auth } from "./to-auth";
 describe("to_auth", () => {
   it("carries the referral id to signup and back to the arrival page", () => {
     const res = to_auth(
-      new Request("https://bg.test/register/welcome?referrer=ABC123")
+      new URL("https://bg.test/register/welcome?referrer=ABC123")
     );
 
     const to = new URL(res.headers.get("location") ?? "");

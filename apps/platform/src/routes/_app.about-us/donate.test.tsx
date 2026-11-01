@@ -2,6 +2,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { createRoutesStub } from "react-router";
 import { describe, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { Steps } from "#/components/donation";
 import { base_url as env_base_url } from "#/constants/env";
 import type { Route } from "./+types/route";
@@ -199,7 +200,7 @@ describe("about-us donate mount config", () => {
 describe("about-us base_url", () => {
   test("the loader derives it from the request origin", async () => {
     const res = await loader({
-      request: new Request("https://preview.example.org/about-us?x=1"),
+      ...doc_args(new Request("https://preview.example.org/about-us?x=1")),
     } as Route.LoaderArgs);
 
     // only the origin — no session, no per-visitor data (the route is cdn-cached)

@@ -43,7 +43,7 @@ export const loader = async (x: Route.LoaderArgs) => {
 
   return {
     id: endow.referral_id,
-    base_url: new URL(x.request.url).origin,
+    base_url: x.url.origin,
     referreds,
     earnings,
     pending_total,

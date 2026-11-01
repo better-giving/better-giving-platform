@@ -61,8 +61,7 @@ export const headers: Route.HeadersFunction = () => ({
 
 const schema = union([fund_id, segment]);
 
-export const loader = async ({ request, params }: Route.LoaderArgs) => {
-  const url = new URL(request.url);
+export const loader = async ({ params, url }: Route.LoaderArgs) => {
   const p = safeParse(schema, params.fund_id);
   if (p.issues) throw resp.status(400, p.issues[0].message);
   const fund = await get_fund(p.output);

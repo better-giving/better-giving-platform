@@ -4,11 +4,11 @@ import { request_login_link } from "#/.server/auth/login-link";
 import { search } from "@/helpers/https";
 import type { Route } from "./+types/route";
 
-export const loader = async ({ request }: Route.LoaderArgs) => {
+export const loader = async ({ request, url }: Route.LoaderArgs) => {
   const { user } = await get_session(request);
   if (user?.emailVerified) return redirect(href("/marketplace"));
 
-  const { email, redirect: redirect_to, stale } = search(request);
+  const { email, redirect: redirect_to, stale } = search(url);
   if (!email) return redirect(href("/signup"));
 
   return { email, redirect_to: redirect_to ?? "", stale: stale === "1" };

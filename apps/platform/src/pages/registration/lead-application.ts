@@ -92,7 +92,11 @@ const rhf_encoded = (fd: FormData): FormData => {
  * The address is not proven yet, so no session is *authority* here — the one
  * thing a session decides is whether this browser can act as the address at
  * all, which it must, or the wizard bounces them the moment they arrive. */
-export async function lead_application(request: Request, fd: FormData) {
+export async function lead_application(
+  request: Request,
+  url: URL,
+  fd: FormData
+) {
   // honeypot: offscreen and out of the tab order, so only a bot fills it.
   // a bare 400 rather than a field message — naming it teaches the bot.
   if (fd.get("middle_name")) {
@@ -217,6 +221,7 @@ export async function lead_application(request: Request, fd: FormData) {
    * nothing attached to it. */
   const res = await new_application_for(
     request,
+    url,
     encoded,
     { email, unproven: !signed_in },
     o_name

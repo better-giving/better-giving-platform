@@ -8,7 +8,7 @@ import { npo_series_opts } from "@/nav/schemas";
 import { nav_ltd, npo_series } from "$/pg/queries/nav";
 
 export const loader: LoaderFunction = async (x) => {
-  const p = safeParse(npo_series_opts, search(x.request));
+  const p = safeParse(npo_series_opts, search(x.url));
   if (p.issues) throw resp.status(400, p.issues[0].message);
   const opts = p.output;
 

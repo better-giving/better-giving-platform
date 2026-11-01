@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 
 const session = vi.hoisted(() => ({ user: undefined as object | undefined }));
 const sign_in_social = vi.hoisted(() => vi.fn());
@@ -39,24 +40,24 @@ beforeEach(() => {
 describe("/signup ?redirect=", () => {
   it("sends a signed-in submitter home, not off-site", async () => {
     session.user = { id: "u1" };
-    const res = (await action({ request: post(EVIL) } as any)) as Response;
+    const res = (await action({ ...doc_args(post(EVIL)) } as any)) as Response;
     expect(res.headers.get("location")).toBe("/marketplace");
   });
 
   it("never gives google an off-site callback", async () => {
-    await action({ request: post(EVIL, oauth()) } as any);
+    await action({ ...doc_args(post(EVIL, oauth())) } as any);
     expect(sign_in_social.mock.calls[0][0].body.callbackURL).toBe(
       "/marketplace"
     );
   });
 
   it("gives google a same-origin callback as asked", async () => {
-    await action({ request: post("/dashboard", oauth()) } as any);
+    await action({ ...doc_args(post("/dashboard", oauth())) } as any);
     expect(sign_in_social.mock.calls[0][0].body.callbackURL).toBe("/dashboard");
   });
 
   it("sends a failed google sign-in to /login, keeping the return path", async () => {
-    await action({ request: post("/donate/x?a=1&b=2", oauth()) } as any);
+    await action({ ...doc_args(post("/donate/x?a=1&b=2", oauth())) } as any);
     const to = new URL(
       sign_in_social.mock.calls[0][0].body.errorCallbackURL,
       "https://app.test"

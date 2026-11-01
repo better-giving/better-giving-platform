@@ -8,17 +8,15 @@ import type { Route } from "./+types/api.npos._index";
 
 const cache = "public, s-maxage=60, stale-while-revalidate=300";
 
-export const loader = public_api_route(
-  async ({ request }: Route.LoaderArgs) => {
-    const params = safeParse(npos_search, search(request));
-    if (params.issues) {
-      return api_error("invalid_request", params.issues[0].message);
-    }
-
-    const page = await search_npos(params.output);
-
-    return resp.json(page, 200, { "cache-control": cache });
+export const loader = public_api_route(async ({ url }: Route.LoaderArgs) => {
+  const params = safeParse(npos_search, search(url));
+  if (params.issues) {
+    return api_error("invalid_request", params.issues[0].message);
   }
-);
+
+  const page = await search_npos(params.output);
+
+  return resp.json(page, 200, { "cache-control": cache });
+});
 
 export const action = read_only;

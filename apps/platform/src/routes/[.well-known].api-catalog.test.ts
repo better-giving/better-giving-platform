@@ -1,15 +1,15 @@
 import { describe, expect, test } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { loader } from "./[.well-known].api-catalog";
 import { loader as openapi } from "./[openapi.json]";
 import { loader as guide } from "./agents._index";
 
 const get = (method: string) =>
   loader({
-    request: new Request(
-      "https://preview.better.giving/.well-known/api-catalog",
-      {
+    ...doc_args(
+      new Request("https://preview.better.giving/.well-known/api-catalog", {
         method,
-      }
+      })
     ),
     params: {},
     context: {},
@@ -44,7 +44,7 @@ describe("/.well-known/api-catalog", () => {
       path: string
     ): Promise<string | undefined> => {
       const res = (await handler({
-        request: new Request(`https://preview.better.giving${path}`),
+        ...doc_args(new Request(`https://preview.better.giving${path}`)),
         params: {},
         context: {},
       } as never)) as Response;

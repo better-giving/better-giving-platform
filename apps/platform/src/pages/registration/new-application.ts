@@ -36,6 +36,7 @@ export interface IApplicant {
  * `o_name` is seeded only by entry points that collected it. */
 export const new_application_for = async (
   request: Request,
+  url: URL,
   fd: FormData,
   applicant: IApplicant,
   o_name?: string
@@ -50,7 +51,7 @@ export const new_application_for = async (
     .parse(request.headers.get("cookie"))
     .then((x) => x || {});
 
-  const { referrer } = search(request);
+  const { referrer } = search(url);
 
   const payload: IRegNew = identity_payload(fv.data, applicant.email);
 
@@ -93,8 +94,12 @@ export const new_application_for = async (
 };
 
 /** the signed-in user's own application — the wizard's start screen. */
-export const new_application = async (request: Request, fd: FormData) => {
+export const new_application = async (
+  request: Request,
+  url: URL,
+  fd: FormData
+) => {
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
-  return new_application_for(request, fd, { ...user, unproven: false });
+  if (!user) return to_auth(url);
+  return new_application_for(request, url, fd, { ...user, unproven: false });
 };

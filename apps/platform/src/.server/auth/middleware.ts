@@ -15,11 +15,11 @@ export type AuthUser = NonNullable<
 export const user_ctx = createContext<AuthUser>();
 
 export const auth_mdlwr: MiddlewareFunction = async (
-  { request, context },
+  { request, context, url },
   next
 ) => {
   const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) throw to_auth(request);
+  if (!session) throw to_auth(url);
   context.set(user_ctx, session.user);
   return next();
 };

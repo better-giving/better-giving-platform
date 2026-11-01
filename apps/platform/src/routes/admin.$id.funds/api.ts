@@ -15,11 +15,9 @@ import {
 import type { Route } from "./+types/route";
 import { fund_creator } from "./creator";
 
-export const loader = ({ request, context }: Route.LoaderArgs) => {
+export const loader = ({ context, url }: Route.LoaderArgs) => {
   const id = context.get(admin_ctx);
-  const creator = fund_creator(
-    new URL(request.url).searchParams.get("creator")
-  );
+  const creator = fund_creator(url.searchParams.get("creator"));
   const q = new URLSearchParams({ tab: "supporters" });
   if (creator) q.set("creator", creator);
   return redirect(`${href("/admin/:id/campaigns", { id: String(id) })}?${q}`);

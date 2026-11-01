@@ -15,14 +15,13 @@ const target_query = v.variant("kind", [
   v.object({ kind: v.literal("npo"), npo_id: $int_gte1 }),
 ]);
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request, url }: Route.LoaderArgs) {
   if (!stripe_env.connect_routing) return resp.status(404);
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
   const client_id = stripe_env.connect_client_id;
   if (!client_id) return resp.status(503, "stripe connect is not configured");
 
-  const url = new URL(request.url);
   const p = v.safeParse(target_query, Object.fromEntries(url.searchParams));
   if (!p.success) return resp.status(400, p.issues[0].message);
   const t = p.output;

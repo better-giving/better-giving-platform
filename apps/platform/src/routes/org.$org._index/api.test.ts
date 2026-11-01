@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { seed_fund } from "#/__tests__/fixtures/funds";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { encode_date_cursor } from "$/pg/queries/helpers";
 import { user } from "$/pg/schema/auth";
 import { campaigns } from "$/pg/schema/campaign";
@@ -173,7 +174,7 @@ const hours_ago = (h: number) =>
 /** the loader's answer as it leaves the route: its data plus response init */
 const respond = (param: string, search = "") =>
   loader({
-    request: new Request(`https://x/org/${param}${search}`),
+    ...doc_args(new Request(`https://x/org/${param}${search}`)),
     params: { org: param },
   } as any);
 
@@ -252,7 +253,7 @@ describe("public npo profile loader", () => {
 
     // the id url is an alias of a slugged org's profile
     const thrown = await loader({
-      request: new Request(`https://x/org/${npo.id}?referrer=R1`),
+      ...doc_args(new Request(`https://x/org/${npo.id}?referrer=R1`)),
       params: { org: String(npo.id) },
     } as any).catch((e: unknown) => e);
     expect(thrown).toBeInstanceOf(Response);
@@ -1071,7 +1072,7 @@ describe("donors api", () => {
       const q = new URLSearchParams({ ...query, ...(next ? { next } : {}) });
       const res = (await donors_api.loader({
         params: { id: org },
-        request: new Request(`http://localhost/api/npo/${org}/donors?${q}`),
+        ...doc_args(new Request(`http://localhost/api/npo/${org}/donors?${q}`)),
       } as any)) as Response;
       const page: { items: { id: string }[]; next?: string } = await res.json();
       pages.push(page.items.map((m) => m.id));
@@ -1114,10 +1115,12 @@ describe("donors api", () => {
     (
       donors_api.loader({
         params: { id: String(id) },
-        request: new Request(
-          `http://localhost/api/npo/${id}/donors${
-            campaign_id ? `?campaign_id=${campaign_id}` : ""
-          }`
+        ...doc_args(
+          new Request(
+            `http://localhost/api/npo/${id}/donors${
+              campaign_id ? `?campaign_id=${campaign_id}` : ""
+            }`
+          )
         ),
       } as any) as Promise<Response>
     ).catch((e: unknown) => e as Response);

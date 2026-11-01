@@ -24,13 +24,14 @@ import { reg_get, reg_update } from "$/pg/queries/registration";
  * second application. */
 export const change_identity = async (
   request: Request,
+  url: URL,
   reg_id_param: string | undefined,
   fd: FormData
 ) => {
   // opened to a draft grant for the same reason its screen is: correcting a
   // mistyped identity is what a lead needs *before* the address is proven.
   const ru = await reg_user(request, true);
-  if (!ru) return to_auth(request);
+  if (!ru) return to_auth(url);
   const { user } = ru;
 
   const p1 = safeParse(reg_id, reg_id_param);

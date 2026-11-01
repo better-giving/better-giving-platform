@@ -5,8 +5,8 @@ const CONTENT_TYPE =
 
 /** RFC 9727: one linkset entry per API, each pointing at its machine-readable
  * description and its human guide */
-export function loader({ request }: LoaderFunctionArgs) {
-  const { origin } = new URL(request.url);
+export function loader({ url }: LoaderFunctionArgs) {
+  const { origin } = url;
   const links = {
     "service-desc": [
       { href: `${origin}/openapi.json`, type: "application/json" },

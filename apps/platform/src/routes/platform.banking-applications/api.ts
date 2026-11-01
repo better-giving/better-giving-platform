@@ -5,12 +5,8 @@ import { $int_gte1 } from "@/schemas";
 import { bapps_by_status } from "$/pg/queries/banking";
 import type { Route } from "./+types/route";
 
-export const loader = async ({ request }: Route.LoaderArgs) => {
-  const {
-    status = "under-review",
-    nextPageKey,
-    endowmentID,
-  } = search(request.url);
+export const loader = async ({ url }: Route.LoaderArgs) => {
+  const { status = "under-review", nextPageKey, endowmentID } = search(url);
 
   // "default" is an approved account that is also the npo's primary one — a
   // verdict, not a review state of its own, so it rides with "approved".

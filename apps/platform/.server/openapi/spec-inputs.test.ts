@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { reset_rate_limits } from "#/.server/auth/rate-limit";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { operations } from "./spec";
 
 vi.mock("#/.server/npos", () => ({
@@ -54,7 +55,10 @@ const path_schema = (id: string) =>
   (op(id).parameters ?? []).find((p) => p.in === "path")!.schema;
 
 const args = (path: string, id?: string) =>
-  ({ request: new Request(`https://bg.test${path}`), params: { id } }) as never;
+  ({
+    ...doc_args(new Request(`https://bg.test${path}`)),
+    params: { id },
+  }) as never;
 
 const json_of = async (res: Response | Promise<Response>) => {
   const r = await res;

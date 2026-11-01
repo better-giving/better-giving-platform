@@ -15,12 +15,12 @@ import {
 } from "./schema";
 import { type LoaderData, step } from "./types";
 
-export const loader = ({ request }: Route.LoaderArgs) => {
-  const { redirect: redir = "/", error, ..._step } = search(request);
+export const loader = ({ url }: Route.LoaderArgs) => {
+  const { redirect: redir = "/", error, ..._step } = search(url);
 
   // better-auth appends ?error=INVALID_TOKEN when reset link expires
   if (error && _step.type === "set-password" && _step.email) {
-    const to = new URL(request.url);
+    const to = new URL(url);
     to.searchParams.set("type", "expired");
     to.searchParams.set("email", _step.email);
     to.searchParams.delete("token");
@@ -36,7 +36,7 @@ export const loader = ({ request }: Route.LoaderArgs) => {
   } satisfies LoaderData;
 };
 
-export const action: ActionFunction = async ({ request }) => {
+export const action: ActionFunction = async ({ request, url }) => {
   const fv = await request.formData();
 
   if (fv.get("intent") === "confirm") {
@@ -54,7 +54,7 @@ export const action: ActionFunction = async ({ request }) => {
         body: { newPassword: payload.data.password, token },
       });
     } catch {
-      const to = new URL(request.url);
+      const to = new URL(url);
       const email = fv.get("email")?.toString() || "";
       to.searchParams.set("type", "expired");
       to.searchParams.set("email", email);
@@ -62,7 +62,7 @@ export const action: ActionFunction = async ({ request }) => {
       return redirect(to.toString());
     }
 
-    const to = new URL(request.url);
+    const to = new URL(url);
     to.searchParams.set("type", "success");
     return redirect(to.toString());
   }
@@ -85,7 +85,7 @@ export const action: ActionFunction = async ({ request }) => {
     } satisfies IFormInvalid<IEmailSchema>;
   }
 
-  const to = new URL(request.url);
+  const to = new URL(url);
   to.searchParams.set("type", "set-password");
   to.searchParams.set("email", email);
   // token will arrive via email link

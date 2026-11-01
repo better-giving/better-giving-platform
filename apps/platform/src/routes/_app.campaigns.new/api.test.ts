@@ -7,6 +7,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { user } from "$/pg/schema/auth";
 import { npos } from "$/pg/schema/npo";
 import { user_npo_memberships } from "$/pg/schema/user";
@@ -95,7 +96,7 @@ function call(which: "loader" | "action", url: string) {
     method: which === "action" ? "POST" : "GET",
   });
   const fn = which === "action" ? action : loader;
-  return fn({ request, params: {} } as any) as Promise<Response>;
+  return fn({ ...doc_args(request), params: {} } as any) as Promise<Response>;
 }
 
 describe("/campaigns/new", () => {

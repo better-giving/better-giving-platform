@@ -1,12 +1,13 @@
 import { describe, expect, test } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { loader } from "./[.well-known].mcp[.json]";
 import { MCP_PROTOCOL_VERSION, MCP_SERVER_INFO, tools } from "./agents/tools";
 
 describe("/.well-known/mcp.json", () => {
   test("describes the MCP server with urls at the request origin", async () => {
     const res = (await loader({
-      request: new Request(
-        "https://preview.better.giving/.well-known/mcp.json"
+      ...doc_args(
+        new Request("https://preview.better.giving/.well-known/mcp.json")
       ),
       params: {},
       context: {},

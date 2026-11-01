@@ -37,9 +37,9 @@ export const update_action =
     next: string | ((reg: IReg) => string),
     opts?: IUpdateActionOpts
   ): ActionFunction =>
-  async ({ request, params }) => {
+  async ({ request, params, url }) => {
     const ru = await reg_user(request, !!opts?.registrant);
-    if (!ru) return to_auth(request);
+    if (!ru) return to_auth(url);
     const { user, grant } = ru;
 
     const p1 = safeParse(reg_id, params.reg_id);
