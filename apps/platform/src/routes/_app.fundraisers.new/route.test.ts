@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { loader } from "./route";
 
 const location = (r: Response) => [
@@ -8,7 +9,7 @@ const location = (r: Response) => [
 ];
 const MOVED = "public, max-age=3600, s-maxage=86400";
 const call = (path: string) =>
-  loader({ request: new Request(`https://x${path}`) } as never);
+  loader({ ...doc_args(new Request(`https://x${path}`)) } as never);
 
 describe("old /fundraisers/new url", () => {
   it("301s to /campaigns/new, keeping the query", async () => {

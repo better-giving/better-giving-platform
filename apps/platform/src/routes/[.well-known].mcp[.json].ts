@@ -1,8 +1,8 @@
 import type { LoaderFunction } from "react-router";
 import { MCP_PROTOCOL_VERSION, MCP_SERVER_INFO, tools } from "./agents/tools";
 
-export const loader: LoaderFunction = ({ request }) => {
-  const { origin } = new URL(request.url);
+export const loader: LoaderFunction = ({ url }) => {
+  const { origin } = url;
   return Response.json(
     {
       name: MCP_SERVER_INFO.name,

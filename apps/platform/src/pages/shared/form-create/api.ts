@@ -42,9 +42,10 @@ interface IActors {
 export const loader = async ({
   request,
   params,
+  url,
 }: UserRoute.LoaderArgs | AdminRoute.LoaderArgs) => {
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
 
   //creating inside admin, form is attributed to :id
   if ("id" in params) {
@@ -70,7 +71,7 @@ export const loader = async ({
     } satisfies ILoaderData;
   }
 
-  const { npo_id } = search(request);
+  const { npo_id } = search(url);
 
   if (!npo_id) {
     return {
@@ -97,6 +98,7 @@ export const loader = async ({
 export const action = async ({
   request,
   params,
+  url,
 }: UserRoute.ActionArgs | AdminRoute.ActionArgs) => {
   const fvraw = await getValidatedFormData<FV>(
     request,
@@ -106,10 +108,10 @@ export const action = async ({
   const { data: fv } = fvraw;
 
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
 
   let actors: IActors | undefined;
-  const { npo_id: y } = search(request);
+  const { npo_id: y } = search(url);
   if ("id" in params) {
     const x = params.id;
 

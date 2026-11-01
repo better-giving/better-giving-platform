@@ -34,10 +34,9 @@ import { account, user as userTable } from "$/pg/schema/auth";
 import type { Route } from "./+types/route";
 import { retry_form_action } from "./oauth-error";
 
-export const action = async ({ request }: Route.ActionArgs) => {
+export const action = async ({ request, url }: Route.ActionArgs) => {
   try {
-    const from = new URL(request.url);
-    const asked_to = safe_redirect(from.searchParams.get("redirect"), null);
+    const asked_to = safe_redirect(url.searchParams.get("redirect"), null);
     const redirect_to = asked_to || href("/marketplace");
     const { user } = await get_session(request);
     if (user) return redirect(redirect_to);
@@ -120,7 +119,7 @@ export const action = async ({ request }: Route.ActionArgs) => {
       // carries no credential. delete this arm and `accountless_user`'s
       // "verified" case together once that population is gone.
       if (accountless === "verified") {
-        const origin = from.origin;
+        const origin = url.origin;
         try {
           await request_password_reset(email, request);
         } catch {
@@ -203,9 +202,9 @@ async function post_auth_destination(user: {
   return href("/marketplace");
 }
 
-export const loader = async ({ request }: Route.LoaderArgs) => {
+export const loader = async ({ request, url }: Route.LoaderArgs) => {
   const { user } = await get_session(request);
-  const to = safe_redirect(search(request).redirect, null);
+  const to = safe_redirect(search(url).redirect, null);
   if (user) return redirect(to ?? (await post_auth_destination(user)));
   return to || href("/marketplace");
 };

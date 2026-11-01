@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
@@ -59,7 +60,9 @@ const refused_sign_in = (redirect: string, code: string) => {
   const body = new FormData();
   body.set("email", EMAIL);
   body.set("password", "any-password-1");
-  return action({ request: req(redirect, { method: "POST", body }) } as any);
+  return action({
+    ...doc_args(req(redirect, { method: "POST", body })),
+  } as any);
 };
 
 beforeAll(async () => {
@@ -123,35 +126,35 @@ const password_sign_in = (redirect?: string) => {
     ? `https://app.test/login?redirect=${encodeURIComponent(redirect)}`
     : "https://app.test/login";
   return action({
-    request: new Request(url, { method: "POST", body }),
+    ...doc_args(new Request(url, { method: "POST", body })),
   } as any);
 };
 
 describe("/login ?redirect=", () => {
   it("sends a signed-in visitor home, not off-site", async () => {
     session.user = { id: "u1" };
-    const res = await loader({ request: req(EVIL) } as any);
+    const res = await loader({ ...doc_args(req(EVIL)) } as any);
     expect(location_of(res)).toBe("/marketplace");
   });
 
   it("sends a signed-in visitor home rather than failing on an unsendable path", async () => {
     session.user = { id: "u1" };
-    const res = await loader({ request: req("/ ") } as any);
+    const res = await loader({ ...doc_args(req("/ ")) } as any);
     expect(location_of(res)).toBe("/marketplace");
   });
 
   it("hands the page a safe return path to forward to signup and reset", async () => {
-    expect(await loader({ request: req("//evil.example") } as any)).toBe(
+    expect(await loader({ ...doc_args(req("//evil.example")) } as any)).toBe(
       "/marketplace"
     );
-    expect(await loader({ request: req("/dashboard") } as any)).toBe(
+    expect(await loader({ ...doc_args(req("/dashboard")) } as any)).toBe(
       "/dashboard"
     );
   });
 
   it("forwards the same default a sign-in lands on when none is asked", async () => {
     const res = await loader({
-      request: new Request("https://app.test/login"),
+      ...doc_args(new Request("https://app.test/login")),
     } as any);
     expect(res).toBe("/marketplace");
   });
@@ -159,7 +162,7 @@ describe("/login ?redirect=", () => {
   it("sends a signed-in submitter home, not off-site", async () => {
     session.user = { id: "u1" };
     const res = await action({
-      request: req(EVIL, { method: "POST", body: new FormData() }),
+      ...doc_args(req(EVIL, { method: "POST", body: new FormData() })),
     } as any);
     expect(location_of(res)).toBe("/marketplace");
   });
@@ -167,10 +170,12 @@ describe("/login ?redirect=", () => {
   it("sends a signed-in submitter home past a double-encoded authority", async () => {
     session.user = { id: "u1" };
     const res = await action({
-      request: req("/%2F%2Fevil.example", {
-        method: "POST",
-        body: new FormData(),
-      }),
+      ...doc_args(
+        req("/%2F%2Fevil.example", {
+          method: "POST",
+          body: new FormData(),
+        })
+      ),
     } as any);
     expect(location_of(res)).toBe("/marketplace");
   });
@@ -179,7 +184,7 @@ describe("/login ?redirect=", () => {
     sign_in_social.mockResolvedValue(new Response(null, { status: 200 }));
     const body = new FormData();
     body.set("intent", "oauth");
-    await action({ request: req(EVIL, { method: "POST", body }) } as any);
+    await action({ ...doc_args(req(EVIL, { method: "POST", body })) } as any);
     expect(sign_in_social.mock.calls[0][0].body.callbackURL).toBe("/login");
     expect(sign_in_social.mock.calls[0][0].body.errorCallbackURL).toBe(
       "/login"
@@ -191,7 +196,7 @@ describe("/login ?redirect=", () => {
     const body = new FormData();
     body.set("intent", "oauth");
     await action({
-      request: req("/dashboard", { method: "POST", body }),
+      ...doc_args(req("/dashboard", { method: "POST", body })),
     } as any);
     expect(sign_in_social.mock.calls[0][0].body.callbackURL).toBe("/dashboard");
   });
@@ -201,7 +206,7 @@ describe("/login ?redirect=", () => {
     const body = new FormData();
     body.set("intent", "oauth");
     await action({
-      request: req("/donate/x?a=1&b=2", { method: "POST", body }),
+      ...doc_args(req("/donate/x?a=1&b=2", { method: "POST", body })),
     } as any);
     const to = new URL(
       sign_in_social.mock.calls[0][0].body.errorCallbackURL,
@@ -284,7 +289,7 @@ describe("/login home", () => {
     const { id, org_ids } = await seed_user({ orgs: 1 });
     session.user = { id, role: "user" };
     const res = await loader({
-      request: new Request("https://app.test/login"),
+      ...doc_args(new Request("https://app.test/login")),
     } as any);
     expect(location_of(res)).toBe(`/admin/${org_ids[0]}/dashboard`);
   });
@@ -292,7 +297,7 @@ describe("/login home", () => {
   it("keeps an explicit redirect ahead of the single-org dashboard", async () => {
     const { id } = await seed_user({ orgs: 1 });
     session.user = { id, role: "user" };
-    const res = await loader({ request: req("/donate/x") } as any);
+    const res = await loader({ ...doc_args(req("/donate/x")) } as any);
     expect(location_of(res)).toBe("/donate/x");
   });
 
@@ -300,7 +305,7 @@ describe("/login home", () => {
     const { id } = await seed_user({ role: "admin", orgs: 1 });
     session.user = { id, role: "admin" };
     const res = await loader({
-      request: new Request("https://app.test/login"),
+      ...doc_args(new Request("https://app.test/login")),
     } as any);
     expect(location_of(res)).toBe("/marketplace");
   });

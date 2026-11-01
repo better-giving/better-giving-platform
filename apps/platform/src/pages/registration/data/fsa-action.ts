@@ -59,9 +59,9 @@ const signer_of = (reg: IReg, docs_or_eid: IFsaDocs | string): IFsaSigner => {
 /** the step 3 documentation form and the sign-result page's retry both post
  * here: the first with the documents as json, the second with the signer eid
  * of a packet it wants reissued. */
-export const action: ActionFunction = async ({ request, params }) => {
+export const action: ActionFunction = async ({ request, params, url }) => {
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
 
   const content_type = request.headers.get("content-type");
   const payload =
@@ -95,11 +95,11 @@ export const action: ActionFunction = async ({ request, params }) => {
   if (exit) return redirect(exit);
   const signer = signer_of(reg, docs_or_eid);
 
-  const from = new URL(request.url);
+  const from = new URL(url);
   from.pathname = href("/register/:reg_id/sign-result", { reg_id: rid });
   from.search = "";
 
-  const { url, doc_eid } = await gen_fsa_signing_url(
+  const { url: signing_url, doc_eid } = await gen_fsa_signing_url(
     rid,
     signer,
     from.toString()
@@ -111,7 +111,7 @@ export const action: ActionFunction = async ({ request, params }) => {
    * submitted meanwhile, which goes where the step loader would send it. */
   const packet = await reg_fsa_packet(rid, reg.updated_at, {
     ...(typeof docs_or_eid === "string" ? {} : docs_or_eid),
-    o_fsa_signing_url: url,
+    o_fsa_signing_url: signing_url,
     o_fsa_doc_eid: doc_eid,
   });
   if (!packet.won) {
@@ -122,5 +122,5 @@ export const action: ActionFunction = async ({ request, params }) => {
 
   await enqueue(msg("reg-updated", packet.row));
 
-  return redirect(url);
+  return redirect(signing_url);
 };

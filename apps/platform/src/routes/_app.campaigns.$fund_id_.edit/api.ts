@@ -60,9 +60,9 @@ const assert_fund_editor = async (
   }
 };
 
-export const loader = async ({ request, params }: Route.LoaderArgs) => {
+export const loader = async ({ request, params, url }: Route.LoaderArgs) => {
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
 
   const p_id = safeParse(fund_id, params.fund_id);
   if (p_id.issues) throw resp.status(400, p_id.issues[0].message);
@@ -80,20 +80,20 @@ export const loader = async ({ request, params }: Route.LoaderArgs) => {
       `${href("/admin/:id/campaigns/:campaign_id", {
         id: String(campaign.owner_npo_id),
         campaign_id: campaign.id,
-      })}${new URL(request.url).search}`
+      })}${url.search}`
     );
   }
 
   await assert_fund_editor(user, fund);
 
-  const base_url = new URL(request.url).origin;
+  const base_url = url.origin;
 
   return { fund, user, base_url } satisfies LoaderData;
 };
 
-export const action = async ({ request, params }: Route.ActionArgs) => {
+export const action = async ({ request, params, url }: Route.ActionArgs) => {
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
 
   const p_id = safeParse(fund_id, params.fund_id);
   if (p_id.issues) throw resp.status(400, p_id.issues[0].message);

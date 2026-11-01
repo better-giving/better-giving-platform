@@ -18,8 +18,8 @@ import { isbot } from "isbot";
 import type { RenderToPipeableStreamOptions } from "react-dom/server";
 import { renderToPipeableStream } from "react-dom/server";
 import {
-  type AppLoadContext,
   type EntryContext,
+  type RouterContextProvider,
   ServerRouter,
 } from "react-router";
 import { redact } from "#/errors/redact";
@@ -56,7 +56,7 @@ export default async function handle_request(
   response_status_code: number,
   response_headers: Headers,
   router_context: EntryContext,
-  _load_context: AppLoadContext
+  _load_context: RouterContextProvider
 ) {
   if (request.method.toUpperCase() === "HEAD") {
     return new Response(null, {

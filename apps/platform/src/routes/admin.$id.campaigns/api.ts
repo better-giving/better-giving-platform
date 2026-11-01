@@ -5,12 +5,11 @@ import { campaign_list, campaign_shown_status } from "$/pg/queries/campaign";
 import { npo_get } from "$/pg/queries/npo";
 import type { Route } from "./+types/route";
 
-export const loader = async ({ context, request }: Route.LoaderArgs) => {
+export const loader = async ({ context, url }: Route.LoaderArgs) => {
   const id = context.get(admin_ctx);
   const endow = await npo_get(id);
   if (!endow) throw resp.status(404);
 
-  const url = new URL(request.url);
   // "fundraisers" is this tab's previous query value; an old bookmarked link
   // must keep landing on the supporters view
   const tab = url.searchParams.get("tab");

@@ -26,8 +26,7 @@ async function append_referrer(
   return reg_cookie.serialize(rc);
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const url = new URL(request.url);
+export const loader = async ({ request, url }: LoaderFunctionArgs) => {
   const { referrer } = search(url);
   const cookie_header = request.headers.get("cookie");
 

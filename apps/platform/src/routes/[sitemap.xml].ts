@@ -49,8 +49,8 @@ const staticUrls: SitemapUrl[] = [
   { url: "/terms-of-use-npo", changeFrequency: "monthly", priority: 0.4 },
 ];
 
-export const loader: LoaderFunction = async ({ request }) => {
-  const base_url = new URL(request.url).origin;
+export const loader: LoaderFunction = async ({ url }) => {
+  const base_url = url.origin;
 
   // static pages have no per-page mtime; request time is a valid ISO lastmod
   // and refreshes each crawl of the cached (max-age=3600) doc.

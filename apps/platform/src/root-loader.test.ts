@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 
 vi.mock("#/.server/toast", () => ({ getToast: vi.fn() }));
 
@@ -20,7 +21,7 @@ const set_cookies = (res: any): string[] =>
 describe("referral attribution cookie", () => {
   it("stores ?referrer for a first-time visitor with no cookies", async () => {
     const res = await loader({
-      request: req("https://bg.test/register/welcome?referrer=ABC123"),
+      ...doc_args(req("https://bg.test/register/welcome?referrer=ABC123")),
     } as any);
 
     const [set_cookie] = set_cookies(res);
@@ -36,7 +37,9 @@ describe("referral attribution cookie", () => {
     });
 
     const res = await loader({
-      request: req("https://bg.test/register/welcome?referrer=SECOND", held),
+      ...doc_args(
+        req("https://bg.test/register/welcome?referrer=SECOND", held)
+      ),
     } as any);
 
     expect(set_cookies(res)).toHaveLength(0);

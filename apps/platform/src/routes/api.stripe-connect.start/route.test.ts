@@ -8,6 +8,7 @@ import {
   test,
   vi,
 } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
@@ -108,7 +109,7 @@ const seed_reg = async (
 
 const call = async (qs: string) =>
   (await (loader as any)({
-    request: new Request(`https://app.test/api/stripe-connect/start?${qs}`),
+    ...doc_args(new Request(`https://app.test/api/stripe-connect/start?${qs}`)),
     params: {},
     context: {},
   })) as Response;
@@ -336,8 +337,10 @@ describe("stripe connect start", () => {
       "state"
     )!;
     const res = (await (callback as any)({
-      request: new Request(
-        `https://app.test/api/stripe-connect/callback?${new URLSearchParams({ code: "ac_back", state })}`
+      ...doc_args(
+        new Request(
+          `https://app.test/api/stripe-connect/callback?${new URLSearchParams({ code: "ac_back", state })}`
+        )
       ),
       params: {},
       context: {},

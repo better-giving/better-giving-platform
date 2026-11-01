@@ -10,6 +10,7 @@ import {
   vi,
 } from "vitest";
 import { cleanup, render } from "vitest-browser-react";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { get_qstash_events } from "#/setup-tests-browser";
 import { banking_apps } from "$/pg/schema/banking";
 import { npos } from "$/pg/schema/npo";
@@ -583,9 +584,11 @@ describe("action edge cases", () => {
     const thrown = await Promise.resolve(
       (action as (...args: unknown[]) => unknown)({
         params: { id: "99999" },
-        request: new Request(
-          "http://test/platform/banking-applications/99999",
-          { method: "POST", body: form }
+        ...doc_args(
+          new Request("http://test/platform/banking-applications/99999", {
+            method: "POST",
+            body: form,
+          })
         ),
         context: {},
       })
@@ -602,7 +605,9 @@ describe("action edge cases", () => {
 describe("list loader", () => {
   const list = (qs: string) =>
     (list_loader as (...a: any[]) => any)({
-      request: new Request(`http://test/platform/banking-applications${qs}`),
+      ...doc_args(
+        new Request(`http://test/platform/banking-applications${qs}`)
+      ),
       params: {},
       context: {},
     });
@@ -643,9 +648,11 @@ describe("list loader", () => {
     form.set("type", "approved");
     await (action as (...a: any[]) => any)({
       params: { id: old_id },
-      request: new Request(
-        `http://test/platform/banking-applications/${old_id}`,
-        { method: "POST", body: form }
+      ...doc_args(
+        new Request(`http://test/platform/banking-applications/${old_id}`, {
+          method: "POST",
+          body: form,
+        })
       ),
       context: {},
     });

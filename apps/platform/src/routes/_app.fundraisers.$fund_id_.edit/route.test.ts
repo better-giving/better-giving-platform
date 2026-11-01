@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { seed_fund, seed_npo, seed_user } from "#/__tests__/fixtures/funds";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { user_fund_memberships } from "$/pg/schema/user";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
@@ -40,7 +41,7 @@ const MOVED = "public, max-age=3600, s-maxage=86400";
 const call = (path: string, fund_id: string) =>
   loader({
     params: { fund_id },
-    request: new Request(`https://x${path}`),
+    ...doc_args(new Request(`https://x${path}`)),
   } as never);
 
 describe("old /fundraisers/:fund_id/edit url", () => {
@@ -82,11 +83,13 @@ describe("saving the editor left open on the old url", () => {
 
     const res = await action({
       params: { fund_id: FUND_ID },
-      request: new Request(`https://x/fundraisers/${FUND_ID}/edit`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Renamed" }),
-      }),
+      ...doc_args(
+        new Request(`https://x/fundraisers/${FUND_ID}/edit`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: "Renamed" }),
+        })
+      ),
       context: {},
     } as never);
 

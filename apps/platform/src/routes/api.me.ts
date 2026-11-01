@@ -38,9 +38,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request, url }: ActionFunctionArgs) => {
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
 
   const form = await request.formData();
   const intent = form.get("intent");

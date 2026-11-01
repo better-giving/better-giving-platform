@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { registrations } from "$/pg/schema/registration";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
@@ -385,7 +386,7 @@ async function all_regs() {
 
 describe("marketing lead → application", () => {
   it("creates one unverified user and one application, and hands over the wizard", async () => {
-    const res: any = await us_action({ request: post(US_LEAD) } as any);
+    const res: any = await us_action({ ...doc_args(post(US_LEAD)) } as any);
 
     const users = await all_users();
     expect(users).toHaveLength(1);
@@ -412,22 +413,26 @@ describe("marketing lead → application", () => {
     // can be what stops the last one
     for (let i = 0; i < LEAD_PER_IP.max; i++) {
       const res: any = await us_action({
-        request: post_from("203.0.113.30", {
-          ...US_LEAD,
-          o_ein: `12-${3456789 + i}`,
-          email: `lead${i}@example.org`,
-        }),
+        ...doc_args(
+          post_from("203.0.113.30", {
+            ...US_LEAD,
+            o_ein: `12-${3456789 + i}`,
+            email: `lead${i}@example.org`,
+          })
+        ),
       } as any);
       expect(res.status).toBe(302);
     }
 
     mock_evaluate.mockClear();
     const over = us_action({
-      request: post_from("203.0.113.30", {
-        ...US_LEAD,
-        o_ein: "98-7654321",
-        email: "over@example.org",
-      }),
+      ...doc_args(
+        post_from("203.0.113.30", {
+          ...US_LEAD,
+          o_ein: "98-7654321",
+          email: "over@example.org",
+        })
+      ),
     } as any);
 
     // visible on the form, values kept — it fires on volume, never on anything
@@ -453,22 +458,26 @@ describe("marketing lead → application", () => {
     const cookie = await sign_in("staff@example.org");
     for (let i = 0; i < LEAD_PER_USER.max; i++) {
       const res: any = await us_action({
-        request: post_as_from(cookie, "203.0.113.31", {
-          ...US_LEAD,
-          o_ein: `12-${3456789 + i}`,
-          email: "staff@example.org",
-        }),
+        ...doc_args(
+          post_as_from(cookie, "203.0.113.31", {
+            ...US_LEAD,
+            o_ein: `12-${3456789 + i}`,
+            email: "staff@example.org",
+          })
+        ),
       } as any);
       expect(res.status).toBe(302);
     }
 
     mock_evaluate.mockClear();
     const over = us_action({
-      request: post_as_from(cookie, "203.0.113.31", {
-        ...US_LEAD,
-        o_ein: "98-7654321",
-        email: "staff@example.org",
-      }),
+      ...doc_args(
+        post_as_from(cookie, "203.0.113.31", {
+          ...US_LEAD,
+          o_ein: "98-7654321",
+          email: "staff@example.org",
+        })
+      ),
     } as any);
 
     const res: any = await over;
@@ -485,22 +494,26 @@ describe("marketing lead → application", () => {
     const ip = "203.0.113.40";
     for (let i = 0; i < LEAD_PER_IP.max; i++) {
       const res: any = await us_action({
-        request: post_from(ip, {
-          ...US_LEAD,
-          o_ein: `12-${3456789 + i}`,
-          email: `lead${i}@example.org`,
-        }),
+        ...doc_args(
+          post_from(ip, {
+            ...US_LEAD,
+            o_ein: `12-${3456789 + i}`,
+            email: `lead${i}@example.org`,
+          })
+        ),
       } as any);
       expect(res.status).toBe(302);
     }
 
     // spent, for anyone anonymous behind it
     const anon = us_action({
-      request: post_from(ip, {
-        ...US_LEAD,
-        o_ein: "98-7654321",
-        email: "anon@example.org",
-      }),
+      ...doc_args(
+        post_from(ip, {
+          ...US_LEAD,
+          o_ein: "98-7654321",
+          email: "anon@example.org",
+        })
+      ),
     } as any);
     expect(((await anon) as any).data.message).toBe(LEAD_THROTTLED);
 
@@ -511,7 +524,7 @@ describe("marketing lead → application", () => {
     ] as const;
     for (const [cookie, email, o_ein] of pairs) {
       const res: any = await us_action({
-        request: post_as_from(cookie, ip, { ...US_LEAD, o_ein, email }),
+        ...doc_args(post_as_from(cookie, ip, { ...US_LEAD, o_ein, email })),
       } as any);
       expect(res.status).toBe(302);
     }
@@ -521,7 +534,7 @@ describe("marketing lead → application", () => {
     const odd = new Response(null, { status: 200 });
     vi.mocked(new_application_for).mockResolvedValueOnce(odd);
 
-    await expect(us_action({ request: post(US_LEAD) } as any)).rejects.toBe(
+    await expect(us_action({ ...doc_args(post(US_LEAD)) } as any)).rejects.toBe(
       odd
     );
 
@@ -531,7 +544,7 @@ describe("marketing lead → application", () => {
 
   it("faults an EIN that is not nine digits and creates nothing", async () => {
     const res: any = await us_action({
-      request: post({ ...US_LEAD, o_ein: "12345" }),
+      ...doc_args(post({ ...US_LEAD, o_ein: "12345" })),
     } as any);
 
     expect(res.init.status).toBe(400);
@@ -542,7 +555,7 @@ describe("marketing lead → application", () => {
 
   it("hands back every posted value so a failed submit keeps the form", async () => {
     const res: any = await us_action({
-      request: post({ ...US_LEAD, o_ein: "12345" }),
+      ...doc_args(post({ ...US_LEAD, o_ein: "12345" })),
     } as any);
 
     // keyed by the names the form posts, so the fields repopulate as typed
@@ -558,7 +571,7 @@ describe("marketing lead → application", () => {
   it("creates nothing for a post carrying no org type", async () => {
     const { o_type: _, ...without } = US_LEAD;
 
-    const res = us_action({ request: post(without) } as any);
+    const res = us_action({ ...doc_args(post(without)) } as any);
 
     // `o_type` is a hidden input no one can edit — a fault on it is malformed,
     // not correctable, and must not reach a write
@@ -569,7 +582,7 @@ describe("marketing lead → application", () => {
 
   it("creates nothing when the honeypot is filled", async () => {
     const res = us_action({
-      request: post({ ...US_LEAD, middle_name: "i am a bot" }),
+      ...doc_args(post({ ...US_LEAD, middle_name: "i am a bot" })),
     } as any);
 
     await expect(res).rejects.toMatchObject({ status: 400 });
@@ -588,7 +601,7 @@ describe("marketing lead → application", () => {
       field: "email",
     });
 
-    const res: any = await us_action({ request: post(US_LEAD) } as any);
+    const res: any = await us_action({ ...doc_args(post(US_LEAD)) } as any);
 
     expect(res.data.errors.email).toBe("disposable email domain");
     expect(await all_users()).toHaveLength(0);
@@ -596,12 +609,12 @@ describe("marketing lead → application", () => {
   }, 30_000);
 
   it("mints no second user for an address that already has a draft", async () => {
-    await us_action({ request: post(US_LEAD) } as any);
+    await us_action({ ...doc_args(post(US_LEAD)) } as any);
     issued.length = 0;
     sent_links.length = 0;
 
     const res: any = await us_action({
-      request: post({ ...US_LEAD, o_ein: "98-7654321" }),
+      ...doc_args(post({ ...US_LEAD, o_ein: "98-7654321" })),
     } as any);
 
     expect(await all_users()).toHaveLength(1);
@@ -620,7 +633,7 @@ describe("marketing lead → application", () => {
   it("answers a verified address exactly as it answers an unverified one", async () => {
     await verified_account(LEAD_EMAIL);
 
-    const res: any = await us_action({ request: post(US_LEAD) } as any);
+    const res: any = await us_action({ ...doc_args(post(US_LEAD)) } as any);
 
     // byte-for-byte the answer the unverified case gets above — whether the
     // address already finished signing up is not this form's to disclose
@@ -640,7 +653,7 @@ describe("marketing lead → application", () => {
     const cookie = await sign_in("someone.else@example.org");
 
     const res: any = await us_action({
-      request: post_as(cookie, US_LEAD),
+      ...doc_args(post_as(cookie, US_LEAD)),
     } as any);
 
     expect(res.init.status).toBe(400);
@@ -658,7 +671,7 @@ describe("marketing lead → application", () => {
     const cookie = await sign_in(LEAD_EMAIL);
 
     const res: any = await us_action({
-      request: post_as(cookie, US_LEAD),
+      ...doc_args(post_as(cookie, US_LEAD)),
     } as any);
 
     const reg = (await all_regs()).at(-1)!;
@@ -670,7 +683,9 @@ describe("marketing lead → application", () => {
 
   it("starts an international application from the eligibility form", async () => {
     const res: any = await intl_action({
-      request: post(INTL_LEAD, "https://bg.test/for-international-nonprofits"),
+      ...doc_args(
+        post(INTL_LEAD, "https://bg.test/for-international-nonprofits")
+      ),
     } as any);
 
     const [reg] = await all_regs();
@@ -683,9 +698,11 @@ describe("marketing lead → application", () => {
 
   it("keeps an all-digit registration number a string", async () => {
     await intl_action({
-      request: post(
-        { ...INTL_LEAD, o_registration_number: "1234567" },
-        "https://bg.test/for-international-nonprofits"
+      ...doc_args(
+        post(
+          { ...INTL_LEAD, o_registration_number: "1234567" },
+          "https://bg.test/for-international-nonprofits"
+        )
       ),
     } as any);
 
@@ -696,7 +713,9 @@ describe("marketing lead → application", () => {
   it("faults a missing country under its own field and creates nothing", async () => {
     const { o_hq_country: _, ...without } = INTL_LEAD;
     const res: any = await intl_action({
-      request: post(without, "https://bg.test/for-international-nonprofits"),
+      ...doc_args(
+        post(without, "https://bg.test/for-international-nonprofits")
+      ),
     } as any);
 
     expect(res.data.errors.o_hq_country).toBe(
@@ -710,7 +729,9 @@ describe("marketing lead → application", () => {
   it("faults a missing registration number under its own field", async () => {
     const { o_registration_number: _, ...without } = INTL_LEAD;
     const res: any = await intl_action({
-      request: post(without, "https://bg.test/for-international-nonprofits"),
+      ...doc_args(
+        post(without, "https://bg.test/for-international-nonprofits")
+      ),
     } as any);
 
     expect(res.data.errors.o_registration_number).toBe(
@@ -722,7 +743,7 @@ describe("marketing lead → application", () => {
   it("reports an already-registered identity on the field that matched, leaving no account behind", async () => {
     await seed_owned_npo("123456789", "Riverside Youth Alliance");
 
-    const res: any = await us_action({ request: post(US_LEAD) } as any);
+    const res: any = await us_action({ ...doc_args(post(US_LEAD)) } as any);
 
     expect(res.data.errors.o_ein).toContain("already registered");
     expect(await all_regs()).toHaveLength(0);
@@ -734,12 +755,14 @@ describe("marketing lead → application", () => {
 
   it("faults a missing organization name and email together", async () => {
     const res: any = await us_action({
-      request: post({
-        o_type: "501c3",
-        o_name: "",
-        o_ein: "12-3456789",
-        email: "nope",
-      }),
+      ...doc_args(
+        post({
+          o_type: "501c3",
+          o_name: "",
+          o_ein: "12-3456789",
+          email: "nope",
+        })
+      ),
     } as any);
 
     expect(res.data.errors.o_name).toBeTruthy();
@@ -752,14 +775,23 @@ describe("marketing lead → application", () => {
 
 /** run the marketing form and hand back what it created */
 async function lead(fields: Record<string, string> = US_LEAD) {
-  const res: any = await us_action({ request: post(fields) } as any);
+  const res: any = await us_action({ ...doc_args(post(fields)) } as any);
   const location: string = res.headers.get("location");
   return { reg_id: location.split("/")[2]!, cookie: grant() };
 }
 
-const step_args = (reg_id: string, cookie?: string, step = "1") => ({
+/** `raw` is the path as it arrives — a client navigation asks for
+ * `<path>.data`, or `<path>/_.data` with a trailing slash — while `url` is the
+ * normalized one react-router hands every loader. */
+const step_args = (
+  reg_id: string,
+  cookie?: string,
+  step = "1",
+  raw = `/register/${reg_id}/${step}`
+) => ({
   params: { reg_id },
-  request: req(`https://bg.test/register/${reg_id}/${step}`, cookie),
+  request: req(`https://bg.test${raw}`, cookie),
+  url: new URL(`https://bg.test/register/${reg_id}/${step}`),
   context: {} as any,
 });
 
@@ -769,10 +801,12 @@ const patch_args = (
   body: object
 ) => ({
   params: { reg_id },
-  request: req(`https://bg.test/register/${reg_id}/1`, cookie, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  }),
+  ...doc_args(
+    req(`https://bg.test/register/${reg_id}/1`, cookie, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    })
+  ),
   context: {} as any,
 });
 
@@ -857,7 +891,7 @@ describe("the contact step before the address is proven", () => {
 /** the screen that starts an application, reached with no path of its own */
 const index_args = (cookie?: string) => ({
   params: {},
-  request: req("https://bg.test/register", cookie),
+  ...doc_args(req("https://bg.test/register", cookie)),
   context: {} as any,
 });
 
@@ -965,6 +999,45 @@ describe("the grant reaches nothing else", () => {
     expect(res.reg.id).toBe(reg_id);
   }, 30_000);
 
+  it("answers a client navigation as it answers the document", async () => {
+    const { reg_id, cookie } = await lead();
+    const data = `?_routes=${encodeURIComponent("routes/_app.register.$reg_id")}`;
+
+    const open: any = await reg_loader(
+      step_args(
+        reg_id,
+        cookie,
+        "identity",
+        `/register/${reg_id}/identity.data${data}`
+      ) as any
+    );
+    expect(open.reg.id).toBe(reg_id);
+
+    const slashed: any = await reg_loader(
+      step_args(
+        reg_id,
+        cookie,
+        "identity/",
+        `/register/${reg_id}/identity/_.data${data}`
+      ) as any
+    );
+    expect(slashed.reg.id).toBe(reg_id);
+
+    const closed: any = await reg_loader(
+      step_args(
+        reg_id,
+        cookie,
+        "sign-result",
+        `/register/${reg_id}/sign-result.data${data}`
+      ) as any
+    );
+    const to_signin = closed.headers.get("location");
+    expect(to_signin).toContain("/signup");
+    // the sign-in comes back to the page, not to its data endpoint
+    expect(to_signin).not.toContain(".data");
+    expect(to_signin).not.toContain("_routes");
+  }, 30_000);
+
   it("closes every later step to it", async () => {
     const { reg_id, cookie } = await lead();
 
@@ -1014,6 +1087,7 @@ describe("resume_application", () => {
 
     const res: any = await resume_application(
       req("https://bg.test/register", cookie),
+      new URL("https://bg.test/register"),
       form({ reference: JSON.stringify(id) })
     );
 
@@ -1029,6 +1103,7 @@ describe("resume_application", () => {
 
     const res: any = await resume_application(
       req("https://bg.test/register", cookie),
+      new URL("https://bg.test/register"),
       form({ reference: JSON.stringify(id) })
     );
 

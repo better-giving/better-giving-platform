@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 
 const put = vi.hoisted(() => vi.fn());
 vi.mock("@vercel/blob", () => ({ put }));
@@ -18,9 +19,11 @@ import { avatar_spec } from "./dashboard.edit-profile/use-rhf";
 
 const upload = (body: Blob, filename = "photo.png") =>
   action({
-    request: new Request(
-      `https://bg.test/api/file-upload?filename=${filename}`,
-      { method: "POST", body }
+    ...doc_args(
+      new Request(`https://bg.test/api/file-upload?filename=${filename}`, {
+        method: "POST",
+        body,
+      })
     ),
   } as any) as Promise<any>;
 

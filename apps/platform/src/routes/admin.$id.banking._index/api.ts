@@ -38,7 +38,7 @@ export const loader = async (x: Route.LoaderArgs) => {
     status,
     start_href: connect_start_href({ kind: "npo", npo_id: id }),
     ...(connect_routing && {
-      notice: connect_notice(new URL(x.request.url)),
+      notice: connect_notice(x.url),
     }),
   };
   return { methods: page.items, stripe, connect_routing } satisfies LoaderData;

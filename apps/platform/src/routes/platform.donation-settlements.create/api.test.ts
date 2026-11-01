@@ -8,6 +8,7 @@ import {
   test,
   vi,
 } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { user } from "$/pg/schema/auth";
 import { bal_txs } from "$/pg/schema/bal-tx";
 import { dists } from "$/pg/schema/dist";
@@ -274,7 +275,7 @@ function settle(f: Fields) {
   if (f.key !== null) body.set("idempotency_key", f.key ?? crypto.randomUUID());
   const url = "http://localhost/platform/donation-settlements/create";
   return action({
-    request: new Request(url, { method: "POST", body }),
+    ...doc_args(new Request(url, { method: "POST", body })),
     params: {},
     context: {} as any,
   } as any);
@@ -283,7 +284,7 @@ function settle(f: Fields) {
 function preview(p: Record<string, string>) {
   const url = `http://localhost/platform/donation-settlements/create?${new URLSearchParams(p)}`;
   return loader({
-    request: new Request(url),
+    ...doc_args(new Request(url)),
     params: {},
     context: {} as any,
   } as any);

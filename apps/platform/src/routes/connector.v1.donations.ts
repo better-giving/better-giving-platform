@@ -5,10 +5,10 @@ import { list_donations } from "$/connector/reads";
 import { db } from "$/pg/db";
 
 export const loader = connector_route(
-  async ({ request }: LoaderFunctionArgs) => {
+  async ({ request, url }: LoaderFunctionArgs) => {
     const live = await open_key(db, request);
     if (live instanceof Response) return live;
-    return list_donations(db, live.npo_id, new URL(request.url));
+    return list_donations(db, live.npo_id, url);
   }
 );
 

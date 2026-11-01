@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 
 // --- mocks (hoisted) ---
 
@@ -60,7 +61,12 @@ afterEach(() => {
 // they read, so the shim is where the cast lives instead of every call site
 const call_route = (
   fn: typeof proxy_action | typeof proxy_loader | typeof payout_action,
-  a: { request: Request; params?: Record<string, string>; context?: unknown }
+  a: {
+    request: Request;
+    url: URL;
+    params?: Record<string, string>;
+    context?: unknown;
+  }
 ): Promise<Response> =>
   (fn as any)({ params: {}, context: {}, ...a }) as Promise<Response>;
 
@@ -75,7 +81,7 @@ describe("wise proxy", () => {
   it("refuses a caller with no session", async () => {
     session.user = null;
     const res = await call_route(proxy_action, {
-      request: req("POST", {}),
+      ...doc_args(req("POST", {})),
       params: { "*": "v1/accounts" },
     });
 
@@ -86,7 +92,7 @@ describe("wise proxy", () => {
 
   it("refuses a path the bank-details form never asks for", async () => {
     const res = await call_route(proxy_loader, {
-      request: new Request("https://app.test/api/wise/v1/profiles"),
+      ...doc_args(new Request("https://app.test/api/wise/v1/profiles")),
       params: { "*": "v1/profiles" },
     });
 
@@ -97,7 +103,7 @@ describe("wise proxy", () => {
   it("refuses an allowed path under the wrong method", async () => {
     // reading currencies is fine; writing to that path is not
     const res = await call_route(proxy_action, {
-      request: req("POST", {}),
+      ...doc_args(req("POST", {})),
       params: { "*": "v1/currencies" },
     });
 
@@ -114,7 +120,7 @@ describe("wise proxy", () => {
     );
 
     const res = await call_route(proxy_action, {
-      request: req("POST", { profile: "{{profileId}}" }),
+      ...doc_args(req("POST", { profile: "{{profileId}}" })),
       params: { "*": "v1/accounts" },
     });
 
@@ -134,11 +140,13 @@ describe("wise proxy", () => {
 describe("payout account", () => {
   const call = (body: unknown) =>
     call_route(payout_action, {
-      request: new Request("https://app.test/dashboard/referrals/payout", {
-        method: "POST",
-        body: JSON.stringify(body),
-        headers: { "content-type": "application/json" },
-      }),
+      ...doc_args(
+        new Request("https://app.test/dashboard/referrals/payout", {
+          method: "POST",
+          body: JSON.stringify(body),
+          headers: { "content-type": "application/json" },
+        })
+      ),
       context: { get: () => USER },
     });
 
@@ -193,14 +201,16 @@ describe("payout account", () => {
 describe("file upload", () => {
   const upload = (filename: string) =>
     call_route(upload_action, {
-      request: new Request(
-        `https://app.test/api/file-upload?filename=${encodeURIComponent(filename)}`,
-        // a real pdf, typed as an uploader posts it: a bare string goes as
-        // text/plain, and the route checks the bytes against the type
-        {
-          method: "POST",
-          body: new Blob(["%PDF-1.7\n"], { type: "application/pdf" }),
-        }
+      ...doc_args(
+        new Request(
+          `https://app.test/api/file-upload?filename=${encodeURIComponent(filename)}`,
+          // a real pdf, typed as an uploader posts it: a bare string goes as
+          // text/plain, and the route checks the bytes against the type
+          {
+            method: "POST",
+            body: new Blob(["%PDF-1.7\n"], { type: "application/pdf" }),
+          }
+        )
       ),
     });
 

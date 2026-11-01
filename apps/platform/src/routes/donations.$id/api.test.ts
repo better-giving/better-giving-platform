@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 
 // --- mocks (hoisted) ---
 
@@ -111,7 +112,7 @@ const LEGACY_ID = "legacy-v1-001";
 
 const call = (id = DON_ID) =>
   (loader as any)({
-    request: new Request(`https://app.test/donations/${id}`),
+    ...doc_args(new Request(`https://app.test/donations/${id}`)),
     params: { id },
     context: {},
   });
@@ -227,10 +228,12 @@ describe("donation thank-you action", () => {
     form.set("type", "public_msg");
     form.set("msg", "hello");
     return (action as any)({
-      request: new Request(`https://app.test/donations/${id}`, {
-        method: "POST",
-        body: form,
-      }),
+      ...doc_args(
+        new Request(`https://app.test/donations/${id}`, {
+          method: "POST",
+          body: form,
+        })
+      ),
       params: { id },
       context: {},
     });

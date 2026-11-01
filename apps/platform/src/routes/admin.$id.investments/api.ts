@@ -18,7 +18,7 @@ export interface LoaderData extends IPageKeyed<IBalanceTx> {
 export const loader = async (x: Route.LoaderArgs) => {
   const id = x.context.get(admin_ctx);
 
-  const { next } = search(x.request);
+  const { next } = search(x.url);
   const [npo, ltd, btxs_page1] = await Promise.all([
     npo_get(id),
     nav_ltd(),

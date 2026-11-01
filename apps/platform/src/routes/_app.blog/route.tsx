@@ -19,8 +19,7 @@ const page_of = (param: string | null) => {
 };
 
 export const clientLoader = createClientLoaderCache<Route.ClientLoaderArgs>();
-export const loader = async ({ request }: Route.LoaderArgs) => {
-  const url = new URL(request.url);
+export const loader = async ({ url }: Route.LoaderArgs) => {
   const currPage = page_of(url.searchParams.get("page"));
   const [items, total] = await posts(currPage);
 

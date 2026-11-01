@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { forms } from "$/pg/schema/form";
 import { npos } from "$/pg/schema/npo";
 import type { TestDb } from "$/pg/test-utils/pglite";
@@ -57,7 +58,7 @@ describe("public form loader", () => {
     });
 
     const d = await loader({
-      request: new Request("https://x/forms/form-1"),
+      ...doc_args(new Request("https://x/forms/form-1")),
       params: { id: "form-1" },
     } as any);
 
@@ -90,7 +91,7 @@ describe("public form loader", () => {
     });
 
     const d = await loader({
-      request: new Request("https://x/forms/form-keys"),
+      ...doc_args(new Request("https://x/forms/form-keys")),
       params: { id: "form-keys" },
     } as any);
 

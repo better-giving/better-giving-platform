@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { user } from "$/pg/schema/auth";
 import { funds as fund_table } from "$/pg/schema/fund";
 import { npos } from "$/pg/schema/npo";
@@ -73,10 +74,12 @@ describe("fund creation", () => {
     const fd = new FormData();
     fd.append("name", JSON.stringify("Save The Whales"));
     const res = (await action({
-      request: new Request(`http://localhost/campaigns/new?npo=${npo!.id}`, {
-        method: "POST",
-        body: fd,
-      }),
+      ...doc_args(
+        new Request(`http://localhost/campaigns/new?npo=${npo!.id}`, {
+          method: "POST",
+          body: fd,
+        })
+      ),
       params: {},
       context: new Map() as any,
     } as any)) as Response;

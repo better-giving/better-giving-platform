@@ -233,8 +233,8 @@ const inactive_npo_msg = (npo: { name: string }) =>
 const fund_gift_npo_msg = (gift: { id: string; to_name: string }) =>
   `Donation ${gift.id} went to ${gift.to_name} — a match follows the fund the gift was given to, not a nonprofit picked beside it`;
 
-export const loader = async ({ request }: Route.LoaderArgs) => {
-  const { searchParams: s } = new URL(request.url);
+export const loader = async ({ url }: Route.LoaderArgs) => {
+  const { searchParams: s } = url;
   const npo_id = Number(s.get("npo_id"));
   const gross = Number(s.get("net"));
   /**

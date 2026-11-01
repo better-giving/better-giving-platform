@@ -6,7 +6,18 @@ import { BUGSINK_URL } from "./utils/bugsink";
 export default {
   ssr: true,
   appDirectory: "src",
-  future: { v8_middleware: true },
+  future: {
+    v8_middleware: true,
+    v8_passThroughRequests: true,
+    v8_trailingSlashAwareDataRequests: true,
+    // v8_viteEnvironmentApi stays off. vercelPreset splits the server into two
+    // bundles, and with this flag react-router 7.18.5 (and 8.5.1) builds them
+    // with Promise.all over shared plugins: the main bundle's manifest names an
+    // index.css the client build never emits and that bundle never writes, and
+    // the build fails moving it into build/client (ENOENT). building the two
+    // one after the other passes.
+    v8_splitRouteModules: true,
+  },
   presets: [vercelPreset()],
   buildEnd: async (args) => {
     // the same predicate vite.config.ts gates map emission and the upload

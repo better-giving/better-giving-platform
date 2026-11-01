@@ -13,7 +13,7 @@ import { subs_search } from "./helpers";
 export const loader = async (x: Route.LoaderArgs) => {
   const npo_id = x.context.get(admin_ctx);
 
-  const p = safeParse(subs_search, search(x.request));
+  const p = safeParse(subs_search, search(x.url));
   if (p.issues) throw resp.status(400, p.issues[0].message);
   const { limit = 20, ...q } = p.output;
 

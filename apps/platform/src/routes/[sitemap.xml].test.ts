@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 
 const fetch_mock = vi.hoisted(() => vi.fn());
 vi.mock("#/api/sanity", () => ({ sanity: { fetch: fetch_mock } }));
@@ -7,7 +8,7 @@ import { loader } from "./[sitemap.xml]";
 
 const sitemap = async () => {
   const res = (await loader({
-    request: new Request("https://better.giving/sitemap.xml"),
+    ...doc_args(new Request("https://better.giving/sitemap.xml")),
     params: {},
     context: {},
   } as any)) as Response;

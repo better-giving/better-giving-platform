@@ -37,7 +37,7 @@ export interface ILoader extends FormPublic {
   base_url: string;
 }
 
-export const loader = async ({ request, params }: Route.LoaderArgs) => {
+export const loader = async ({ params, url }: Route.LoaderArgs) => {
   const form = await form_get(params.id);
   if (!form) throw resp.err(404, "form not found");
 
@@ -64,6 +64,6 @@ export const loader = async ({ request, params }: Route.LoaderArgs) => {
       hide_bg_tip: x.hide_bg_tip,
       donor_address_required: x.donor_address_required,
     },
-    base_url: new URL(request.url).origin,
+    base_url: url.origin,
   } satisfies ILoader;
 };

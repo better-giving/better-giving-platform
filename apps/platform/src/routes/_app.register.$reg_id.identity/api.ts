@@ -14,9 +14,9 @@ import type { Route } from "./+types/route";
 /* answers to a draft grant, like the contact step does. the identity summary
  * offers "Change" to a lead whose address is not proven yet, and a link that
  * lands them on /signup is the one correction they cannot make. */
-export const loader = async ({ params, request }: Route.LoaderArgs) => {
+export const loader = async ({ params, request, url }: Route.LoaderArgs) => {
   const ru = await reg_user(request, true);
-  if (!ru) return to_auth(request);
+  if (!ru) return to_auth(url);
   const { user } = ru;
   const p = safeParse(reg_id, params.reg_id);
   if (p.issues) throw resp.status(400, p.issues[0].message);
@@ -56,5 +56,5 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
   };
 };
 
-export const action = async ({ params, request }: Route.ActionArgs) =>
-  change_identity(request, params.reg_id, await request.formData());
+export const action = async ({ params, request, url }: Route.ActionArgs) =>
+  change_identity(request, url, params.reg_id, await request.formData());

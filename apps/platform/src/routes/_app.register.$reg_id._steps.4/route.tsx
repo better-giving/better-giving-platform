@@ -35,7 +35,7 @@ export const loader = async (args: Route.LoaderArgs) => {
         : "not_connected",
     start_href: connect_start_href({ kind: "reg", reg_id: reg.id }),
     ...(connect_routing && {
-      notice: connect_notice(new URL(args.request.url)),
+      notice: connect_notice(args.url),
     }),
   };
   return { ...reg, stripe, connect_routing };

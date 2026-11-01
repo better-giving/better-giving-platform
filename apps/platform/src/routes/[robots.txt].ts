@@ -1,7 +1,7 @@
 import type { LoaderFunction } from "react-router";
 
-export const loader: LoaderFunction = async ({ request }) => {
-  const base_url = new URL(request.url).origin;
+export const loader: LoaderFunction = async ({ url }) => {
+  const base_url = url.origin;
 
   const robotText = `
 # https://www.robotstxt.org/robotstxt.html

@@ -7,6 +7,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
@@ -96,7 +97,7 @@ async function seed_raised(fund_id: string, to_id: number, net: number) {
 
 function load(fund_id: string, search = "") {
   return loader({
-    request: new Request(`https://x/campaigns/${fund_id}${search}`),
+    ...doc_args(new Request(`https://x/campaigns/${fund_id}${search}`)),
     params: { fund_id },
   } as any);
 }

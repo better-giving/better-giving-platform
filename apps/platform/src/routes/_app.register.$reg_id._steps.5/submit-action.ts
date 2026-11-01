@@ -14,9 +14,10 @@ import { reg_get, reg_update_from } from "$/pg/queries/registration";
 export const submit_action = async ({
   request,
   params,
+  url,
 }: ActionFunctionArgs) => {
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
 
   const p = safeParse(reg_id, params.reg_id);
   if (p.issues) throw resp.status(400, p.issues[0].message);

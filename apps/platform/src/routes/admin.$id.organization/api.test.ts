@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { npo_media, npos } from "$/pg/schema/npo";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
@@ -36,7 +37,7 @@ afterAll(async () => {
 const read = async (npo_id: number, search: string) =>
   (await (loader as any)({
     params: { id: String(npo_id) },
-    request: new Request(`http://x/admin/${npo_id}/organization${search}`),
+    ...doc_args(new Request(`http://x/admin/${npo_id}/organization${search}`)),
   })) as Awaited<ReturnType<typeof loader>>;
 
 describe("organization loader — videos", () => {

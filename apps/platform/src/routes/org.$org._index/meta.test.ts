@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { createRoutesStub, Meta, type MetaDescriptor } from "react-router";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { base_url } from "#/constants/env";
 import { npos } from "$/pg/schema/npo";
 import { registrations } from "$/pg/schema/registration";
@@ -47,7 +48,7 @@ type Descriptor = MetaDescriptor & Record<string, unknown>;
 /** the meta a crawler reads for `/org/<param>`, from the real loader */
 async function meta_of(param: string) {
   const { data: d } = await loader({
-    request: new Request(`${base_url}/org/${param}`),
+    ...doc_args(new Request(`${base_url}/org/${param}`)),
     params: { org: param },
   } as never);
   await Promise.all([d.funds, d.media, d.programs]);
@@ -215,7 +216,7 @@ describe("org profile meta", () => {
     const name = "Acme </script><script>alert(1)</script> & co";
     await seed("hostile", "meta-hostile", { name, tagline: name });
     const { data: d } = await loader({
-      request: new Request(`${base_url}/org/meta-hostile`),
+      ...doc_args(new Request(`${base_url}/org/meta-hostile`)),
       params: { org: "meta-hostile" },
     } as never);
     await Promise.all([d.funds, d.media, d.programs]);

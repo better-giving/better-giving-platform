@@ -7,6 +7,7 @@ import {
   test,
   vi,
 } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import type { IFsaDocs, TStatus } from "@/reg/schema";
 import { registrations } from "$/pg/schema/registration";
 import type { TestDb } from "$/pg/test-utils/pglite";
@@ -110,11 +111,13 @@ const seed = (status: TStatus | null, fields: Partial<typeof READY> = READY) =>
 const post_docs = () =>
   Promise.resolve(
     action({
-      request: new Request(`http://localhost/register/${RID}/3/fsa`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(DOCS),
-      }),
+      ...doc_args(
+        new Request(`http://localhost/register/${RID}/3/fsa`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(DOCS),
+        })
+      ),
       params: { reg_id: RID },
       context: {} as any,
     } as any)
@@ -260,10 +263,12 @@ describe("fsa action — sign-result retry", () => {
   const post_eid = () =>
     Promise.resolve(
       action({
-        request: new Request(`http://localhost/register/${RID}/sign-result`, {
-          method: "POST",
-          body: new URLSearchParams({ signer_eid: "signer-1" }),
-        }),
+        ...doc_args(
+          new Request(`http://localhost/register/${RID}/sign-result`, {
+            method: "POST",
+            body: new URLSearchParams({ signer_eid: "signer-1" }),
+          })
+        ),
         params: { reg_id: RID },
         context: {} as any,
       } as any)

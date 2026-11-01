@@ -24,16 +24,17 @@ const ALLOWED: ReadonlyArray<{ method: string; path: RegExp }> = [
   { method: "GET", path: /^v1\/validators\/[\w-]+$/ },
 ];
 
-export const loader: LoaderFunction = ({ request, params }) => {
-  return handle_request(request, params);
+export const loader: LoaderFunction = ({ request, params, url }) => {
+  return handle_request(request, url, params);
 };
 
-export const action: ActionFunction = ({ request, params }) => {
-  return handle_request(request, params);
+export const action: ActionFunction = ({ request, params, url }) => {
+  return handle_request(request, url, params);
 };
 
 async function handle_request(
   request: Request,
+  url: URL,
   params: { "*"?: string }
 ): Promise<ReturnType<typeof loader | typeof action>> {
   const METHOD = request.method;
@@ -59,7 +60,6 @@ async function handle_request(
   }
 
   try {
-    const url = new URL(request.url);
     const body = await request.text();
     const payload = body?.replace(/"{{profileId}}"/g, wise.profile_id);
 

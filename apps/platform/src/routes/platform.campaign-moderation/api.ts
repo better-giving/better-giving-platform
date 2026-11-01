@@ -4,8 +4,8 @@ import { resp, search } from "@/helpers/https";
 import { fund_delete, funds_list } from "$/pg/queries/fund";
 import type { Route } from "./+types/route";
 
-export const loader = async ({ request }: Route.LoaderArgs) => {
-  const { next } = search(request.url);
+export const loader = async ({ url }: Route.LoaderArgs) => {
+  const { next } = search(url);
   const page = await funds_list({
     next,
   });

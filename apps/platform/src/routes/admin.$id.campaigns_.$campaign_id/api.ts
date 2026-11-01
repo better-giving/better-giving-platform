@@ -32,11 +32,7 @@ async function owned(npo_id: number, campaign_id: string) {
   return row;
 }
 
-export const loader = async ({
-  context,
-  params,
-  request,
-}: Route.LoaderArgs) => {
+export const loader = async ({ context, params, url }: Route.LoaderArgs) => {
   const id = context.get(admin_ctx);
   const endow = await npo_get(id);
   if (!endow) throw resp.status(404);
@@ -45,7 +41,7 @@ export const loader = async ({
     npo_programs(id),
     campaign_gift_count(campaign.id),
   ]);
-  const origin = new URL(request.url).origin;
+  const origin = url.origin;
   const campaign_url =
     endow.slug && campaign.slug
       ? `${origin}/org/${endow.slug}/${campaign.slug}`
