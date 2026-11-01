@@ -6,6 +6,7 @@ import {
   is_optional,
   OPTIONAL_KEYS,
   type OptionalKey,
+  PRODUCTION_KEYS,
   SERVER_KEYS,
   type ServerKey,
 } from "../lib/env";
@@ -93,7 +94,13 @@ function normalize_optional(env: Record<string, string | undefined>) {
 // surface, and the suite hands it objects it built rather than a loaded env.
 export function missing_keys(env: Record<string, string | undefined>) {
   const required = [...SERVER_KEYS, ...CLIENT_KEYS];
-  return required.filter((k) => !is_optional(k) && !env[k]?.trim());
+  const prod = env.STAGE === "production";
+  return required.filter(
+    (k) =>
+      (!is_optional(k) ||
+        (prod && (PRODUCTION_KEYS as readonly string[]).includes(k))) &&
+      !env[k]?.trim()
+  );
 }
 
 // the other half of validation, named so it is testable the same way.

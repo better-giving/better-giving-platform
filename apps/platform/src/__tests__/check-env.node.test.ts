@@ -371,8 +371,24 @@ describe("missing_keys", () => {
       "CONNECTOR_RETURN_URL",
       "CONNECTOR_ORIGINS",
       "SLACK_BOT_TOKEN",
+      "SMTP_PASSWORD",
+      "HUBSPOT_ACCESS_TOKEN",
     ]);
   });
+
+  // optional off production only: a preview or local start without these
+  // boots, and the senders skip; production still refuses to build without them
+  test.each(["SLACK_BOT_TOKEN", "SMTP_PASSWORD", "HUBSPOT_ACCESS_TOKEN"])(
+    "%s is required on production only",
+    (key) => {
+      const vars = full();
+      delete vars[key];
+      vars.STAGE = "staging";
+      expect(missing_keys(vars)).toEqual([]);
+      vars.STAGE = "production";
+      expect(missing_keys(vars)).toEqual([key]);
+    }
+  );
 
   // one case per key rather than a shared loop: a loop's failure names no key
   // and aborts before the later ones run.
