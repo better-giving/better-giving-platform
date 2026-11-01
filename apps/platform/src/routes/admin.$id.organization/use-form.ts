@@ -11,6 +11,7 @@ import {
 } from "react-hook-form";
 import * as v from "valibot";
 import { to_text } from "#/components/rich-text";
+import { json_ok } from "@/helpers/https";
 import {
   type FV,
   fields,
@@ -138,7 +139,7 @@ export function use_organization_form(
         const update: Update = {};
         if (!locked && dirty("slug") && fv.slug !== "") {
           const found = await fetch(`/api/npos/${fv.slug}?fields=id`).then(
-            (r) => (r.status === 404 ? undefined : r.json())
+            (r) => (r.status === 404 ? undefined : json_ok<{ id: number }>(r))
           );
           if (found?.id && found.id !== npo_id) {
             set_prompt({

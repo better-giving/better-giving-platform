@@ -249,6 +249,10 @@ describe("create_photo_upload_link", () => {
       code: "campaign_ended",
       status: 409,
       detail: "This campaign has ended, and an ended campaign stays ended.",
+      error: {
+        code: "campaign_ended",
+        message: "This campaign has ended, and an ended campaign stays ended.",
+      },
     });
     expect(await links()).toHaveLength(0);
   });
@@ -288,13 +292,27 @@ describe("create_photo_upload_link", () => {
     });
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ code: "key_refused", status: 401 });
+    expect(await res.json()).toEqual({
+      code: "key_refused",
+      status: 401,
+      error: {
+        code: "key_refused",
+        message: "The API key is missing or no longer valid.",
+      },
+    });
   });
 
   test("GET is unknown_action", async () => {
     const res = (await loader()) as Response;
 
     expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ code: "unknown_action", status: 404 });
+    expect(await res.json()).toEqual({
+      code: "unknown_action",
+      status: 404,
+      error: {
+        code: "unknown_action",
+        message: "This connector action does not exist.",
+      },
+    });
   });
 });

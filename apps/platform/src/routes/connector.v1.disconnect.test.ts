@@ -100,7 +100,14 @@ describe("POST /connector/v1/disconnect", () => {
     const again = await disconnect(`Bearer ${issued.key}`);
     expect(again.status).toBe(401);
     expect(again.headers.get("content-type")).toBe("application/problem+json");
-    expect(await again.json()).toEqual({ code: "key_refused", status: 401 });
+    expect(await again.json()).toEqual({
+      code: "key_refused",
+      status: 401,
+      error: {
+        code: "key_refused",
+        message: "The API key is missing or no longer valid.",
+      },
+    });
   });
 
   test.each([
@@ -110,7 +117,14 @@ describe("POST /connector/v1/disconnect", () => {
   ])("%s bearer is key_refused", async (_label, authorization) => {
     const res = await disconnect(authorization);
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ code: "key_refused", status: 401 });
+    expect(await res.json()).toEqual({
+      code: "key_refused",
+      status: 401,
+      error: {
+        code: "key_refused",
+        message: "The API key is missing or no longer valid.",
+      },
+    });
   });
 });
 
@@ -123,7 +137,14 @@ describe("GET /connector/v1/disconnect", () => {
     } as any)) as Response;
     expect(res.status).toBe(404);
     expect(res.status).not.toBe(405);
-    expect(await res.json()).toEqual({ code: "unknown_action", status: 404 });
+    expect(await res.json()).toEqual({
+      code: "unknown_action",
+      status: 404,
+      error: {
+        code: "unknown_action",
+        message: "This connector action does not exist.",
+      },
+    });
   });
 });
 

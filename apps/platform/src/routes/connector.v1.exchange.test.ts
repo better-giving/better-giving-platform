@@ -98,7 +98,14 @@ describe("POST /connector/v1/exchange", () => {
     const again = await post(JSON.stringify({ code: issued.code }));
     expect(again.status).toBe(400);
     expect(again.headers.get("content-type")).toBe("application/problem+json");
-    expect(await again.json()).toEqual({ code: "code_invalid", status: 400 });
+    expect(await again.json()).toEqual({
+      code: "code_invalid",
+      status: 400,
+      error: {
+        code: "code_invalid",
+        message: "The authorization code is invalid, expired or already used.",
+      },
+    });
     expect(await db().select().from(connector_keys)).toHaveLength(1);
   });
 
@@ -111,7 +118,14 @@ describe("POST /connector/v1/exchange", () => {
     const res = await post(JSON.stringify({ code: issued.code }));
 
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ code: "code_invalid", status: 400 });
+    expect(await res.json()).toEqual({
+      code: "code_invalid",
+      status: 400,
+      error: {
+        code: "code_invalid",
+        message: "The authorization code is invalid, expired or already used.",
+      },
+    });
     expect(await db().select().from(connector_keys)).toHaveLength(0);
   });
 
@@ -120,7 +134,15 @@ describe("POST /connector/v1/exchange", () => {
     async (body) => {
       const res = await post(body);
       expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ code: "code_invalid", status: 400 });
+      expect(await res.json()).toEqual({
+        code: "code_invalid",
+        status: 400,
+        error: {
+          code: "code_invalid",
+          message:
+            "The authorization code is invalid, expired or already used.",
+        },
+      });
     }
   );
 
@@ -132,7 +154,14 @@ describe("POST /connector/v1/exchange", () => {
     const limited = await post("nope", "203.0.113.30");
     expect(limited.status).toBe(429);
     expect(limited.headers.get("cache-control")).toBe("no-store");
-    expect(await limited.json()).toEqual({ code: "rate_limited", status: 429 });
+    expect(await limited.json()).toEqual({
+      code: "rate_limited",
+      status: 429,
+      error: {
+        code: "rate_limited",
+        message: "Too many requests. Wait a moment, then retry.",
+      },
+    });
   });
 });
 
@@ -145,6 +174,13 @@ describe("GET /connector/v1/exchange", () => {
     } as any)) as Response;
     expect(res.status).toBe(404);
     expect(res.status).not.toBe(405);
-    expect(await res.json()).toEqual({ code: "unknown_action", status: 404 });
+    expect(await res.json()).toEqual({
+      code: "unknown_action",
+      status: 404,
+      error: {
+        code: "unknown_action",
+        message: "This connector action does not exist.",
+      },
+    });
   });
 });

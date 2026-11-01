@@ -1429,6 +1429,10 @@ describe("writes", () => {
     expect(await missing.json()).toEqual({
       code: "idempotency_key_required",
       status: 400,
+      error: {
+        code: "idempotency_key_required",
+        message: "This request needs an Idempotency-Key header.",
+      },
     });
 
     const hidden = await get(

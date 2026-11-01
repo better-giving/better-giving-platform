@@ -598,13 +598,27 @@ describe("create_form", () => {
 
     const anon = await create(undefined, { name: "F" });
     expect(anon.status).toBe(401);
-    expect(await anon.json()).toEqual({ code: "key_refused", status: 401 });
+    expect(await anon.json()).toEqual({
+      code: "key_refused",
+      status: 401,
+      error: {
+        code: "key_refused",
+        message: "The API key is missing or no longer valid.",
+      },
+    });
 
     const put = await send(forms_action as Handler, "PUT", null, a.key, {
       name: "F",
     });
     expect(put.status).toBe(404);
-    expect(await put.json()).toEqual({ code: "unknown_action", status: 404 });
+    expect(await put.json()).toEqual({
+      code: "unknown_action",
+      status: 404,
+      error: {
+        code: "unknown_action",
+        message: "This connector action does not exist.",
+      },
+    });
     expect(await db().select().from(forms)).toHaveLength(0);
   });
 });
@@ -717,6 +731,10 @@ describe("update_form", () => {
         code: "not_found",
         status: 404,
         detail: `Form ${id} does not exist for this nonprofit.`,
+        error: {
+          code: "not_found",
+          message: `Form ${id} does not exist for this nonprofit.`,
+        },
       });
     }
     expect((await row_of(theirs)).tag).toBe("Main form");
@@ -1038,6 +1056,7 @@ describe("update_form", () => {
       code: "internal_error",
       status: 500,
       detail: expect.any(String),
+      error: { code: "internal_error", message: expect.any(String) },
     });
     expect(report_error).toHaveBeenCalledOnce();
     expect(report_error.mock.calls[0]![0]).toBeInstanceOf(Error);
@@ -1050,13 +1069,27 @@ describe("update_form", () => {
 
     const anon = await update(id, undefined, { name: "F" });
     expect(anon.status).toBe(401);
-    expect(await anon.json()).toEqual({ code: "key_refused", status: 401 });
+    expect(await anon.json()).toEqual({
+      code: "key_refused",
+      status: 401,
+      error: {
+        code: "key_refused",
+        message: "The API key is missing or no longer valid.",
+      },
+    });
 
     const post = await send(form_action as Handler, "POST", id, a.key, {
       name: "F",
     });
     expect(post.status).toBe(404);
-    expect(await post.json()).toEqual({ code: "unknown_action", status: 404 });
+    expect(await post.json()).toEqual({
+      code: "unknown_action",
+      status: 404,
+      error: {
+        code: "unknown_action",
+        message: "This connector action does not exist.",
+      },
+    });
     expect((await row_of(id)).tag).toBe("Main form");
   });
 });
