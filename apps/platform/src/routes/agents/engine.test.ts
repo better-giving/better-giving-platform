@@ -1598,6 +1598,40 @@ describe("find_nonprofit IRS fallback", () => {
     expect(released[1]).toHaveBeenCalledOnce();
   });
 
+  test("a joining caller answers only after its refund is written", async () => {
+    stub_fetch(() =>
+      http(200, { query: "slow refund", limit: 10, results: [] })
+    );
+    let written = false;
+    let finish: () => void = () => {};
+    const write = new Promise<void>((resolve) => {
+      finish = () => {
+        written = true;
+        resolve();
+      };
+    });
+    mocks.reserve_shared
+      .mockImplementationOnce(
+        decided_later(() => ({ release: async () => {} }))
+      )
+      .mockImplementationOnce(decided_later(() => ({ release: () => write })));
+    const req = caller("192.0.2.244");
+
+    const pending = Promise.all([
+      find_nonprofit({ query: "slow refund" }, req),
+      find_nonprofit({ query: "slow refund" }, req).then((r) => ({
+        r,
+        written,
+      })),
+    ]);
+    setTimeout(finish, 20);
+    const [first, second] = await pending;
+
+    expect(first.external_lookup).toBe("ok");
+    expect(second.r.external_lookup).toBe("ok");
+    expect(second.written).toBe(true);
+  });
+
   test("a refund that fails is logged and the caller still joins", async () => {
     const fetch = stub_fetch(() =>
       http(200, { query: "refund", limit: 10, results: [] })
