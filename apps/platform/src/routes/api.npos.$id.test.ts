@@ -18,7 +18,7 @@ vi.mock("$/pg/db", () => ({
   ),
 }));
 
-const { loader } = await import("./api.npos.$id");
+const { action, loader } = await import("./api.npos.$id");
 const { create_test_db } = await import("$/pg/test-utils/pglite");
 
 beforeAll(async () => {
@@ -59,5 +59,63 @@ describe("GET /api/npos/:id", () => {
         "public, s-maxage=60, stale-while-revalidate=300"
       );
     }
+  });
+
+  const get = (id: string) =>
+    loader({
+      request: new Request(`https://x/api/npos/${encodeURIComponent(id)}`),
+      params: { id },
+    } as any) as Promise<Response>;
+
+  // before: a thrown text/plain 400 carrying the issue message
+  it.each(["!!bad", "0", "a..b"])(
+    "answers the malformed id %s with an invalid_request json error that says what an id is",
+    async (id) => {
+      const res = await get(id);
+
+      expect(res.status).toBe(400);
+      expect(res.headers.get("content-type")).toBe("application/json");
+      const body = await res.json();
+      expect(body.error.code).toBe("invalid_request");
+      expect(body.error.message).toBe(
+        "must be a nonprofit id: a positive integer, or a slug of letters, numbers, -, ., _ and ~"
+      );
+    }
+  );
+
+  // before: an empty-bodied 404
+  it("answers an unknown or inactive npo with a not_found json error", async () => {
+    await test_db.current!.db.insert(npos).values({
+      registration_number: "EIN-2",
+      name: "Gone",
+      slug: "gone-npo",
+      endow_designation: "Charity",
+      overview_pt: "[]",
+      hq_country: "United States",
+      active: false,
+    });
+
+    for (const id of ["999999", "no-such-npo", "gone-npo"]) {
+      const res = await get(id);
+      expect(res.status).toBe(404);
+      expect(res.headers.get("cache-control")).toBe("no-store");
+      expect(await res.json()).toEqual({
+        error: { code: "not_found", message: "No nonprofit has this id." },
+      });
+    }
+  });
+
+  // before: react-router's 405 `{"message":"Unexpected Server Error"}`, no allow
+  it("answers a write method with method_not_allowed naming GET and HEAD", async () => {
+    const res = action();
+
+    expect(res.status).toBe(405);
+    expect(res.headers.get("allow")).toBe("GET, HEAD");
+    expect(await res.json()).toEqual({
+      error: {
+        code: "method_not_allowed",
+        message: "This endpoint answers GET and HEAD only.",
+      },
+    });
   });
 });

@@ -57,4 +57,8 @@ describe("/agents/skill.md", () => {
     expect(text).toContain("  - `email` (required): string (email)");
     expect(text).toContain("Requires at least one of `query`, `ein`.");
   });
+
+  test("points at the OpenAPI document", () => {
+    expect(GUIDE).toContain("https://better.giving/openapi.json");
+  });
 });

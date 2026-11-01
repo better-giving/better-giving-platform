@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { ActionFunction, LoaderFunction } from "react-router";
 import { client_ip, limit_shared } from "#/.server/auth/rate-limit";
+import { report_error } from "#/errors/report";
 import {
   AgentDonationError,
   create_quote,
@@ -8,6 +9,7 @@ import {
   donation_status,
   find_nonprofit,
 } from "./agents/engine";
+import { jsonrpc, method_not_allowed, rpc_error } from "./agents/rpc";
 import {
   GUIDE,
   MCP_PROTOCOL_VERSION,
@@ -15,25 +17,13 @@ import {
   tools,
 } from "./agents/tools";
 
-function jsonrpc(id: unknown, result: unknown) {
-  return Response.json({ jsonrpc: "2.0", id, result });
-}
-
-function rpc_error(
-  id: unknown,
-  code: number,
-  message: string,
-  data?: unknown,
-  init?: ResponseInit
-) {
-  return Response.json(
-    {
-      jsonrpc: "2.0",
-      id,
-      error: { code, message, ...(data === undefined ? {} : { data }) },
-    },
-    init
-  );
+/** a tool result the model reads and can act on, not a protocol failure */
+function tool_error(id: unknown, code: string, message: string) {
+  return jsonrpc(id, {
+    isError: true,
+    content: [{ type: "text", text: JSON.stringify({ code, message }) }],
+    structuredContent: { code, message },
+  });
 }
 
 const REQUEST_QUOTA = { max: 60, window_s: 60 };
@@ -58,25 +48,25 @@ async function rate_limited(request: Request): Promise<Response | null> {
     null,
     -32029,
     `Request limit reached. Try again in ${s} ${s === 1 ? "second" : "seconds"}.`,
-    { retry_after_s: s },
+    { code: "rate_limited", retry_after_s: s },
     { status: 429, headers: { "retry-after": String(s) } }
   );
 }
 
-async function call_tool(name: string, args: unknown, request: Request) {
-  switch (name) {
-    case "find_nonprofit":
-      return find_nonprofit(args, request);
-    case "quote_donation":
-      return create_quote(args);
-    case "donate":
-      return donate(args, request);
-    case "donation_status":
-      return donation_status(args);
-    default:
-      throw new AgentDonationError("tool_not_found", `Unknown tool: ${name}`);
-  }
-}
+type ToolName = (typeof tools)[number]["name"];
+
+const run_tool: Record<
+  ToolName,
+  (args: unknown, request: Request) => Promise<unknown>
+> = {
+  find_nonprofit,
+  quote_donation: (args) => create_quote(args),
+  donate,
+  donation_status: (args) => donation_status(args),
+};
+
+const is_tool = (name: string): name is ToolName =>
+  Object.hasOwn(run_tool, name);
 
 export const loader: LoaderFunction = () =>
   new Response(GUIDE, {
@@ -88,7 +78,7 @@ export const loader: LoaderFunction = () =>
 
 export const action: ActionFunction = async ({ request }) => {
   if (request.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return method_not_allowed(request.method, "GET, POST");
   }
   const refused = await rate_limited(request);
   if (refused) return refused;
@@ -97,14 +87,31 @@ export const action: ActionFunction = async ({ request }) => {
   try {
     body = await request.json();
   } catch {
-    return rpc_error(null, -32700, "Parse error");
+    return rpc_error(null, -32700, "Parse error", { code: "parse_error" });
   }
+  try {
+    return await respond(body, request);
+  } catch (error) {
+    report_error(error, { where: "agents mcp", method: body?.method });
+    return rpc_error(
+      body?.id ?? null,
+      -32603,
+      "Better Giving hit an error and could not complete this request.",
+      { code: "internal_error" },
+      { status: 500 }
+    );
+  }
+};
+
+async function respond(body: any, request: Request): Promise<Response> {
   if (body?.jsonrpc !== "2.0" || typeof body.method !== "string") {
-    return rpc_error(body?.id ?? null, -32600, "Invalid Request");
+    return rpc_error(body?.id ?? null, -32600, "Invalid Request", {
+      code: "invalid_request",
+    });
   }
 
-  if (body.method === "notifications/initialized") {
-    return new Response(null, { status: 204 });
+  if (body.method.startsWith("notifications/") && !Object.hasOwn(body, "id")) {
+    return new Response(null, { status: 202 });
   }
   if (body.method === "ping") return jsonrpc(body.id, {});
   if (body.method === "initialize") {
@@ -117,35 +124,47 @@ export const action: ActionFunction = async ({ request }) => {
   }
   if (body.method === "tools/list") return jsonrpc(body.id, { tools });
   if (body.method !== "tools/call") {
-    return rpc_error(body.id, -32601, "Method not found");
+    return rpc_error(body.id, -32601, "Method not found", {
+      code: "method_not_found",
+    });
+  }
+
+  const name: unknown = body.params?.name;
+  if (typeof name !== "string") {
+    return rpc_error(
+      body.id,
+      -32602,
+      "params.name must be a tool name string.",
+      { code: "invalid_params" }
+    );
+  }
+  if (!is_tool(name)) {
+    return rpc_error(body.id, -32602, `Unknown tool: ${name}`, {
+      code: "tool_not_found",
+    });
+  }
+
+  const given: unknown = body.params.arguments;
+  const args = given === undefined ? {} : given;
+  if (typeof args !== "object" || args === null || Array.isArray(args)) {
+    return tool_error(body.id, "invalid_input", "arguments must be an object.");
   }
 
   try {
-    const result = await call_tool(
-      body.params?.name,
-      body.params?.arguments ?? {},
-      request
-    );
+    const result = await run_tool[name](args, request);
     return jsonrpc(body.id, {
       content: [{ type: "text", text: JSON.stringify(result) }],
       structuredContent: result,
     });
   } catch (error) {
     if (error instanceof AgentDonationError) {
-      return jsonrpc(body.id, {
-        isError: true,
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              code: error.code,
-              message: error.message,
-            }),
-          },
-        ],
-        structuredContent: { code: error.code, message: error.message },
-      });
+      return tool_error(body.id, error.code, error.message);
     }
-    throw error;
+    report_error(error, { where: "agents mcp", tool: name });
+    return tool_error(
+      body.id,
+      "internal_error",
+      "Better Giving hit an error and could not complete this call. Try again shortly."
+    );
   }
-};
+}

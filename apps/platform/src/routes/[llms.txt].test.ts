@@ -30,4 +30,10 @@ describe("/llms.txt", () => {
     expect(guide).toContain("(https://better.giving/agents/skill.md)");
     expect(guide).toContain("(https://better.giving/.well-known/mcp.json)");
   });
+
+  test("links the OpenAPI document and names the API error shape", () => {
+    expect(guide).toContain("(https://better.giving/openapi.json)");
+    expect(guide).toContain("(https://better.giving/.well-known/api-catalog)");
+    expect(guide).toContain('`{"error": {"code": "...", "message": "..."}}`');
+  });
 });

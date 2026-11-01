@@ -39,6 +39,13 @@ Example donor prompts:
 
 Nonprofit profile pages and campaign pages carry schema.org JSON-LD: each nonprofit is an NGO with a DonateAction, and each campaign is a Project that carries a DonateAction while it takes donations.
 
+## API
+
+- [OpenAPI 3.1 document](https://better.giving/openapi.json): the public read API (`/api/npos`, `/api/currencies`, `/api/tickers`, `/api/tokens`, `/api/top-countries`) and the key-authenticated connector API (`/connector/v1/*`)
+- [API catalog](https://better.giving/.well-known/api-catalog): RFC 9727 links to that document
+
+Errors from the public read endpoints, and from any `/api/` path that matches no endpoint, are JSON of the form `{"error": {"code": "...", "message": "..."}}` with the matching HTTP status. Connector errors are `application/problem+json` carrying the same `error` object.
+
 ## Product Pages
 
 - [Home](https://better.giving/): main landing page

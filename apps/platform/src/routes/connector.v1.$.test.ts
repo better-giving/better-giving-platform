@@ -101,7 +101,14 @@ describe("unserved connector actions", () => {
     expect(res.status).not.toBe(405);
     expect(res.headers.get("content-type")).toBe("application/problem+json");
     expect(res.headers.get("cache-control")).toBe("no-store");
-    expect(await res.json()).toEqual({ code: "unknown_action", status: 404 });
+    expect(await res.json()).toEqual({
+      code: "unknown_action",
+      status: 404,
+      error: {
+        code: "unknown_action",
+        message: "This connector action does not exist.",
+      },
+    });
   });
 });
 
@@ -134,7 +141,14 @@ describe("served connector routes without a key", () => {
       expect(res.status).toBe(401);
       expect(res.status).not.toBe(405);
       expect(res.status >= 300 && res.status < 400).toBe(false);
-      expect(await res.json()).toEqual({ code: "key_refused", status: 401 });
+      expect(await res.json()).toEqual({
+        code: "key_refused",
+        status: 401,
+        error: {
+          code: "key_refused",
+          message: "The API key is missing or no longer valid.",
+        },
+      });
     }
   );
 });

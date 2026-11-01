@@ -79,7 +79,14 @@ describe("GET /connector/v1/hello", () => {
     expect(limited.headers.get("content-type")).toBe(
       "application/problem+json"
     );
-    expect(await limited.json()).toEqual({ code: "rate_limited", status: 429 });
+    expect(await limited.json()).toEqual({
+      code: "rate_limited",
+      status: 429,
+      error: {
+        code: "rate_limited",
+        message: "Too many requests. Wait a moment, then retry.",
+      },
+    });
 
     expect(hello("203.0.113.9").status).toBe(200);
   });
@@ -105,6 +112,13 @@ describe("POST /connector/v1/hello", () => {
 
     expect(res.status).toBe(404);
     expect(res.status).not.toBe(405);
-    expect(await res.json()).toEqual({ code: "unknown_action", status: 404 });
+    expect(await res.json()).toEqual({
+      code: "unknown_action",
+      status: 404,
+      error: {
+        code: "unknown_action",
+        message: "This connector action does not exist.",
+      },
+    });
   });
 });

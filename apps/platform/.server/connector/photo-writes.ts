@@ -1,6 +1,7 @@
 import { campaign_get } from "../pg/queries/campaign";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { json, open_key } from "./http";
+import { BODY_KEYS } from "./inputs";
 import { absolute } from "./money";
 import { issue_photo_link } from "./photo-links";
 import {
@@ -60,7 +61,7 @@ export async function create_photo_upload_link(
   const parsed = await read_body(request);
   if (!parsed.ok) return parsed.response;
   const issues: FieldError[] = [];
-  unknown_keys(parsed.body, ["target", "slot"], issues);
+  unknown_keys(parsed.body, BODY_KEYS.create_photo_upload_link, issues);
   const campaign_id = read_target(parsed.body.target, issues);
   // a campaign has one photo, its banner
   if (Object.hasOwn(parsed.body, "slot") && parsed.body.slot !== "hero") {

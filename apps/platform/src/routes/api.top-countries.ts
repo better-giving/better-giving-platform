@@ -1,11 +1,11 @@
 import { getISOWeek } from "date-fns";
-import type { LoaderFunction } from "react-router";
 import { resp } from "@/helpers/https";
 import { countries_query } from "$/pg/queries/country";
+import { public_api_route, read_only } from "$/public-api";
 
 const cache = "public, s-maxage=300, stale-while-revalidate=3600";
 
-export const loader: LoaderFunction = async () => {
+export const loader = public_api_route(async () => {
   const items = await countries_query();
 
   const latest_weeknum = getISOWeek(items[0].updated_at!);
@@ -29,4 +29,6 @@ export const loader: LoaderFunction = async () => {
     200,
     { "cache-control": cache }
   );
-};
+});
+
+export const action = read_only;

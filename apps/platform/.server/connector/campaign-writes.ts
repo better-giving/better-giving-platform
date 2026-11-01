@@ -13,6 +13,7 @@ import type { DbOrTx } from "../pg/queries/helpers";
 import { npo_program_get } from "../pg/queries/program";
 import { connector_photo_links } from "../pg/schema/connector";
 import { json, open_key, valid_day } from "./http";
+import { BODY_KEYS, EXPECTED_VERSION } from "./inputs";
 import { AMOUNT, AMOUNT_MSG, usd_amount } from "./money";
 import {
   campaign_ended as ended,
@@ -125,7 +126,7 @@ function read_version(
 ): string | null | undefined {
   if (!Object.hasOwn(body, "expected_version")) return undefined;
   const v = body.expected_version;
-  if (typeof v === "string" && /^\d{1,19}$/.test(v)) return v;
+  if (typeof v === "string" && EXPECTED_VERSION.test(v)) return v;
   issues.push({ path: "expected_version", message: VERSION_MSG });
   return null;
 }
@@ -164,7 +165,7 @@ export async function end_campaign(
   const parsed = await read_body(request, { allow_empty: true });
   if (!parsed.ok) return parsed.response;
   const issues: FieldError[] = [];
-  unknown_keys(parsed.body, [], issues);
+  unknown_keys(parsed.body, BODY_KEYS.end_campaign, issues);
   if (issues.length > 0) return invalid(issues);
   if (!(await campaign_end(npo_id, id))) return missing(id);
   return detail(db, npo_id, id);
@@ -193,7 +194,7 @@ export async function publish_campaign(
   const parsed = await read_body(request, { allow_empty: true });
   if (!parsed.ok) return parsed.response;
   const issues: FieldError[] = [];
-  unknown_keys(parsed.body, ["gifts_go_to"], issues);
+  unknown_keys(parsed.body, BODY_KEYS.publish_campaign, issues);
   const sent = Object.hasOwn(parsed.body, "gifts_go_to");
   const to = parsed.body.gifts_go_to;
   if (sent && to !== null && typeof to !== "string") {
@@ -255,11 +256,7 @@ export async function update_campaign_settings(
   if (!parsed.ok) return parsed.response;
   const { body } = parsed;
   const issues: FieldError[] = [];
-  unknown_keys(
-    body,
-    ["goal", "end_date", "time_zone", "sharing", "expected_version"],
-    issues
-  );
+  unknown_keys(body, BODY_KEYS.update_campaign_settings, issues);
   const expected = read_version(body, issues);
   for (const key of READ_ONLY) {
     if (Object.hasOwn(body, key) && !same_json(body[key], current[key]))
@@ -468,7 +465,7 @@ export async function update_campaign_blocks(
   const parsed = await read_body(request);
   if (!parsed.ok) return parsed.response;
   const issues: FieldError[] = [];
-  unknown_keys(parsed.body, ["blocks", "expected_version"], issues);
+  unknown_keys(parsed.body, BODY_KEYS.update_campaign_blocks, issues);
   const expected = read_version(parsed.body, issues);
   const patch = read_blocks(parsed.body.blocks, current, issues);
   if (
