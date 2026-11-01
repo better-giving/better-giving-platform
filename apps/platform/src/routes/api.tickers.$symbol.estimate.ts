@@ -21,7 +21,7 @@ export const loader = public_api_route(async ({ params }: Route.LoaderArgs) => {
   const { pc: usdpu } = await res.json();
   // finnhub quotes an unknown symbol as pc: 0
   if (!(usdpu > 0)) {
-    return api_error("not_found", `no price for ${params.symbol}`, {
+    return api_error("not_found", `No price for ${params.symbol}.`, {
       "cache-control": cache,
     });
   }

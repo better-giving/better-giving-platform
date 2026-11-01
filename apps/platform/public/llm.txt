@@ -44,7 +44,7 @@ Nonprofit profile pages and campaign pages carry schema.org JSON-LD: each nonpro
 - [OpenAPI 3.1 document](https://better.giving/openapi.json): the public read API (`/api/npos`, `/api/currencies`, `/api/tickers`, `/api/tokens`, `/api/top-countries`) and the key-authenticated connector API (`/connector/v1/*`)
 - [API catalog](https://better.giving/.well-known/api-catalog): RFC 9727 links to that document
 
-Errors from those public read endpoints, and from an `/api/` path that matches no endpoint, are JSON, `{"error": {"code": "...", "message": "..."}}`, with the matching HTTP status. Connector errors are `application/problem+json` carrying the same `error` object.
+Errors from the public read endpoints, and from any `/api/` path that matches no endpoint, are JSON of the form `{"error": {"code": "...", "message": "..."}}` with the matching HTTP status. Connector errors are `application/problem+json` carrying the same `error` object.
 
 ## Product Pages
 

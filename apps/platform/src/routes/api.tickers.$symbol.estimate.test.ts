@@ -36,7 +36,7 @@ describe("api.tickers.$symbol.estimate loader", () => {
       "public, s-maxage=30, stale-while-revalidate=60"
     );
     await expect(res.json()).resolves.toEqual({
-      error: { code: "not_found", message: "no price for ZZ\nZZ" },
+      error: { code: "not_found", message: "No price for ZZ\nZZ." },
     });
   });
 

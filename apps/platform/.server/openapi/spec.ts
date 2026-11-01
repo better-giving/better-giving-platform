@@ -140,7 +140,7 @@ const search_q = {
   name: "q",
   in: "query",
   required: false,
-  description: "Fuzzy search; left out, the first 10 are returned.",
+  description: "Fuzzy search. Without it, the first 10 are returned.",
   schema: { type: "string" },
 };
 
@@ -148,7 +148,7 @@ const ESTIMATE = {
   type: "object",
   required: ["min", "usdpu"],
   properties: {
-    min: { type: "number", description: "Minimum donation, in units." },
+    min: { type: "number", description: "Minimum gift, in shares or tokens." },
     usdpu: { type: "number", description: "USD per unit." },
   },
 };
@@ -214,7 +214,7 @@ const public_ops = (): IOperation[] => [
     method: "get",
     op: {
       operationId: "list_currencies",
-      summary: "Donation currencies with USD rates",
+      summary: "List donation currencies with USD rates",
       responses: {
         200: ok("Supported currencies, with the caller's preferred one."),
         ...api_errors(500),
@@ -244,7 +244,7 @@ const public_ops = (): IOperation[] => [
     method: "get",
     op: {
       operationId: "estimate_ticker",
-      summary: "Price and minimum gift for a stock ticker",
+      summary: "Get the price and minimum gift for a stock ticker",
       parameters: [path_param("symbol", { type: "string" }, "Ticker symbol.")],
       responses: {
         200: ok("The minimum gift in shares and the USD price.", ESTIMATE),
@@ -275,7 +275,7 @@ const public_ops = (): IOperation[] => [
     method: "get",
     op: {
       operationId: "estimate_token",
-      summary: "Price and minimum gift for a crypto token",
+      summary: "Get the price and minimum gift for a crypto token",
       parameters: [path_param("code", { type: "string" }, "Token code.")],
       responses: {
         200: ok("The minimum gift in tokens and the USD price.", ESTIMATE),
@@ -289,7 +289,7 @@ const public_ops = (): IOperation[] => [
     method: "get",
     op: {
       operationId: "list_top_countries",
-      summary: "Countries giving the most this week",
+      summary: "List the countries giving the most this week",
       responses: {
         200: ok("Up to 10 country names.", {
           type: "array",
@@ -334,12 +334,17 @@ const FIELD_SCHEMA: Record<BodyKey, Json> = {
     description: "Last day, YYYY-MM-DD, or null for no end.",
     type: ["string", "null"],
   },
-  time_zone: { description: "As read; it can't be changed here." },
-  sharing: { description: "As read; it can't be changed here." },
+  time_zone: {
+    description: "Send it back as read; this action can't change it.",
+  },
+  sharing: {
+    description: "Send it back as read; this action can't change it.",
+  },
   expected_version: {
     type: "string",
     pattern: EXPECTED_VERSION.source,
-    description: "The `version` read; a newer one is a 409 `stale_read`.",
+    description:
+      "The `version` you read. If the campaign changed since, the write is a 409 `stale_read`.",
   },
   blocks: { type: "array", items: { type: "object" } },
   gifts_go_to: {
@@ -351,15 +356,24 @@ const FIELD_SCHEMA: Record<BodyKey, Json> = {
   suggested_amounts: { type: "array" },
   frequencies: { type: "array", items: { type: "string" } },
   donate_methods: { type: "array", items: { type: "string" } },
-  id: { description: "As read; it can't be changed here." },
-  campaign_id: { description: "As read; it can't be changed here." },
+  id: { description: "Send it back as read; this action can't change it." },
+  campaign_id: {
+    description: "Send it back as read; this action can't change it.",
+  },
   updated_at: {
     type: "string",
-    description: "As read; a newer one is a 409 `stale_read`.",
+    description:
+      "The `updated_at` you read. If the form changed since, the write is a 409 `stale_read`.",
   },
-  minimum: { description: "As read; it can't be changed here." },
-  maximum: { description: "As read; it can't be changed here." },
-  allowed_origins: { description: "As read; it can't be changed here." },
+  minimum: {
+    description: "Send it back as read; this action can't change it.",
+  },
+  maximum: {
+    description: "Send it back as read; this action can't change it.",
+  },
+  allowed_origins: {
+    description: "Send it back as read; this action can't change it.",
+  },
   confirm: {
     const: true,
     description: "Confirms a change donors will see.",
@@ -409,7 +423,7 @@ const idempotency_key = (required: boolean) => ({
   required,
   description: required
     ? "One logical write per key for 24 hours; a retry with the same key and body replays the first answer."
-    : "Optional. Sent, it makes the create replayable as on `create_campaign`.",
+    : "Optional. When sent, a retry with the same key and body replays the first answer, as on `create_campaign`.",
   schema: { type: "string", minLength: 1, maxLength: 255 },
 });
 
@@ -468,7 +482,11 @@ const keyed_write = (
         ? {
             ...(extra.idem === undefined
               ? {}
-              : { 200: ok("A retry's replay of the first answer.") }),
+              : {
+                  200: ok(
+                    "A retry with the same Idempotency-Key, replaying the first answer."
+                  ),
+                }),
             201: ok("Created.", extra.created),
           }
         : { 200: ok("The resource after the change.") }),
@@ -492,7 +510,7 @@ const connector_ops = (): IOperation[] => [
     method: "get",
     op: {
       operationId: "hello",
-      summary: "The connector contract and the actions served",
+      summary: "Get the connector contract and the actions served",
       security: [],
       responses: {
         200: ok("The contract.", {
@@ -614,7 +632,7 @@ const connector_ops = (): IOperation[] => [
     "connector.v1.blocks.catalog",
     "/connector/v1/blocks/catalog",
     "get_block_catalog",
-    "The blocks a campaign page can hold"
+    "List the blocks a campaign page can hold"
   ),
   keyed_read(
     "connector.v1.forms",
@@ -649,7 +667,7 @@ const connector_ops = (): IOperation[] => [
     "connector.v1.results",
     "/connector/v1/results",
     "get_results",
-    "Fundraising totals"
+    "Get fundraising totals"
   ),
   keyed_read(
     "connector.v1.donations",
@@ -681,7 +699,7 @@ const connector_ops = (): IOperation[] => [
     "/connector/v1/photos/upload-link",
     "post",
     "create_photo_upload_link",
-    "A one-time link where a person uploads a campaign photo",
+    "Create a one-time link for uploading a campaign photo",
     {
       required: ["target"],
       created: {
