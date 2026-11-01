@@ -25,6 +25,13 @@ Send \`Authorization: Bearer\` with the agent token when you have one. The hourl
 
 Requests are also limited per client address. A request past that limit gets HTTP 429, with the seconds to wait in \`Retry-After\` and in the error's \`data.retry_after_s\`.
 
+## Errors
+
+Every error carries a stable \`code\` and a human \`message\`.
+
+- A tool that ran but could not do what was asked returns a result with \`isError: true\` and \`structuredContent: { code, message }\`. \`invalid_input\` means the arguments were rejected: fix them and call again. \`internal_error\` is a failure on Better Giving's side: retry later. Other codes, such as \`quote_expired\`, \`recipient_unavailable\` or \`rate_limited\` for the hourly cap, are explained in \`message\`.
+- A request the server could not act on gets a JSON-RPC \`error\` with the code in \`error.data.code\`: \`parse_error\`, \`invalid_request\`, \`method_not_found\`, \`method_not_allowed\` (HTTP 405), \`tool_not_found\` and \`invalid_params\` (both -32602), \`rate_limited\` (HTTP 429) and \`internal_error\`.
+
 Repeated \`donate\` calls with the same quote token and an open Checkout return that Checkout and do not create another charge. Quote tokens are signed: send them back unchanged.
 `;
 

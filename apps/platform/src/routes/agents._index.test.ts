@@ -37,6 +37,9 @@ const mocks = vi.hoisted(() => ({
   find_nonprofit: vi.fn(),
 }));
 
+const report_error = vi.hoisted(() => vi.fn());
+vi.mock("#/errors/report", () => ({ report_error }));
+
 vi.mock("./agents/engine", async (importOriginal) => {
   const original = await importOriginal<typeof import("./agents/engine")>();
   return { ...original, ...mocks };
@@ -136,6 +139,9 @@ describe("/agents MCP endpoint", () => {
     expect(text).toContain("Stripe-hosted checkout link");
     expect(text).toContain("not_on_better_giving");
     expect(text).toContain("onboarding_url");
+    for (const code of ["error.data.code", "tool_not_found", "invalid_input"]) {
+      expect(text).toContain(code);
+    }
   });
 
   test("initialize advertises MCP tools", async () => {
@@ -237,6 +243,244 @@ describe("/agents MCP endpoint", () => {
   });
 });
 
+const call = (id: number, params: object) =>
+  post({ jsonrpc: "2.0", id, method: "tools/call", params });
+
+describe("MCP errors", () => {
+  test("a successful call's body is the tool output and nothing else", async () => {
+    mocks.donation_status.mockResolvedValue({ status: "settled" });
+
+    const response = await call(13, {
+      name: "donation_status",
+      arguments: { donation_id: "d" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(
+      '{"jsonrpc":"2.0","id":13,"result":{"content":[{"type":"text","text":"{\\"status\\":\\"settled\\"}"}],"structuredContent":{"status":"settled"}}}'
+    );
+  });
+
+  test("an unknown tool is a JSON-RPC invalid-params error", async () => {
+    const response = await call(4, { name: "refund", arguments: {} });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: 4,
+      error: {
+        code: -32602,
+        message: "Unknown tool: refund",
+        data: { code: "tool_not_found" },
+      },
+    });
+  });
+
+  test.each([
+    ["missing", { arguments: {} }],
+    ["not a string", { name: 7, arguments: {} }],
+  ])(
+    "a tool name that is %s is a JSON-RPC invalid-params error",
+    async (_, params) => {
+      const response = await call(5, params);
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        jsonrpc: "2.0",
+        id: 5,
+        error: {
+          code: -32602,
+          message: "params.name must be a tool name string.",
+          data: { code: "invalid_params" },
+        },
+      });
+    }
+  );
+
+  test("arguments its validator rejects are a tool error the model can correct", async () => {
+    const real =
+      await vi.importActual<typeof import("./agents/engine")>(
+        "./agents/engine"
+      );
+    mocks.donation_status.mockImplementation(real.donation_status);
+
+    const response = await call(6, {
+      name: "donation_status",
+      arguments: { donation_id: "not-a-uuid" },
+    });
+
+    expect(response.status).toBe(200);
+    const { result } = await response.json();
+    expect(result).toMatchObject({
+      isError: true,
+      structuredContent: { code: "invalid_input" },
+    });
+    expect(result.structuredContent.message).toEqual(expect.any(String));
+    expect(JSON.parse(result.content[0].text)).toEqual(
+      result.structuredContent
+    );
+  });
+
+  test.each([
+    ["a string", "donation_id=1"],
+    ["an array", [1]],
+    ["null", null],
+  ])("arguments that are %s are a tool error", async (_, args) => {
+    const response = await call(7, {
+      name: "donation_status",
+      arguments: args,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      id: 7,
+      result: {
+        isError: true,
+        structuredContent: {
+          code: "invalid_input",
+          message: "arguments must be an object.",
+        },
+      },
+    });
+    expect(mocks.donation_status).not.toHaveBeenCalled();
+  });
+
+  test("an engine failure is reported and answered as a generic tool error", async () => {
+    const failure = new Error("connection to db-7.internal refused");
+    mocks.find_nonprofit.mockRejectedValue(failure);
+
+    const response = await call(8, {
+      name: "find_nonprofit",
+      arguments: { query: "ACME" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    const { result } = await response.json();
+    expect(result).toMatchObject({
+      isError: true,
+      structuredContent: { code: "internal_error" },
+    });
+    expect(JSON.stringify(result)).not.toContain("db-7.internal");
+    expect(report_error).toHaveBeenCalledWith(
+      failure,
+      expect.objectContaining({ tool: "find_nonprofit" })
+    );
+  });
+
+  test("a failure outside a tool is a JSON-RPC internal error, never an HTML 500", async () => {
+    mocks.find_nonprofit.mockRejectedValue(new Error("engine down"));
+    report_error.mockImplementationOnce(() => {
+      throw new Error("sentry unreachable");
+    });
+
+    const response = await call(12, {
+      name: "find_nonprofit",
+      arguments: { query: "ACME" },
+    });
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: 12,
+      error: {
+        code: -32603,
+        message:
+          "Better Giving hit an error and could not complete this request.",
+        data: { code: "internal_error" },
+      },
+    });
+    expect(report_error).toHaveBeenLastCalledWith(
+      expect.objectContaining({ message: "sentry unreachable" }),
+      expect.objectContaining({ where: "agents mcp" })
+    );
+  });
+
+  test.each(["PUT", "DELETE", "PATCH"])(
+    "%s is refused with a JSON-RPC error",
+    async (method) => {
+      const response = (await action({
+        request: new Request("https://better.giving/agents/mcp", {
+          method,
+          headers: { "x-forwarded-for": "192.0.2.1" },
+        }),
+        params: {},
+        context: {} as any,
+      } as any)) as Response;
+
+      expect(response.status).toBe(405);
+      expect(response.headers.get("allow")).toBe("GET, POST");
+      expect(response.headers.get("content-type")).toContain(
+        "application/json"
+      );
+      await expect(response.json()).resolves.toEqual({
+        jsonrpc: "2.0",
+        id: null,
+        error: {
+          code: -32600,
+          message: `Method ${method} not allowed. Send JSON-RPC requests with POST.`,
+          data: { code: "method_not_allowed" },
+        },
+      });
+    }
+  );
+
+  test("a body that is not JSON is a parse error", async () => {
+    const response = (await action({
+      request: new Request("https://better.giving/agents/mcp", {
+        method: "POST",
+        headers: { "x-forwarded-for": "192.0.2.1" },
+        body: "{not json",
+      }),
+      params: {},
+      context: {} as any,
+    } as any)) as Response;
+
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: null,
+      error: {
+        code: -32700,
+        message: "Parse error",
+        data: { code: "parse_error" },
+      },
+    });
+  });
+
+  test("a body that is not a JSON-RPC request is an invalid request", async () => {
+    const response = await post({ id: 10, method: "ping" });
+
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: 10,
+      error: {
+        code: -32600,
+        message: "Invalid Request",
+        data: { code: "invalid_request" },
+      },
+    });
+  });
+
+  test("an unknown method is method-not-found", async () => {
+    const response = await post({
+      jsonrpc: "2.0",
+      id: 11,
+      method: "resources/list",
+    });
+
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: 11,
+      error: {
+        code: -32601,
+        message: "Method not found",
+        data: { code: "method_not_found" },
+      },
+    });
+  });
+});
+
 /** takes one use through the endpoint, then fills the window it opened */
 async function fill_window(ip?: string) {
   await ping(ip);
@@ -265,7 +509,7 @@ describe("per-address request limit", () => {
       error: {
         code: -32029,
         message: "Request limit reached. Try again in 45 seconds.",
-        data: { retry_after_s: 45 },
+        data: { code: "rate_limited", retry_after_s: 45 },
       },
     });
     expect(mocks.find_nonprofit).not.toHaveBeenCalled();
