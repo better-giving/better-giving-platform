@@ -32,6 +32,7 @@ import {
   refuse,
   stray_params,
 } from "./http";
+import { QUERY_PARAMS } from "./inputs";
 import { absolute, type Money, usd, usd_amount, usd_minor } from "./money";
 import { type FieldError, not_found } from "./problem";
 
@@ -208,7 +209,7 @@ export async function list_campaigns(
   url: URL
 ): Promise<Response> {
   const issues: FieldError[] = [];
-  stray_params(url, ["status", "cursor", "limit"], issues);
+  stray_params(url, QUERY_PARAMS.list_campaigns, issues);
   const limit = read_limit(url, issues);
   const cursor = read_cursor(url, CAMPAIGNS_NEWEST, issues);
   const status = url.searchParams.get("status");
@@ -270,7 +271,7 @@ export async function get_campaign(
   url: URL
 ): Promise<Response> {
   const issues: FieldError[] = [];
-  stray_params(url, [], issues);
+  stray_params(url, QUERY_PARAMS.get_campaign, issues);
   const refused = refuse(issues);
   if (refused) return refused;
   const detail = await read_campaign_detail(db, npo_id, id);
@@ -285,7 +286,7 @@ export async function get_donation_page(
   url: URL
 ): Promise<Response> {
   const issues: FieldError[] = [];
-  stray_params(url, [], issues);
+  stray_params(url, QUERY_PARAMS.get_donation_page, issues);
   const refused = refuse(issues);
   if (refused) return refused;
 
@@ -333,7 +334,7 @@ export async function get_donation_page(
 
 export function get_block_catalog(url: URL): Response {
   const issues: FieldError[] = [];
-  stray_params(url, [], issues);
+  stray_params(url, QUERY_PARAMS.get_block_catalog, issues);
   const refused = refuse(issues);
   if (refused) return refused;
   return json(block_catalog());
@@ -427,7 +428,7 @@ export async function list_forms(
   url: URL
 ): Promise<Response> {
   const issues: FieldError[] = [];
-  stray_params(url, ["cursor", "limit"], issues);
+  stray_params(url, QUERY_PARAMS.list_forms, issues);
   const limit = read_limit(url, issues);
   const cursor = read_cursor(url, FORMS_NEWEST, issues);
   const refused = refuse(issues);
@@ -468,7 +469,7 @@ export async function get_form(
   url: URL
 ): Promise<Response> {
   const issues: FieldError[] = [];
-  stray_params(url, [], issues);
+  stray_params(url, QUERY_PARAMS.get_form, issues);
   const refused = refuse(issues);
   if (refused) return refused;
   const form = await read_form(db, npo_id, id);
@@ -745,7 +746,7 @@ export async function list_donations(
   url: URL
 ): Promise<Response> {
   const issues: FieldError[] = [];
-  stray_params(url, ["campaign_id", "from", "to", "cursor", "limit"], issues);
+  stray_params(url, QUERY_PARAMS.list_donations, issues);
   const limit = read_limit(url, issues);
   const cursor = read_cursor(url, GIFTS_NEWEST, issues);
   const window = read_window(url, issues);
@@ -856,7 +857,7 @@ export async function list_donors(
   url: URL
 ): Promise<Response> {
   const issues: FieldError[] = [];
-  stray_params(url, ["q", "cursor", "limit"], issues);
+  stray_params(url, QUERY_PARAMS.list_donors, issues);
   const limit = read_limit(url, issues);
   const cursor = read_cursor(url, DONORS_NEWEST, issues);
   const q = url.searchParams.get("q")?.trim() ?? "";
@@ -934,7 +935,7 @@ export async function get_donor(
   url: URL
 ): Promise<Response> {
   const issues: FieldError[] = [];
-  stray_params(url, ["cursor", "limit"], issues);
+  stray_params(url, QUERY_PARAMS.get_donor, issues);
   const limit = read_limit(url, issues);
   const cursor = read_cursor(url, GIFTS_NEWEST, issues);
   const refused = refuse(issues);
@@ -1005,7 +1006,7 @@ export async function list_recurring(
   url: URL
 ): Promise<Response> {
   const issues: FieldError[] = [];
-  stray_params(url, ["cursor", "limit"], issues);
+  stray_params(url, QUERY_PARAMS.list_recurring_gifts, issues);
   const limit = read_limit(url, issues);
   const cursor = read_cursor(url, RECURRING_NEWEST, issues);
   const refused = refuse(issues);
@@ -1071,7 +1072,7 @@ export async function get_results(
   url: URL
 ): Promise<Response> {
   const issues: FieldError[] = [];
-  stray_params(url, ["campaign_id", "from", "to"], issues);
+  stray_params(url, QUERY_PARAMS.get_results, issues);
   const window = read_window(url, issues);
   const campaign_id = url.searchParams.get("campaign_id");
   if (campaign_id === "") {

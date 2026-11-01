@@ -9,6 +9,11 @@ import tailwind from "./index.css?url";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: tailwind },
+  {
+    rel: "service-desc",
+    href: "/openapi.json",
+    type: "application/openapi+json",
+  },
 ];
 
 export const meta: MetaFunction = () => metas({});

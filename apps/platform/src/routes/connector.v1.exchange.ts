@@ -2,13 +2,12 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import * as v from "valibot";
 import { reserve_ip } from "$/connector/gate";
 import { connector_route } from "$/connector/http";
+import { exchange_body } from "$/connector/inputs";
 import { exchange_code } from "$/connector/keys";
 import { problem } from "$/connector/problem";
 import { db } from "$/pg/db";
 
 const NO_STORE = { "cache-control": "no-store" };
-
-const exchange_body = v.object({ code: v.string() });
 
 export function loader(_args: LoaderFunctionArgs) {
   return problem(404, "unknown_action");

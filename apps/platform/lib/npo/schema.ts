@@ -10,6 +10,7 @@ import {
   MAX_NUM_INCREMENTS,
   org_designation,
   org_slug,
+  segment_shape,
   slug,
   target,
   unsdg_num,
@@ -49,6 +50,9 @@ const csv_strs = v.pipe(
   v.transform((x) => x.split(",")),
   v.filterItems((x) => x.length > 0)
 );
+
+/** a nonprofit's numeric id or its slug, as `/api/npos/{id}` reads it */
+export const npo_ref = v.union([$int_gte1, segment_shape]);
 
 export const reg_number = v.pipe(
   $,

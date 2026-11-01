@@ -6,6 +6,7 @@ import { campaign_members, campaigns } from "../pg/schema/campaign";
 import { npos } from "../pg/schema/npo";
 import { json, open_key } from "./http";
 import { with_idempotency } from "./idempotency";
+import { BODY_KEYS } from "./inputs";
 import { type FieldError, invalid, problem } from "./problem";
 import { read_campaign_detail } from "./reads";
 
@@ -119,7 +120,7 @@ async function insert_campaign(
   const parsed = await read_body(request);
   if (!parsed.ok) return parsed.response;
   const issues: Issue[] = [];
-  unknown_keys(parsed.body, ["title"], issues);
+  unknown_keys(parsed.body, BODY_KEYS.create_campaign, issues);
   const title = parsed.body.title;
   const trimmed = typeof title === "string" ? title.trim() : "";
   if (

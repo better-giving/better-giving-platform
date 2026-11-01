@@ -27,6 +27,7 @@ describe("/.well-known/mcp.json", () => {
       documentation: "https://preview.better.giving/agents",
       skill: "https://preview.better.giving/agents/skill.md",
       llms_txt: "https://preview.better.giving/llms.txt",
+      openapi: "https://preview.better.giving/openapi.json",
       authentication: { type: "optional-bearer" },
     });
     expect(card.tools).toEqual(

@@ -117,6 +117,7 @@ export const top_level_route_segments = [
   "nonprofit",
   "nonprofits",
   "open-source",
+  "openapi.json",
   "org",
   "photo-upload",
   "platform",

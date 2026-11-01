@@ -452,6 +452,9 @@ importers:
       '@upstash/qstash':
         specifier: 2.10.1
         version: 2.10.1
+      '@valibot/to-json-schema':
+        specifier: 1.6.0
+        version: 1.6.0(valibot@1.5.0(typescript@5.9.3))
       '@vercel/blob':
         specifier: 2.3.3
         version: 2.3.3

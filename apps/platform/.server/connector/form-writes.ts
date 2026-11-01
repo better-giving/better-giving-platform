@@ -19,30 +19,14 @@ import { npo_program_get } from "../pg/queries/program";
 import { forms } from "../pg/schema/form";
 import { json, open_key } from "./http";
 import { with_idempotency } from "./idempotency";
+import { BODY_KEYS, FORM_ECHOES, FORM_WRITABLE } from "./inputs";
 import { AMOUNT, AMOUNT_MSG, usd_amount } from "./money";
 import { type FieldError, invalid, not_found, problem } from "./problem";
 import { type ConnectorForm, read_form, read_form_state } from "./reads";
 import { read_body, same_json, TITLE_MAX } from "./writes";
 
-const WRITABLE = [
-  "name",
-  "status",
-  "suggested_amounts",
-  "frequencies",
-  "donate_methods",
-  "gifts_go_to",
-] as const;
-type Writable = (typeof WRITABLE)[number];
+type Writable = (typeof FORM_WRITABLE)[number];
 
-/** what get_form shows but this action can't move */
-const ECHOES = [
-  "id",
-  "campaign_id",
-  "updated_at",
-  "minimum",
-  "maximum",
-  "allowed_origins",
-] as const;
 /** set by Better Giving, so a new form has none to echo */
 const ASSIGNED = ["id", "campaign_id", "updated_at"] as const;
 
@@ -95,7 +79,7 @@ function read_echoes(
 ): boolean {
   const blank = { minimum: null, maximum: null, allowed_origins: [] };
   let stale = false;
-  for (const key of ECHOES) {
+  for (const key of FORM_ECHOES) {
     if (!Object.hasOwn(body, key)) continue;
     if (shown && key === "updated_at" && typeof body[key] === "string") {
       stale = body[key] !== shown.updated_at;
@@ -370,7 +354,7 @@ async function insert_form(
   if (!parsed.ok) return parsed.response;
   const { body } = parsed;
   const issues: FieldError[] = [];
-  refuse_keys(body, [...WRITABLE, ...ECHOES], issues);
+  refuse_keys(body, BODY_KEYS.create_form, issues);
   read_echoes(body, null, issues);
   if (!Object.hasOwn(body, "name")) read_name(undefined, issues);
   const { patch } = await read_fields(body, npo_id, null, issues);
@@ -448,7 +432,9 @@ async function write_patch(
 }
 
 /** the label is the admin's own; every other field reaches donors */
-const DONOR_VISIBLE: readonly Writable[] = WRITABLE.filter((f) => f !== "name");
+const DONOR_VISIBLE: readonly Writable[] = FORM_WRITABLE.filter(
+  (f) => f !== "name"
+);
 
 export async function update_form(
   db: DbOrTx,
@@ -466,7 +452,7 @@ export async function update_form(
   if (!parsed.ok) return parsed.response;
   const { body } = parsed;
   const shape: FieldError[] = [];
-  refuse_keys(body, [...WRITABLE, ...ECHOES, "confirm"], shape);
+  refuse_keys(body, BODY_KEYS.update_form, shape);
   const confirmed = body.confirm === true;
   if (Object.hasOwn(body, "confirm") && !confirmed) {
     shape.push({ path: "confirm", message: "is true, or left out" });

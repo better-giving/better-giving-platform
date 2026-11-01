@@ -1,19 +1,22 @@
-export type ProblemCode =
-  | "unknown_action"
-  | "key_refused"
-  | "rate_limited"
-  | "code_invalid"
-  | "idempotency_key_required"
-  | "idempotency_conflict"
-  | "idempotency_in_progress"
-  | "internal_error"
-  | "invalid"
-  | "not_found"
-  | "write_failed"
-  | "campaign_ended"
-  | "already_published"
-  | "confirm_required"
-  | "stale_read";
+export const PROBLEM_CODES = [
+  "unknown_action",
+  "key_refused",
+  "rate_limited",
+  "code_invalid",
+  "idempotency_key_required",
+  "idempotency_conflict",
+  "idempotency_in_progress",
+  "internal_error",
+  "invalid",
+  "not_found",
+  "write_failed",
+  "campaign_ended",
+  "already_published",
+  "confirm_required",
+  "stale_read",
+] as const;
+
+export type ProblemCode = (typeof PROBLEM_CODES)[number];
 
 export type FieldError = { path: string; message: string };
 

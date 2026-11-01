@@ -33,6 +33,10 @@ Every error carries a stable \`code\` and a human \`message\`.
 - A request the server could not act on gets a JSON-RPC \`error\` with the code in \`error.data.code\`: \`parse_error\`, \`invalid_request\`, \`method_not_found\`, \`method_not_allowed\` (HTTP 405), \`tool_not_found\` and \`invalid_params\` (both -32602), \`rate_limited\` (HTTP 429) and \`internal_error\`.
 
 Repeated \`donate\` calls with the same quote token and an open Checkout return that Checkout and do not create another charge. Quote tokens are signed: send them back unchanged.
+
+## Other APIs
+
+The public read API and the nonprofit connector API are described by an OpenAPI 3.1 document at https://better.giving/openapi.json.
 `;
 
 export const tools = [

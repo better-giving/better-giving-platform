@@ -15,6 +15,7 @@ export const loader: LoaderFunction = ({ request }) => {
       documentation: `${origin}/agents`,
       skill: `${origin}/agents/skill.md`,
       llms_txt: `${origin}/llms.txt`,
+      openapi: `${origin}/openapi.json`,
       authentication: {
         type: "optional-bearer",
         description:
