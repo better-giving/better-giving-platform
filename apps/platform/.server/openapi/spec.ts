@@ -1,7 +1,7 @@
 import type { JsonSchema } from "@valibot/to-json-schema";
 import type { ObjectEntries, ObjectSchema } from "valibot";
 import { API_ERROR_STATUS } from "@/helpers/api-error";
-import { npo_ref, npos_search, reg_number } from "@/npo/schema";
+import { ein_ref, npo_ref, npos_search } from "@/npo/schema";
 import { CONNECTOR_ACTIONS } from "../connector/actions";
 import {
   BODY_KEYS,
@@ -198,8 +198,8 @@ const public_ops = (): IOperation[] => [
       parameters: [
         path_param(
           "id",
-          wire_schema(reg_number),
-          "Registration number, letters and digits only."
+          wire_schema(ein_ref),
+          "Registration number, letters and digits only, or a US EIN as NN-NNNNNNN."
         ),
       ],
       responses: {

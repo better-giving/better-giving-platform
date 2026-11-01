@@ -52,10 +52,21 @@ const csv_strs = v.pipe(
 );
 
 // v.message, not union's message argument: a union answers with the issues
-// of the one option whose type matched, so "0" would report the integer's `>=1`
+// of the one option whose type matched, so "0" would report the slug's
+// "should not be an id"
 /** a nonprofit's numeric id or its slug, as `/api/npos/{id}` reads it */
 export const npo_ref = v.message(
-  v.union([$int_gte1, segment_shape]),
+  v.union([
+    // `$int_gte1`, with the digits checked before the transform so the
+    // spec's input schema carries them
+    v.pipe(
+      $,
+      v.regex(/^[1-9]\d*$/),
+      v.transform((x) => +x),
+      int_gte1
+    ),
+    segment_shape,
+  ]),
   "must be a nonprofit id: a positive integer, or a slug of letters, numbers, -, ., _ and ~"
 );
 
@@ -64,6 +75,19 @@ export const reg_number = v.pipe(
   v.nonEmpty("required"),
   v.regex(/^[a-zA-Z0-9]+$/, "must only contain letters and numbers")
 );
+
+// a miss on the first branch ends untyped (its transform), so the union
+// answers with `reg_number`'s own issue
+/** a registration number, or a dashed US EIN read as its nine digits, as
+ * `/api/npos/ein/{id}` reads it */
+export const ein_ref = v.union([
+  v.pipe(
+    $,
+    v.regex(/^\d{2}-\d{7}$/),
+    v.transform((x) => x.replace("-", ""))
+  ),
+  reg_number,
+]);
 const _url = v.pipe($, v.url());
 
 export const social_media_urls = v.object({

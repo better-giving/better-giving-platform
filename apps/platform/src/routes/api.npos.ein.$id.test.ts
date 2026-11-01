@@ -1,6 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 
-vi.mock("$/pg/queries/npo", () => ({ npo_by_regnum: async () => null }));
+const registered = { id: 7, registration_number: "123456789" };
+vi.mock("$/pg/queries/npo", () => ({
+  npo_by_regnum: async (ein: string) =>
+    ein === registered.registration_number ? registered : null,
+}));
 
 const { loader } = await import("./api.npos.ein.$id");
 
@@ -23,6 +27,30 @@ describe("GET /api/npos/ein/:id", () => {
       },
     });
   });
+
+  test("finds a dashed US EIN by its nine digits", async () => {
+    for (const id of ["123456789", "12-3456789"]) {
+      const res = await by_ein(id);
+
+      expect(res.status, id).toBe(200);
+      expect(await res.json(), id).toEqual(registered);
+    }
+  });
+
+  test.each(["12-345", "1-23456789"])(
+    "answers %s, a dash outside the NN-NNNNNNN shape, as before",
+    async (id) => {
+      const res = await by_ein(id);
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: {
+          code: "invalid_request",
+          message: "must only contain letters and numbers",
+        },
+      });
+    }
+  );
 
   // before: an empty-bodied 404
   test("answers an unregistered ein with a not_found json error", async () => {

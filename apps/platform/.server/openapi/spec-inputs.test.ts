@@ -68,7 +68,9 @@ describe("a public input the spec documents is the one its route enforces", () =
   // draw the same line
   test.each([
     { id: "12345", ok: true },
+    { id: "12-3456789", ok: true },
     { id: "12-345", ok: false },
+    { id: "1-23456789", ok: false },
   ])("get_nonprofit_by_ein: $id", async ({ id, ok }) => {
     const [status, body] = await json_of(
       ein_loader(args(`/api/npos/ein/${id}`, id))
@@ -77,29 +79,33 @@ describe("a public input the spec documents is the one its route enforces", () =
     expect(status === 400 && body.error?.code === "invalid_request").toBe(!ok);
   });
 
-  test("get_nonprofit: the slug branch is letters, numbers and - . _ ~ up to 30, not all digits", async () => {
-    // the spec's first branch is a bare string (the integer id as it arrives),
-    // which accepts anything, so the slug branch is the one that can disagree
-    const [as_int, as_slug] = path_schema("get_nonprofit").anyOf!;
-    expect(as_int).toEqual({ type: "string" });
+  test("get_nonprofit: a positive integer without leading zeros, or a slug of letters, numbers and - . _ ~ up to 30, not all digits", async () => {
+    const schema = path_schema("get_nonprofit");
+    const [as_int] = schema.anyOf!;
     const probes = [
-      { id: "my-slug_1.x~", ok: true },
-      { id: "a".repeat(30), ok: true },
-      { id: "a".repeat(31), ok: false },
-      { id: "has space", ok: false },
-      { id: "a/b", ok: false },
+      { id: "1", ok: true, int: true },
+      { id: "42", ok: true, int: true },
+      { id: "0", ok: false, int: false },
+      { id: "01", ok: false, int: false },
+      // "-1" and "1.5" are slugs, not ids
+      { id: "-1", ok: true, int: false },
+      { id: "1.5", ok: true, int: false },
+      { id: "my-slug_1.x~", ok: true, int: false },
+      { id: "a".repeat(30), ok: true, int: false },
+      { id: "a".repeat(31), ok: false, int: false },
+      { id: "has space", ok: false, int: false },
+      { id: "a/b", ok: false, int: false },
     ];
-    for (const { id, ok } of probes) {
+    for (const { id, ok, int } of probes) {
       const [status, body] = await json_of(
         npo_loader(args(`/api/npos/${encodeURIComponent(id)}`, id))
       );
-      expect(spec_accepts(as_slug, id), id).toBe(ok);
+      expect(spec_accepts(schema, id), id).toBe(ok);
+      expect(spec_accepts(as_int, id), id).toBe(int);
       expect(status === 400 && body.error?.code === "invalid_request", id).toBe(
         !ok
       );
     }
-    // a positive integer is an id; the spec documents the string it arrives as
-    expect((await npo_loader(args("/api/npos/42", "42"))).status).toBe(404);
   });
 
   test("search_nonprofits: every documented parameter is read, and a bad value on a validated one is refused", async () => {
