@@ -9,9 +9,9 @@ import { Progress } from "@/reg/progress";
 import { reg_latest } from "$/pg/queries/registration";
 import type { Route } from "./+types/route";
 
-export const loader = async ({ request }: Route.LoaderArgs) => {
+export const loader = async ({ request, url }: Route.LoaderArgs) => {
   const ru = await reg_user(request, true);
-  if (!ru) return to_auth(request);
+  if (!ru) return to_auth(url);
 
   /* a lead who closed the tab before opening the mail arrives here holding
    * only a grant. this screen starts an application and offers to resume one
@@ -24,7 +24,7 @@ export const loader = async ({ request }: Route.LoaderArgs) => {
    * unsigned and client-writable and so decides nothing about who this is. */
   if (ru.grant) {
     const reg = await reg_latest(ru.user.email);
-    if (!reg) return to_auth(request);
+    if (!reg) return to_auth(url);
     return redirect(`/register/${reg.id}/${new Progress(reg).step}`);
   }
 
@@ -37,10 +37,10 @@ export const loader = async ({ request }: Route.LoaderArgs) => {
 /** the screen has two independent submissions — starting an application and
  * resuming one — each driven by its own fetcher so their errors and pending
  * states never bleed into one another. `intent` picks the handler. */
-export const action = async ({ request }: Route.ActionArgs) => {
+export const action = async ({ request, url }: Route.ActionArgs) => {
   const fd = await request.formData();
   const { intent } = await parseFormData<{ intent?: string }>(fd);
 
-  if (intent === "resume") return resume_application(request, fd);
-  return new_application(request, fd);
+  if (intent === "resume") return resume_application(request, url, fd);
+  return new_application(request, url, fd);
 };

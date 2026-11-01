@@ -8,6 +8,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { NPO_PUBLIC_KEYS } from "$/pg/queries/npo";
 import { npos } from "$/pg/schema/npo";
 import { programs } from "$/pg/schema/program";
@@ -70,7 +71,7 @@ async function load_key(id: string, program_id?: string) {
   const qs = program_id ? `?programId=${program_id}` : "";
   const request = new Request(`https://x/donate/${id}${qs}`);
   const res: any = await loader({
-    request,
+    ...doc_args(request),
     params: { id },
   } as any);
   return res.data;

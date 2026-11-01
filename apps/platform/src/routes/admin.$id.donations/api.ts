@@ -9,7 +9,7 @@ import type { Route } from "./+types/route";
 export const loader = async (x: Route.LoaderArgs) => {
   const id = x.context.get(admin_ctx);
 
-  const p = safeParse(donations_search, search(x.request));
+  const p = safeParse(donations_search, search(x.url));
   if (p.issues) throw resp.status(400, p.issues[0].message);
   const { limit = 10, ...q } = p.output;
   const page = await npo_donations(id, { ...q, limit });

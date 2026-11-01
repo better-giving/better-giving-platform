@@ -39,8 +39,8 @@ export interface PaymentRow {
   match_send_failed_kind: string | null;
 }
 
-export const loader = async ({ request }: Route.LoaderArgs) => {
-  const { searchParams: s } = new URL(request.url);
+export const loader = async ({ url }: Route.LoaderArgs) => {
+  const { searchParams: s } = url;
   const cursor = s.get("cursor") || undefined;
   const limit = 20;
 

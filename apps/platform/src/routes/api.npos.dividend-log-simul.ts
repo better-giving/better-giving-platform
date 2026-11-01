@@ -6,9 +6,9 @@ import { resp } from "@/helpers/https";
 import { dividend_log_fv } from "@/nav/schemas";
 import { nav_ltd } from "$/pg/queries/nav";
 
-export const action: ActionFunction = async ({ request }) => {
+export const action: ActionFunction = async ({ request, url }) => {
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
   if (user.role !== "admin") return resp.status(403);
 
   const body = await request.json().catch(() => undefined);

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 
 const auth_state = vi.hoisted(() => ({
   signed_in: true,
@@ -23,11 +24,13 @@ const ORIGIN = "https://app.example";
 
 const send = (url: URL, init: { content_type: string; body: string }) =>
   action({
-    request: new Request(url, {
-      method: "POST",
-      headers: { "content-type": init.content_type },
-      body: init.body,
-    }),
+    ...doc_args(
+      new Request(url, {
+        method: "POST",
+        headers: { "content-type": init.content_type },
+        body: init.body,
+      })
+    ),
     context: {} as any,
     params: {},
   } as any) as Promise<Response>;

@@ -16,8 +16,8 @@ import hero from "./hero.webp?url";
 import { Toolbar } from "./toolbar";
 import { use_search_pending } from "./toolbar/search";
 
-export const loader = async ({ request }: Route.LoaderArgs) => {
-  const p_s = safeParse(npos_search, search(request));
+export const loader = async ({ url }: Route.LoaderArgs) => {
+  const p_s = safeParse(npos_search, search(url));
   if (p_s.issues) throw resp.status(400, p_s.issues[0].message);
   const { published, ...p } = p_s.output;
   const page = await get_npos({ ...p, published: [true] });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { loader } from "./route";
 
 const location = (r: Response) => [
@@ -10,7 +11,7 @@ const MOVED = "public, max-age=3600, s-maxage=86400";
 const call = (path: string, fund_id: string) =>
   loader({
     params: { fund_id },
-    request: new Request(`https://x${path}`),
+    ...doc_args(new Request(`https://x${path}`)),
   } as never);
 
 describe("old /fundraisers/:fund_id url", () => {

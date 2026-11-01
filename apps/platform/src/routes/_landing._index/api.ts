@@ -30,17 +30,17 @@ const TRACKING_PARAMS = [
 // hit the function each time. swr widens the freshness window cheaply.
 const CACHE_CONTROL = "public, s-maxage=60, stale-while-revalidate=86400";
 
-export const loader = ({ request }: Route.LoaderArgs) => {
-  const url = new URL(request.url);
+export const loader = ({ url }: Route.LoaderArgs) => {
+  const to = new URL(url);
   let stripped = false;
   for (const p of TRACKING_PARAMS) {
-    if (url.searchParams.has(p)) {
-      url.searchParams.delete(p);
+    if (to.searchParams.has(p)) {
+      to.searchParams.delete(p);
       stripped = true;
     }
   }
   if (stripped)
-    throw redirect(url.pathname + url.search, {
+    throw redirect(to.pathname + to.search, {
       status: 308,
       headers: { "cache-control": CACHE_CONTROL },
     });

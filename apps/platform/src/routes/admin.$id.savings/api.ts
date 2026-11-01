@@ -12,7 +12,7 @@ export interface LoaderData extends IPageKeyed<IBalanceTx> {
 }
 
 export const loader = async (x: Route.LoaderArgs) => {
-  const { searchParams: s } = new URL(x.request.url);
+  const { searchParams: s } = x.url;
   const p = v.safeParse(v.nullable(v.string()), s.get("next"));
   if (p.issues) throw resp.status(400, p.issues[0].message);
   const key = p.output;

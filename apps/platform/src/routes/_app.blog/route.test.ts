@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 
 const fetch = vi.hoisted(() =>
   vi.fn(async (_query: string, _params: { from: number; to: number }) => ({
@@ -12,7 +13,7 @@ vi.mock("#/api/sanity", () => ({ sanity: { fetch }, urlFor: vi.fn() }));
 import { loader } from "./route";
 
 const load = (search: string) =>
-  loader({ request: new Request(`https://app.test/blog${search}`) } as any);
+  loader({ ...doc_args(new Request(`https://app.test/blog${search}`)) } as any);
 
 const slice_of = () => fetch.mock.calls[0][1];
 

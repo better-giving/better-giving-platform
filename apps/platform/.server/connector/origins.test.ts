@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { origin_allowed, request_origin } from "./origins";
+import { origin_allowed } from "./origins";
 
 describe("origin_allowed", () => {
   const env = {
@@ -70,14 +70,5 @@ describe("origin_allowed", () => {
       )
     ).toBe(false);
     expect(origin_allowed("https://better.giving", production)).toBe(true);
-  });
-});
-
-describe("request_origin", () => {
-  test("is the request url's origin", () => {
-    const request = new Request(
-      "https://app.example:444/connector/v1/hello?x=1"
-    );
-    expect(request_origin(request)).toBe("https://app.example:444");
   });
 });

@@ -21,11 +21,8 @@ import { reg_get } from "$/pg/queries/registration";
 /** which child of `/register/:reg_id` this request matched. `params` says
  * nothing about it — the layout wraps every child alike — so the grant it hands
  * down has to name the one it is for off the url. */
-const matched_child = (request: Request, rid: string): string => {
-  const path = new URL(request.url).pathname
-    // single fetch asks for the same route at `<path>.data`
-    .replace(/_?\.data$/, "")
-    .replace(/\/$/, "");
+const matched_child = (url: URL, rid: string): string => {
+  const path = url.pathname.replace(/\/$/, "");
   const segs = path.split("/");
   const i = segs.lastIndexOf(rid);
   return i < 0 ? "" : segs.slice(i + 1).join("/");
@@ -33,16 +30,13 @@ const matched_child = (request: Request, rid: string): string => {
 
 /** the chrome the grant-open children render inside, so it answers to the same
  * authority they do — and to no more of them than they do. */
-export const reg_loader: LoaderFunction = async ({ params, request }) => {
+export const reg_loader: LoaderFunction = async ({ params, request, url }) => {
   const p = safeParse(reg_id, params.reg_id);
   if (p.issues) throw resp.status(400, p.issues[0].message);
   const rid = p.output;
 
-  const ru = await reg_user(
-    request,
-    grant_open.has(matched_child(request, rid))
-  );
-  if (!ru) return to_auth(request);
+  const ru = await reg_user(request, grant_open.has(matched_child(url, rid)));
+  if (!ru) return to_auth(url);
   const { user } = ru;
 
   const reg = await reg_get(rid);
@@ -88,9 +82,9 @@ export const wizard_exit = (
 
 export const step_loader =
   (this_step: Progress["step"]) =>
-  async ({ params, request }: LoaderFunctionArgs) => {
+  async ({ params, request, url }: LoaderFunctionArgs) => {
     const ru = await reg_user(request, this_step === GRANT_STEP);
-    if (!ru) return to_auth(request);
+    if (!ru) return to_auth(url);
     const { user } = ru;
     const p = safeParse(reg_id, params.reg_id);
     if (p.issues) throw resp.status(400, p.issues[0].message);

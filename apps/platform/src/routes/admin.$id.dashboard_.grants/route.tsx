@@ -15,7 +15,7 @@ import type { Route } from "./+types/route";
 import { GrantsTable, type IGrantLine } from "./common/grants-table";
 
 export const loader = async (x: Route.LoaderArgs) => {
-  const { next } = search(x.request);
+  const { next } = search(x.url);
   const id = x.context.get(admin_ctx);
 
   // the history is the page's, not each grant page's: a load-more reads

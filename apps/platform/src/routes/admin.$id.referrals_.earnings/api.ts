@@ -8,7 +8,7 @@ import type { Route } from "./+types/route";
 export interface LoaderData extends IPageKeyed<INpoDonation> {}
 
 export const loader = async (args: Route.LoaderArgs) => {
-  const { nextKey } = search(args.request);
+  const { nextKey } = search(args.url);
   const id = args.context.get(admin_ctx);
 
   const x = await npo_get(id);

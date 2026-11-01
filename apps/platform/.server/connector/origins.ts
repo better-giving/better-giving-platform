@@ -6,10 +6,6 @@ type Env = {
   VERCEL_BRANCH_URL?: string;
 };
 
-export function request_origin(request: Request): string {
-  return new URL(request.url).origin;
-}
-
 /**
  * `origin` equals the origin of `BASE_URL`, or one of the comma-separated
  * origins in `CONNECTOR_ORIGINS`. Paths are not origins and never match.

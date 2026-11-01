@@ -25,9 +25,8 @@ import type { Route } from "./+types/route";
 
 /** stripe's oauth redirect. the code is never logged and the tokens it buys
  * are never kept: only the account id is. */
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request, url }: Route.LoaderArgs) {
   if (!stripe_env.connect_routing) return resp.status(404);
-  const url = new URL(request.url);
   const read = read_state(url.searchParams.get("state"));
   // unsigned, so its target can't be trusted as a place to send anyone
   if (read.status === "invalid") return resp.status(400, "invalid state");

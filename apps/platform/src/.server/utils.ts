@@ -23,12 +23,13 @@ interface IChecked {
 export const admin_checks = async ({
   request,
   params,
+  url,
 }: LoaderFunctionArgs | ActionFunctionArgs): Promise<Response | IChecked> => {
   const p = safeParse($int_gte1, params.id);
   if (p.issues) throw resp.status(400, p.issues[0].message);
   const id = p.output;
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
 
   if (user.role !== "admin") {
     const [membership] = await db

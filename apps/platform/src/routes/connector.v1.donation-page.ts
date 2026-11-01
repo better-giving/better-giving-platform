@@ -4,10 +4,10 @@ import { problem } from "$/connector/problem";
 import { get_donation_page } from "$/connector/reads";
 import { db } from "$/pg/db";
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request, url }: LoaderFunctionArgs) {
   const live = await open_key(db, request);
   if (live instanceof Response) return live;
-  return get_donation_page(db, live.npo_id, new URL(request.url));
+  return get_donation_page(db, live.npo_id, url);
 }
 
 export function action(_args: ActionFunctionArgs) {

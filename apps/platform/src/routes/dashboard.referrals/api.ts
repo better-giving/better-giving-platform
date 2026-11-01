@@ -32,7 +32,7 @@ function payout(raw: string) {
   return wise.v2_account(id).catch(report_degraded_null);
 }
 
-export const loader = async ({ request, context }: Route.LoaderArgs) => {
+export const loader = async ({ context, url }: Route.LoaderArgs) => {
   const user = context.get(user_ctx);
   const db_user = await user_get(user.email);
   if (!db_user) throw new Response("user not found", { status: 404 });
@@ -52,7 +52,7 @@ export const loader = async ({ request, context }: Route.LoaderArgs) => {
 
   return {
     referral_code,
-    base_url: new URL(request.url).origin,
+    base_url: url.origin,
     referreds,
     earnings,
     pending_total,

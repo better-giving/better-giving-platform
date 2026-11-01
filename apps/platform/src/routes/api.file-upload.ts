@@ -5,14 +5,14 @@ import { upload_limits } from "@/constants/upload";
 import { resp, search } from "@/helpers/https";
 import { basename, sniff, store_upload, type_of } from "$/blob-upload";
 
-export const action: ActionFunction = async ({ request }) => {
+export const action: ActionFunction = async ({ request, url }) => {
   // every surface that uploads is signed in — the img editor, the bank
   // statement field, and the fsa step. nothing else guards this route: it has
   // no parent layout.
   const { user } = await get_session(request);
   if (!user) return resp.fail(401, "Sign in to continue");
 
-  const { filename } = search(request);
+  const { filename } = search(url);
   const p = safeParse(pipe(string(), nonEmpty()), filename);
   if (p.issues) return resp.status(400, p.issues[0].message);
 

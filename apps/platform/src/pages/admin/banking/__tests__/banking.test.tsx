@@ -11,6 +11,7 @@ import {
   vi,
 } from "vitest";
 import { cleanup, render } from "vitest-browser-react";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { get_qstash_events } from "#/setup-tests-browser";
 import { banking_apps } from "$/pg/schema/banking";
 import { npos } from "$/pg/schema/npo";
@@ -910,7 +911,7 @@ describe("stripe connect card", () => {
   const status_of = async (npo_id: number) => {
     const data = await list_loader({
       context: { get: () => npo_id },
-      request: new Request(`https://app.test/admin/${npo_id}/banking`),
+      ...doc_args(new Request(`https://app.test/admin/${npo_id}/banking`)),
       params: { id: `${npo_id}` },
     } as any);
     return data.stripe.status;

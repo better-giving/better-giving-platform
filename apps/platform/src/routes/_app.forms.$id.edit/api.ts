@@ -46,9 +46,9 @@ const recipient_fn = async (
   }
 };
 
-export const loader = async ({ request, params }: Route.LoaderArgs) => {
+export const loader = async ({ request, params, url }: Route.LoaderArgs) => {
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
 
   const form = await form_get(params.id);
   if (!form) throw resp.err(404, "form not found");
@@ -79,7 +79,7 @@ export const loader = async ({ request, params }: Route.LoaderArgs) => {
   );
   if (!recipient_details) throw resp.err(404, "recipient not found");
 
-  const { origin: base_url } = new URL(request.url);
+  const { origin: base_url } = url;
   const back_path = form.owner_user_id
     ? href("/dashboard/forms")
     : href("/admin/:id/forms", { id: String(form.owner_npo_id) });
@@ -88,14 +88,14 @@ export const loader = async ({ request, params }: Route.LoaderArgs) => {
   return { ...form, back_url, base_url, recipient_details } satisfies ILoader;
 };
 
-export const action = async ({ request, params }: Route.ActionArgs) => {
+export const action = async ({ request, params, url }: Route.ActionArgs) => {
   const json = await request.json();
   const p = v.safeParse(schema, json);
   if (p.issues) throw resp.status(400, p.issues[0].message);
   const fv = p.output;
 
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
 
   const form = await form_get(params.id);
   if (!form) throw resp.err(404, "form not found");

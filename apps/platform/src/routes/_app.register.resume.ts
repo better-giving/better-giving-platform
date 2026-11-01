@@ -10,7 +10,7 @@ import { resume_application } from "#/pages/registration/resume-application";
  * still POSTing a reference here are still honored. */
 export const loader: LoaderFunction = () => redirect("/register");
 
-export const action: ActionFunction = async ({ request }) => {
+export const action: ActionFunction = async ({ request, url }) => {
   const fd = await request.formData();
-  return resume_application(request, fd);
+  return resume_application(request, url, fd);
 };

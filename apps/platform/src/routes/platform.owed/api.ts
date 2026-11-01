@@ -18,8 +18,8 @@ const list_query = v.object({
   next: v.optional(v.string()),
 });
 
-export const loader = async ({ request }: Route.LoaderArgs) => {
-  const s = new URL(request.url).searchParams;
+export const loader = async ({ url }: Route.LoaderArgs) => {
+  const s = url.searchParams;
   const p = v.safeParse(list_query, {
     party: s.get("party") ?? undefined,
     sort: s.get("sort") ?? undefined,

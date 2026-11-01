@@ -9,11 +9,11 @@ export interface LoaderData {
   logo?: string;
 }
 
-export const loader = async ({ params, request }: Route.LoaderArgs) => {
+export const loader = async ({ params, url }: Route.LoaderArgs) => {
   const p = safeParse($int_gte1, params.id);
   if (p.issues) throw resp.status(400, p.issues[0].message);
   const id = p.output;
-  const base_url = new URL(request.url).origin;
+  const base_url = url.origin;
   const npo = await npo_get(id);
   if (!npo) throw resp.status(404);
 

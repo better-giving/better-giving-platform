@@ -6,13 +6,13 @@ import { get_form } from "$/connector/reads";
 import { db } from "$/pg/db";
 
 export const loader = connector_route(
-  async ({ request, params }: LoaderFunctionArgs) => {
+  async ({ request, params, url }: LoaderFunctionArgs) => {
     const live = await open_key(db, request);
     if (live instanceof Response) return live;
     const id = params.id;
     if (!id)
       return problem(404, "not_found", { detail: "Form id is missing." });
-    return get_form(db, live.npo_id, id, new URL(request.url));
+    return get_form(db, live.npo_id, id, url);
   }
 );
 

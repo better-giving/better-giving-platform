@@ -12,6 +12,7 @@ import {
   vi,
 } from "vitest";
 import { render } from "vitest-browser-react";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { search } from "@/helpers/https";
 import { npos_search } from "@/npo/schema";
 import { user } from "$/pg/schema/auth";
@@ -146,7 +147,9 @@ beforeEach(async () => {
   // /api/npos needs the same pglite the loader reads.
   mswWorker.use(
     http.get(href("/api/npos"), async ({ request }) =>
-      HttpResponse.json(await get_npos(parse(npos_search, search(request))))
+      HttpResponse.json(
+        await get_npos(parse(npos_search, search(new URL(request.url))))
+      )
     )
   );
 });
@@ -250,7 +253,7 @@ describe("form-create action attaches a program only the recipient owns", () => 
       `https://x/dashboard/forms/create?npo_id=${recipient_id}`,
       { method: "POST", body: createFormData({ tag: "site", program }) }
     );
-    await action({ request, params: {} } as any);
+    await action({ ...doc_args(request), params: {} } as any);
     const rows = await test_db.current!.db.select().from(forms);
     expect(rows).toHaveLength(1);
     return rows[0];
@@ -288,7 +291,7 @@ describe("form-create action without a nonprofit", () => {
       body: createFormData({ tag: "site", program: "" }),
     });
 
-    const res = await action({ request, params: {} } as any);
+    const res = await action({ ...doc_args(request), params: {} } as any);
 
     expect(res).toEqual({ error: "Select a nonprofit" });
     expect(await test_db.current!.db.select().from(forms)).toHaveLength(0);

@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { GUIDE, MCP_PROTOCOL_VERSION, MCP_URL, tools } from "./agents/tools";
 import { loader } from "./agents.skill[.md]";
 
 const get = (url: string) =>
   loader({
-    request: new Request(url),
+    ...doc_args(new Request(url)),
     params: {},
     context: {},
   } as never) as Response;

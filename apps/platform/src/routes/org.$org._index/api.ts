@@ -41,7 +41,7 @@ export const headers: Route.HeadersFunction = ({
 /** the profile shows up to this many featured videos */
 export const MAX_VIDEOS = 4;
 
-export const loader = async ({ params, request }: Route.LoaderArgs) => {
+export const loader = async ({ params, request, url }: Route.LoaderArgs) => {
   const id = npo_id(params.org);
   const npo = await (typeof id === "number" ? npo_get(id) : npo_by_slug(id));
   if (!npo || npo.active === false) throw new Response(null, { status: 404 });
@@ -57,7 +57,7 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
     npo.slug &&
     (typeof id === "number" || id !== npo.slug)
   ) {
-    throw moved(`${org_href(npo)}${new URL(request.url).search}`);
+    throw moved(`${org_href(npo)}${url.search}`);
   }
 
   // each read fails soft (settled below, flagged in `lists.failed`), so nothing else reports it
@@ -168,7 +168,7 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
   return data(
     {
       npo: npo_public(npo),
-      url: new URL(org_href(npo), request.url).toString(),
+      url: new URL(org_href(npo), url).toString(),
       donors,
       /** an approved 501(c)(3) registration's ein */
       ein: registration?.ein ?? null,

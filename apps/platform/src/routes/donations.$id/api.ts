@@ -101,8 +101,7 @@ async function match_outcome(don: IDonation) {
   };
 }
 
-export const loader = async ({ request, params }: Route.LoaderArgs) => {
-  const url = new URL(request.url);
+export const loader = async ({ request, params, url }: Route.LoaderArgs) => {
   const don = await donation_get(params.id);
   if (!don) throw resp.status(404, "donation not found");
 
@@ -133,7 +132,7 @@ export const loader = async ({ request, params }: Route.LoaderArgs) => {
   };
 };
 
-export const action = async ({ request, params }: Route.ActionArgs) => {
+export const action = async ({ request, params, url }: Route.ActionArgs) => {
   const fv = await getValidatedFormData<Schema>(
     request,
     valibotResolver(schema)
@@ -161,7 +160,7 @@ export const action = async ({ request, params }: Route.ActionArgs) => {
 
   const access = await donor_access(request, params.id, don);
   if (!access.is_donor) {
-    if (!access.user) return to_auth(request);
+    if (!access.user) return to_auth(url);
     throw resp.status(403, "not authorized");
   }
 

@@ -52,8 +52,8 @@ function tool_section(tool: (typeof tools)[number]): string {
   return lines.join("\n");
 }
 
-export const loader: LoaderFunction = ({ request }) => {
-  const { origin } = new URL(request.url);
+export const loader: LoaderFunction = ({ url }) => {
+  const { origin } = url;
   const mcp_url = `${origin}/agents/mcp`;
   // one server throughout: a preview host names its own endpoint, not production's
   const body = `${GUIDE.replaceAll(MCP_URL, mcp_url)}

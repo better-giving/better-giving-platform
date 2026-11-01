@@ -8,9 +8,9 @@ export interface LoaderData {
   doc_eid: string;
 }
 
-export const loader = async ({ request, context }: Route.LoaderArgs) => {
+export const loader = async ({ context, url }: Route.LoaderArgs) => {
   const user = context.get(user_ctx);
-  const q = new URL(request.url).searchParams;
+  const q = url.searchParams;
   const weld_data_eid = q.get("weldDataEid");
   if (!weld_data_eid) throw new Response(null, { status: 400 });
 

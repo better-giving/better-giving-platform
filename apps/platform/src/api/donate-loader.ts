@@ -24,8 +24,8 @@ export interface DonateData {
   arrived: string;
 }
 
-export const loader = async ({ params, request }: LoaderFunctionArgs) => {
-  const { programId } = search(request);
+export const loader = async ({ params, request, url }: LoaderFunctionArgs) => {
+  const { programId } = search(url);
   const p1 = v.safeParse(v.optional(program_id), programId);
   if (p1.issues) throw resp.status(400, p1.issues[0].message);
   const pid = p1.output;
@@ -51,7 +51,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     endow: npo_public(endow),
     program,
     user,
-    base_url: new URL(request.url).origin,
+    base_url: url.origin,
     arrived: params.id ?? String(id),
   } satisfies DonateData);
 };

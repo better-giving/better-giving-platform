@@ -8,9 +8,13 @@ import { Progress } from "@/reg/progress";
 import { reg_resume_fv } from "@/reg/schema";
 import { reg_get } from "$/pg/queries/registration";
 
-export const resume_application = async (request: Request, fd: FormData) => {
+export const resume_application = async (
+  request: Request,
+  url: URL,
+  fd: FormData
+) => {
   const { user } = await get_session(request);
-  if (!user) return to_auth(request);
+  if (!user) return to_auth(url);
 
   const fv = await getValidatedFormData<IRegResumeFv>(
     fd,

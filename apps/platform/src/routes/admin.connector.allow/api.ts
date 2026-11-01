@@ -3,7 +3,7 @@ import { data, redirect } from "react-router";
 import { user_ctx } from "#/.server/auth";
 import { type ClientId, parse_client } from "#/components/connector/clients";
 import { issue_code } from "$/connector/keys";
-import { origin_allowed, request_origin } from "$/connector/origins";
+import { origin_allowed } from "$/connector/origins";
 import { connector_return_url } from "$/connector/return-url";
 import { db } from "$/pg/db";
 import { npos } from "$/pg/schema/npo";
@@ -65,8 +65,8 @@ const see_other = (href: string, query: Record<string, string>) => {
   return redirect(url.toString(), 303);
 };
 
-export const loader = async ({ request, context }: Route.LoaderArgs) => {
-  const query = new URL(request.url).searchParams;
+export const loader = async ({ context, url }: Route.LoaderArgs) => {
+  const query = url.searchParams;
   const state = query.get("state") ?? "";
   const user = context.get(user_ctx);
   const shared: Shared = {
@@ -78,12 +78,12 @@ export const loader = async ({ request, context }: Route.LoaderArgs) => {
   return { ...shared, nonprofits, state, blocked: false as const };
 };
 
-export const action = async ({ request, context }: Route.ActionArgs) => {
+export const action = async ({ request, context, url }: Route.ActionArgs) => {
   const form = await request.formData();
   const state = field(form, "state");
   if (!state_ok(state)) return refused();
 
-  const origin = request_origin(request);
+  const { origin } = url;
   if (!origin_allowed(origin, process.env)) return refused();
 
   const decision = field(form, "decision");

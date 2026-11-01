@@ -9,6 +9,7 @@ import {
   vi,
 } from "vitest";
 import { render } from "vitest-browser-react";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
@@ -185,7 +186,9 @@ describe("folded fund donate redirect", () => {
 
   const load = (fund_id: string, search = "") =>
     (loader as any)({
-      request: new Request(`https://x/campaigns/${fund_id}/donate${search}`),
+      ...doc_args(
+        new Request(`https://x/campaigns/${fund_id}/donate${search}`)
+      ),
       params: { fund_id },
     });
 

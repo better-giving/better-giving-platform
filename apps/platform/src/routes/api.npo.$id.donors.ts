@@ -11,11 +11,11 @@ const schema = v.union([fund_id, $int_gte1]);
 
 const cache = "public, s-maxage=60, stale-while-revalidate=300";
 
-export const loader: LoaderFunction = async ({ params, request }) => {
+export const loader: LoaderFunction = async ({ params, request, url }) => {
   const p = v.safeParse(schema, params.id);
   if (p.issues) throw resp.status(400, p.issues[0].message);
   const id = p.output;
-  const q = new URL(request.url).searchParams;
+  const q = url.searchParams;
   const campaign_id = q.get("campaign_id") || undefined;
 
   // an unpublished org's feed follows its pages: it shows, whole or a single
@@ -36,7 +36,7 @@ export const loader: LoaderFunction = async ({ params, request }) => {
     }
   }
 
-  const { next } = search(request);
+  const { next } = search(url);
   const with_message = q.get("with_message") === "1";
 
   const page = await npo_donors(id.toString(), next, campaign_id, with_message);

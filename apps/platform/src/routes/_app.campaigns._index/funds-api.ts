@@ -8,8 +8,8 @@ export const headers: Route.HeadersFunction = () => ({
   "cache-control": "public, s-maxage=60, stale-while-revalidate=300",
 });
 
-export const loader = async ({ request }: Route.LoaderArgs) => {
-  const p = safeParse(funds_search, search(request));
+export const loader = async ({ url }: Route.LoaderArgs) => {
+  const p = safeParse(funds_search, search(url));
   if (p.issues) throw resp.status(400, p.issues[0].message);
   const s = p.output;
   const page = await get_funds(s);

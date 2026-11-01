@@ -13,8 +13,8 @@ import { Volunteer } from "./volunteer";
 // host the donor is on (preview/dev/prod), not the build-time VITE_BASE_URL.
 // user-independent by design: no session, no cookies, nothing per-visitor, so
 // the s-maxage below still holds.
-export const loader = ({ request }: Route.LoaderArgs) => ({
-  base_url: new URL(request.url).origin,
+export const loader = ({ url }: Route.LoaderArgs) => ({
+  base_url: url.origin,
 });
 
 export const headers: Route.HeadersFunction = () => ({

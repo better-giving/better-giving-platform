@@ -23,7 +23,7 @@ export interface LoaderData {
 
 const schema = union([fund_id, segment]);
 
-export const loader = async ({ params, request }: Route.LoaderArgs) => {
+export const loader = async ({ params, request, url }: Route.LoaderArgs) => {
   const { user } = await get_session(request);
   const p = safeParse(schema, params.fund_id);
   if (p.issues) throw resp.status(400, p.issues[0].message);
@@ -35,13 +35,13 @@ export const loader = async ({ params, request }: Route.LoaderArgs) => {
   // fund's own donate page
   const campaign = await campaign_by_legacy_fund(fund.id);
   if (folded_campaign_public(campaign, fund.members.length)) {
-    throw campaign_moved(campaign, new URL(request.url).search);
+    throw campaign_moved(campaign, url.search);
   }
 
   return {
     user,
     fund,
     now: new Date().toISOString(),
-    base_url: new URL(request.url).origin,
+    base_url: url.origin,
   } satisfies LoaderData;
 };

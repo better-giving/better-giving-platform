@@ -10,6 +10,7 @@ import {
   vi,
 } from "vitest";
 import { seed_fund } from "#/__tests__/fixtures/funds";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { user } from "$/pg/schema/auth";
 import { fund_members, funds } from "$/pg/schema/fund";
 import { npos } from "$/pg/schema/npo";
@@ -178,7 +179,7 @@ describe("another nonprofit's campaign", () => {
     const mine = await foreign();
     const status = await thrown_status(
       edit_loader({
-        request: new Request("https://x/admin/a/campaigns/camp-b"),
+        ...doc_args(new Request("https://x/admin/a/campaigns/camp-b")),
         params: { id: String(mine.id), campaign_id: "camp-b" },
         context: ctx(mine.id),
       } as any)
@@ -195,7 +196,7 @@ describe("another nonprofit's campaign", () => {
     const mine = await foreign();
     const status = await thrown_status(
       edit_action({
-        request: post(mine.id, payload, "camp-b"),
+        ...doc_args(post(mine.id, payload, "camp-b")),
         params: { id: String(mine.id), campaign_id: "camp-b" },
         context: ctx(mine.id),
       } as any)
@@ -210,7 +211,7 @@ describe("campaign slug", () => {
     const org = await npo("EIN-NOSLUG");
     const res = outcome(
       await create_action({
-        request: post(org.id, body("winter")),
+        ...doc_args(post(org.id, body("winter"))),
         params: { id: String(org.id) },
         context: ctx(org.id),
       } as any)
@@ -225,7 +226,7 @@ describe("campaign slug", () => {
     const org = await npo("EIN-TAKEN", "taken-org");
     const first = outcome(
       await create_action({
-        request: post(org.id, body("Winter")),
+        ...doc_args(post(org.id, body("Winter"))),
         params: { id: String(org.id) },
         context: ctx(org.id),
       } as any)
@@ -233,7 +234,7 @@ describe("campaign slug", () => {
     expect(first.status).toBe(302);
     const second = outcome(
       await create_action({
-        request: post(org.id, body("winter")),
+        ...doc_args(post(org.id, body("winter"))),
         params: { id: String(org.id) },
         context: ctx(org.id),
       } as any)
@@ -247,7 +248,7 @@ describe("campaign slug", () => {
     const org = await npo("EIN-LOCK", "lock-org");
     const created = outcome(
       await create_action({
-        request: post(org.id, body("draft-slug")),
+        ...doc_args(post(org.id, body("draft-slug"))),
         params: { id: String(org.id) },
         context: ctx(org.id),
       } as any)
@@ -257,7 +258,7 @@ describe("campaign slug", () => {
 
     const renamed = outcome(
       await edit_action({
-        request: post(org.id, body("open-slug"), campaign_id),
+        ...doc_args(post(org.id, body("open-slug"), campaign_id)),
         params: { id: String(org.id), campaign_id },
         context: ctx(org.id),
       } as any)
@@ -272,7 +273,7 @@ describe("campaign slug", () => {
 
     const published = outcome(
       await edit_action({
-        request: post(org.id, body("open-slug", "publish"), campaign_id),
+        ...doc_args(post(org.id, body("open-slug", "publish"), campaign_id)),
         params: { id: String(org.id), campaign_id },
         context: ctx(org.id),
       } as any)
@@ -281,7 +282,7 @@ describe("campaign slug", () => {
 
     const locked = outcome(
       await edit_action({
-        request: post(org.id, body("changed", "save"), campaign_id),
+        ...doc_args(post(org.id, body("changed", "save"), campaign_id)),
         params: { id: String(org.id), campaign_id },
         context: ctx(org.id),
       } as any)
@@ -303,7 +304,7 @@ describe("campaign slug", () => {
     const org = await npo("EIN-RACE", "race-org");
     const created = outcome(
       await create_action({
-        request: post(org.id, body("first-slug")),
+        ...doc_args(post(org.id, body("first-slug"))),
         params: { id: String(org.id) },
         context: ctx(org.id),
       } as any)
@@ -337,7 +338,7 @@ describe("campaign slug", () => {
       .where(eq(npos.id, org.id));
     const created = outcome(
       await create_action({
-        request: post(org.id, { ...body("tipped"), hide_bg_tip: false }),
+        ...doc_args(post(org.id, { ...body("tipped"), hide_bg_tip: false })),
         params: { id: String(org.id) },
         context: ctx(org.id),
       } as any)
@@ -355,10 +356,12 @@ describe("campaign slug", () => {
     const org = await npo("EIN-FIELD", "field-org");
     const missing = outcome(
       await create_action({
-        request: post(org.id, {
-          ...body("field-slug"),
-          program_id: "11111111-1111-4111-8111-111111111111",
-        }),
+        ...doc_args(
+          post(org.id, {
+            ...body("field-slug"),
+            program_id: "11111111-1111-4111-8111-111111111111",
+          })
+        ),
         params: { id: String(org.id) },
         context: ctx(org.id),
       } as any)
@@ -369,7 +372,7 @@ describe("campaign slug", () => {
 
     const blank = outcome(
       await create_action({
-        request: post(org.id, { ...body("field-slug"), name: "" }),
+        ...doc_args(post(org.id, { ...body("field-slug"), name: "" })),
         params: { id: String(org.id) },
         context: ctx(org.id),
       } as any)
@@ -380,7 +383,7 @@ describe("campaign slug", () => {
 
     const created = outcome(
       await create_action({
-        request: post(org.id, body("field-slug", "publish")),
+        ...doc_args(post(org.id, body("field-slug", "publish"))),
         params: { id: String(org.id) },
         context: ctx(org.id),
       } as any)
@@ -389,7 +392,7 @@ describe("campaign slug", () => {
     const campaign_id = created.location!.split("/").pop()!;
     const ended = outcome(
       await edit_action({
-        request: post(org.id, { op: "end" }, campaign_id),
+        ...doc_args(post(org.id, { op: "end" }, campaign_id)),
         params: { id: String(org.id), campaign_id },
         context: ctx(org.id),
       } as any)
@@ -397,7 +400,7 @@ describe("campaign slug", () => {
     expect(ended.status).toBe(302);
     const again = outcome(
       await edit_action({
-        request: post(org.id, body("field-slug", "publish"), campaign_id),
+        ...doc_args(post(org.id, body("field-slug", "publish"), campaign_id)),
         params: { id: String(org.id), campaign_id },
         context: ctx(org.id),
       } as any)
@@ -478,7 +481,7 @@ describe("campaign list loader", () => {
       context: ctx(org.id),
     };
     const data = await list_loader({
-      request: new Request("https://x/admin/list/campaigns"),
+      ...doc_args(new Request("https://x/admin/list/campaigns")),
       ...args,
     } as any);
     if (data.view !== "campaigns")
@@ -497,7 +500,7 @@ describe("campaign list loader", () => {
     ]);
 
     const tab = await list_loader({
-      request: new Request("https://x/admin/list/campaigns?tab=supporters"),
+      ...doc_args(new Request("https://x/admin/list/campaigns?tab=supporters")),
       ...args,
     } as any);
     if (tab.view !== "supporters")
@@ -506,8 +509,10 @@ describe("campaign list loader", () => {
 
     // the tab is others-only; a stale ?creator= from an old link is ignored
     const stale = await list_loader({
-      request: new Request(
-        "https://x/admin/list/campaigns?tab=supporters&creator=ours"
+      ...doc_args(
+        new Request(
+          "https://x/admin/list/campaigns?tab=supporters&creator=ours"
+        )
       ),
       ...args,
     } as any);
@@ -519,7 +524,9 @@ describe("campaign list loader", () => {
     // "fundraisers" is this tab's previous query value; an old bookmarked link
     // must still land on the supporters view, not fall through to the default
     const legacy = await list_loader({
-      request: new Request("https://x/admin/list/campaigns?tab=fundraisers"),
+      ...doc_args(
+        new Request("https://x/admin/list/campaigns?tab=fundraisers")
+      ),
       ...args,
     } as any);
     if (legacy.view !== "supporters") {
@@ -528,7 +535,7 @@ describe("campaign list loader", () => {
     expect(legacy.funds.map((f) => f.id)).toEqual(["fund-supporter"]);
 
     const unknown = await list_loader({
-      request: new Request("https://x/admin/list/campaigns?tab=nope"),
+      ...doc_args(new Request("https://x/admin/list/campaigns?tab=nope")),
       ...args,
     } as any);
     expect(unknown.view).toBe("campaigns");

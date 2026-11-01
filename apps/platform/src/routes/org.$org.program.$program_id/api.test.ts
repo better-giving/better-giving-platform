@@ -9,6 +9,7 @@ import {
   vi,
 } from "vitest";
 import { seed_npo, seed_user } from "#/__tests__/fixtures/funds";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { campaigns } from "$/pg/schema/campaign";
 import { dists } from "$/pg/schema/dist";
 import { donation_donors, donations } from "$/pg/schema/donation";
@@ -109,7 +110,9 @@ const seed_campaign = (
 const load = (program_id: string, org = String(npo_a), search = "") =>
   (loader as any)({
     params: { org, program_id },
-    request: new Request(`https://x/org/${org}/program/${program_id}${search}`),
+    ...doc_args(
+      new Request(`https://x/org/${org}/program/${program_id}${search}`)
+    ),
   });
 
 describe("program page", () => {

@@ -11,11 +11,10 @@ import { resp } from "@/helpers/https";
 import { safe_redirect } from "@/helpers/safe-redirect";
 import { evaluate } from "./evaluate";
 
-export const action: ActionFunction = async ({ request }) => {
-  const from = new URL(request.url);
+export const action: ActionFunction = async ({ request, url }) => {
   const fv = await request.formData();
   const redirect_to = safe_redirect(
-    from.searchParams.get("redirect"),
+    url.searchParams.get("redirect"),
     href("/marketplace")
   );
 
