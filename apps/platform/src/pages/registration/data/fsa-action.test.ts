@@ -130,6 +130,29 @@ const post_docs = () =>
   );
 
 describe("fsa action — documentation form", () => {
+  test("returns the signer to the sign-result page when posted by a client navigation", async () => {
+    await seed("01");
+    // a client submission arrives raw: `.data` suffix and `_routes` left in
+    const raw = new Request(
+      `http://localhost/register/${RID}/3/fsa.data?_routes=routes%2Ffsa`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(DOCS),
+      }
+    );
+    await action({
+      request: raw,
+      url: new URL(`http://localhost/register/${RID}/3/fsa`),
+      params: { reg_id: RID },
+      context: {} as any,
+    } as any);
+
+    expect(vi.mocked(gen_fsa_signing_url).mock.calls[0][2]).toBe(
+      `http://localhost/register/${RID}/sign-result`
+    );
+  });
+
   test("refuses another user's application with 403 and writes nothing", async () => {
     await seed("01");
     vi.mocked(get_session).mockResolvedValue({
