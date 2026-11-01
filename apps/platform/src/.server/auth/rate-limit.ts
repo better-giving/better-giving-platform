@@ -1,22 +1,32 @@
 import * as v from "valibot";
+import type { Db } from "$/pg/db";
+import {
+  type RateWindow,
+  rate_limit_release,
+  rate_limit_sweep,
+  rate_limit_take,
+} from "$/pg/queries/rate-limit";
 
-/** Application-level throttling for auth work that runs server-side.
+/** Application-level throttling for server-side work: auth, and the public
+ * agents endpoint.
  *
  * better-auth's own limiter lives in its router's `onRequest`, so it only sees
  * traffic that arrives at `/api/auth/*`. Every call this app makes through
  * `auth.api.*` goes straight to the endpoint and is never counted — which is
  * exactly the anonymous lead path. These counters are that missing gate.
  *
- * They are per-process: each serverless instance keeps its own map, so the real
- * ceiling is `max` × live instances, and a cold start resets it. That makes this
- * a blunt cap on a single abusive source rather than an exact quota. A durable
- * one needs a shared store (the app has no redis today); when one exists, swap
- * the map for it and the callers stay as they are.
+ * `reserve` and `consume` are per-process: each serverless instance keeps its
+ * own map, so the real ceiling is `max` × live instances, and a cold start
+ * resets it. That makes them a blunt cap on a single abusive source rather than
+ * an exact quota. The `_shared` variants hold across instances: one postgres
+ * row per key and window, at a db round trip per call. Their windows are fixed
+ * and aligned to the clock, so a burst straddling a window edge can spend up to
+ * 2 × `max`.
  */
 
 export interface Quota {
   max: number;
-  /** rolling window, in seconds */
+  /** window length, in seconds */
   window_s: number;
 }
 
@@ -64,6 +74,87 @@ export function reserve(key: string, quota: Quota): Reservation | null {
 /** Records one use of `key` and reports whether it was within `quota`. */
 export function consume(key: string, quota: Quota): boolean {
   return reserve(key, quota) !== null;
+}
+
+/** like `Reservation`, but its release is a db write to await. not a
+ * `Reservation` on purpose: a caller typed for the sync one would drop the
+ * promise and its error. */
+export interface SharedReservation {
+  release(): Promise<void>;
+}
+
+/** `reserve` over the counters every instance shares. a db error propagates.
+ * `conn` is never a transaction: a failed sweep would abort it, take and all. */
+export async function reserve_shared(
+  key: string,
+  quota: Quota,
+  conn?: Db
+): Promise<SharedReservation | null> {
+  const w = fixed_window(quota);
+  if ((await take(key, w, quota.max, conn)) === null) return null;
+  let released = false;
+  return {
+    async release() {
+      if (released) return;
+      released = true;
+      await rate_limit_release(key, w.start, conn);
+    },
+  };
+}
+
+/** `consume` over the shared counters, saying when to come back on a denial.
+ * a db error propagates. */
+export async function limit_shared(
+  key: string,
+  quota: Quota,
+  conn?: Db
+): Promise<{ ok: true } | { ok: false; retry_after_s: number }> {
+  const w = fixed_window(quota);
+  if ((await take(key, w, quota.max, conn)) !== null) {
+    return { ok: true };
+  }
+  // `now` is inside the window, so this is at least 1
+  return { ok: false, retry_after_s: Math.ceil((w.end_ms - w.now) / 1000) };
+}
+
+/** one take in this many also sweeps ended windows */
+const SWEEP_ONE_IN = 100;
+
+/** the take, plus — on a sampled call — a sweep of ended windows. the sweep is
+ * its own statement so its failure can't fail the take, and it is awaited
+ * because work left running after a serverless response can be frozen. */
+async function take(
+  key: string,
+  w: RateWindow & { now: number },
+  max: number,
+  conn?: Db
+): Promise<number | null> {
+  const count = await rate_limit_take(key, w, max, conn);
+  if (Math.random() * SWEEP_ONE_IN < 1) {
+    try {
+      await rate_limit_sweep(new Date(w.now).toISOString(), conn);
+    } catch (err) {
+      console.error("rate limit sweep failed", err);
+    }
+  }
+  return count;
+}
+
+/** the `window_s`-long window holding now, aligned to the epoch so every
+ * instance computes the same one */
+function fixed_window(
+  quota: Quota
+): RateWindow & { now: number; end_ms: number } {
+  const now = Date.now();
+  const span = quota.window_s * 1000;
+  const start_ms = Math.floor(now / span) * span;
+  const end_ms = start_ms + span;
+  return {
+    start: new Date(start_ms).toISOString(),
+    end: new Date(end_ms).toISOString(),
+    now,
+    end_ms,
+  };
 }
 
 function prune(now: number): void {

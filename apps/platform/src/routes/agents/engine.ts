@@ -2,7 +2,11 @@ import { Buffer } from "node:buffer";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { href } from "react-router";
 import * as v from "valibot";
-import { client_ip, reserve } from "#/.server/auth/rate-limit";
+import {
+  client_ip,
+  reserve_shared,
+  type SharedReservation,
+} from "#/.server/auth/rate-limit";
 import { to_fn } from "#/.server/donation-recipient";
 import { stripe_amounts } from "#/components/donation/common/amounts";
 import { report_error } from "#/errors/report";
@@ -22,7 +26,7 @@ import { npo_share, settled_parts, shared_parts } from "@/settlement/plan";
 import { app, base_url } from "$/env";
 import {
   type INonprofitOrg,
-  nonprofits_cancel_fetch,
+  nonprofits_needs_fetch,
   nonprofits_org,
   nonprofits_search,
   nonprofits_will_fetch,
@@ -420,16 +424,40 @@ async function offer(
   return eligible_orgs.filter((org) => !taken.has(org.ein)).map(external_entry);
 }
 
-async function allow_fetch(
+// runs `lookup` if the caller's cap allows it, or returns null when it doesn't
+async function capped_fetch<T>(
   request: Request,
   kind: "search" | "org",
-  raw: string
-): Promise<boolean> {
-  if (!nonprofits_will_fetch(kind, raw)) return true;
-  const reserved =
-    reserve(`nonprofits:${caller_id(request)}`, NONPROFITS_QUOTA) !== null;
-  if (!reserved) nonprofits_cancel_fetch(kind, raw);
-  return reserved;
+  raw: string,
+  lookup: () => Promise<T>
+): Promise<T | null> {
+  if (!nonprofits_needs_fetch(kind, raw)) return lookup();
+  // reserve before claiming: a duplicate arriving during this await would see
+  // a held claim, skip the cap, and start the fetch even if this reservation
+  // is then denied
+  let reservation: SharedReservation | null;
+  try {
+    reservation = await reserve_shared(
+      `nonprofits:${caller_id(request)}`,
+      NONPROFITS_QUOTA
+    );
+  } catch (err) {
+    // fail closed: an uncounted lookup spends the shared nonprofits api quota
+    console.error("nonprofits lookup cap unavailable", err);
+    return null;
+  }
+  if (!reservation) return null;
+  if (nonprofits_will_fetch(kind, raw)) return lookup();
+  // a concurrent caller claimed it during the await: join theirs, refund ours.
+  // the lookup starts before the refund write so the flight is still there to
+  // join, and both are awaited so the refund lands before the response does
+  const [result] = await Promise.all([
+    lookup(),
+    reservation.release().catch((err) => {
+      console.error("nonprofits lookup slot not released", err);
+    }),
+  ]);
+  return result;
 }
 
 export async function find_nonprofit(input: unknown, request: Request) {
@@ -454,7 +482,10 @@ async function find_by_ein(raw: string, request: Request) {
         : "disabled") as TExternalLookup,
     };
   }
-  if (!(await allow_fetch(request, "org", ein))) {
+  const remote = await capped_fetch(request, "org", ein, () =>
+    nonprofits_org(ein).catch((): TNonprofitsOrg => ({ status: "unavailable" }))
+  );
+  if (!remote) {
     return {
       items: [],
       match: "none" as const,
@@ -462,9 +493,6 @@ async function find_by_ein(raw: string, request: Request) {
       external_lookup: "skipped",
     };
   }
-  const remote = await nonprofits_org(ein).catch(
-    (): TNonprofitsOrg => ({ status: "unavailable" })
-  );
   if (remote.status !== "ok") {
     return {
       items: [],
@@ -494,12 +522,12 @@ async function remote_search(
   request: Request,
   query: string
 ): Promise<TNonprofitsSearch | { status: "skipped" }> {
-  if (!(await allow_fetch(request, "search", query))) {
-    return { status: "skipped" };
-  }
-  return nonprofits_search(query).catch(
-    (): TNonprofitsSearch => ({ status: "unavailable" })
+  const remote = await capped_fetch(request, "search", query, () =>
+    nonprofits_search(query).catch(
+      (): TNonprofitsSearch => ({ status: "unavailable" })
+    )
   );
+  return remote ?? { status: "skipped" };
 }
 
 async function local_matches(query: string): Promise<INpoNameHit[]> {

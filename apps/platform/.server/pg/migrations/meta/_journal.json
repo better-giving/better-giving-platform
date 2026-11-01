@@ -519,6 +519,13 @@
       "when": 1793025963763,
       "tag": "0073_connector_photo_links_unsaved_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1793238355465,
+      "tag": "0074_rate_limit_windows",
+      "breakpoints": true
     }
   ]
 }

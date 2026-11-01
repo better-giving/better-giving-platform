@@ -132,29 +132,28 @@ function cache_set(key: string, entry: Omit<ICacheEntry, "exp">, ttl: number) {
   cache.set(key, { ...entry, exp: Date.now() + ttl });
 }
 
-/** true only when this caller claims the fetch. cache hits, an in-flight
- * request, an active cooldown, and a missing key do not. a true result holds
- * the key until the lookup runs or `nonprofits_cancel_fetch` drops it. */
-export function nonprofits_will_fetch(
+/** whether a lookup now would reach the api, claiming nothing. cache hits, an
+ * in-flight request, an active cooldown, and a missing api key would not. */
+export function nonprofits_needs_fetch(
   kind: "search" | "org",
   raw: string
 ): boolean {
   if (!api_key() || in_cooldown()) return false;
   const key = cache_key(kind, raw);
-  if (cache_get(key) || flights.has(key)) return false;
-  claim_flight(key);
-  return true;
+  return !cache_get(key) && !flights.has(key);
 }
 
-/** drops a claim that never started, so a refused quota slot does not stick. */
-export function nonprofits_cancel_fetch(
+/** true only when this caller claims the fetch, which holds the key until the
+ * lookup runs. check and claim are one synchronous step, so a caller that has
+ * awaited since `nonprofits_needs_fetch` claims here rather than trusting that
+ * answer. */
+export function nonprofits_will_fetch(
   kind: "search" | "org",
   raw: string
-): void {
-  const flight = flights.get(cache_key(kind, raw));
-  if (!flight || flight.started) return;
-  flights.delete(cache_key(kind, raw));
-  flight.resolve(ABORTED);
+): boolean {
+  if (!nonprofits_needs_fetch(kind, raw)) return false;
+  claim_flight(cache_key(kind, raw));
+  return true;
 }
 
 async function share<T>(

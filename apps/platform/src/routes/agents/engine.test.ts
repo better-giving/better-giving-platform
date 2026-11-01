@@ -31,9 +31,25 @@ const mocks = vi.hoisted(() => ({
   descriptor: vi.fn(),
   expire: vi.fn(),
   report_error: vi.fn(),
+  reserve_shared: vi.fn(),
 }));
 
 vi.mock("$/env", () => env);
+
+// the shared store's own behavior is rate-limit-shared.test.ts's; here the
+// per-process counter stands in for it, so cap counts stay observable
+vi.mock("$/pg/db", () => ({ db: {} }));
+vi.mock("#/.server/auth/rate-limit", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("#/.server/auth/rate-limit")>();
+  mocks.reserve_shared.mockImplementation(
+    async (key: string, quota: { max: number; window_s: number }) => {
+      const r = original.reserve(key, quota);
+      return r && { release: async () => r.release() };
+    }
+  );
+  return { ...original, reserve_shared: mocks.reserve_shared };
+});
 
 vi.mock("#/.server/donation-recipient", () => ({ to_fn: mocks.to_fn }));
 vi.mock("$/pg/queries/donation", () => ({
@@ -954,6 +970,14 @@ const local_hits = [
 /** what find_nonprofit lists for `local_hits`: none of them set increments */
 const listed_hits = local_hits.map((hit) => ({ ...hit, increments: [] }));
 
+/** a shared-cap answer that lands after both concurrent lookups have checked */
+function decided_later<T>(answer: () => T) {
+  return async () => {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    return answer();
+  };
+}
+
 describe("find_nonprofit IRS fallback", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -1449,6 +1473,45 @@ describe("find_nonprofit IRS fallback", () => {
     expect(fetch).toHaveBeenCalledTimes(20);
   });
 
+  test("a lookup the shared cap denies is skipped and leaves no claim", async () => {
+    const fetch = stub_fetch(() =>
+      http(200, { query: "denied", limit: 10, results: [] })
+    );
+    mocks.npo_name_search.mockResolvedValue(local_hits);
+    const req = caller("192.0.2.240");
+    mocks.reserve_shared.mockResolvedValueOnce(null);
+
+    const skipped = await find_nonprofit({ query: "denied" }, req);
+    expect(skipped.external_lookup).toBe("skipped");
+    expect(skipped.items).toEqual(listed_hits);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.reserve_shared).toHaveBeenCalledWith(
+      expect.stringMatching(/^nonprofits:ip:[0-9a-f]{64}$/),
+      { max: 20, window_s: 600 }
+    );
+
+    // a stuck claim would serve every later identical query as in flight
+    const retried = await find_nonprofit({ query: "denied" }, req);
+    expect(retried.external_lookup).toBe("ok");
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  test("a shared cap that cannot be read skips the lookup and leaves no claim", async () => {
+    const fetch = stub_fetch(() => http(200, org_detail()));
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.reserve_shared.mockRejectedValueOnce(new Error("db down"));
+
+    const skipped = await find_nonprofit({ ein: ELIGIBLE_EIN }, caller());
+    expect(skipped.external_lookup).toBe("skipped");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
+
+    const retried = await find_nonprofit({ ein: ELIGIBLE_EIN }, caller());
+    expect(retried.external_lookup).toBe("ok");
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
   test("concurrent identical searches share one fetch and one quota slot", async () => {
     let entered = 0;
     let release: () => void = () => {};
@@ -1491,6 +1554,113 @@ describe("find_nonprofit IRS fallback", () => {
     expect(skipped.external_lookup).toBe("skipped");
     expect(skipped.items).toEqual(listed_hits);
     expect(fetch).toHaveBeenCalledTimes(20);
+  });
+
+  test("a duplicate sent while the shared cap is still deciding does not fetch past a denial", async () => {
+    const fetch = stub_fetch(() =>
+      http(200, { query: "dup", limit: 10, results: [] })
+    );
+    mocks.reserve_shared
+      .mockImplementationOnce(decided_later(() => null))
+      .mockImplementationOnce(decided_later(() => null));
+    const req = caller("192.0.2.241");
+
+    const [first, second] = await Promise.all([
+      find_nonprofit({ query: "dup" }, req),
+      find_nonprofit({ query: "dup" }, req),
+    ]);
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(first.external_lookup).toBe("skipped");
+    expect(second.external_lookup).toBe("skipped");
+  });
+
+  test("a slot reserved for a lookup another caller claimed first is released, and the caller joins", async () => {
+    const fetch = stub_fetch(() =>
+      http(200, { query: "race", limit: 10, results: [] })
+    );
+    const released = [vi.fn(async () => {}), vi.fn(async () => {})];
+    mocks.reserve_shared
+      .mockImplementationOnce(decided_later(() => ({ release: released[0] })))
+      .mockImplementationOnce(decided_later(() => ({ release: released[1] })));
+    const req = caller("192.0.2.242");
+
+    const [first, second] = await Promise.all([
+      find_nonprofit({ query: "race" }, req),
+      find_nonprofit({ query: "race" }, req),
+    ]);
+
+    expect(mocks.reserve_shared).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(first.external_lookup).toBe("ok");
+    expect(second.external_lookup).toBe("ok");
+    expect(released[0]).not.toHaveBeenCalled();
+    expect(released[1]).toHaveBeenCalledOnce();
+  });
+
+  test("a joining caller answers only after its refund is written", async () => {
+    stub_fetch(() =>
+      http(200, { query: "slow refund", limit: 10, results: [] })
+    );
+    let written = false;
+    let finish: () => void = () => {};
+    const write = new Promise<void>((resolve) => {
+      finish = () => {
+        written = true;
+        resolve();
+      };
+    });
+    mocks.reserve_shared
+      .mockImplementationOnce(
+        decided_later(() => ({ release: async () => {} }))
+      )
+      .mockImplementationOnce(decided_later(() => ({ release: () => write })));
+    const req = caller("192.0.2.244");
+
+    const pending = Promise.all([
+      find_nonprofit({ query: "slow refund" }, req),
+      find_nonprofit({ query: "slow refund" }, req).then((r) => ({
+        r,
+        written,
+      })),
+    ]);
+    setTimeout(finish, 20);
+    const [first, second] = await pending;
+
+    expect(first.external_lookup).toBe("ok");
+    expect(second.r.external_lookup).toBe("ok");
+    expect(second.written).toBe(true);
+  });
+
+  test("a refund that fails is logged and the caller still joins", async () => {
+    const fetch = stub_fetch(() =>
+      http(200, { query: "refund", limit: 10, results: [] })
+    );
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.reserve_shared
+      .mockImplementationOnce(
+        decided_later(() => ({ release: async () => {} }))
+      )
+      .mockImplementationOnce(
+        decided_later(() => ({
+          release: () => Promise.reject(new Error("db down")),
+        }))
+      );
+    const req = caller("192.0.2.243");
+
+    const [first, second] = await Promise.all([
+      find_nonprofit({ query: "refund" }, req),
+      find_nonprofit({ query: "refund" }, req),
+    ]);
+
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(first.external_lookup).toBe("ok");
+    expect(second.external_lookup).toBe("ok");
+    expect(log).toHaveBeenCalledWith(
+      "nonprofits lookup slot not released",
+      expect.any(Error)
+    );
+    log.mockRestore();
   });
 
   test("concurrent EIN lookups share one fetch", async () => {
