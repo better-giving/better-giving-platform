@@ -83,14 +83,24 @@ const STATUS_TEXT: Record<number, string> = {
   500: "Better Giving hit an error.",
 };
 
+/** an error response carrying `schema` as `media`, inline so a reader of one
+ * operation sees its error schema without resolving a shared response */
+const error_response = (status: number, media: string, schema: string) => ({
+  description: STATUS_TEXT[status],
+  content: { [media]: { schema: ref(schema) } },
+});
+
 const api_errors = (...statuses: number[]) =>
   Object.fromEntries(
-    statuses.map((s) => [s, { $ref: `#/components/responses/Api${s}` }])
+    statuses.map((s) => [s, error_response(s, "application/json", "ApiError")])
   );
 
 const problems = (...statuses: number[]) =>
   Object.fromEntries(
-    statuses.map((s) => [s, { $ref: `#/components/responses/Problem${s}` }])
+    statuses.map((s) => [
+      s,
+      error_response(s, "application/problem+json", "ConnectorProblem"),
+    ])
   );
 
 /** a keyed action's error responses: the key check (401, 429), input
@@ -749,19 +759,23 @@ export function operations(): readonly IOperation[] {
   return built;
 }
 
+/** the `{code, message}` object every error response carries; each surface
+ * narrows `code` to the codes its routes send */
+const ERROR_DETAIL = {
+  type: "object",
+  required: ["code", "message"],
+  properties: { code: { type: "string" }, message: { type: "string" } },
+};
+
+const error_of = (codes: readonly string[]) => ({
+  allOf: [ref("ErrorDetail")],
+  properties: { code: { type: "string", enum: [...codes] } },
+});
+
 const API_ERROR = {
   type: "object",
   required: ["error"],
-  properties: {
-    error: {
-      type: "object",
-      required: ["code", "message"],
-      properties: {
-        code: { type: "string", enum: Object.keys(API_ERROR_STATUS) },
-        message: { type: "string" },
-      },
-    },
-  },
+  properties: { error: error_of(Object.keys(API_ERROR_STATUS)) },
 };
 
 const CONNECTOR_PROBLEM = {
@@ -781,28 +795,9 @@ const CONNECTOR_PROBLEM = {
         properties: { path: { type: "string" }, message: { type: "string" } },
       },
     },
-    error: {
-      type: "object",
-      required: ["code", "message"],
-      properties: {
-        code: { type: "string", enum: [...PROBLEM_CODES] },
-        message: { type: "string" },
-      },
-    },
+    error: error_of(PROBLEM_CODES),
   },
 };
-
-/** every error status documented by an operation on a `prefix` route; each
- * gets one components response */
-const error_statuses = (prefix: string) =>
-  [
-    ...new Set(
-      operations()
-        .filter((o) => o.route.startsWith(prefix))
-        .flatMap((o) => Object.keys(o.op.responses as Json).map(Number))
-        .filter((s) => s >= 400)
-    ),
-  ].sort((a, b) => a - b);
 
 /** the OpenAPI 3.1 document for the public read API and connector v1, with
  * `origin` as its server */
@@ -837,30 +832,10 @@ export function openapi_doc(origin: string) {
           description: "A connector API key, from `/connector/v1/exchange`.",
         },
       },
-      schemas: { ApiError: API_ERROR, ConnectorProblem: CONNECTOR_PROBLEM },
-      responses: {
-        ...Object.fromEntries(
-          error_statuses("api.").map((s) => [
-            `Api${s}`,
-            {
-              description: STATUS_TEXT[s],
-              content: { "application/json": { schema: ref("ApiError") } },
-            },
-          ])
-        ),
-        ...Object.fromEntries(
-          error_statuses("connector.v1.").map((s) => [
-            `Problem${s}`,
-            {
-              description: STATUS_TEXT[s],
-              content: {
-                "application/problem+json": {
-                  schema: ref("ConnectorProblem"),
-                },
-              },
-            },
-          ])
-        ),
+      schemas: {
+        ErrorDetail: ERROR_DETAIL,
+        ApiError: API_ERROR,
+        ConnectorProblem: CONNECTOR_PROBLEM,
       },
     },
   };

@@ -74,11 +74,44 @@ describe("/.well-known/mcp.json", () => {
       authentication: { type: "optional-bearer" },
     });
     expect(card.tools).toEqual(
-      tools.map(({ name, description, inputSchema }) => ({
+      tools.map(({ name, description, inputSchema, annotations }) => ({
         name,
         description,
         inputSchema,
+        annotations,
       }))
     );
+  });
+
+  test("carries an icon and points its server at the server card", async () => {
+    const card = await (await card_at(loader, "/.well-known/mcp.json")).json();
+    expect(card.icons).toEqual([
+      {
+        src: "https://preview.better.giving/logo.png",
+        mimeType: "image/png",
+        sizes: ["2048x2048"],
+      },
+    ]);
+    expect(card.servers).toEqual([
+      {
+        url: "https://preview.better.giving/agents/mcp",
+        transport: "streamable-http",
+        card: "https://preview.better.giving/.well-known/mcp/server-card.json",
+      },
+    ]);
+  });
+
+  test("every product tool declares all four behavioral hints", () => {
+    for (const t of tools) {
+      expect(Object.keys(t.annotations).sort(), t.name).toEqual([
+        "destructiveHint",
+        "idempotentHint",
+        "openWorldHint",
+        "readOnlyHint",
+      ]);
+      for (const v of Object.values(t.annotations)) {
+        expect(typeof v, t.name).toBe("boolean");
+      }
+    }
   });
 });

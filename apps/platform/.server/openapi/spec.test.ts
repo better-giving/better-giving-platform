@@ -268,21 +268,24 @@ describe("openapi drift", () => {
     }
   });
 
-  test("every error response is a component carrying its surface's error schema", () => {
-    const { responses } = doc.components as {
-      responses: Record<string, { content: Record<string, { schema: Json }> }>;
-    };
+  test("every error response carries its surface's error schema, built on the shared ErrorDetail", () => {
+    const { schemas } = doc.components;
+    expect(schemas.ApiError.properties.error.allOf).toEqual([
+      { $ref: "#/components/schemas/ErrorDetail" },
+    ]);
+    expect(schemas.ConnectorProblem.properties.error.allOf).toEqual([
+      { $ref: "#/components/schemas/ErrorDetail" },
+    ]);
     for (const o of operations()) {
       const [media, schema] = o.route.startsWith("api.")
         ? ["application/json", "ApiError"]
         : ["application/problem+json", "ConnectorProblem"];
       for (const [status, res] of Object.entries(o.op.responses as Json)) {
         if (Number(status) < 400) continue;
-        const label = `${o.op.operationId} ${status}`;
-        const $ref = (res as { $ref?: string }).$ref ?? "";
-        expect($ref, label).toMatch(/^#\/components\/responses\//);
-        const component = responses[$ref.split("/").at(-1) ?? ""];
-        expect(component?.content, label).toEqual({
+        expect(
+          (res as { content: Json }).content,
+          `${o.op.operationId} ${status}`
+        ).toEqual({
           [media]: { schema: { $ref: `#/components/schemas/${schema}` } },
         });
       }

@@ -232,7 +232,8 @@ describe("markdown negotiation in the document entry", () => {
     expect(res.headers.get("vary")).toBe("Cookie, Accept");
     expect(res.headers.get("cache-control")).toBe("public, max-age=60");
     const md = await res.text();
-    expect(md.startsWith("# Acme Fund\n\n## Acme")).toBe(true);
+    expect(md.startsWith("---\n")).toBe(true);
+    expect(md).toContain("---\n\n# Acme Fund\n\n## Acme");
     expect(md).toContain(`[Donate](${ORIGIN}/donate/7)`);
     expect(md).toContain("Deferred story");
     for (const gone of [
@@ -296,7 +297,9 @@ describe("markdown negotiation in the document entry", () => {
       "public, s-maxage=60, stale-while-revalidate=300"
     );
     const md = await res.text();
-    expect(md).toMatch(/^# Pricing \| /);
+    expect(md).toMatch(
+      /^---\ntitle: "Pricing \| [^\n]*\n(.*\n)*---\n\n# Pricing \| /
+    );
     expect(md).toContain("Free. Forever.");
     expect(md).not.toMatch(/\]\(\//);
   });

@@ -81,12 +81,21 @@ function absolute(url: string, base: string): string {
   }
 }
 
+/** a YAML double-quoted scalar; JSON strings are valid YAML */
+const quoted = (v: string) => JSON.stringify(v.replace(/\s+/g, " ").trim());
+
 /**
- * markdown of a rendered document's `<main>`, headed by its `<title>` unless
- * that repeats the `<h1>`; links and image sources resolve against `page_url`.
- * null when the document has no `<main>`.
+ * markdown of a rendered document's `<main>`, opening with a `---` frontmatter
+ * block (title, description, canonical, last-updated as the day it was
+ * rendered) and headed by its `<title>` unless that repeats the `<h1>`; links
+ * and image sources resolve against `page_url`. null when the document has no
+ * `<main>`.
  */
-export function page_markdown(html: string, page_url: string): string | null {
+export function page_markdown(
+  html: string,
+  page_url: string,
+  now: Date = new Date()
+): string | null {
   const root = parse(html);
   const main = root.querySelector("main");
   if (!main) return null;
@@ -110,5 +119,22 @@ export function page_markdown(html: string, page_url: string): string | null {
   const title = root.querySelector("title")?.text.trim();
   const h1 = main.querySelector("h1")?.text.trim();
   const heading = title && title !== h1 ? `# ${title}\n\n` : "";
-  return `${heading}${body}\n`;
+
+  const description = root
+    .querySelector('meta[name="description"]')
+    ?.getAttribute("content");
+  const canonical = root
+    .querySelector('link[rel="canonical"]')
+    ?.getAttribute("href");
+  const front = [
+    ["title", title || h1],
+    ["description", description],
+    ["canonical", absolute(canonical || page_url, page_url)],
+    ["last-updated", now.toISOString().slice(0, 10)],
+  ]
+    .filter((e): e is [string, string] => !!e[1])
+    .map(([k, v]) =>
+      k === "last-updated" ? `${k}: ${v}` : `${k}: ${quoted(v)}`
+    );
+  return `---\n${front.join("\n")}\n---\n\n${heading}${body}\n`;
 }
