@@ -11,7 +11,7 @@ export const MCP_TITLE = "Better Giving donations";
 export const MCP_DESCRIPTION =
   "Find a nonprofit on Better Giving, quote a one-time USD donation, and hand the donor a Stripe-hosted checkout link.";
 
-/** the site's existing logo asset, `public/logo.png` (2048x2048) */
+/** the site logo, `public/logo.png` (2048x2048) */
 export const mcp_icons = (origin: string) => [
   { src: `${origin}/logo.png`, mimeType: "image/png", sizes: ["2048x2048"] },
 ];
