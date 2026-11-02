@@ -179,9 +179,8 @@ interface IFeedDonor {
   date?: string | Date | null;
 }
 
-// bg-gray-2, not bg-panel: panel + border + radius + padding is the card shell the sweep rejects
-const feed_card =
-  "items-start gap-3 rounded border border-gray-6 bg-gray-2 p-3";
+// a card, not a well: this row sits on the ground
+const feed_card = "card items-start gap-3";
 
 function FeedCard({
   donor,

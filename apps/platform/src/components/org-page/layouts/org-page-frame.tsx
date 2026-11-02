@@ -8,6 +8,9 @@ interface IOrgPageFrame {
   page: IOrgLayout;
   /** the hero's Donate: the header's waits until it has scrolled away */
   hero_donate: HTMLElement | null;
+  /** the hero's name: the header's mark and name wait until it has scrolled
+   * away */
+  hero_name: HTMLElement | null;
   sections?: IHeaderSection[];
   /** the page's main content, hero first */
   children: ReactNode;
@@ -17,12 +20,13 @@ interface IOrgPageFrame {
 export function OrgPageFrame({
   page,
   hero_donate,
+  hero_name,
   sections,
   children,
 }: IOrgPageFrame) {
   const { npo } = page;
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-background text-gray-12">
+    <div className="flex min-h-[100dvh] flex-col text-gray-12">
       <OrgHeader
         name={npo.name}
         logo={npo.logo}
@@ -31,6 +35,7 @@ export function OrgPageFrame({
         share={page.share}
         donate_to={page.donate_to}
         donate_after={hero_donate}
+        identity_after={hero_name}
         sections={sections}
       />
       <main className="flex flex-1 flex-col">{children}</main>

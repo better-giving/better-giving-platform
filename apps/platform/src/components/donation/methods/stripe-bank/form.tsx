@@ -179,7 +179,7 @@ export function Form(props: TMethodState<"stripe_bank">) {
           custom_tip={
             rhf.tip_format.value === "custom" ? (
               <div className="relative w-full flex items-baseline">
-                <span className="font-bold text-2xs self-baseline text-form-primary">
+                <span className="font-bold text-xs self-baseline text-form-primary">
                   {rhf.currency.value.code}
                 </span>
                 <input

@@ -19,20 +19,22 @@ export function Card(props: IOrgLayout) {
   const { npo } = props;
   // the card's Donate, which the header waits on before showing its own
   const [hero_donate, set_hero_donate] = useState<HTMLElement | null>(null);
+  // the hero's name, which the header's mark and name wait on
+  const [hero_name, set_hero_name] = useState<HTMLElement | null>(null);
   const tagline = npo.tagline?.trim();
 
   return (
-    <OrgPageFrame page={props} hero_donate={hero_donate}>
+    <OrgPageFrame page={props} hero_donate={hero_donate} hero_name={hero_name}>
       <div className="page flex flex-1 flex-col justify-center py-8 md:py-12">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
           {/* a media frame, not `card`: the banner runs edge to edge, so the
               inset is the body's */}
-          <article className="overflow-hidden rounded border bg-panel">
+          <article className="overflow-hidden bg-card rounded-card border border-hairline">
             <OrgBanner src={npo.image} />
             <div className="flex flex-col items-center gap-4 p-6 text-center md:gap-5">
               <OrgMark name={npo.name} logo={npo.logo} size="lg" />
               <div className="flex flex-col gap-2">
-                <OrgName name={npo.name} scale="md" />
+                <OrgName ref={set_hero_name} name={npo.name} scale="md" />
                 {tagline && (
                   <p className="text-lg leading-snug text-gray-11 md:text-xl">
                     {tagline}

@@ -18,7 +18,7 @@ export function TokenField({ ref, ...props }: ITokenField & { ref?: Ref<El> }) {
         {props.label}
       </label>
 
-      <div className="mt-1 grid grid-cols-[auto_1fr] field-input-container rounded pr-5 divide-x divide-gray-6">
+      <div className="mt-1 grid grid-cols-[auto_1fr] field-input-container rounded pr-5 divide-x divide-input">
         {props.combobox}
         {/** match input text, and append $ value */}
         <div className="relative h-full w-full">

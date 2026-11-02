@@ -58,7 +58,7 @@ function EditorHarness({
         charLimit={char_limit}
         classes={{
           field:
-            "rich-text-toolbar border text-sm grid grid-rows-[auto_1fr] rounded bg-surface p-3 min-h-60",
+            "rich-text-toolbar text-sm grid grid-rows-[auto_1fr] p-3 min-h-60",
           counter: "text-gray-11",
         }}
       />
@@ -88,7 +88,7 @@ function StatefulEditor({
         charLimit={char_limit}
         classes={{
           field:
-            "rich-text-toolbar border text-sm grid grid-rows-[auto_1fr] rounded bg-surface p-3 min-h-60",
+            "rich-text-toolbar text-sm grid grid-rows-[auto_1fr] p-3 min-h-60",
           counter: "text-gray-11",
         }}
       />
@@ -109,7 +109,9 @@ describe("rich text editor — toolbar", () => {
     const screen = await render(<EditorHarness />);
 
     await vi.waitFor(() => {
-      const toolbar = screen.container.querySelector(".border-b.border-gray-3");
+      const toolbar = screen.container.querySelector(
+        ".border-b.border-hairline"
+      );
       expect(toolbar).not.toBeNull();
       const btns = toolbar!.querySelectorAll(":scope > button");
       // bold, italic, ordered-list, bulleted-list, link
@@ -125,7 +127,9 @@ describe("rich text editor — toolbar", () => {
     await userEvent.click(editor);
     await userEvent.keyboard("normal ");
 
-    const toolbar = screen.container.querySelector(".border-b.border-gray-3")!;
+    const toolbar = screen.container.querySelector(
+      ".border-b.border-hairline"
+    )!;
     const bold_btn = toolbar.querySelectorAll(
       ":scope > button"
     )[0] as HTMLElement;
@@ -145,7 +149,9 @@ describe("rich text editor — toolbar", () => {
     const editor = await wait_for_editor(screen);
     await userEvent.click(editor);
 
-    const toolbar = screen.container.querySelector(".border-b.border-gray-3")!;
+    const toolbar = screen.container.querySelector(
+      ".border-b.border-hairline"
+    )!;
     const italic_btn = toolbar.querySelectorAll(
       ":scope > button"
     )[1] as HTMLElement;
@@ -202,7 +208,9 @@ describe("rich text editor — lists", () => {
     await userEvent.click(editor);
 
     // toolbar order: strong, em, number, bullet, link → bullet is index 3
-    const toolbar = screen.container.querySelector(".border-b.border-gray-3")!;
+    const toolbar = screen.container.querySelector(
+      ".border-b.border-hairline"
+    )!;
     const list_btn = toolbar.querySelectorAll(
       ":scope > button"
     )[3] as HTMLElement;
@@ -223,7 +231,9 @@ describe("rich text editor — lists", () => {
     await userEvent.click(editor);
 
     // numbered list is index 2
-    const toolbar = screen.container.querySelector(".border-b.border-gray-3")!;
+    const toolbar = screen.container.querySelector(
+      ".border-b.border-hairline"
+    )!;
     const list_btn = toolbar.querySelectorAll(
       ":scope > button"
     )[2] as HTMLElement;
@@ -243,7 +253,9 @@ describe("rich text editor — lists", () => {
     const editor = await wait_for_editor(screen);
     await userEvent.click(editor);
 
-    const toolbar = screen.container.querySelector(".border-b.border-gray-3")!;
+    const toolbar = screen.container.querySelector(
+      ".border-b.border-hairline"
+    )!;
     const list_btn = toolbar.querySelectorAll(
       ":scope > button"
     )[3] as HTMLElement;
@@ -275,6 +287,20 @@ describe("rich text editor — char counter", () => {
 
     await expect
       .element(screen.getByText(/chars\s*:\s*5\s*\/500/i))
+      .toBeVisible();
+  });
+
+  it("counts stored content that arrives without a length, before any edit", async () => {
+    // a form seeded from the db holds the json alone: { value }
+    const screen = await render(
+      <StatefulEditor
+        initial={{ value: pt_json("Clean water for all") }}
+        char_limit={500}
+      />
+    );
+
+    await expect
+      .element(screen.getByText(/chars\s*:\s*19\s*\/500/i))
       .toBeVisible();
   });
 
@@ -358,7 +384,7 @@ describe("rich text editor — read-only", () => {
     const screen = await render(<RichText content={content} readOnly />);
 
     await expect.element(screen.getByText("read only")).toBeVisible();
-    const toolbar = screen.container.querySelector(".border-b.border-gray-3");
+    const toolbar = screen.container.querySelector(".border-b.border-hairline");
     expect(toolbar).toBeNull();
   });
 

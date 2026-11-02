@@ -1,3 +1,5 @@
+import { days_left } from "#/routes/org.$org.$campaign/format";
+
 /** a campaign or supporter campaign the org page links to */
 export interface IGiveItem {
   kind: "campaign" | "supporter";
@@ -44,18 +46,15 @@ export interface IDonorMessage {
   message: string;
 }
 
-const DAY = 86_400_000;
-
 /** "Ends in N days" while more than a day is left, "Ends today" under that,
- * nothing once it has ended or when there is no end date. whole days elapsed,
- * not calendar days, so the server and the browser agree whatever their zones */
+ * nothing once it has ended or when there is no end date. counts days as the
+ * campaign page does, so both surfaces show one number */
 export function ends_label(ends_at: string | null, now: number): string | null {
   if (!ends_at) return null;
-  const left = Date.parse(ends_at) - now;
-  if (!(left > 0)) return null;
-  if (left < DAY) return "Ends today";
-  const days = Math.floor(left / DAY);
-  return days === 1 ? "Ends in 1 day" : `Ends in ${days} days`;
+  const days = days_left(ends_at, now);
+  if (days === null) return null;
+  if (days === 1) return "Ends today";
+  return `Ends in ${days} days`;
 }
 
 /** a card names its kind only in a mixed list; a single-kind list's heading

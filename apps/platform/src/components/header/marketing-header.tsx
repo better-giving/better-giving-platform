@@ -3,13 +3,13 @@ import { useState } from "react";
 import { href, Link, NavLink } from "react-router";
 import { DappLogo } from "#/components/image";
 import { use_session } from "#/hooks/use-session";
-import { UserAvatar } from "./user-avatar";
+import { AccountMenu } from "./account-menu";
 
 const links = [
-  { label: "Donation Processing", to: href("/product") },
-  { label: "Fund Management", to: href("/fund-management") },
-  { label: "Fiscal Sponsorship", to: href("/fiscal-sponsorship") },
-  { label: "Open Source", to: href("/open-source") },
+  { label: "Donation processing", to: href("/product") },
+  { label: "Fund management", to: href("/fund-management") },
+  { label: "Fiscal sponsorship", to: href("/fiscal-sponsorship") },
+  { label: "Open source", to: href("/open-source") },
   { label: "Pricing", to: href("/pricing") },
   { label: "About", to: href("/about-us") },
 ] as const;
@@ -31,7 +31,7 @@ export function MarketingHeader({ classes = "" }: IMarketingHeader) {
 
   return (
     <header
-      className={`${classes} relative bg-panel/95 backdrop-blur-md border-b`}
+      className={`${classes} relative bg-background/95 border-b border-hairline backdrop-blur-md`}
     >
       {/* the row carries a logo, six labels and two ctas — 944px of intrinsic
           width before a single gap, which is why the nav collapses at 75rem
@@ -58,23 +58,14 @@ export function MarketingHeader({ classes = "" }: IMarketingHeader) {
         {/* fixed cta/avatar slot: anon->avatar swap doesn't shift the nav */}
         <div className="hidden nav:flex items-center justify-end gap-3">
           {is_signed_in ? (
-            <Link
-              to={href("/dashboard")}
-              aria-label="Your dashboard"
-              className="contents"
-            >
-              <UserAvatar avatar={session?.avatar_url} classes="size-7" />
-            </Link>
+            <AccountMenu avatar={session?.avatar_url} />
           ) : (
             <>
-              <Link
-                to={href("/register")}
-                className="btn btn-primary shadow-lift-cta"
-              >
+              <Link to={href("/register")} className="btn btn-primary">
                 Join free forever
               </Link>
               <Link to={href("/login")} className="btn btn-secondary">
-                Log In
+                Log in
               </Link>
             </>
           )}
@@ -108,7 +99,7 @@ export function MarketingHeader({ classes = "" }: IMarketingHeader) {
             onClick={close}
             className="nav:hidden absolute inset-x-0 top-full h-[calc(100dvh_-_100%)] cursor-default bg-gray-12/40 backdrop-blur-sm"
           />
-          <div className="nav:hidden absolute inset-x-0 top-full bg-panel border-b border-secondary shadow-floating">
+          <div className="nav:hidden absolute inset-x-0 top-full bg-popover shadow-floating">
             <nav aria-label="Marketing" className="grid gap-1 p-4">
               {links.map((l) => (
                 <NavLink
@@ -116,20 +107,20 @@ export function MarketingHeader({ classes = "" }: IMarketingHeader) {
                   to={l.to}
                   onClick={close}
                   className={({ isActive }) =>
-                    `rounded px-4 py-2 text-sm font-medium hover:bg-secondary ${isActive ? "text-primary" : "text-gray-12"}`
+                    `rounded px-4 py-2 text-sm font-medium hover:bg-secondary-hover ${isActive ? "text-primary" : "text-gray-12"}`
                   }
                 >
                   {l.label}
                 </NavLink>
               ))}
-              <div className="my-2 h-px bg-gray-6" />
+              <div className="my-2 h-px bg-hairline" />
               {is_signed_in ? (
                 <Link
                   to={href("/dashboard")}
                   onClick={close}
-                  className="rounded px-4 py-2 text-sm font-medium hover:bg-secondary text-gray-12"
+                  className="rounded px-4 py-2 text-sm font-medium hover:bg-secondary-hover text-gray-12"
                 >
-                  My Dashboard
+                  My dashboard
                 </Link>
               ) : (
                 <>
@@ -145,7 +136,7 @@ export function MarketingHeader({ classes = "" }: IMarketingHeader) {
                     onClick={close}
                     className="btn btn-secondary"
                   >
-                    Log In
+                    Log in
                   </Link>
                 </>
               )}

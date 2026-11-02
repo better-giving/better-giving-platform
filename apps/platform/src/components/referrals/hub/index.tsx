@@ -24,13 +24,13 @@ const cards: ICard[] = [
   },
   {
     id: "2",
-    title: "Social Media Templates",
+    title: "Social media templates",
     img: { src: img2, alt: "people using gadget" },
     to: "https://intercom.help/better-giving/en/articles/11549960-referral-resource-hub-social-media-guidance-and-templates",
   },
   {
     id: "3",
-    title: "Email Templates",
+    title: "Email templates",
     img: {
       src: img3,
       alt: "man using laptop",
@@ -39,7 +39,7 @@ const cards: ICard[] = [
   },
   {
     id: "4",
-    title: "Resource Hub",
+    title: "Resource hub",
     img: { src: img4, alt: "diamond logo" },
     to: "https://intercom.help/better-giving/en/collections/13341032-referral-program-resource-hub",
   },
@@ -51,42 +51,43 @@ interface Props {
 export const Hub = ({ classes = "" }: Props) => {
   return (
     <div className={classes}>
-      <h3 className="text-2xl mb-2">Referral Hub</h3>
-      <div className={" bg-gray-3 p-6 rounded border"}>
+      <h3 className="text-2xl mb-2">Referral hub</h3>
+      <div className="card">
         <p className="mb-6">
           Your all-in-one resource for sharing Better Giving, equipping you to
           refer nonprofits, grow your network, and earn rewards smoothly.
         </p>
-        <div className="overflow-x-auto scrollbars">
-          <div className="grid grid-rows-[auto_1fr] grid-cols-5 gap-x-8 min-w-max">
+        {/* wraps rather than scrolls: five tiles are wider than a dashboard
+            column, and a scroller hides the last one past the card's edge */}
+        <div className="@container">
+          <div className="grid grid-cols-2 @xl:grid-cols-3 @4xl:grid-cols-5 gap-x-8 gap-y-6">
             {cards.map((card) => (
-              <div
-                key={card.title}
-                className="grid grid-rows-subgrid row-span-2 content-start"
-              >
+              <div key={card.title} className="grid content-start gap-y-2">
                 <Link target="_blank" to={card.to}>
                   <Image
                     src={card.img.src}
                     alt={card.img.alt}
                     width={200}
-                    className="rounded shrink-0"
+                    className="rounded w-full"
                   />
                 </Link>
 
                 <Link
                   target="_blank"
                   to={card.to}
-                  className="link mt-2 text-center font-semibold text-nowrap"
+                  className="link text-center font-semibold"
                 >
                   {card.title}
                 </Link>
               </div>
             ))}
+            {/* the fifth cell: under @xl two columns leave it alone on its
+                own row, an unlabelled tile among labelled ones */}
             <Image
               src={img5}
               alt="laira holding folder"
               height={100}
-              className="self-start h-36 object-contain grid grid-rows-subgrid row-span-2"
+              className="w-full h-36 object-contain @max-xl:hidden"
             />
           </div>
         </div>

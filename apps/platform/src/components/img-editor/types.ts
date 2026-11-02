@@ -62,4 +62,6 @@ export interface ControlledProps extends Omit<Props<any, any>, "name"> {
   classes?: Classes;
   disabled?: boolean;
   error?: string;
+  /** help text under the dropzone — what the crop does to the image shown */
+  hint?: string;
 }

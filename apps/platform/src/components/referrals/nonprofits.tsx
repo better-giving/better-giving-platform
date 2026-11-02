@@ -35,10 +35,10 @@ export function Nonprofits({ classes = "", npos }: Props) {
   });
   return (
     <div className={classes}>
-      <h2 className="text-2xl mb-4">Onboarded Nonprofits</h2>
+      <h2 className="text-2xl mb-4">Onboarded nonprofits</h2>
       {rows.length > 0 ? (
-        <div className="table-scroll bg-panel rounded">
-          <table className="min-w-full [&_th,&_td]:p-2 [&_th,&_td]:first:pl-0 [&_th,&_td]:text-left [&_tbody]:divide-y [&_tbody]:divide-gray-6 divide-y divide-gray-6">
+        <div className="table-scroll card">
+          <table className="min-w-full [&_th,&_td]:p-2 [&_th,&_td]:first:pl-0 [&_th,&_td]:text-left [&_tbody]:divide-y [&_tbody]:divide-hairline divide-y divide-hairline">
             <thead>
               <tr>
                 <th>Name</th>
@@ -50,7 +50,9 @@ export function Nonprofits({ classes = "", npos }: Props) {
           </table>
         </div>
       ) : (
-        <EmptyState>No nonprofits onboarded yet</EmptyState>
+        <div className="card">
+          <EmptyState>No nonprofits onboarded yet</EmptyState>
+        </div>
       )}
     </div>
   );

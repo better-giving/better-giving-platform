@@ -3,13 +3,13 @@ import type { TFrequency } from "@/schemas";
 import { freqs_default } from "./constants";
 
 const opt_style =
-  "group text-sm rounded px-4 py-2 border flex items-center justify-center @md/frequency:justify-start hover:not-data-[state=checked]:bg-(--form-secondary) data-[state=checked]:bg-(--form-primary) data-[state=checked]:text-primary-fg data-[state=checked]:border-none data-focus-visible:outline-2 data-focus-visible:outline-ring data-focus-visible:outline-offset-2 select-none";
+  "group text-sm rounded px-4 py-2 border border-gray-7 hover:not-data-[state=checked]:border-gray-8 flex items-center justify-center @md/frequency:justify-start hover:not-data-[state=checked]:bg-(--form-secondary) data-[state=checked]:bg-(--form-primary) data-[state=checked]:text-primary-fg data-[state=checked]:border-none data-focus-visible:outline-2 data-focus-visible:outline-ring data-focus-visible:outline-offset-2 select-none";
 
 const freqs_disp = {
-  "one-time": "Once",
-  weekly: "Weekly",
-  monthly: "Monthly",
-  annual: "Annually",
+  "one-time": "once",
+  weekly: "weekly",
+  monthly: "monthly",
+  annual: "annually",
 } as const;
 
 export function opening_frequency(

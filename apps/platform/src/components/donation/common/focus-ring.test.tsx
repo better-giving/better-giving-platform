@@ -73,7 +73,7 @@ describe("donation form controls under keyboard focus", () => {
       "switch",
       "control"
     );
-    const freq_option = item_of(screen.getByText("Give Once").element());
+    const freq_option = item_of(screen.getByText("Give once").element());
 
     // document order, so each is one forward tab run from the last
     const rings = [];

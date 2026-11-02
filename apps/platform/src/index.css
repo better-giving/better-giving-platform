@@ -40,3 +40,14 @@
 #donation-container {
   --ring: var(--form-primary);
 }
+
+/* the ground: the page fill, painted once here for every screen and never per
+   page — --background, radix's step 1, on app and marketing pages alike, so a
+   step-2 `card` sits on it by its fill and its step-6 edge. the embedded
+   donation form never takes a ground: it sits in an iframe on a nonprofit's
+   own page, so its two routes (`donate-widget.$id`, `forms.$id`) mark their
+   root `data-surfaces="embed"` and the body stays transparent to the host. on
+   body, not html, so the fill propagates to the canvas and covers overscroll. */
+:root:not(:has([data-surfaces="embed"])) body {
+  background: var(--background);
+}

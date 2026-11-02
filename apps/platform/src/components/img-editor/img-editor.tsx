@@ -1,4 +1,4 @@
-import { use_ask } from "@better-giving/ui";
+import { Image, use_ask } from "@better-giving/ui";
 import { unpack } from "@better-giving/ui/helpers";
 import { ArrowUpFromLine, Crop, Undo } from "lucide-react";
 import type React from "react";
@@ -17,7 +17,15 @@ export function ImgEditor({ ref, id, ...props }: ControlledProps) {
   const fallback_id = useId();
   const input_id = id ?? fallback_id;
   const hint_id = `${input_id}-hint`;
+  const crop_hint_id = `${input_id}-crop-hint`;
   const error_id = `${input_id}-error`;
+  const described_by = [
+    hint_id,
+    props.hint && crop_hint_id,
+    props.error && error_id,
+  ]
+    .filter(Boolean)
+    .join(" ");
   const [file, setFile] = useState<File>();
   const [drag_active, set_drag_active] = useState(false);
   const root_ref = useRef<HTMLDivElement>(null);
@@ -125,7 +133,7 @@ export function ImgEditor({ ref, id, ...props }: ControlledProps) {
       accept={props.spec.type.join(",")}
       disabled={disabled}
       aria-invalid={!!props.error}
-      aria-describedby={props.error ? `${hint_id} ${error_id}` : hint_id}
+      aria-describedby={described_by}
       onChange={(e) => {
         const files = Array.from(e.target.files ?? []);
         if (files.length) handle_files(files);
@@ -201,18 +209,22 @@ export function ImgEditor({ ref, id, ...props }: ControlledProps) {
           const files = Array.from(e.dataTransfer.files);
           if (files.length) handle_files(files);
         }}
-        className={`relative min-w-0 max-w-full ${overlay} ${styles.dropzone} group rounded border border-dashed bg-surface cursor-pointer
+        className={`relative isolate min-w-0 max-w-full ${overlay} ${styles.dropzone} group rounded border border-dashed border-gray-7 bg-surface cursor-pointer
           focus-visible:outline-2 has-focus-visible:outline-2 data-[focus-error]:outline-2 data-[drag="true"]:outline-2 outline-ring
-          hover:bg-secondary
+          hover:bg-secondary-hover
           data-[disabled="true"]:bg-gray-3 data-[disabled="true"]:pointer-events-none
           data-[invalid="true"]:border-destructive
           `}
-        style={{
-          background: preview
-            ? `url('${preview}') center/cover no-repeat`
-            : undefined,
-        }}
       >
+        {/* an <img> rather than a background so a url that fails to load
+            shows the placeholder instead of an empty box; -z-10 inside the
+            isolated dropzone keeps it under the drag/loading overlay */}
+        {preview && (
+          <Image
+            src={preview}
+            className="absolute inset-0 -z-10 size-full object-cover rounded"
+          />
+        )}
         {!preview ? (
           <div
             className="absolute-center relative grid justify-items-center text-sm text-gray-11 select-none"
@@ -273,6 +285,15 @@ export function ImgEditor({ ref, id, ...props }: ControlledProps) {
         )}
       </div>
 
+      {props.hint && (
+        <p
+          id={crop_hint_id}
+          className="text-sm text-gray-11 mt-2 min-w-0 break-words"
+        >
+          {props.hint}
+        </p>
+      )}
+
       {/* always mounted: a message raised by picking a file is announced as
           a change, which a region inserted with its text is not reliably */}
       <span
@@ -287,7 +308,7 @@ export function ImgEditor({ ref, id, ...props }: ControlledProps) {
 }
 
 const buttonStyle =
-  "text-primary-fg text-lg bg-primary hover:bg-primary/80 disabled:bg-gray-6 disabled:text-gray-11 p-2 m-1 rounded";
+  "text-primary-fg text-lg bg-primary hover:bg-primary/80 disabled:bg-gray-3 disabled:text-gray-11 p-2 m-1 rounded";
 function IconButton(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button {...props} type="button" className={buttonStyle} />;
 }

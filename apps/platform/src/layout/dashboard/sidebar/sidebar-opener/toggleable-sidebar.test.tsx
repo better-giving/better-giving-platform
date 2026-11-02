@@ -34,6 +34,7 @@ describe("ToggleableSidebar", () => {
         path: "/dashboard",
         Component: () => (
           <ToggleableSidebar
+            rootRoute="/"
             open
             linkGroups={link_groups}
             set_open={() => {}}

@@ -1,4 +1,4 @@
-import { EIN } from "@better-giving/brand";
+import { EIN, EMAILS, LEGAL_NAME } from "@better-giving/brand";
 import { ExtLink } from "@better-giving/ui";
 import { href, Link } from "react-router";
 import logo_white from "#/assets/images/bettergiving-logo-white.webp";
@@ -13,10 +13,10 @@ import { NewsletterForm } from "./newsletter-form";
 
 type Props = {
   classes?: string;
-  variant?: "full" | "minimal";
+  variant?: "full" | "minimal" | "app";
   /**
    * page-width intent of the surface above. defaults to the one each variant
-   * usually sits under — `minimal` on browse and the operator surfaces (wide),
+   * usually sits under — `minimal` on browse (wide),
    * `full` on marketing (narrow). pass it only where the page disagrees with
    * that default, which today is the npo profile: quiet chrome over a narrow
    * body.
@@ -25,14 +25,14 @@ type Props = {
 };
 
 const platform = [
-  { label: "Donation Processing", to: href("/product") },
-  { label: "Fund Management", to: href("/fund-management") },
-  { label: "Fiscal Sponsorship", to: href("/fiscal-sponsorship") },
-  { label: "Open Source", to: href("/open-source") },
+  { label: "Donation processing", to: href("/product") },
+  { label: "Fund management", to: href("/fund-management") },
+  { label: "Fiscal sponsorship", to: href("/fiscal-sponsorship") },
+  { label: "Open source", to: href("/open-source") },
   { label: "Pricing", to: href("/pricing") },
   { label: "Marketplace", to: href("/marketplace") },
   { label: "Campaigns", to: href("/campaigns") },
-  { label: "Referral Program", to: href("/referral-program") },
+  { label: "Referral program", to: href("/referral-program") },
 ] as const;
 
 const social_links = [
@@ -45,6 +45,13 @@ const social_links = [
 
 const link_cls = "text-sm text-primary-fg/90 hover:text-primary-fg";
 
+const app_links = [
+  { label: "Contact support", to: `mailto:${EMAILS.support}` },
+  { label: "Privacy policy", to: href("/privacy-policy") },
+  { label: "Donor terms", to: href("/terms-of-use") },
+  { label: "Nonprofit terms", to: TERMS_OF_USE_NPO },
+] as const;
+
 export function Footer({ classes = "", variant = "full", width }: Props) {
   const page =
     (width ?? (variant === "minimal" ? "wide" : "narrow")) === "wide"
@@ -56,8 +63,33 @@ export function Footer({ classes = "", variant = "full", width }: Props) {
   // full-bleed band and holds the vertical rhythm only — a px-* here would
   // stack a second gutter on the container inside it.
   //
-  // minimal: logged-in operator surfaces (dashboard/platform/admin) + npo profile.
-  // logo + one quiet socials row + legal bar; no nav/newsletter/mission/seal/perf-disclaimer.
+  // app: the dashboard shell (donor, npo admin, platform admin). one quiet line
+  // on the page under a hairline rule — no band, no logo, no socials. the inline gutter is the
+  // views' own (`px-4 md:px-10`), so the line starts where their content does.
+  if (variant === "app") {
+    return (
+      <footer
+        className={`${classes} border-t border-hairline px-4 py-6 md:px-10 text-sm text-gray-11`}
+      >
+        {/* spacing, not "·" separators: a wrapped line would start on a dot */}
+        <ul className="flex flex-wrap gap-x-5 gap-y-1">
+          <li>
+            © {new Date().getFullYear()} {LEGAL_NAME}
+          </li>
+          {app_links.map((l) => (
+            <li key={l.label} className="whitespace-nowrap">
+              <Link to={l.to} className="link">
+                {l.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </footer>
+    );
+  }
+
+  // minimal: browse surfaces + npo profile. logo + one quiet socials row +
+  // legal bar; no nav/newsletter/mission/seal/perf-disclaimer.
   if (variant === "minimal") {
     return (
       <footer
@@ -66,7 +98,9 @@ export function Footer({ classes = "", variant = "full", width }: Props) {
         <div
           className={`${page} flex flex-wrap items-center justify-between gap-x-6 gap-y-5`}
         >
-          <Link to={href("/")} title="Go to Home page">
+          {/* the asset carries ~12px of transparent margin at this width; the
+              offset puts the mark itself on the text edge */}
+          <Link to={href("/")} title="Go to Home page" className="-ml-3">
             <img src={logo_white} alt="Better Giving" className="w-32 h-auto" />
           </Link>
           <div className="flex flex-wrap gap-x-3.5 gap-y-1">
@@ -81,38 +115,39 @@ export function Footer({ classes = "", variant = "full", width }: Props) {
             ))}
           </div>
         </div>
-        <div
-          className={`${page} mt-6 pt-5 border-t border-primary-fg/10 flex flex-wrap justify-between gap-x-6 gap-y-2.5`}
-        >
-          <span className="text-xs text-primary-fg/90">
-            © {new Date().getFullYear()} Better Giving.
-          </span>
-          <span className="flex flex-wrap gap-4">
-            <Link
-              to={href("/privacy-policy")}
-              className="text-xs text-primary-fg/90 hover:text-primary-fg"
-            >
-              Privacy Policy
-            </Link>
-            <Link
-              to={href("/security-policy")}
-              className="text-xs text-primary-fg/90 hover:text-primary-fg"
-            >
-              Security
-            </Link>
-            <Link
-              to={href("/terms-of-use")}
-              className="text-xs text-primary-fg/90 hover:text-primary-fg"
-            >
-              Donor Terms
-            </Link>
-            <Link
-              to={TERMS_OF_USE_NPO}
-              className="text-xs text-primary-fg/90 hover:text-primary-fg"
-            >
-              Nonprofit Terms
-            </Link>
-          </span>
+        {/* the rule on an inner box: on `page` it would run through the gutter */}
+        <div className={`${page} mt-6`}>
+          <div className="pt-5 border-t border-primary-fg/10 flex flex-wrap justify-between gap-x-6 gap-y-2.5">
+            <span className="text-xs text-primary-fg/90">
+              © {new Date().getFullYear()} Better Giving.
+            </span>
+            <span className="flex flex-wrap gap-4">
+              <Link
+                to={href("/privacy-policy")}
+                className="text-xs text-primary-fg/90 hover:text-primary-fg"
+              >
+                Privacy policy
+              </Link>
+              <Link
+                to={href("/security-policy")}
+                className="text-xs text-primary-fg/90 hover:text-primary-fg"
+              >
+                Security
+              </Link>
+              <Link
+                to={href("/terms-of-use")}
+                className="text-xs text-primary-fg/90 hover:text-primary-fg"
+              >
+                Donor terms
+              </Link>
+              <Link
+                to={TERMS_OF_USE_NPO}
+                className="text-xs text-primary-fg/90 hover:text-primary-fg"
+              >
+                Nonprofit terms
+              </Link>
+            </span>
+          </div>
         </div>
       </footer>
     );
@@ -126,7 +161,8 @@ export function Footer({ classes = "", variant = "full", width }: Props) {
         className={`${page} grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.3fr]`}
       >
         <div className="grid content-start gap-4 justify-items-start">
-          <Link to={href("/")} title="Go to Home page">
+          {/* ~14px of transparent margin in the asset at this width */}
+          <Link to={href("/")} title="Go to Home page" className="-ml-3.5">
             <img src={logo_white} alt="Better Giving" className="w-36 h-auto" />
           </Link>
           <p className="text-sm/relaxed text-primary-fg/90 max-w-70 text-pretty">
@@ -202,40 +238,40 @@ export function Footer({ classes = "", variant = "full", width }: Props) {
         </div>
       </div>
 
-      <div
-        className={`${page} mt-10 pt-5 border-t border-primary-fg/10 flex flex-wrap justify-between gap-x-6 gap-y-2.5`}
-      >
-        <span className="text-xs/relaxed text-primary-fg/90 text-pretty">
-          Past performance of the Sustainability Fund is not indicative of
-          future results; all investments carry risk. ©{" "}
-          {new Date().getFullYear()} Better Giving.
-        </span>
-        <span className="flex flex-wrap gap-4">
-          <Link
-            to={href("/privacy-policy")}
-            className="text-xs text-primary-fg/90 hover:text-primary-fg"
-          >
-            Privacy Policy
-          </Link>
-          <Link
-            to={href("/security-policy")}
-            className="text-xs text-primary-fg/90 hover:text-primary-fg"
-          >
-            Security
-          </Link>
-          <Link
-            to={href("/terms-of-use")}
-            className="text-xs text-primary-fg/90 hover:text-primary-fg"
-          >
-            Donor Terms
-          </Link>
-          <Link
-            to={TERMS_OF_USE_NPO}
-            className="text-xs text-primary-fg/90 hover:text-primary-fg"
-          >
-            Nonprofit Terms
-          </Link>
-        </span>
+      <div className={`${page} mt-10`}>
+        <div className="pt-5 border-t border-primary-fg/10 flex flex-wrap justify-between gap-x-6 gap-y-2.5">
+          <span className="text-xs/relaxed text-primary-fg/90 text-pretty">
+            Past performance of the Sustainability Fund is not indicative of
+            future results; all investments carry risk. ©{" "}
+            {new Date().getFullYear()} Better Giving.
+          </span>
+          <span className="flex flex-wrap gap-4">
+            <Link
+              to={href("/privacy-policy")}
+              className="text-xs text-primary-fg/90 hover:text-primary-fg"
+            >
+              Privacy policy
+            </Link>
+            <Link
+              to={href("/security-policy")}
+              className="text-xs text-primary-fg/90 hover:text-primary-fg"
+            >
+              Security
+            </Link>
+            <Link
+              to={href("/terms-of-use")}
+              className="text-xs text-primary-fg/90 hover:text-primary-fg"
+            >
+              Donor terms
+            </Link>
+            <Link
+              to={TERMS_OF_USE_NPO}
+              className="text-xs text-primary-fg/90 hover:text-primary-fg"
+            >
+              Nonprofit terms
+            </Link>
+          </span>
+        </div>
       </div>
     </footer>
   );

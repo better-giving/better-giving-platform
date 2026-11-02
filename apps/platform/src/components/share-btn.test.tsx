@@ -12,7 +12,7 @@ async function open_menu() {
 }
 
 describe("ShareButton", () => {
-  test("opens menu showing all social links and Copy Link", async () => {
+  test("opens menu showing all social links and Copy link", async () => {
     const screen = await open_menu();
 
     await expect
@@ -53,7 +53,7 @@ describe("ShareButton", () => {
     expect(x_href).toContain(encodeURIComponent(orgName));
   });
 
-  test("Copy Link writes url to clipboard", async () => {
+  test("Copy link writes url to clipboard", async () => {
     const write_text = vi
       .spyOn(navigator.clipboard, "writeText")
       .mockResolvedValue();

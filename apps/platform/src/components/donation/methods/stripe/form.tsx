@@ -321,7 +321,7 @@ export function Form(props: TMethodState<"stripe">) {
       className={`${stack_wallets ? "" : "mt-auto "}btn btn-form-primary min-h-11`}
       type="submit"
     >
-      Continue with Card
+      Continue with card
     </button>
   );
 
@@ -378,7 +378,7 @@ export function Form(props: TMethodState<"stripe">) {
           custom_tip={
             rhf.tip_format.value === "custom" ? (
               <div className="relative w-full flex items-baseline">
-                <span className="font-bold text-2xs self-baseline text-form-primary">
+                <span className="font-bold text-xs self-baseline text-form-primary">
                   {rhf.currency.value.code}
                 </span>
                 <input

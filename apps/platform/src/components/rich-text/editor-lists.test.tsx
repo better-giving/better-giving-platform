@@ -28,7 +28,7 @@ async function render_editor(items: Item[]) {
     <RichText
       content={doc(items)}
       onChange={vi.fn()}
-      classes={{ field: "border rounded bg-surface p-3" }}
+      classes={{ field: "p-3" }}
     />
   );
   await vi.waitFor(
