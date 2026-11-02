@@ -36,6 +36,8 @@ export const meta: Route.MetaFunction = () =>
     description: `Fundraising for U.S. 501(c)(3)s. No platform fee while the optional donor contribution stays on. ${app_name} accepts cash, crypto, stock and DAF gifts, and donation records export from the dashboard.`,
   });
 
+export const handle = { markdown: true };
+
 export default function Page() {
   const { nav, data } = useRmxForm<ILeadInvalid>();
 

@@ -72,6 +72,8 @@ export const links: LinksFunction = () => [
   { rel: "preload", href: donation_form, as: "image", fetchPriority: "high" },
 ];
 
+export const handle = { markdown: true };
+
 export default function Page() {
   return (
     <main>

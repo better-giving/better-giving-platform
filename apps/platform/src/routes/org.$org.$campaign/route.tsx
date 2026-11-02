@@ -131,6 +131,8 @@ function Footer() {
   );
 }
 
+export const handle = { markdown: true };
+
 export default function Page({ loaderData, params }: Route.ComponentProps) {
   const {
     campaign,

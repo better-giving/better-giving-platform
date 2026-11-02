@@ -75,6 +75,8 @@
     "isbot": "5.1.40",
     "lucide-react": "0.562.0",
     "motion": "12.38.0",
+    "node-html-markdown": "2.0.0",
+    "node-html-parser": "6.1.13",
     "nodemailer": "9.1.1",
     "pdf-lib": "1.17.1",
     "react": "19.2.9",

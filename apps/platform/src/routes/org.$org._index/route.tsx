@@ -78,6 +78,8 @@ const LAYOUTS: Record<TOrgLayout, ComponentType<IOrgLayout>> = {
   feature: Feature,
 };
 
+export const handle = { markdown: true };
+
 export default CacheRoute(Page);
 function Page({ loaderData }: Route.ComponentProps) {
   // keyed, so the messages paged in for one org never carry to the next

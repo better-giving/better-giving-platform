@@ -41,6 +41,8 @@ const why = [
   },
 ] as const;
 
+export const handle = { markdown: true };
+
 export default function Page() {
   return (
     <main>

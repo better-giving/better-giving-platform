@@ -38,6 +38,8 @@ const stats = [
   { value: "2021", label: "serving nonprofits since" },
 ] as const;
 
+export const handle = { markdown: true };
+
 export default function Page() {
   // success is a redirect into the wizard, so the only thing that ever comes
   // back here is a failed submit
