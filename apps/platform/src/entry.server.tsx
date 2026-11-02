@@ -16,12 +16,17 @@ import { createReadableStreamFromReadable } from "@react-router/node";
 import * as Sentry from "@sentry/react-router";
 import { isbot } from "isbot";
 import type { RenderToPipeableStreamOptions } from "react-dom/server";
-import { renderToPipeableStream } from "react-dom/server";
+import {
+  renderToPipeableStream,
+  renderToReadableStream,
+} from "react-dom/server";
 import {
   type EntryContext,
   type RouterContextProvider,
   ServerRouter,
 } from "react-router";
+import { prefers_markdown } from "#/.server/markdown/negotiate";
+import { page_markdown } from "#/.server/markdown/page";
 import { redact } from "#/errors/redact";
 import { report_error } from "#/errors/report";
 import { scrub_event, scrub_url } from "#/errors/scrub-event";
@@ -70,11 +75,30 @@ export default async function handle_request(
   router_context: EntryContext,
   _load_context: RouterContextProvider
 ) {
+  const markdown = opts_into_markdown(router_context);
+  // rr re-enters with the same headers after a shell error, so Accept may
+  // already be listed
+  if (markdown) vary_on_accept(response_headers);
+  const as_markdown =
+    markdown &&
+    response_status_code === 200 &&
+    prefers_markdown(request.headers.get("accept"));
+
   if (request.method.toUpperCase() === "HEAD") {
+    if (markdown) {
+      response_headers.set(
+        "content-type",
+        as_markdown ? MARKDOWN_TYPE : "text/html"
+      );
+    }
     return new Response(null, {
       status: response_status_code,
       headers: response_headers,
     });
+  }
+
+  if (as_markdown) {
+    return render_markdown(request, response_headers, router_context);
   }
 
   return new Promise((resolve, reject) => {
@@ -128,6 +152,67 @@ export default async function handle_request(
       }
     );
   });
+}
+
+const MARKDOWN_TYPE = "text/markdown; charset=utf-8";
+
+function vary_on_accept(headers: Headers) {
+  const listed = (headers.get("vary") ?? "")
+    .split(",")
+    .some((v) => v.trim().toLowerCase() === "accept");
+  if (!listed) headers.append("vary", "Accept");
+}
+
+/** a page opts in with `export const handle = { markdown: true }` on its own route module */
+function opts_into_markdown({
+  staticHandlerContext: { matches },
+  routeModules,
+}: EntryContext): boolean {
+  const leaf = matches.at(-1);
+  const handle: unknown = leaf && routeModules[leaf.route.id]?.handle;
+  return (
+    typeof handle === "object" &&
+    handle !== null &&
+    "markdown" in handle &&
+    handle.markdown === true
+  );
+}
+
+/** the page rendered to completion (deferred data in), then its `<main>` as markdown */
+async function render_markdown(
+  request: Request,
+  headers: Headers,
+  router_context: EntryContext
+): Promise<Response> {
+  // a shell error rejects below and reaches rr's handleError; errors inside a
+  // boundary can fire before the shell resolves, so they wait for it
+  const before_shell: unknown[] = [];
+  let shell_rendered = false;
+  const stream = await renderToReadableStream(
+    <ServerRouter context={router_context} url={request.url} />,
+    {
+      signal: AbortSignal.timeout(streamTimeout + 1000),
+      // React outlines a boundary above this many bytes into a hidden div the converter strips
+      progressiveChunkSize: Number.POSITIVE_INFINITY,
+      onError(error: unknown) {
+        if (shell_rendered) report_error(error);
+        else before_shell.push(error);
+      },
+    }
+  );
+  shell_rendered = true;
+  for (const error of before_shell) report_error(error);
+  await stream.allReady;
+  const html = await new Response(stream).text();
+
+  const md = page_markdown(html, request.url);
+  if (md === null) {
+    // a page with no <main>: the html it rendered, as html
+    headers.set("content-type", "text/html");
+    return new Response(html, { status: 200, headers });
+  }
+  headers.set("content-type", MARKDOWN_TYPE);
+  return new Response(md, { status: 200, headers });
 }
 
 // react-router calls handleError for loader/action throws; report_error filters

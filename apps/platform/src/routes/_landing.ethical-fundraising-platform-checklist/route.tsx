@@ -20,6 +20,8 @@ export const meta: Route.MetaFunction = () =>
       "28 questions to ask the platform collecting donations in your nonprofit's name, drawn from the National Council of Nonprofits' Principles for Ethical Online Fundraising Platforms. Free, printable, nothing to sign up for.",
   });
 
+export const handle = { markdown: true };
+
 export default function Page() {
   return (
     <main>

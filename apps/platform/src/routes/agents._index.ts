@@ -73,6 +73,7 @@ export const loader: LoaderFunction = () =>
     headers: {
       "content-type": "text/markdown; charset=utf-8",
       "cache-control": "public, max-age=300",
+      vary: "Accept",
     },
   });
 

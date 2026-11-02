@@ -60,6 +60,8 @@ export const meta: Route.MetaFunction = ({ loaderData: d, location: l }) => {
   return [...metas({ ...shared, jsonld: project }), agents_link(base_url)];
 };
 export { ErrorBoundary } from "#/components/error";
+export const handle = { markdown: true };
+
 export default CacheRoute(Fund);
 
 const fund_status = (fund: IFund, now: Date) =>
@@ -80,7 +82,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
   const status = fund_status(fund, now);
 
   return (
-    <section className="grid pb-10 bg-gray-3">
+    <main className="grid pb-10 bg-gray-3">
       <div className="group relative page grid md:grid-cols-[3fr_2fr] gap-4">
         <div className="self-start mt-14 z-10 grid gap-4 relative">
           <div className="absolute -top-8 flex items-center justify-between w-full">
@@ -197,7 +199,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
           <Share recipientName={fund.name} url={url} classes="mt-auto" />
         </div>
       </div>
-    </section>
+    </main>
   );
 }
 

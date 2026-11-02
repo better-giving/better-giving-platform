@@ -135,6 +135,7 @@ describe("/agents MCP endpoint", () => {
     } as any)) as Response;
 
     expect(response.headers.get("content-type")).toContain("text/markdown");
+    expect(response.headers.get("vary")).toBe("Accept");
     const text = await response.text();
     expect(text).toContain("Laira skill");
     expect(text).toContain("Stripe-hosted checkout link");

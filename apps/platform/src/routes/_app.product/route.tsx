@@ -21,6 +21,8 @@ export const meta: Route.MetaFunction = () =>
       "One brandable, embeddable donation form: every gift type, express checkout, and recurring giving. No platform fee while the optional donor contribution stays on.",
   });
 
+export const handle = { markdown: true };
+
 export default function Page() {
   return (
     <main>

@@ -63,6 +63,16 @@ const api_route_ids = () =>
     .filter((e) => !/\.test\.tsx?$/.test(e.name))
     .map((e) => (e.isDirectory() ? e.name : e.name.replace(/\.tsx?$/, "")));
 
+/** operations whose route never refuses a request, so their only error is a
+ * throw's 500; the api_error-codes test below confirms they send no 4xx */
+const REFUSES_NOTHING = [
+  "list_currencies",
+  "search_tickers",
+  "search_tokens",
+  "list_top_countries",
+];
+
+type Json = Record<string, unknown>;
 const doc = openapi_doc("https://better.giving");
 type Param = { name: string; in: string; schema: unknown };
 const op_of = (id: string) => {
@@ -247,6 +257,66 @@ describe("openapi drift", () => {
     expect(ConnectorProblem.properties.error.properties.code.enum).toEqual([
       ...PROBLEM_CODES,
     ]);
+  });
+
+  test("every operation documents a 4xx and a 5xx, unless its route refuses nothing", () => {
+    for (const o of operations()) {
+      const id = o.op.operationId;
+      const classes = Object.keys(op_of(id).responses ?? {}).map((s) => s[0]);
+      expect(classes, id).toContain("5");
+      expect(classes.includes("4"), id).toBe(!REFUSES_NOTHING.includes(id));
+    }
+  });
+
+  test("every error response is a component carrying its surface's error schema", () => {
+    const { responses } = doc.components as {
+      responses: Record<string, { content: Record<string, { schema: Json }> }>;
+    };
+    for (const o of operations()) {
+      const [media, schema] = o.route.startsWith("api.")
+        ? ["application/json", "ApiError"]
+        : ["application/problem+json", "ConnectorProblem"];
+      for (const [status, res] of Object.entries(o.op.responses as Json)) {
+        if (Number(status) < 400) continue;
+        const label = `${o.op.operationId} ${status}`;
+        const $ref = (res as { $ref?: string }).$ref ?? "";
+        expect($ref, label).toMatch(/^#\/components\/responses\//);
+        const component = responses[$ref.split("/").at(-1) ?? ""];
+        expect(component?.content, label).toEqual({
+          [media]: { schema: { $ref: `#/components/schemas/${schema}` } },
+        });
+      }
+    }
+  });
+
+  test("a public operation's 4xx are the api_error codes its route sends", () => {
+    for (const o of operations().filter((x) => x.route.startsWith("api."))) {
+      const source = route_source_of(`src/routes/${o.route}.ts`);
+      const sent = [...source.matchAll(/api_error\(\s*"(\w+)"/g)]
+        .map((m) => API_ERROR_STATUS[m[1] as keyof typeof API_ERROR_STATUS])
+        .filter((s) => s < 500);
+      const documented = Object.keys(o.op.responses as Json)
+        .map(Number)
+        .filter((s) => s >= 400 && s < 500);
+      expect(documented, o.route).toEqual(
+        [...new Set(sent)].sort((a, b) => a - b)
+      );
+      // public_api_route answers any throw with the documented 500
+      expect(source, o.route).toMatch(
+        /export const loader = public_api_route\(/
+      );
+    }
+  });
+
+  test("a connector operation's handler answers a throw with its documented 500", () => {
+    for (const o of operations()) {
+      if (!o.route.startsWith("connector.v1.")) continue;
+      const source = route_source_of(`src/routes/${o.route}.ts`);
+      const handler = o.method === "get" ? "loader" : "action";
+      expect(source, `${o.method} ${o.route}`).toMatch(
+        new RegExp(`export const ${handler} = connector_route\\(`)
+      );
+    }
   });
 
   test("every $ref resolves inside the document", () => {

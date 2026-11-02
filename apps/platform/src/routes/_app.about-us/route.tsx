@@ -29,6 +29,8 @@ export const meta: Route.MetaFunction = () =>
       "Since 2021, Better Giving has offered donation forms, savings, and fund growth tools, with a simple belief: the organizations doing the work should keep the money.",
   });
 
+export const handle = { markdown: true };
+
 export default function Page({ loaderData }: Route.ComponentProps) {
   return (
     <main>

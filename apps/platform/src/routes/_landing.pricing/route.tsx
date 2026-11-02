@@ -17,6 +17,8 @@ export const meta: Route.MetaFunction = () =>
       "Fundraising with no platform fee while the optional donor contribution stays on. Turning that ask off is 1.5%. Fiscal sponsorship is 2.9% of each sponsored gift.",
   });
 
+export const handle = { markdown: true };
+
 export default function Page() {
   return (
     <main>
