@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, test, vi } from "vitest";
 import {
-  SAFE,
+  FILTERED_HEADERS,
   SECRETS,
-  vercel_request,
+  vercel_event,
 } from "#/__tests__/fixtures/sentry-request";
 
 // both entries' `Sentry.init`, captured instead of run
@@ -16,6 +16,9 @@ vi.mock("$/env", () => ({
   sentry: { dsn: "https://key@o0.ingest.sentry.io/0" },
   stage: "production",
 }));
+// what `handleError` hands on, captured instead of sent
+const report_error = vi.hoisted(() => vi.fn());
+vi.mock("#/errors/report", () => ({ report_error, report_unhandled: vi.fn() }));
 // the client entry hydrates `document` at import; nothing here to hydrate
 vi.mock("react-dom/client", () => ({ hydrateRoot: vi.fn() }));
 
@@ -70,19 +73,14 @@ function expect_scrubbing_request(options: Options) {
       | ((x: unknown, hint?: unknown) => unknown)
       | undefined;
     expect(fn, hook).toBeTypeOf("function");
-    const raw = vercel_request();
-    const out = fn!({ ...event(), request: raw }, {}) as {
-      request: ReturnType<typeof vercel_request>;
+    const out = fn!({ ...event(), ...vercel_event() }, {}) as {
+      request: { headers: unknown; cookies: unknown };
     };
     const json = JSON.stringify(out);
-    for (const secret of SECRETS)
+    for (const secret of SECRETS) {
       expect(json, `${hook}: ${secret}`).not.toContain(secret);
-    for (const name of SAFE) {
-      expect(
-        out.request.headers[name as keyof typeof raw.headers],
-        `${hook}: ${name}`
-      ).toBe(raw.headers[name as keyof typeof raw.headers]);
     }
+    expect(out.request.headers, hook).toEqual(FILTERED_HEADERS);
     expect(out.request.cookies, hook).toEqual({
       "__Secure-better-auth.session_token": "[Filtered]",
       theme: "[Filtered]",
@@ -101,10 +99,24 @@ describe("every Sentry setup strips photo upload tokens before sending", () => {
     expect_redacting(options);
     expect(options.sendDefaultPii).toBe(false);
     expect_scrubbing_request(options);
-    // the SDK never collects cookies, so the hooks are the second line for them
+    // the SDK never collects cookies or the body, so the hooks are the second line for them
     expect(options.integrations).toContainEqual({
       name: "RequestData",
-      options: { include: expect.objectContaining({ cookies: false }) },
+      options: {
+        include: expect.objectContaining({ cookies: false, data: false }),
+      },
+    });
+  });
+
+  test("the server's handleError reports the url with credential params filtered", async () => {
+    const { handleError } = await import("../entry.server");
+    report_error.mockClear();
+    handleError(new Error("boom"), {
+      request: new Request("https://bg.test/api/x?page=2&token=zz-tok-zz"),
+    });
+    expect(report_error).toHaveBeenCalledWith(expect.any(Error), {
+      method: "GET",
+      url: "https://bg.test/api/x?page=2&token=[Filtered]",
     });
   });
 
