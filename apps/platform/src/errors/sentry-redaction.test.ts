@@ -99,7 +99,7 @@ describe("every Sentry setup strips photo upload tokens before sending", () => {
     expect_redacting(options);
     expect(options.sendDefaultPii).toBe(false);
     expect_scrubbing_request(options);
-    // the SDK never collects cookies or the body, so the hooks are the second line for them
+    // the SDK must not collect cookies or the body at all; for those the hooks are the second line
     expect(options.integrations).toContainEqual({
       name: "RequestData",
       options: {

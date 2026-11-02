@@ -121,8 +121,8 @@ type RequestData = {
 
 type Breadcrumb = { data?: Record<string, unknown> };
 
-// an outgoing fetch's breadcrumb keeps its query apart from its url, raw, and
-// an API key can ride in it (finnhub's `?token=`)
+// an outgoing fetch's breadcrumb carries its raw query in `http.query`, apart
+// from its url, and an API key can ride there (finnhub's `?token=`)
 const scrub_breadcrumb = <B extends Breadcrumb>(crumb: B): B => {
   const query = crumb.data?.["http.query"];
   if (typeof query !== "string") return crumb;
@@ -132,11 +132,11 @@ const scrub_breadcrumb = <B extends Breadcrumb>(crumb: B): B => {
   };
 };
 
-/** `event` with its `request` and breadcrumbs copied so that only allowlisted
- * header values survive, no cookie value, `env` or request body does, and no
- * credential-named query parameter does in the request url, its query string,
- * the referer or an outgoing request's breadcrumb. the original event is not
- * mutated. */
+/** a copy of `event` in which only allowlisted header values survive, every
+ * cookie value is filtered, `env` and the request body are gone, and every
+ * credential-named query parameter is filtered in the request url, its query
+ * string, the referer and outgoing request breadcrumbs. the original event is
+ * not mutated. */
 export function scrub_event<
   T extends { request?: RequestData; breadcrumbs?: Breadcrumb[] },
 >(event: T): T {

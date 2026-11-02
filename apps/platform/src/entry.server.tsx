@@ -36,8 +36,8 @@ if (stage === "production") {
     tracesSampleRate: 0,
     // cookies are a session; dropping them here also drops the `cookie` header.
     // a body is a sign-in password or a donor's details. headers stay on
-    // because the SDK has no allowlist of its own, and `scrub_event` keeps the
-    // few worth having (`user-agent`, `x-vercel-id`)
+    // because the SDK keeps all of them or none, so `scrub_event` decides
+    // which values survive
     integrations: [
       Sentry.requestDataIntegration({
         include: { cookies: false, data: false },
