@@ -59,6 +59,7 @@ describe("the button size and variant sets", () => {
     "btn-destructive",
     "btn-success",
     "btn-warning",
+    "btn-inverse",
     "btn-form-primary",
     "btn-donate",
   ]);
@@ -87,6 +88,20 @@ describe("the button size and variant sets", () => {
         ? [`${file}:${n}`]
         : [];
     });
+    expect(offenders).toEqual([]);
+  });
+
+  test("a button on a brand fill is `btn-inverse`, not its fill spelled out", () => {
+    // `bg-primary-fg text-primary` beside `btn` paints the same button with no
+    // press and no ring that reads on blue, and grows a hover rung by accretion.
+    const offenders = class_values
+      .filter(({ value }) => {
+        const t = tokens(value);
+        return (
+          t.includes("btn") && t.some((x) => x.startsWith("bg-primary-fg"))
+        );
+      })
+      .map(({ file, n }) => `${file}:${n}`);
     expect(offenders).toEqual([]);
   });
 
@@ -319,13 +334,13 @@ describe("the form action row", () => {
   test("the dialog footer band is not typed out by hand", () => {
     // the band is a tinted strip with a top border, and its properties are
     // cheap to re-type by hand — the name is the only place they are authored.
-    // bare tokens on purpose: `hover:bg-gray-3` on a menu item is a different
-    // thing entirely and is not a finding.
+    // bare tokens on purpose: a `hover:bg-gray-*` on a menu item is a
+    // different thing entirely and is not a finding.
     const offenders = class_values
       .filter(({ value }) => {
         const raw = value.split(/\s+/).filter(Boolean);
         return (
-          raw.includes("bg-gray-3") &&
+          raw.includes("bg-gray-2") &&
           raw.includes("border-t") &&
           !raw.includes("actions-band")
         );

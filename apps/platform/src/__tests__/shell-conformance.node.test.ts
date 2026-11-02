@@ -3,8 +3,7 @@ import { sources_of } from "./conformance/walk";
 
 /**
  * the names sweep for the shells: the scrollbar skin, the table scroller, the
- * popup content shell, the dashboard shell and the card (and its band
- * variant). same reason as the other two sweeps — tailwind v4 is a
+ * popup content shell, the dashboard shell and the card. same reason as the other two sweeps — tailwind v4 is a
  * jit over source text, so a half-spelled skin or a re-hand-rolled shell
  * produces no error, just a surface that quietly stops matching the others.
  *
@@ -64,6 +63,8 @@ describe("the table scroller", () => {
       "apps/platform/src/components/referrals/hub/index.tsx",
       // a rebalance summary panel: paragraphs and a diff, no table
       "apps/platform/src/routes/platform.investments.rebalance/review/index.tsx",
+      // the embed snippet's code well: one line of markup, no table
+      "apps/platform/src/routes/_app.forms.$id.edit/snippet.tsx",
     ];
     const offenders = class_values
       .filter(({ file, value }) => {
@@ -124,8 +125,21 @@ describe("the popup content shell", () => {
     expect(offenders).toEqual([]);
   });
 
+  test("the header context reaches the app header through the shell alone", () => {
+    // the slot beside the logo (the npo admin's org switcher) also has a
+    // phone-width home at the top of the drawer, which only `Layout` wires.
+    // a caller handing `AppHeader` a context directly gets the desktop half
+    // and silently drops it below md.
+    const offenders = sources
+      .filter((x) => /<AppHeader\b[^>]*\bcontext=/.test(x.text))
+      .map((x) => x.file);
+    expect(offenders).toEqual([
+      "apps/platform/src/layout/dashboard/layout.tsx",
+    ]);
+  });
+
   test("the shell is defined in one place", () => {
-    expect(files_with("outline outline-gray-6")).toEqual([
+    expect(files_with("shadow-floating rounded-card p-4 z-floating")).toEqual([
       "packages/ui/src/components/popup.ts",
     ]);
   });
@@ -147,66 +161,77 @@ describe("the dashboard shell", () => {
   });
 
   test("the shell is defined in one place", () => {
-    expect(files_with("md:grid-cols-[auto_1fr] border-b")).toEqual([
-      "apps/platform/src/layout/dashboard/layout.tsx",
-    ]);
+    expect(
+      files_with("grid max-md:content-start md:grid-cols-[auto_1fr]")
+    ).toEqual(["apps/platform/src/layout/dashboard/layout.tsx"]);
   });
 });
 
 describe("the card shell", () => {
   // a card is `card`: the fill, the edge, the corner and the inset, spelled
-  // once in packages/ui/src/styles/utilities.css. hand-assembling the four is
-  // how the inset reached 30 spellings across 131 sites — every value on both
-  // sides is on-system, so nothing but this sweep separates a card from a
-  // thirty-first spelling of one.
+  // once in packages/ui/src/styles/utilities.css. hand-assembling
+  // them is how the inset reached 30 spellings across 131 sites — every value
+  // on both sides is on-system, so nothing but this sweep separates a card
+  // from a thirty-first spelling of one. a container spelled on another fill
+  // (a `bg-panel` with an edge, a corner and an inset) is not a card at all:
+  // `the surface model` in surface-conformance.node.test.ts fails it on the
+  // edge alone, inset or not.
   const utilities = sources.find(
     (x) => x.file === "packages/ui/src/styles/utilities.css"
   );
 
   test("the recipe carries the fill, the edge, the corner and the inset", () => {
-    // and nothing else: a shadow, a layout, a gap or a type size baked in here
-    // is a decision every caller then has to cancel, and `shadow-none` is not
-    // a spelling the closed --shadow-* namespace leaves available.
+    // and nothing else: radix's card is step 2 with a step-6 edge and no
+    // shadow (packages/brand/design-system.md, "Resting surfaces"). a layout,
+    // a gap or a type size baked in here is a decision every caller then has
+    // to cancel.
     const recipe = utilities?.text.match(/@utility card \{\s*@apply ([^;]*);/);
     expect(tokens(recipe?.[1] ?? "")).toEqual([
-      "bg-panel",
+      "bg-card",
+      "rounded-card",
       "border",
-      "rounded",
-      "p-6",
+      "border-hairline",
+      "p-4",
+      "md:p-6",
     ]);
   });
 
-  test("the band card is the card a rung up, and differs in nothing else", () => {
-    // on a `bg-band` ground the panel rung measures 1.004:1, so the card there
-    // goes up to --surface (packages/brand/design-system.md, "Resting
-    // surfaces"). a name of its own, because `card bg-surface` is a second
-    // fill resolved by stylesheet order.
+  test("the single-purpose card carries the same edge, and no shadow", () => {
     const recipe = utilities?.text.match(
-      /@utility card-on-band \{\s*@apply ([^;]*);/
+      /@utility solo-card \{\s*@apply ([^;]*);/
     );
-    expect(tokens(recipe?.[1] ?? "")).toEqual([
-      "bg-surface",
-      "border",
-      "rounded",
-      "p-6",
-    ]);
+    const t = tokens(recipe?.[1] ?? "");
+    expect({
+      missing: ["bg-card", "rounded-card", "border", "border-hairline"].filter(
+        (c) => !t.includes(c)
+      ),
+      shadow: t.filter((c) => c.startsWith("shadow")),
+    }).toEqual({ missing: [], shadow: [] });
   });
 
-  // the fill, edge and corner that make a surface a card. the edge accepts the
-  // step spelling too (`border-gray-6`) because that is how two thirds of the
-  // hand-assembled ones were written, and the corner accepts a side because a
+  test("there is one card for every ground", () => {
+    // the edged card reads on a `bg-band` ground as well as on the page, so
+    // the band variant was folded into it. a second name would be a second
+    // recipe to keep in step for no visible difference.
+    expect(files_with("card-on-band")).toEqual([]);
+  });
+
+  // the fill, edge, shadow and corner are still read beside `card` below: a
+  // second one there is a coin flip with the recipe's. the edge accepts the step
+  // spelling too (`border-gray-6`), and the corner a side, because a
   // half-rounded panel is still a panel.
-  const is_fill = (c: string) => c === "bg-panel";
+  const is_fill = (c: string) => c === "bg-panel" || c === "bg-card";
   const is_edge = (c: string) =>
     c === "border" ||
     /^border-[xytblr]$/.test(c) ||
     /^border-gray-\d+$/.test(c);
+  const is_shadow = (c: string) => c.startsWith("shadow-");
   const is_corner = (c: string) =>
-    c === "rounded" || /^rounded-[tblr]$/.test(c);
+    c === "rounded" || c === "rounded-card" || /^rounded-[tblr]$/.test(c);
   const is_inset = (c: string) => /^p[xytblr]?-/.test(c);
   const bare = (c: string) => c.split(":").pop() ?? c;
 
-  /** the four together, which is a card and nothing else is. */
+  /** the card's fill, its own corner and an inset: the recipe spelled out. */
   function is_hand_assembled(value: string): boolean {
     const t = tokens(value).map(bare);
     // a transient layer over the page is not a card: it is the floating
@@ -214,39 +239,40 @@ describe("the card shell", () => {
     if (t.some((c) => c === "shadow-floating" || c.startsWith("z-floating")))
       return false;
     return (
-      t.some(is_fill) &&
-      t.some(is_edge) &&
-      t.some(is_corner) &&
-      t.some(is_inset)
+      t.includes("bg-card") && t.includes("rounded-card") && t.some(is_inset)
     );
   }
 
-  test("the four spellings are a card only together", () => {
+  test("the recipe is a card only together", () => {
     // a surface with no inset has DELEGATED it and is a different shell — a
     // table shell, a `divide-y` list, an `overflow-hidden` media frame. the
     // ledger names those as real shapes, so the sweep leaves them alone, along
     // with the shells that already have a name of their own.
     const cases: [string, boolean][] = [
       ["card flex items-center gap-x-3", false],
-      ["card shadow-lift-card grid gap-6", false],
+      ["card grid gap-6", false],
       [`\${classes} md:card grid gap-2 md:gap-4`, false],
       // the named shells' own recipes, as a call site writes them
       ["page grid gap-8", false],
       ["solo-card", false],
       ["actions-band actions", false],
-      // panel-filled, but not cards
-      ["w-full border bg-panel rounded overflow-hidden", false],
-      ["bg-panel border border-gray-6 rounded divide-y divide-gray-6", false],
-      ["bg-panel text-gray-12 border rounded shadow-floating px-4 py-3", false],
-      ["size-14 border rounded object-cover bg-panel row-span-2", false],
-      // hand-assembled cards, in the spellings the tree used
-      ["bg-panel border rounded p-6 my-4 w-full", true],
-      ["rounded border border-gray-6 bg-panel p-5", true],
+      // delegated insets: a media frame, a divided list, a table shell
       [
-        "flex gap-3.5 items-start bg-panel border border-gray-6 rounded px-5 py-5",
-        true,
+        "w-full bg-card rounded-card border border-hairline overflow-hidden",
+        false,
       ],
-      [`\${classes} md:bg-panel md:border md:p-4 md:rounded`, true],
+      [
+        "bg-card rounded-card border border-hairline divide-y divide-hairline",
+        false,
+      ],
+      // a floating layer
+      ["bg-popover rounded-card shadow-floating px-4 py-3", false],
+      // a well: the control corner, not the card's
+      ["bg-panel rounded p-4", false],
+      // hand-assembled cards
+      ["bg-card rounded-card p-6 grid gap-4", true],
+      ["bg-card rounded-card border border-hairline p-6", true],
+      [`\${classes} md:bg-card md:rounded-card md:p-4`, true],
     ];
     expect(cases.filter(([v, want]) => is_hand_assembled(v) !== want)).toEqual(
       []
@@ -254,32 +280,10 @@ describe("the card shell", () => {
   });
 
   test("a card is not assembled by hand", () => {
-    // each of these carries the four spellings and is still not a card. they
-    // are exempt by file rather than by line: a card written here later would
-    // slip through, and that is the price of not naming a shape that is not
-    // one.
     const exempt = [
-      // a reorderable method row inside a form: a control, with a disabled
-      // fill and ink of its own
-      "apps/platform/src/components/donate-methods/donate-methods.tsx",
-      // a warning-edged alert block. its edge is semantic, not the card's
-      // neutral hairline
-      "apps/platform/src/pages/admin/shared/deposit-form/panel.tsx",
       // the registration layout: its inset is delegated to the two children
       // that fill its grid, and pt-8 is the shell's own top rule
       "apps/platform/src/routes/_app.register.$reg_id._steps/route.tsx",
-      // the checklist's pinned progress band — sticky chrome, not in the flow
-      "apps/platform/src/routes/_landing.ethical-fundraising-platform-checklist/checklist.tsx",
-      // a recharts tooltip body: a floating layer that says so with neither a
-      // shadow nor a z-index
-      "apps/platform/src/routes/admin.$id.donors_.$email/stewardship.tsx",
-      // a native <select>, and a control's box is components.css's
-      "apps/platform/src/routes/dashboard.donations/route.tsx",
-      "apps/platform/src/routes/platform.donation-settlements.create/form.tsx",
-      // a native color input sized with --field-size: a control's box
-      "apps/platform/src/routes/admin.$id.assets/qr-code.tsx",
-      // a role="tablist" holding its tabs at a 4px inset
-      "apps/platform/src/routes/dashboard.subscriptions/route.tsx",
       // a testimonial whose pt-24 is clearance for the avatar overlapping its
       // top edge, not an inset
       "apps/platform/src/routes/simplify-fundraising-maximize-impact/testimonials/testimonial-card.tsx",
@@ -294,7 +298,7 @@ describe("the card shell", () => {
 
   test("nothing re-spells what the card owns", () => {
     // utilities of equal specificity resolve by stylesheet source order, so a
-    // second fill, edge, corner or inset beside `card` wins or loses by where
+    // second fill, edge, shadow, corner or inset beside `card` wins or loses by where
     // it landed in the emitted sheet rather than by intent — the drift the one
     // inset exists to end.
     const exempt = [
@@ -309,17 +313,22 @@ describe("the card shell", () => {
       // something else below it, so what the surface is at the other widths —
       // an inset included — is the caller's to spell, and the two variants
       // never both apply.
-      const name = t.find((x) => x === "card" || x === "card-on-band");
+      const name = t.find((x) => x === "card");
       if (!name) return [];
-      // --surface counts as a fill here and only here: beside a card it is the
-      // band card spelled by hand, while on its own it is a control's box.
+      // --surface counts as a fill here and only here: beside a card it is a
+      // second fill, while on its own it is a control's box. a card tile's
+      // hover — `hover:border-gray-8`, the step-6 edge firming to the
+      // interactive step 8, or the older `hover:bg-panel` fill shift — never
+      // applies at rest beside the card's own.
       const bad = t
+        .filter((x) => x !== "hover:bg-panel" && x !== "hover:border-gray-8")
         .filter((x) => {
           const c = bare(x);
           return (
             is_fill(c) ||
             c === "bg-surface" ||
             is_edge(c) ||
+            is_shadow(c) ||
             is_corner(c) ||
             is_inset(c)
           );
