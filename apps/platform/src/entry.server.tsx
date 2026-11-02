@@ -24,6 +24,7 @@ import {
 } from "react-router";
 import { redact } from "#/errors/redact";
 import { report_error } from "#/errors/report";
+import { scrub_request } from "#/errors/scrub-request";
 import { sentry, stage } from "$/env";
 
 // only report from prod — preview/dev noise drowns out real signal.
@@ -33,8 +34,16 @@ if (stage === "production") {
     environment: stage,
     sendDefaultPii: false,
     tracesSampleRate: 0,
-    // the request url, breadcrumbs and messages can all carry a photo-upload token in a page's path
-    beforeSend: (event) => redact(event),
+    // cookies are a session; dropping them here also drops the `cookie` header.
+    // headers stay on because the SDK has no allowlist of its own, and
+    // `scrub_request` keeps the few worth having (`user-agent`, `x-vercel-id`)
+    integrations: [
+      Sentry.requestDataIntegration({ include: { cookies: false } }),
+    ],
+    // the request url, breadcrumbs and messages can all carry a photo-upload token in a page's path;
+    // the request's headers, cookies and query carry Vercel's proxy secrets and sessions
+    beforeSend: (event) => redact(scrub_request(event)),
+    beforeSendTransaction: (event) => redact(scrub_request(event)),
   });
 }
 
