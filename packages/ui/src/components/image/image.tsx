@@ -3,6 +3,7 @@ import {
   type ReactElement,
   type ReactNode,
   type Ref,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -25,7 +26,9 @@ export function Image({
   ...props
 }: ImageProps & { ref?: Ref<HTMLImageElement> }) {
   const ref = useRef<HTMLImageElement>(null);
-  const [is_error, setError] = useState(false);
+  // the src that failed, not a flag: a new src gets its own attempt
+  const [failed_src, set_failed_src] = useState<string>();
+  const is_error = !!props.src && failed_src === props.src;
 
   // https://legacy.reactjs.org/docs/hooks-reference.html#useimperativehandle
   useImperativeHandle<HTMLImageElement | null, HTMLImageElement | null>(
@@ -33,8 +36,28 @@ export function Image({
     () => ref.current
   );
 
+  // a src that fails before hydration fires its error event before react has
+  // attached onError, so the browser's broken-image glyph would stay. a settled
+  // image with no intrinsic width may be that failure, read after the fact — or
+  // a viewBox-only svg, which firefox reports the same way. decode() rejects
+  // only for the broken one.
+  useEffect(() => {
+    const img = ref.current;
+    const src = props.src;
+    if (!src || onError || !img) return;
+    if (!img.complete || img.naturalWidth > 0) return;
+    let live = true;
+    img.decode().catch(() => {
+      if (live) set_failed_src(src);
+    });
+    return () => {
+      live = false;
+    };
+  }, [props.src, onError]);
+
   if ((!props.src && !isSrcLoading) || is_error) {
-    return <ImagePlaceholder classes={className} />;
+    const placeholder = <ImagePlaceholder classes={className} />;
+    return render ? render(placeholder) : placeholder;
   }
 
   /**
@@ -80,7 +103,7 @@ export function Image({
           {...props}
           className={`object-contain ${commonClasses}`}
           alt={alt}
-          onError={(e) => (onError ? onError(e) : setError(true))}
+          onError={(e) => (onError ? onError(e) : set_failed_src(props.src))}
         />
       ) || (
         <img
@@ -88,7 +111,7 @@ export function Image({
           {...props}
           className={`object-contain ${commonClasses}`}
           alt={alt}
-          onError={(e) => (onError ? onError(e) : setError(true))}
+          onError={(e) => (onError ? onError(e) : set_failed_src(props.src))}
         />
       )}
     </>

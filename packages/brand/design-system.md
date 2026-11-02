@@ -8,7 +8,7 @@ the face tokens, the size/weight/leading/tracking ladders, and the shadow and
 stacking sets all sit in `packages/ui/src/styles/theme.css`. They are recorded
 here because this is the one file that says what a token is *for*, and a second
 ledger would only be a second place to go stale. See "One face, two roles, and
-four closed ladders" and "Elevation: four levels, and one treatment that is not
+four closed ladders" and "Elevation: five levels, and one treatment that is not
 a rung".
 
 Contrast figures are **APCA Lc** values (`apca-w3` 0.1.9), measured on the
@@ -28,7 +28,7 @@ Thresholds are APCA **Bronze Simple Mode**:
 | 60 | content text that is not body | labels, a filled button's label, status ink on a band, step-11 ink generally |
 | 45 | headlines (≥36px normal, ≥24px bold) and fine-detail pictograms | icons: Lucide's thin-stroke glyphs |
 | 30 | any other text (spot-readable, placeholder, disabled) and solid semantic non-text | a control boundary, the focus ring |
-| 15 | non-semantic non-text; below it, treat as invisible | separators, hairlines, table rules |
+| 15 | non-semantic non-text; below it, treat as invisible | `--hairline`, a card's edge and the lines inside it (Lc 15.5 on the card, 17.4 on the page) |
 
 Every color in the palette comes off a **generated 12-step ramp** (see "The
 ramp", below) and every semantic token is an alias onto one of its steps. No
@@ -104,67 +104,91 @@ Three properties of the generated set travel with it:
 
 ### Which step each token points at
 
-The values live in `colors.css`; this is the shape. Every one of the 42 semantic
-tokens resolves to a step (or to `#ffffff`, or to a `color-mix()` off one).
+The values live in `colors.css`; this is the shape. Every semantic token
+resolves to a step, to `#ffffff`, or to a `color-mix()` off one, and since
+2026-11-01 each neutral one sits on the step whose **Radix role** is its job
+(see "Resting surfaces").
 
 | step | blue | red | green | amber | gray |
 | --- | --- | --- | --- | --- | --- |
-| 1 | | | | | `--background` `--surface` `--sidebar` |
-| 2 | `--band` | | | | `--panel` |
-| 3 | `--secondary` | `--destructive-subtle` | `--success-subtle` | `--warning-subtle` | |
+| 1 | | | | | `--background` `--surface` `--popover` |
+| 2 | `--band` | | | | `--card` |
+| 3 | `--secondary` | `--destructive-subtle` | `--success-subtle` | `--warning-subtle` | `--panel` |
+| 4 | `--secondary-hover` | | | | |
 | 5 | `--secondary-active` | `--destructive-subtle-active` | | | |
-| 6 | | | | | `--border` |
-| 7 | | | | | *no token: the control recipes spell `gray-7` (Lc 23.8 on the page)* |
-| 8 | `--ring` | | | | |
+| 6 | | | | | `--hairline` `--border` |
+| 7 | | | | | `--input` (`.btn-secondary`'s edge spells `gray-7`) |
+| 8 | `--ring` | | | | `--input-hover` (`.btn-secondary`'s hovered edge spells `gray-8`) |
 | 9 | `--primary` | `--destructive` | `--success` | `--warning` | |
 | 10 | `--primary-hover` | `--destructive-hover` | `--success-hover` | `--warning-hover` | |
-| 11 | | `--destructive-subtle-fg` | `--success-subtle-fg` | `--warning-subtle-fg` | |
-| 12 | `--primary-deep` | | | `--warning-fg` | |
+| 11 | | `--destructive-subtle-fg` | `--success-subtle-fg` | | |
+| 12 | `--primary-deep` | | | `--warning-fg` `--warning-subtle-fg` | |
+
+`#ffffff` carries no surface any more: it is only the four `-fg` contrast inks
+and `--primary-ring`.
 
 **The gray column is empty from step 11 down, and that is the point.** Neutral
 ink has no token: `--fg`, `--card-fg`, `--popover-fg`, `--secondary-fg`,
 `--sidebar-fg` and `--muted-fg` all resolved to one of two rungs and always would,
 because every surface they sat on is light. A call site writes `text-gray-12` or
 `text-gray-11`. `--muted` went the same way: it named the disabled fill and nothing
-read it. Step 7 has no token for that same reason. Radix reserves it for a
-control's own edge, and the control recipes in
-`packages/ui/src/styles/components.css` (`.field-input`,
-`.field-input-container`, `.btn-secondary`, and `.selector-btn` through the
-`.field-input` it composes with) spend it as a bare `var(--gray-7)`. `--border`
-keeps step 6 and the separator job: dividers, panel hairlines, table rules, card
-edges. The split reaches the shared recipes only, so app call sites that spell
-`border-gray-6` on a control still draw a separator-weight edge.
+read it. Steps 7 and 8 carry one named job each, `--input` and `--input-hover`:
+a field's edge at rest and hovered. A button's edge is the same two rungs,
+spelled as the steps in `packages/ui/src/styles/components.css`, because it is
+not a field's edge.
+
+**`--input` and `--input-hover` sit on Radix's role — PM decision (2026-11-01).**
+Radix puts an interactive component's border on step 7 and its hovered,
+stronger border on step 8, and the field edge takes both. WCAG 1.4.11 asks the
+boundary that identifies an input to clear 3:1, and step 7 measures 1.48:1 on
+the card; the PM chose Radix over that figure, accepting the miss (see "Resting
+surfaces"). Fields and `.btn-secondary` now share 7 / 8.
+
+`--hairline` and `--border` are the same step doing the same job, a
+non-interactive edge. `--border` exists because the base `*` rule reads it and
+`surface-primary` rebinds it; `--hairline` is the name with a utility.
 
 `--overlay` is the one token off the solid ramp on purpose: `gray-12` at 30%,
 via `color-mix()`, for a dialog scrim.
 
 `--primary-fg` / `--destructive-fg` / `--success-fg` are `oklch(1 0 0)`: white,
 each scale's own `contrast` color. `--primary-ring` is `--primary-fg`;
-`--primary-border` is a `color-mix()` off it. The five `--sidebar-*` beyond
-`--sidebar` alias app tokens. `--form-primary` / `--form-secondary` are tenant
+`--primary-border` is a `color-mix()` off it. `--form-primary` / `--form-secondary` are tenant
 values. `--chart-1…5` are stock shadcn defaults and are **not** on the ramp.
 
 ## The accepted misses (APCA)
 
 **Radix certifies its steps in APCA.** Steps 11 and 12 are generated to hit
-Lc 60 and Lc 90 against their own scale's step 2, and the border rungs are tuned
-the same way. **The standing policy is to take Radix's pairings as generated**:
+Lc 60 and Lc 90 against their own scale's step 2 — the only contrast Radix
+guarantees. **The standing policy is to take Radix's pairings as generated**:
 asked with the measurements on the table and reaffirmed. So a figure under its
 threshold on a pair *Radix itself assigns* (an own-scale step 11 or 12 on an
 own-scale surface, or a scale's own contrast ink on its step 9) is a known
 consequence of the scale, not a mistake in the mapping.
 
-Four pairings land under their threshold and are **accepted**, not defects:
+Three pairings land under their threshold and are **accepted**, not defects:
 
 | pairing | measured | threshold | |
 | --- | --- | --- | --- |
-| control boundary `gray-7` on `--background` / `--panel` | **Lc 23.8 / 21.8** | Lc 30 | the element-border rung the shared control recipes draw; `gray-8` would clear and was declined, see "Decisions that look like bugs" |
 | `--destructive-subtle-fg` on `--destructive-subtle-active` (red-11 on red-5) | **Lc 51.7** | Lc 60 | the pressed rung of a subtle error control; transient |
 | `--warning-fg` on `--warning` (amber-12 on amber-9) | **Lc 52.1** | Lc 60 | the filled warning button's label and the checklist badge; white would be weaker still at Lc 46.4 |
-| `--warning` as a meaningful icon on `--background` / white | **Lc 39.9 / 41.8** | Lc 45 | a fill, not an icon ink: a meaningful amber glyph takes `--warning-subtle-fg` (Lc 69.3 / 71.2) |
+| `--warning` as a meaningful icon on `gray-1` / white | **Lc 39.9 / 41.8** | Lc 45 | a fill, not an icon ink: a meaningful amber glyph takes `--warning-subtle-fg` (Lc 94.2 / 96.0) |
 
-Every own-scale band pairing clears: amber-11 is Lc 62.5 on amber-3 and Lc 67.2
-on amber-2, green-11 is Lc 66.1 on green-3, and white on green-9 is Lc 74.3.
+**Borders and rings have no contrast target — PM rule (2026-11-02): follow
+Radix.** Radix sets no Lc (or WCAG) figure for steps 6–8; it assigns the job
+(6 non-interactive edge, 7 interactive edge, 8 stronger edge and focus ring) and
+that assignment is the spec. So the button, field and switch edge (`gray-7`,
+hovered `gray-8`) and the focus ring (`blue-8`) are on spec, not misses. The
+figures, for reference only (an outside WCAG audit may ask):
+
+| edge | APCA on `--card` / `gray-1` / `--panel` | WCAG 2 on `--card` / `gray-1` / `--panel` |
+| --- | --- | --- |
+| `gray-7` (`--input`, button, switch ring) | Lc 21.8 / 23.8 / 16.9 | 1.48:1 / 1.52:1 / 1.37:1 |
+| `gray-8` (`--input-hover`, button hover) | Lc 32.4 / 34.3 / 27.5 | 1.80:1 / 1.85:1 / 1.67:1 |
+| `blue-8` (`--ring`) on `--card` | Lc 42.7 | 2.24:1 |
+
+Every own-scale band pairing clears: amber-12 is Lc 87.3 on amber-3 and Lc 92.0
+on amber-2, green-11 is Lc 66.1 on green-3 (Lc 70.3 on green-2), and white on green-9 is Lc 74.3.
 
 The first row is the shape of the whole policy. Radix guarantees step 11 only
 against step **2**, so a step-11 ink degrades predictably as the surface climbs
@@ -172,7 +196,7 @@ the same scale: Lc 70.3 on red-2, 64.8 on red-3, 57.6 on red-4, 51.7 on red-5.
 Nothing is wrong at red-5; the guarantee simply ran out at red-4.
 
 **What this policy does not cover is a pairing Radix never made.** An own-scale
-ink on a *different* scale's surface, amber-11 on `gray-3` or green-11
+ink on a *different* scale's surface, amber-12 on `gray-3` or green-11
 on `--secondary` (blue-3), is the palette's own combination, and this file's rule
 applies instead: *a fill and an ink are only safe together if someone measured
 that combination*. Those figures are in the sections below; the ones under
@@ -192,15 +216,16 @@ Three rules fall out of that test, and all three are load-bearing:
 - **A `var()` alias mirrors; a `color-mix()` does not.** The test reads a literal
   `oklch(...)` declaration, and it follows a `var()` alias chain of any depth to the literal
   behind it, which is what keeps the flat twin alive now that the semantic
-  tokens are aliases onto ramp steps: 40 of the 42 get a twin; the two
+  tokens are aliases onto ramp steps: every alias gets a twin; the two
   `color-mix()`es (`--primary-border`, `--overlay`) have no literal behind them. `flat_colors.primary` is `#1e6dab` because
   the mirror resolved `var(--blue-9)`, not because anyone typed it twice.
   Anything minted as a mix is left out by rule.
 - **Adding a literal `oklch()` token to `:root` means adding its hex to
   `colors.ts` in the same commit**, or `colors.test.ts` fails: `packages/brand`
   has no build step, so the test is the whole gate. The mirror is mechanically
-  complete, not curated: that is why all 60 ramp steps, `chart_*` and `sidebar`
-  are in it despite no email using them.
+  complete, not curated: that is why all 60 ramp steps, `chart_*` and
+  the surface aliases are in it despite no email using them. The mail layouts
+  paint `gray_1`, which is also the step `background` aliases.
 - **The guard re-derives rather than imports.** `colors.test.ts` parses the CSS
   itself instead of calling the generator's parser, deliberately: a drift guard
   that imports the code it guards cannot catch a bug in that code. The cost is a
@@ -208,37 +233,164 @@ Three rules fall out of that test, and all three are load-bearing:
 
 ## Resting surfaces: what each one is for
 
+**Every neutral surface sits on its Radix step role.** Approved by the PM
+2026-11-01, replacing the 2026-10-31 model (a `gray-2` app ground, a white
+marketing ground, and a white card found by a tinted `shadow-card`). Radix's
+roles, verbatim from
+[understanding the scale](https://www.radix-ui.com/colors/docs/palette-composition/understanding-the-scale):
+
+| step | Radix's job | tokens here | what in this app |
+| --- | --- | --- | --- |
+| 1 | app background | `--background`, `--surface`, `--popover` | the page (app and marketing alike); a field's fill; every floating layer and the dialog |
+| 2 | subtle background ("card background") | `--card`, `--band` (blue) | `card`, `solo-card`, the delegated-inset shells, the `.table` shell; the dialog footer band (`actions-band`); the marketing band |
+| 3 | UI component background, normal | `--panel`, `--secondary` (blue), `gray-3` | a well inside a card; a neutral control at rest (`.btn-secondary`), a subtle badge or chip, a disabled fill |
+| 4 | hovered | `--secondary-hover` (blue), `gray-4` | a ghost control, sidebar row, tab, menu item or option under the pointer or highlighted; a goal-bar or progress track |
+| 5 | active / selected | `--secondary-active` (blue), `gray-5` | a pressed control; the current sidebar row; a checked option |
+| 6 | subtle borders on non-interactive components: sidebars, headers, cards, alerts, separators | `--hairline`, `--border` | a card's edge; the app header's and footer's rule; table row lines; dividers |
+| 7 | subtle borders on interactive components | `--input`, `gray-7` | a field's, checkbox's, radio's and select trigger's edge; `.btn-secondary`'s edge, a radio tile, a dropzone's dashed edge |
+| 8 | stronger interactive borders and focus rings | `--input-hover`, `gray-8`, `--ring` (blue) | a field's hovered edge; a button's hovered edge; a link card's hovered edge; the focus ring |
+| 9 / 10 | solid / hovered solid | `--primary` … `--warning` | filled controls |
+| 11 / 12 | low- / high-contrast text | `text-gray-11` / `text-gray-12` | ink |
+
+**The model, outside in: page → card → well → field.**
+
+- **Page**: `--background`, step 1, on every app and marketing page alike,
+  painted once as `body`'s background in platform's `src/index.css`. One ground:
+  the `data-surfaces="marketing"` split is gone, and `--ground` with it.
+- **Card**: `--card` (step 2), **a `--hairline` edge** (step 6), **no shadow**,
+  12px corners. `card` and `solo-card` carry all of it; a delegated-inset shell
+  (`bg-card rounded-card border border-hairline` with no padding) spells it,
+  and `surface-conformance.node.test.ts` fails one that doesn't. The edge is
+  what finds the card on the step-1 page (Lc 17.4) and on its own fill
+  (Lc 15.5), both over the Lc 15 a non-semantic edge needs. One card for every
+  ground: on a `--band` too. A card that is wholly a link firms its edge to
+  `gray-8` on hover (`CARD_LINK`).
+- **Well**: `--panel` (step 3) inside a card, at the control corner. One rung
+  in from the card; outside a card it is a component fill, not a box.
+- **Field**: `--surface` (step 1, one rung lighter than the card) with the
+  `--input` edge (step 7), `--input-hover` (step 8) under the pointer, and the
+  `--ring` outline focused. `.field-input`, `.field-input-container`, the date
+  fields, `FloatingInput` and the radio control's circle all draw it.
+- **Floating layer**: menu, popover, select list, hovercard, toast, the
+  marketing header's mobile panel and any pinned bar that lifts: `--popover`
+  (step 1) at the card corner with `shadow-floating`, no edge. Radix overlays
+  carry a shadow; the layer is lighter than the card it opens over.
+- **Dialog**: Radix Themes' panel plus shadow: `--popover` and
+  `shadow-floating`, behind the `--overlay` scrim. The fill is the call site's
+  (`bg-popover` on every `Modal`/`RouteModal`); the shadow is in every
+  `modal_box` tier. A dialog is a surface: a table inside it drops its shell,
+  as inside a card.
+
+**A step indicator's pending dot is step 6.** The registration stepper
+(`pages/registration/progress-indicator.tsx`) tells a complete step by its
+`--primary` dot, which carries the state alone and clears 1.4.11's 3:1 on the
+card and the page (`contrast.test.ts`). A pending dot is a marker on the
+connecting `--border` line, not the state's carrier, so it takes the line's
+step: `gray-6`, Lc 15.5 on the card, where the `gray-3` it had read at 1.08:1
+and vanished.
+
+**The field edge stays Radix's step 7 — PM decision (2026-11-01).** WCAG 1.4.11
+asks the boundary that identifies an input to clear **3:1** against what it sits
+on. Measured, WCAG 2 ratio and APCA:
+
+| field edge | on `--card` (gray-2) | on `--surface` (gray-1) | on `--panel` (gray-3) |
+| --- | --- | --- | --- |
+| **`gray-7` = `--input`** (Radix's interactive border) | **1.48:1**, Lc 21.8 | **1.52:1**, Lc 23.8 | **1.37:1**, Lc 16.9 |
+| **`gray-8` = `--input-hover`** | **1.80:1**, Lc 32.4 | **1.85:1**, Lc 34.3 | **1.67:1**, Lc 27.5 |
+| `gray-9` | 3.10:1, Lc 56.3 | 3.19:1, Lc 58.3 | 2.89:1 |
+| `gray-10` | 3.58:1, Lc 61.6 | 3.68:1, Lc 63.5 | 3.33:1 |
+
+`gray-9` is the nearest step that clears 3:1 on the card. Radix assigns step 7
+to an interactive edge and step 8 to its hovered, stronger edge; the PM chose
+Radix over the WCAG 2 figure, accepting the miss on every ground. The field is
+not identified by its edge alone: its label and placeholder name it, and its
+step-1 fill reads against the step-2 card. Do not move it to step 9 without a
+new PM call. `.btn-secondary` draws the same 7 / 8, and so does a **switch's**
+off-state ring (`gray-7`): its off state reads by the ring alone, so this miss
+carries state — accepted all the same (PM, 2026-11-01: "stay true to radix");
+`contrast.test.ts` pins it under 3:1.
+
+**Radix is the authority — PM rule (2026-11-01).** Where a Radix step role and
+a measurement (WCAG 2, APCA) or a house convention disagree, the Radix role
+wins; the miss is recorded here and pinned in `contrast.test.ts`, never fixed
+silently by moving a step. Only a new PM call moves a token off its role.
+
+**Contrast is judged in APCA, as Radix judges it — PM rule (2026-11-02).**
+Radix's only contrast guarantee is APCA: steps 11 and 12 are built to Lc 60 and
+Lc 90 against step 2 of their own scale, and its docs never cite WCAG. So the
+pass/fail in this ledger is the APCA Lc; the WCAG 2 ratios beside them are
+recorded for reference (an outside audit may ask for them), not as the gate.
+Re-running Radix's own generator (`generate-radix-colors.tsx`, radix-ui/website)
+with the inputs above reproduces all 60 steps exactly, and stock slate and blue
+measure the same step-7/8 edges and step-8 ring as ours — the faint edges are
+Radix's design, not a custom ramp.
+
+**The focus ring stays Radix's step 8 — PM decision (2026-11-01).** `--ring` (`blue-8`) is
+Lc 42.7 on the card, clear of APCA's Lc 30, and **2.24:1** on the card in WCAG 2
+terms (2.30:1 on the page), under the 3:1 1.4.11 asks of a state indicator.
+Radix assigns step 8 to the ring; the PM chose Radix over the WCAG 2 figure, accepting the miss (APCA clears it). Do not move it to step 9 without a new PM call.
+
+**Steps that were off role before this, now moved** (for the next reader
+diffing against history): the page was `gray-2` (now 1); the card was white
+above the ramp (now 2); a well was `gray-2` (now 3); `--hairline` was `gray-3`,
+a fill step read as a line at Lc 0.0 on white (now 6); the field edge was
+`gray-7` and stayed there (it sat on `gray-9` for 1.4.11 until the PM decision
+above); a ghost hover was `blue-3`, the resting
+rung (now `gray-4`); the sidebar's current row was ink alone (now `blue-5`);
+`actions-band` was `gray-3` (now 2); a goal-bar track `gray-3` (now 4).
+
+A **data table** is a card with its inset delegated: `.table`
+(`packages/ui/src/styles/components.css`) carries `--card`, a `--hairline`
+edge and `rounded` (the 6px control corner — a 12px curve clipped the header
+row's end labels; PM, 2026-11-02) itself. Its header row is a well on that
+fill, `--panel` (gray-3) under `gray-11` medium ink, so the labels read apart
+from the rows; row lines are `--hairline`. In a `table-scroll` the scroller
+carries the shell instead, and its overflow rounds the table's corners. Inside a `card` or
+a dialog both drop it and are that surface's content: never a card in a card.
+
 Every token here is a **fill**, and its `-fg` is the only ink authored for it.
-The neutral surfaces are gray steps; `--band` (`blue-2`) and `--secondary`
-(`blue-3`) are tints of the brand hue and not the brand color itself: `--primary`
-is the brand action color. The two blues split a ground from an element: see
-"the tint ladder" below.
+`--band` (`blue-2`) and the `--secondary` rungs (`blue-3/4/5`) are tints of the
+brand hue and not the brand color itself: `--primary` is the brand action color.
+See "the tint ladder" below.
 
-| token | what it is |
-| --- | --- |
-| `--background` | the page itself: `gray-1`, `#fbfcfe`. The page ground is **not** `#ffffff`, and every contrast figure in this file is measured against the real ground rather than white. `--surface` is set to this same value on purpose; see "decisions that look like bugs". Ink is `text-gray-12`; there is no `--fg` |
-| `--panel` | every container lifted off the page, in the flow or over it: panel, tile, table shell, row, and the transient layers too (menu, combobox and select list, dialog, toast). Radix files all of them under one rung and so does this. `gray-2`, one step below the page, so a panel reads by its fill *and* its `--border`; that matters because the border alone is Lc 17.4. Splitting a floating layer back out later is a grep |
-| `--surface` | the fill a form control carries: Radix's `--color-surface`. `gray-1`, so on a `--panel` it sits one step *lighter* than its container, which is the direction Radix uses and the only one available: step 1 is the lightest rung there is. On the bare page it is fill-identical and reads by its border alone. Not fields only: `.btn-secondary` and the file dropzone rest here too, for the same reason: a control is a control wherever it sits. One container rests here as well: a card on a `--band`, spelled `card-on-band`; see "On a band, a container goes up" below |
-| `--overlay` | the scrim a dialog lays over the page: `gray-12` at 30%, via `color-mix()`. The token is what stops a backdrop being picked by eye. It is the whole of the `modal` level's color: that level carries no shadow, so the scrim and the stacking step are what define it; see "Elevation". **Every backdrop in the app spells it** (the sites are listed under "Dialogs carry no shadow"). `apps/docs` spells it too, in the embed playground's `<dialog>`: that page is our own docs chrome around an embedded form, not a stand-in for a customer's site. The one backdrop outside this token is `demo-nonprofit`'s, and only because that whole page impersonates a fictional nonprofit's website: a system token there would stop it demonstrating the one thing it is for |
-| `--secondary` | second-tier action, plus chips and tags. The button does **not** rest on it: `.btn-secondary` rests on `--surface` with a `--border` (it is a control, and `--surface` is the fill a control carries) and takes `--secondary` (`blue-3`) on hover and `--secondary-active` (`blue-5`) pressed. So `--secondary` is a *state* fill for the button and a *resting* fill for chips: check which one you are in before assuming its ink. Ink is `text-gray-12` |
-| `--band` | the alternating full-bleed section on the marketing pages, and the far stop of the hero's `--background` → tint gradient. `blue-2`, the ramp's page-level subtle ground: **not** a UI element, and nothing hovers it. It is a *lighter* rung than `--secondary`, so every ink figure recorded below against `blue-3` is a floor for this band, not a ceiling |
-| `--sidebar-*` (6 tokens) | the dashboard sidebar's own set, so the nav chrome can diverge from the page without touching app tokens. It currently does not: `--sidebar` is `gray-1`, equal to `--background`, and the other five alias `--primary` / `--primary-fg` / `--secondary` / `--border` / `--ring`. Its two `-fg` twins went with the rest of the neutral ink. One call site today (`bg-sidebar` in `layout/dashboard/sidebar/sidebar.tsx`) |
+| token | step | what it is |
+| --- | --- | --- |
+| `--background` | gray-1 | the page, app and marketing. Ink is `text-gray-12` (Lc 101.5) / `text-gray-11` (Lc 77.7). `bg-background` is the page tone for a pinned header that has to blend with the page once stuck |
+| `--card` | gray-2 | the in-flow container. `text-gray-12` Lc 99.5, `text-gray-11` Lc 75.8, `--primary` Lc 73.2 |
+| `--panel` | gray-3 | a **well** inside a card. `text-gray-12` Lc 94.6, `text-gray-11` Lc 70.9. A `bg-panel` at `rounded-card`, at the card's inset or with a lift is a container on the wrong step, and `surface-conformance.node.test.ts` fails it |
+| `--popover` | gray-1 | the floating fill: menu, popover, select list, hovercard (and its arrow), toast, dialog |
+| `--hairline` | gray-6 | the edge of something you can't operate: a card's outline, the header and app-footer rule, table rows, dividers. Lc 15.5 on the card, 17.4 on the page. `border-hairline` / `divide-hairline` |
+| `--border` | gray-6 | what a bare `border` draws (the base `*` rule), rebound by `surface-primary` inside a brand fill. The same job as `--hairline`; a control drawn with a bare `border` is on the wrong step (a screen-walk item) |
+| `--input` / `--input-hover` | gray-7 / gray-8 | a field's, checkbox's, radio's and select trigger's edge, at rest / hovered. `border-input`, `hover:border-input-hover`. Radix's interactive-border role; Radix sets no contrast target for edges, so on spec (PM rule 2026-11-02), figures under "The accepted misses" for reference |
+| `--surface` | gray-1 | the fill a form control carries: Radix's `--color-surface`. One rung lighter than the card, so a field reads as set into it, and off a well by fill too. Not `.btn-secondary`, which rests on `gray-3` |
+| `--overlay` | gray-12 at 30% | the scrim a dialog lays over the page, via `color-mix()`. **Every backdrop in the app spells it** (the sites are listed under "Dialogs: panel plus shadow"). `apps/docs` spells it too, in the embed playground's `<dialog>`: that page is our own docs chrome around an embedded form, not a stand-in for a customer's site. The one backdrop outside this token is `demo-nonprofit`'s, and only because that whole page impersonates a fictional nonprofit's website |
+| `--secondary` / `-hover` / `-active` | blue-3 / 4 / 5 | the tinted component at rest / hovered / selected: a tinted chip rests on 3, a tinted option or nav row hovers at 4 and is selected at 5. Ink is `text-gray-12` (Lc 90.6 on 4, 84.6 on 5) |
+| `--band` | blue-2 | the alternating full-bleed section on the marketing pages, the far stop of the hero's `--background` → tint gradient, and **the closing CTA band** (`CtaBand` in `pages/@sections/cta-band.tsx`). A page-level subtle ground: nothing hovers it. A card on it is the plain edged `card` |
 
-**On a band, a container goes up.** The `--panel` rule above assumes the ground
-is the page. `--band` is `blue-2`, the *same rung* as `--panel` in another hue,
-so going down a step from it lands nowhere: a panel on a band measures
-**1.004:1**, against **1.029:1** for a panel on the page, and reads as a
-same-value patch rather than an object. On a tinted ground a container
-separates by going **up**, to `--surface` (`gray-1`): **1.033:1** on a band,
-marginally more than a panel gets on the page. That is the `card-on-band`
-utility, `card` with its fill swapped and nothing else; a card that delegates
-its inset (the blog's media-framed post card) swaps `bg-panel` for `bg-surface`
-the same way. Not `#ffffff` (1.060:1): `gray-1` is this system's white, for the
-reason given under `--background`. The hairline does not rescue a panel here
-either: `border-gray-6` is 1.36:1 on the page and only **1.318:1** on a band,
-so on the one ground where the fill contributes nothing the edge is at its
-weakest. No sweep catches a panel on a band: the band usually arrives through a
-`classes` prop, so the pairing is not visible in any one file.
+**The closing band is light so the footer reads as the page end.** The marketing
+footer is `surface-primary`; a `surface-primary` CTA band directly above it merged
+with it into one blue slab and the page had no visible end. The band is `bg-band`
+with a `border-hairline` top rule (it often follows another `bg-band` section),
+ink text, `btn-primary` for the ask and `btn-secondary` for the second action:
+neither `btn-inverse` nor `btn-outline`, which belong on a brand fill. A route's
+own bottom CTA that sits directly above the footer follows the same rule.
+
+**The dashboard nav sits on the page.** `--sidebar` was deleted with the
+2026-10-31 model and stays deleted: the desktop sidebar's links have no fill at
+rest, hover at `gray-4`, and the current row is `--secondary-active` (`blue-5`)
+with `gray-12` ink (Lc 84.6). The mobile drawer is a dialog and carries
+`bg-popover` like every other one.
+
+**The embedded donation form takes the model but not the ground.** The
+`donate-widget.$id` and `forms.$id` routes render inside an iframe on a
+nonprofit's own page, so they mark their root `data-surfaces="embed"` and the
+ground rule skips them: the page behind the form stays the host's. Inside, the
+form is the card with its fields like everywhere else; the widget's outer box
+keeps a `border` at its call site (`donate-widget.$id/content.tsx`), because
+the host page's colour is unknowable.
+
+**Emails keep `gray-1`.** The two mail layouts paint `flat_colors.gray_1`,
+which is now the app's page step too.
 
 ## Fill or ink: the distinction that causes the most drift
 
@@ -252,8 +404,9 @@ steps are 11 and 12. A semantic token that names a fill (`--primary`,
 be legible as text is a measurement, not a licence.
 
 Every figure below is measured against `--background` (`gray-1`), the real page
-ground. `--panel` sits a rung lower at `gray-2`, so these are a ceiling for
-ink on a panel, not its value. Panel figures, where measured, are in each
+ground. `--card` sits a rung lower at `gray-2` and `--panel` two rungs lower at
+`gray-3`, so these are a ceiling for ink on a card or a well, not its value.
+Card figures, where measured, are in each
 token's own section: `--success-subtle-fg`, `--destructive-subtle-fg` and
 `--warning-subtle-fg` below, and `--destructive` under "The rule only closes
 when one element carries both".
@@ -274,7 +427,7 @@ when one element carries both".
 Icons are Lucide. A *meaningful* icon (one carrying information no adjacent text
 carries) is a fine-detail pictogram, since Lucide draws in thin strokes, and
 needs Lc 45. `stroke-warning` on the page at Lc 39.9 does not qualify: give it
-`--warning-subtle-fg` (Lc 69.3). A decorative icon beside a text label is exempt.
+`--warning-subtle-fg` (Lc 94.2). A decorative icon beside a text label is exempt.
 `stroke-success` at Lc 67.0 clears Lc 45, so a green glyph is fine.
 
 ## The pair rule
@@ -305,7 +458,7 @@ call-site edit to notice. Use an authored pair wherever one exists.
 | pair | what it is |
 | --- | --- |
 | `--destructive-subtle` / `--destructive-subtle-fg` | error panel, banner, or row that carries error copy, not a filled control |
-| `--warning-subtle` / `--warning-subtle-fg` | warning band, same shape |
+| `--warning-subtle` / `--warning-subtle-fg` | warning band, same shape; `Badge`'s `warning` tone |
 | `--success-subtle` / `--success-subtle-fg` | success band, same shape: confirmation panel, `completed`/`active` status pill, badge |
 | `--destructive-subtle-active` | **fill only.** The pressed rung of a control whose hover is `--destructive-subtle`; its ink stays `--destructive-subtle-fg` |
 
@@ -330,8 +483,8 @@ sites**: check for these before assuming a band is a one-line fix:
   `text-destructive` on the child. Inheritance does not rescue it: between two same-layer color utilities
   the winner is **stylesheet order, not attribute order**, so a
   `text-destructive-subtle-fg` container loses to the child's own utility. And the
-  child cannot simply switch: `Usd` also renders on `--panel`, where
-  `--destructive` passes at Lc 72.2. The combination measures Lc 63.1 and clears
+  child cannot simply switch: `Usd` also renders on a card, where
+  `--destructive` passes at Lc 72.2 (Lc 67.3 in a well). The combination measures Lc 63.1 and clears
   Lc 60, which changes the urgency and not the shape: the pair is still open,
   nothing measures it, and the case wants a variant rather than a swap.
 - **The tint is an interaction state with two rungs** (one site).
@@ -387,10 +540,15 @@ control hovers into either. When one does, it is `amber-5` / `green-5`, the same
 
 The band that keeps `bg-<token>/10 text-<token>` out of the success case.
 Surface `green-3`, ink `green-11`. **Measured: Lc 66.1 ink on `--success-subtle`
-(the pairing Radix itself assigns); Lc 70.0 on `--panel` and Lc 72.0 on
-`--background`, Lc 70.3 on the `green-2` band, Lc 65.1 on `gray-3`,
+(step 11 on step 3, clear of the Lc 60 content threshold); Lc 70.0 on `--card` and Lc 72.0 on
+`--background`, Lc 65.1 on `gray-3`,
 Lc 65.8 on `--secondary`, Lc 55.1 on the `blue-5` pressed rung;
 `gray-12` on the band is Lc 95.7, so it also takes neutral body copy.**
+Step 3 because it is Radix's component background: on `green-2` the band sat on
+the `gray-2` card at 1.005:1, so a success `Badge` or active pill had no visible
+fill. The WCAG 2 figure for the ink on it is 4.45:1, just under 4.5:1 — recorded
+for reference, not the gate (Radix is the authority, PM rule 2026-11-01), and
+`contrast.test.ts` pins it under 4.5:1 so a step move is a new decision.
 
 The three cross-scale figures in that list (green ink on a gray or blue surface)
 are **not** covered by the accepted-misses policy, which only speaks for
@@ -441,7 +599,7 @@ vanish:
 | ink on a `--primary` fill | measured | |
 | --- | --- | --- |
 | `--destructive-subtle-fg` | **Lc 0.0** | invisible |
-| `--warning-subtle-fg` | **Lc 0.0** | invisible |
+| `--warning-subtle-fg` | **Lc 17.1** | under any text threshold |
 | `--success-subtle-fg` | **Lc 0.0** | invisible |
 | `--success` | **Lc 0.0** | invisible; was live on the `Check` beside the footer newsletter's success message, now `--primary-fg` |
 | `--warning` | **Lc 34.8** | under the Lc 60 its copy needs; was live on the footer newsletter's field error, now `--primary-fg` |
@@ -508,7 +666,7 @@ accretion: a rung that carries text is a value someone has to measure.
 
 ### `--destructive-subtle` / `-fg`
 
-Surface `red-3`, ink `red-11`: **Lc 64.8** ink on surface, Lc 70.3 ink on `--panel`,
+Surface `red-3`, ink `red-11`: **Lc 64.8** ink on surface, Lc 70.3 ink on `--card`,
 Lc 65.4 on `gray-3`, Lc 66.1 on `--secondary`. All three authored bands clear
 Lc 60 on their own pairing as generated.
 
@@ -523,36 +681,40 @@ Warning takes the **pair** shape rather than a lone ink token, because the app
 tints warning bands in several places and has no legible warning text color at
 all. Unlike destructive, where `--destructive` is a legible ink on the page and
 `-subtle-fg` is the tighter ink for the tint, `--warning` is legible nowhere, so
-**`--warning-subtle-fg` is *the* warning ink everywhere**, including on `--panel`
+**`--warning-subtle-fg` is *the* warning ink everywhere**, including on `--card`
 and `--background`. One value, one name; a second name for the same value would
 be a drift trap the test cannot catch. Green has the same shape (see
 `--success-subtle`), which leaves red as the one hue with a fill that also reads
 as text.
 
-`--warning-subtle-fg` is `amber-11`, `#ac6500`. **It is the tightest ink in the
-palette: it clears Lc 60 on every resting surface and misses on the pressed
-`blue-5` rung**, measured:
+`--warning-subtle-fg` is `amber-12`, `#4f3515`, **and clears every surface it
+lands on, the pressed `blue-5` rung included**, measured:
 
 | on | Lc | |
 | --- | --- | --- |
-| `--background` | Lc 69.3 | |
-| `--panel` | Lc 67.4 | |
-| the `amber-2` band | Lc 67.2 | Radix's own pairing |
-| `--secondary` (blue-3) | Lc 63.2 | cross-scale; the palette's own pairing |
-| `gray-3` | Lc 62.5 | cross-scale |
-| `--warning-subtle` (amber-3) | Lc 62.5 | Radix's own pairing; the tightest band in the system |
-| `--secondary-active` (blue-5) | **Lc 52.5** | cross-scale; under Lc 60 |
+| `--background` | Lc 96.0 | |
+| `--card` | Lc 92.2 | |
+| the `amber-2` band | Lc 92.0 | |
+| `--secondary` (blue-3) | Lc 88.0 | cross-scale; the palette's own pairing |
+| `gray-3` | Lc 87.3 | cross-scale |
+| `--warning-subtle` (amber-3) | Lc 87.3 | 9.98:1 by WCAG 2 |
+| `--secondary-active` (blue-5) | Lc 77.3 | cross-scale |
 
-The two amber-on-amber rows are the ramp's own assignments and stand under the
-standing policy. The rest are cross-scale (amber ink on a grey or blue
-surface) and are what "measure the combination" means in practice: those are
-pairings the palette makes, not ones Radix generated.
+It was `amber-11` (`#ac6500`) until 2026-10-31, the ramp's own band ink: Lc 62.5
+on the band and 4.00:1 by WCAG 2, under the 4.5:1 small warning copy needs, and
+`amber-2` under it only reached 4.30:1. So the band keeps `amber-3` and the ink
+takes step 12, the same step as `--warning-fg`. The two names stay distinct
+roles over one step, each `var(--amber-12)`, so they cannot drift apart:
+`--warning-fg` is the label on the `--warning` fill, `--warning-subtle-fg` the
+warning ink on everything else. `contrast.test.ts` pins the 4.5:1.
 
-`--warning-fg` (`amber-12`) is the scale's other ink and clears every surface
-here (Lc 94.2 on the page, Lc 87.3 on the warning band) but it is authored as
-the label for the `--warning` **fill**, and which ink a band carries is a palette
-decision, not a call-site one. Warning copy takes `--warning-subtle-fg` today,
-with the figures above.
+**`Badge` carries it as the `warning` tone** (`packages/ui/src/components/badge.tsx`):
+`bg-warning-subtle text-warning-subtle-fg`, Lc 87.3 / 9.98:1, so a 12px pill
+label clears 4.5:1 with room. A warning chip reaches it through `Badge`, never by
+spelling the pair. The two warning surfaces that are *not* this stay as they are:
+the checklist's filled chip (`--warning-fg` on `--warning`, the accepted Lc 52.1
+miss above) and the dot-plus-ink status lines (`stripe-connect/status.tsx`,
+payouts, applications), which draw no chip at all.
 
 ### `--primary-deep`: the dark brand ground, and the scrim
 
@@ -604,33 +766,35 @@ The hero it grounds (`routes/unlock-us-donations/hero.tsx`) carries the token
 at all five sites. A hero ground is a palette value, and this is where it is
 named.
 
-## The tint ladder: `--band`, `--secondary`, `--secondary-active`
+## The tint ladder: `--band`, `--secondary`, `--secondary-hover`, `--secondary-active`
 
-Three rungs of the blue ramp, one job each (the retired `--accent` did all three at one
-value):
+Four rungs of the blue ramp, one Radix job each (the retired `--accent` did all
+of them at one value):
 
 | rung | token | job |
 | --- | --- | --- |
-| `blue-2` | `--band` | a page-level GROUND: the full-bleed marketing section, the hero gradient's far stop. Nothing hovers it |
-| `blue-3` | `--secondary` | a UI ELEMENT: a tinted panel or chip at rest, and the hover fill of an element whose resting state is transparent (`.btn-ghost:hover`, a toolbar button, a list row) |
-| `blue-5` | `--secondary-active` | that element SELECTED or pressed (`.selector-opt[data-state="checked"]`) |
+| `blue-2` | `--band` | a page-level subtle GROUND: the full-bleed marketing section, the hero gradient's far stop. Nothing hovers it |
+| `blue-3` | `--secondary` | a tinted UI element at rest: a chip, a subtle badge, an image placeholder |
+| `blue-4` | `--secondary-hover` | that element hovered, and a tinted row resting transparent under the pointer or highlighted (`.selector-opt`, the select/combobox option, the marketing mobile nav, a dropzone) |
+| `blue-5` | `--secondary-active` | that element SELECTED or pressed: a checked option, a checked radio tile, the current sidebar row |
 
-**`blue-4` is deliberately unclaimed.** It is the ramp's hover rung for an element
-that *rests* on `blue-3`; nothing in the app does: every hoverable thing here
-rests transparent or on `--panel`, and the ramp's own rule is that such an element
-hovers to step 3. A declared token with no consumer is drift bait, so it is left
-undeclared until something rests on the tint.
+**`blue-4` is claimed as of 2026-11-01.** It was left undeclared while every
+hover in the app went to step 3, the resting rung, on the ramp's
+transparent-element allowance; the PM's Radix alignment puts every hover on 4,
+so the token now has its consumers. The neutral twin is `gray-3 / 4 / 5`, spelled
+as steps.
 
 The band job constrains the lighter rung: a resting band carries de-emphasised
 body copy, so `gray-11` on it has to hold its Lc 60. It measures **Lc 71.5** on
 `blue-3`; `--band` is a lighter step than that, so the band clears by more than
-the figure recorded here. On the pressed rung (`blue-5`) `gray-11` falls to
-Lc 60.9, which is a transient state and not a band.
+the figure recorded here. On the hover rung (`blue-4`) `gray-11` is Lc 66.9 and
+on the selected rung (`blue-5`) Lc 60.9; selected rows take `gray-12`
+(Lc 84.6) for that reason.
 
 Neither tint carries brand hue as a resting fill beyond that. Brand action color
 is `--primary`.
 
-## Elevation: four levels, and one treatment that is not a rung
+## Elevation: five levels, and one treatment that is not a rung
 
 Its values are **not** in
 this package: the shadow tokens and the stacking steps live in
@@ -641,25 +805,25 @@ that is neither an `oklch()`, a `var()` alias, a `color-mix()` nor a plain
 length. A shadow there would take the email mirror down with it. Only the scrim
 color, `--overlay`, is a color and stays in the palette.
 
-**Depth is scarce here on purpose: the app is flat.** A card does not lift. The
-fill ladder already separates a container from the page by going *down*
-(`--panel` is `gray-2`, one rung below `--background`), and a shadow separates by
-going up, so spending both on one object says the same thing twice. Depth is
-reserved for what genuinely hovers over content.
+**Depth is scarce here on purpose: the app is flat in the flow.** A card has no
+shadow: Radix finds it by its step-2 fill and its step-6 edge (see "Resting
+surfaces"). Real depth is reserved for what genuinely sits over content: a
+floating layer and a dialog are `--popover` (step 1) with `shadow-floating`,
+lighter than the card they open over and lifted off it.
 
 The set is closed and small. `--shadow-*` and `--inset-shadow-*` are reset to
 `initial`, so a call site has these names and nothing else.
 
 | level | what sits here | shadow | stacking |
 | --- | --- | --- | --- |
-| `flush` | the document flow, and most of the product: card, panel, table shell, row, form control. Separates by its `--panel` fill and its `--border` edge | none, and **no token**, see below | none |
-| `floating` | hovers over content, transient, no scrim: menu, dropdown, combobox and select popup, tooltip, hovercard, toast, and pinned page chrome once it is stuck | `shadow-floating` | `z-floating` for a popup; pinned chrome keeps `z-sticky` / `z-subbar` |
-| `modal` | covers the page behind a scrim: dialog, drawer, route-modal | **none, by decision**, see below | `z-scrim` on the backdrop, `z-modal` on the panel |
+| `flush` | the document flow: a card, and inside it a well, a row, a form control. A card separates by its `--card` fill and `--hairline` edge, a well by its `--panel` fill, a control by its `--input` edge | none, and **no token**, see below | none |
+| `floating` | hovers over content, transient, no scrim: menu, dropdown, combobox and select popup, tooltip, hovercard, toast, and pinned page chrome once it is stuck. `bg-popover` + `rounded-card`, no edge | `shadow-floating` | `z-floating` for a popup; pinned chrome keeps `z-sticky` / `z-subbar` |
+| `modal` | covers the page behind a scrim: dialog, drawer, route-modal. `bg-popover` + `rounded-card` (the drawer is square: it is pinned to the edge) | `shadow-floating`, from `modal_box`; see below | `z-scrim` on the backdrop, `z-modal` on the panel |
 | recessed track | a track a control sits *in*: slider track, progress bar, switch control | `inset-shadow-track` | none |
 | recessed fill | the fill that rides raised inside that track | `shadow-track-fill` | none |
 
 Two names sit outside that table on purpose and are described below: the
-**marketing lift** (`shadow-lift-card` / `-cta` / `-media`), a treatment held
+**marketing lift** (`shadow-lift-media`), a treatment held
 apart from the rungs, and `shadow-handle`, a legibility affordance that is not a
 level at all.
 
@@ -677,13 +841,19 @@ namespace closed there is nothing left in the app for it to switch off but a
 named level, and a level that has to be cancelled at its own call site is the
 wrong level for that call site. The sweep treats it as a stock name.
 
-### Dialogs carry no shadow, and that is the decision
+### Dialogs: panel plus shadow
 
-The heaviest layer in the app is the flattest one. **The scrim is what separates
-a dialog from the page**, and a shadow laid on top of an already dimmed page is
-decoration that no reader can attribute to a state. So `modal` is defined by
-`--overlay` and its two stacking steps, and there is deliberately no
-`--shadow-modal` to reach for.
+Decided 2026-11-01, following Radix Themes, whose dialog is its panel colour
+with a shadow: a dialog here is `bg-popover` (step 1) and `shadow-floating`.
+It reverses the 2026-10-31 "modal carries no shadow" call, which rested on the
+dialog sharing the card's white fill; with the card on step 2, the dialog is
+the one lighter surface on the screen and the shadow is what seats it over a
+scrim-dimmed page that still shows cards through it. There is still no
+`--shadow-modal`: the floating rung is the one shadow a layer over the page
+carries, and every `modal_box` tier (`packages/ui/src/helpers/modal-box.ts`)
+spends it, so no call site writes one. The fill stays the call site's
+(`modal_box` is geometry and elevation only, so it never fights a call site's
+surface).
 
 Every backdrop in the app spells `bg-overlay`: the four `Dialog.Backdrop`
 sites, the dashboard drawer (which is a `Modal size="none"` and takes the house
@@ -696,16 +866,20 @@ puts copy over an image. Neither is reachable from the other's name.
 
 ### The marketing lift is named apart, and that is the point
 
-The blue-tinted glow on the marketing pages is deliberate and it stays, as its
-own name, outside the general set. Naming it apart is precisely what stops the
-app picking it up by accident: there is no rung of the elevation ladder it can
-be reached through, so an app card cannot acquire a brand glow by asking for
-depth.
+The glow on a photograph is deliberate and it stays, as its own name,
+outside the general set (a solid control, a hero call to action included,
+carries no shadow). Naming it apart is precisely
+what stops the app picking it up by accident: there is no rung of the
+elevation ladder it can be reached through.
+
+**A marketing card does not lift.** `shadow-lift-card` and then the
+blue-tinted `shadow-card` that replaced it are both deleted: a marketing card
+writes `card` like every other card and is found by its edge. With the
+namespace closed a stray name compiles to nothing, so
+`elevation-conformance.node.test.ts` fails both.
 
 | token | where it goes |
 | --- | --- |
-| `shadow-lift-card` | a marketing card: `--primary` at 5% |
-| `shadow-lift-cta` | a hero call to action: `--primary` at 25% |
 | `shadow-lift-media` | a photograph, or the skeleton or illustrative device standing in for one: `--color-black` at 10%, the one that is not blue |
 
 **A call site spends one class.** The tint lives inside the token, never as a
@@ -792,22 +966,13 @@ migrating onto it moved pixels at the outliers only.
 | `--shadow-floating` | `0 10px 15px -3px` + `0 4px 6px -4px`, both `gray-12` at 10% | Tailwind's stock `shadow-lg`, already on most floating sites |
 | `--inset-shadow-track` | `inset 0 2px 4px 0`, `gray-12` at 5% | Tailwind's `shadow-inner`, on every track site |
 | `--shadow-track-fill` | `0 1px 2px 0`, `gray-12` at 5% | Tailwind's stock `shadow-xs` |
-| `--shadow-lift-card` | `shadow-floating`'s geometry, tinted `--primary` at 5% | `shadow-lg shadow-primary/5`, verbatim on the marketing cards |
-| `--shadow-lift-cta` | the same geometry, tinted `--primary` at 25% | `shadow-lg shadow-primary/25`, on every hero CTA |
 | `--shadow-lift-media` | `0 25px 50px -12px`, tinted `--color-black` at 10% | `shadow-2xl shadow-black/10` |
 | `--shadow-handle` | `0 1px 3px 0` + `0 1px 2px -1px`, both `gray-12` at 10% | the bare `shadow` on the crop handle, see above |
 
-The `color-mix()` in the three lift tokens is exactly what Tailwind compiles a
-`/<alpha>` shadow modifier to, so each token paints identically to the pair it
+The `color-mix()` in the lift token is exactly what Tailwind compiles a
+`/<alpha>` shadow modifier to, so it paints identically to the pair it
 replaced. `--color-black` is `#000101`, not pure black: `shadow-black/10` always
 read that token and the named version reads the same one.
-
-One site spends `shadow-lift-media` on something that is not a photograph: the
-marketing terminal card (`pages/@sections/terminal-card.tsx`). It sits on a
-`surface-primary` ground, where `shadow-lift-card`'s primary-at-5% composites
-onto primary and paints nothing: the black-tinted rung is the only one of the
-three that reads there, and the card is a raised object on a coloured ground,
-which is what that rung names.
 
 **The geometry and the alphas are the transcription; the color is the ramp.**
 Every neutral shadow mixes `gray-12` down to the alpha its stock Tailwind source
@@ -842,6 +1007,8 @@ things the reset provably cannot reach:
 - a stripped utility is silent: `shadow-lg` after the reset renders flat with no
   error, so the reset stops the drift but cannot report that the class was
   written.
+- a deleted name is silent too: `shadow-lift-card` now renders flat, so the
+  sweep fails it by name.
 - `shadow-<color>/<alpha>` beside a named lift compiles fine and simply
   overwrites that lift's own tint, so the class string says one thing and the
   paint says another.
@@ -964,27 +1131,43 @@ guarding them is its own change.
 
 Recorded so they are not "fixed" by someone reading them as oversights.
 
-- **A control's boundary is under its threshold, and the ring does not rescue it.**
-  `--border` is `gray-6` at **Lc 17.4** on the page and Lc 15.5 on `--panel`: a
-  separator, over the Lc 15 a separator needs. `--ring` is `blue-8` at
-  **Lc 44.6** on the page, clear of the Lc 30 a focus indicator needs. A control
-  boundary also needs Lc 30, and the shared recipes draw it in `gray-7` at
-  **Lc 23.8** on the page and Lc 21.8 on `--panel`: under. **The ramp's border
-  and focus rungs are APCA-tuned (6/7/8 are generated as separator, element
-  border and focus ring), and taking them as generated is the deliberate call**,
-  the same standing policy as the accepted misses. What it is *not* is a trade: a
-  faint boundary is not compensated for by the ring, because the ring draws only
-  on focus. The fix inside the scale exists and is not taken: `gray-8` reads
-  Lc 34.3 on the page and Lc 32.4 on `--panel`, both over Lc 30, and moving
-  fields and secondary buttons to it was declined on 2026-09-13 to keep Radix's
-  element-border rung as generated. The `gray-7` boundary is an accepted miss. It compounds
-  with `--surface`, which is the page color (`gray-1`): a field **on the bare
-  page** is identified by its boundary alone, and that boundary is intentionally
-  faint. Inside a `--panel` the field also reads by fill, one rung lighter than
-  its container; that is separation, not contrast, and it does not rescue the
-  boundary. The 6 / 7 split is under "Which step each token points at";
-  change one rung and re-check the other;
-  `colors.css` carries the short form of this at `--border`.
+- **The success band's ink is 4.45:1 in WCAG 2 terms.** `--success-subtle` is
+  `green-3`, Radix's component background; on `green-2` the band sat on the
+  `gray-2` card at 1.005:1 and a success `Badge` or active pill had no fill.
+  green-11 on it is Lc 66.1, clear of Lc 60; the WCAG figure is recorded, not
+  the gate, and `contrast.test.ts` pins it under 4.5:1 (see `--success-subtle`).
+- **A goal bar shows a 4px fill for $25 against $100,000.** Not a rounding
+  error: `GoalBar` floors any amount raised at `min-w-1`, trading true
+  proportion at the very bottom of the bar for a first gift being seen. Nothing
+  raised is no fill. A goal of 0 is met by anything raised (full bar) and has no
+  0/0 width.
+- **An unsorted column head has no sort glyph at rest on a desktop.**
+  `HeaderButton` shows the muted double chevron on hover or keyboard focus of
+  that head (its own `group/sort`, so a `.group` row around it does not
+  trigger it) and **always** on a coarse pointer, which has no hover to reveal
+  it. Only the sorted column paints its caret at rest.
+- **`--background`, `--surface` and `--popover` are all `gray-1`, and that is
+  three jobs, not one value named thrice.** The page; the field's fill; the
+  floating layer's fill. They share Radix's step-1 role, and collapsing them
+  would lose which job a call site meant. `--hairline` and `--border` share
+  step 6 the same way (see "Which step each token points at").
+- **A card has an edge and no shadow.** Not a missing lift: Radix's step 6 is
+  "subtle borders on components which are not interactive … cards", and the
+  edge (Lc 17.4 on the page) is what finds a step-2 card. `shadow-card` is
+  deleted; the elevation sweep fails the name.
+- **A field's edge is under 3:1 in WCAG 2 terms.** `--input` is `gray-7`,
+  Radix's interactive border, 1.48:1 on the card against the 3:1 1.4.11 asks
+  of an input's boundary (Lc 21.8). Radix sets no contrast target for edges,
+  so this is on spec, not a miss (PM rule, 2026-11-02). The label, placeholder and the step-1 fill on the
+  step-2 card identify the field with it. Measured under "Resting surfaces";
+  a button draws the same step. **Every switch** (the shared `Toggle` and the
+  donation form's two hand-rolled ones) draws its off-state ring in `gray-7`,
+  Radix's interactive border (1.48:1 on the card): on spec by the same rule,
+  though that ring alone carries the state.
+- **The focus ring is under 3:1 in WCAG 2 terms.** `--ring` (`blue-8`) is
+  Lc 42.7 on the card, clear of APCA's Lc 30, and 2.24:1 in WCAG 2 — on spec:
+  Radix's step 8 is the focus ring and it sets no contrast target (PM rule, 2026-11-02). It is not compensated for by
+  anything else: the offset only moves it off a fill.
 - **`--destructive` is red-9 and clears every surface in the palette** (Lc 74.1 on
   the page, Lc 67.3 on `gray-3`, Lc 68.0 on `--secondary`, Lc 66.7 on
   `--destructive-subtle`, all over Lc 60). The tinted case is still served by
@@ -1041,7 +1224,10 @@ rung is a named token off the ramp**: nothing is mixed at a use-site.
 | control | resting | hover | active (pressed) |
 | --- | --- | --- | --- |
 | filled (`.btn-primary` and the three semantic variants) | step 9: `--primary`, `--destructive`, `--success`, `--warning` | step 10: `--*-hover` | **step 10 + `translateY(1px)`** |
-| tinted / ghost (`.btn-secondary`, `.btn-ghost`) | `--panel` or transparent | step 3: `--secondary` | step 5: `--secondary-active` |
+| neutral (`.btn-secondary`) | `gray-3` fill, `gray-7` edge | `gray-4` fill, `gray-8` edge | `gray-5` fill |
+| ghost (`.btn-ghost`, the table's load-more row, a menu item, a sidebar row, a tab) | transparent | `gray-4` | `gray-5` (a sidebar row's current state: `--secondary-active`) |
+| tinted (an option, a tinted nav row) | transparent or `--secondary` | `--secondary-hover` (`blue-4`) | `--secondary-active` (`blue-5`) |
+| field (`.field-input`, date fields, radio) | `--surface` fill, `--input` edge | `--input-hover` edge | n/a; focus draws `--ring` |
 | a subtle band that is also a control | `--destructive-subtle` (step 3) | n/a | `--destructive-subtle-active` (step 5) |
 | text-only (`link`) | step 9: `--primary` | step 10: `--primary-hover` | n/a: the two solid rungs are spent, and a run of text has no press affordance to spend instead |
 
@@ -1062,12 +1248,17 @@ bug:
   transitioned: a press is the one state a user can outrun, so easing the
   nudge in reads as lag rather than as contact. On touch, where there is no
   hover, that nudge is the only acknowledgement a tap gets.
-- **A tinted surface presses UP its scale**, 3 → 5, never toward black. Darkening
+- **A press reads over a hover.** `.btn-secondary` and `.btn-ghost` write
+  `:active` with the same `:not(:disabled)` guard as `:hover` and after it, so
+  the step-5 press wins under the pointer instead of losing to the hover's
+  higher specificity.
+- **A tinted surface presses UP its scale**, 3 → 4 → 5, never toward black. Darkening
   a light band moves it toward its own dark ink, which is the failure a
   darkening ladder produces there and the reason these active rungs are steps.
 
-`--radius` is the one radius system; `--radius-xs…3xl` are computed from it in
-`index.css`. Don't author parallel values.
+Two corners and no third: `--radius` (6px) for a control or a well,
+`--radius-card` (12px) for a container or a floating layer. The `--radius-*`
+scale is reset, so don't author parallel values; see "Two corners".
 
 ## Which states each control carries
 
@@ -1083,18 +1274,18 @@ and the components beside them. `n/a` means the state does not apply to that con
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `.btn` + 7 variants | ✓ | ✓ | ✓ | ✓¹ | ✓ | ✓ | n/a | n/a |
 | `link` (a text link) | ✓ | ✓ | ✓ | | ⁹ | ⁹ | n/a | n/a |
-| `.field-input` (input, textarea) | ✓ | | ✓² | n/a | ✓ | | ✓ | ✓³ |
-| `.field-input-container` (composite field) | ✓ | | ✓² | n/a | ✓ | | ✓ | ✓³ |
-| `DateInput.Segment` (date field) | ✓ | | ✓⁸ | n/a | | | n/a⁸ | n/a |
-| `checkbox` / `check-field` | ✓ | | ✓ | | ✓ | | ⁴ | n/a |
-| `radio` | ✓ | | ✓ | | ✓ | | ⁴ | n/a |
+| `.field-input` (input, textarea) | ✓ | ✓¹⁰ | ✓² | n/a | ✓ | | ✓ | ✓³ |
+| `.field-input-container` (composite field) | ✓ | ✓¹⁰ | ✓² | n/a | ✓ | | ✓ | ✓³ |
+| `DateInput.Segment` (date field) | ✓ | ✓¹⁰ | ✓⁸ | n/a | | | n/a⁸ | n/a |
+| `checkbox` / `check-field` | ✓ | ✓ | ✓ | | ✓ | | ⁴ | n/a |
+| `radio` | ✓ | ✓ | ✓ | | ✓ | | ⁴ | n/a |
 | `Toggle` (switch) | ✓⁵ | | ✓ | n/a | ✓ | | ⁴ | n/a |
-| `Select` / `Combo` trigger | ✓ | | ✓⁶ | n/a | ✓ | | ✓ | n/a |
+| `Select` / `Combo` trigger | ✓ | ✓¹⁰ | ✓⁶ | n/a | ✓ | | ✓ | n/a |
 | `.selector-opt` (option row) | ✓ | ✓⁷ | n/a | ✓⁷ | | n/a | n/a | n/a |
 | badge / chip | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 
 1. Filled variants share step 10 between hover and active, see the two-rungs
-   note above. Tinted and ghost press 3 → 5.
+   note above. Neutral, ghost and tinted controls hover at step 4 and press at 5.
 2. The text controls take the UA outline, colored by the `*` rule in
    `styles/base.css` (`outline-color: var(--ring)`); the composite reaches it
    through `:has(input:focus)`.
@@ -1123,6 +1314,11 @@ and the components beside them. `n/a` means the state does not apply to that con
    have one (`aria-disabled:text-gray-11`, `[.pending]:text-gray-11`) rather
    than by the recipe: `styles/base.css` already gives a disabled anchor
    `pointer-events: none`, so what is missing is the ink, not the behaviour.
+10. The edge firms from `--input` (gray-7) to `--input-hover` (gray-8), radix's
+    hovered interactive border. `.field-input` and `.field-input-container`
+    skip it while disabled, read-only or invalid, so the destructive edge is
+    never repainted; the date field's segment group and the `Select` / `Combo`
+    trigger (a `.field-input`) draw the same pair.
 
 **One focus trigger: `focus-visible`, never `focus`.** Applied at every control
 in the table. Browsers withhold `:focus-visible` from a pointer press on
@@ -1134,9 +1330,10 @@ observable.
 
 Two things the table shows and no single component would:
 
-- **Nothing has a hover state but the button, the link and the option row.** A checkbox, a
-  radio and a switch are all pointer targets that give no acknowledgement until
-  they are pressed.
+- **Every control acknowledges the pointer but the switch.** The button, the
+  link and the option row change fill or ink; every field, checkbox and radio
+  firms its edge (`--input` to `--input-hover`). A switch is a pointer target
+  that gives no acknowledgement until it is pressed.
 - **`pending` reaches the button alone.** A form whose submit is in flight has
   one control that says so; its fields do not.
 
@@ -1146,8 +1343,8 @@ filling it by eye.
 
 ## Button variant set: what each fill means
 
-Seven variants, authored in `packages/ui/src/styles/components.css` and closed by
-`Button`'s `variant` prop. Two of them are **semantic**, and a semantic fill is a
+Eight variants, authored in `packages/ui/src/styles/components.css`; seven are
+closed by `Button`'s `variant` prop, and `btn-inverse` is a class only. Two of them are **semantic**, and a semantic fill is a
 claim about the action, not a way to make a row look less grey.
 
 | variant | means |
@@ -1159,6 +1356,7 @@ claim about the action, not a way to make a row look less grey.
 | `btn-destructive` | this deletes, rejects, or cannot be undone |
 | `btn-success` | **approve / confirm.** Nothing else |
 | `btn-warning` | proceed with caution: a real hazard the user should weigh |
+| `btn-inverse` | the filled action **on a brand fill**, see below |
 
 - **Green is a verdict, not a category.** Its live sites are the three moderation
   screens where a reviewer approves something (`platform.redeem-requests`,
@@ -1194,6 +1392,27 @@ the `--ring`/`--border` remaps a control needs on that ground; a `btn-outline`
 inside a bare `bg-primary` is invisible, and that is the correct failure: it
 fails where the band forgot to declare itself, not quietly at the button.
 
+### `btn-inverse`: the filled action on a brand fill
+
+`--primary` on a `surface-primary` band (or on `--primary-deep`) is no button,
+so the band's one filled action inverts: `--primary-fg` fill, `--primary` label
+(**Lc 76.9**, clears body). It replaced seven hand-spelled
+`bg-primary-fg text-primary active:translate-y-px` sites (pricing, the
+marketing CTA band, since moved to `bg-band`, the open-source hero, the blog post CTA, the donor bottom
+CTA, `unlock-us-donations`' bottom CTA, and the org page's `DonateButton` on a
+brand ground), one of which had grown a `hover:bg-primary-fg/90` rung.
+
+- **No hover rung.** A hover would be a `--primary-fg` alpha step, and that
+  ladder is unmeasured (see "`--primary-fg` alpha steps are an unmeasured
+  ladder"). The press is the filled variants' 1px nudge, nothing else.
+- **Its ring is `--primary-ring`**, set on the variant rather than read from the
+  scope, so it reads on the brand fill around the offset even where a band
+  forgot `surface-primary`. Every current site is inside one anyway.
+- **No disabled or pending rung.** No site disables it; a disabled one would
+  need a measured fill on blue, which is a value, not a guess.
+- `controls-conformance.node.test.ts` holds the variant in the closed set and
+  fails a `btn` beside a hand-spelled `bg-primary-fg`.
+
 ## Button size scale
 
 Three sizes plus one that borrows its height. Bare `.btn` is authored in
@@ -1217,7 +1436,7 @@ Four rules travel with it:
   on a button. A button that needs to be wider takes `w-full` inside a wrapper
   the caller sizes, or `w-fit`/`inline-flex`. If two buttons in one tier carry
   different `px`, one of them is spelling width as padding.
-- **The button radius is `var(--radius)` (4px), not `--radius-sm`.** See the
+- **The button radius is `var(--radius)` (6px), not `--radius-sm`.** See the
   decision below.
 - **A square icon-only button is `btn-icon`, a modifier, not a fourth tier.** It
   composes with all three sizes; see below.
@@ -1306,6 +1525,26 @@ Three rules travel with it:
 here the width is not a layout choice, it is the shape of the control: a square
 button that a caller can stretch is not a square button.
 
+### Two corners: `--radius` and `--radius-card`
+
+The surface model has two corners, one per job, and the ladder stays closed
+around them:
+
+- **`--radius`, 6px (`0.375rem`)**: a control (button, field, checkbox box,
+  chip that is not a pill) and a well inside a card. `rounded` and its sides
+  (`rounded-t/-b/-l/-r`) read it.
+- **`--radius-card`, 12px (`0.75rem`)**: a container and every layer over the
+  page: card, `solo-card`, dialog, menu, popover, select and combobox list,
+  hovercard, toast. `rounded-card` reads it, bound by `@utility` in
+  `packages/ui/src/styles/utilities.css` because the theme scale it would
+  otherwise derive from is reset.
+
+The smaller corner nested inside the larger one is what reads as *inside*. A
+third corner is a decision to take back to the system, not a call-site class;
+`rounded-full` and `rounded-none` remain, emitted from literals. Both values
+were 4px (`0.25rem`) before the model; the history below records why the one
+corner was `var(--radius)` and is kept because the reasoning still holds at 6px.
+
 ### Why buttons are `var(--radius)` and not `--radius-sm`
 
 Recorded because the recipe, the shipped call sites and `.design-sync/conventions.md`
@@ -1337,11 +1576,9 @@ md 3.2 / lg 4.0 px), and `.btn-secondary` draws a 1px `--border` that is
 deliberately faint at Lc 17.4: a fractional radius on a faint border is where an
 uneven corner shows.
 
-**Consequence, not yet decided:** `.field-input` and `.field-input-container`
-stay at `--radius-sm`, so a button and the input beside it stop matching.
-`.design-sync/conventions.md:77` ("`rounded-sm` for buttons and inputs") is wrong
-on the value but right that the two should share one; moving the fields to
-`var(--radius)` is the companion fix and is the user's call.
+**Consequence, since landed:** `.field-input` and `.field-input-container`
+read `var(--radius)` too, so a button and the field beside it share one corner
+(the control corner of the two-corner model above).
 
 ## The link primitive
 
@@ -1524,8 +1761,9 @@ What follows from it:
 - **The radius is set once, on the outermost thing that clips.** A child reaching
   for `rounded` inside an already-rounded shell is either drawing a corner nobody
   asked for, or standing in for the `overflow-hidden` its shell should carry.
-- **`solo-card` is the worked example.** It carries the fill, the border, the
-  corner and the inset, and its comment in
+- **`solo-card` is the worked example.** It carries the fill, the corner and
+  the inset, plus the card edge (`border border-hairline`, see "Resting
+  surfaces"), and its comment in
   `packages/ui/src/styles/utilities.css` records what it deliberately does *not*
   carry (no `gap`, no `justify-items`) because those are flow, and flow stays
   the caller's. That split is the rule restated: the box is the shell's, the
@@ -1539,23 +1777,26 @@ What follows from it:
 **The popup content shell is named, on the component.** A tooltip or
 hovercard body (the panel-shaped surface that *does* converge) is
 `popup_shell` in `packages/ui/src/components/popup.ts`, and `Content` in
-`tooltip.tsx` and `hover-card.tsx` carries it: `bg-panel`, an `outline-gray-6`
-hairline, `shadow-floating` + `z-floating` (the `floating` elevation row),
-`rounded`, and `p-4`.
-Its edge is `outline`,
-not `border`, on purpose: it pins the ramp step directly so that inside a
-`surface-primary` band it keeps drawing against the page it floats over while
-every other bordered surface redraws against the fill. A call site passes only
+`tooltip.tsx` and `hover-card.tsx` carries it: `bg-popover`, `shadow-floating`
++ `z-floating` (the `floating` elevation row), `rounded-card`, and `p-4`. It
+has **no edge**: a floating layer is told from what it covers by its shadow,
+and its arrow tip is filled from `--popover` with no edge either. The select/combobox
+list (`popup_cls` in `select/classes.ts`) and the toast are the same box. A call
+site passes only
 what is its own: a width cap (`max-w-xs`, `w-80`), a type size, an alignment,
 a scroller. `shell-conformance.node.test.ts` fails a `Content` whose class
 string carries anything the shell owns: a fill, an edge, a shadow, a radius, a
 padding, a z-index, the ink.
 
 **The card is named: `card` in `packages/ui/src/styles/utilities.css`.** It is
-`bg-panel border rounded p-6`: the four things this rule assigns to a shell,
-and nothing else. The inset is **24px in every role and at every width**: no
-tier, no responsive step. A marketing card, a dashboard tile, a figure, a
-callout and a link tile are all the same box.
+`bg-card rounded-card border border-hairline p-4 md:p-6`: Radix's step-2 fill, the
+step-6 edge, the corner and the inset, and nothing else. **No shadow** (see
+"Resting surfaces"), and the same card serves every page and a `--band`
+alike: the retired `card-on-band` and the retired marketing card lift both
+folded into it. The inset is **one value in every role, 16px on a phone and
+24px from md** — the step the views' gutter takes (`px-4 md:px-10`; PM,
+2026-11-02). No tier: a marketing card, a dashboard tile, a figure, a callout
+and a link tile are all the same box.
 
 The count it replaced, measured 2026-09-03: the in-flow, rounded, padded
 panel-shaped surfaces spelled **30 different insets across 131 sites** (`p-4`
@@ -1566,38 +1807,33 @@ the one: it moves the fewest pixels.
 
 What `card` deliberately does not carry:
 
-- **No shadow.** `flush` is a card's elevation and is written by writing no
-  shadow at all. The marketing cards that lift spend `shadow-lift-card` beside
-  the name: one named level at one call site, rather than a level baked in
-  that every other caller would have to cancel with a `shadow-none` the closed
-  `--shadow-*` namespace does not leave available.
+- **No shadow, and no second edge.** The edge is baked in, so a `border-*`
+  written beside `card` is a coin flip with it, and a shadow is a level a
+  card does not sit at; the sweep fails both.
 - **No layout and no type.** `grid`, `flex`, a `gap`, a `divide-y`, a heading
   size are the arrangement of the contents, and the arrangement is the
   caller's, the same split `solo-card` records. So is the outer margin.
-- **The edge is `border`, not `border-gray-6`.** The bare utility reads
-  `--border` through the base `*` rule, so `surface-primary`'s rebind reaches
-  inside a card and its hairline is drawn against the brand fill rather than
-  against the page. gray-7 is the ELEMENT-BORDER rung `./components.css`
-  spells on controls; a card is a container, and takes the separator rung.
+- **No inner lines.** A line inside the card is the caller's
+  `border-hairline` / `divide-hairline`.
 
 **What is not a card keeps its own shape.** A surface with no inset has
 delegated it (table shell, `divide-y` list, `overflow-hidden` media frame); a
 transient layer over the page is `floating`, not a card; a control's box is
-`components.css`'s. `shell-conformance.node.test.ts` fails the four spellings
-written out together, exempting nine surfaces by file with a reason each, and
-fails a second fill, edge, corner or inset written beside `card`. The small
+`components.css`'s. `shell-conformance.node.test.ts` fails the recipe written
+out by hand (`bg-card rounded-card` plus an inset), exempting surfaces by file with a
+reason each, fails a second fill, edge, shadow, corner or inset written beside `card`,
+and fails any `card-on-band`. The small
 inline chip is still unnamed and still the worse spread: 22 spellings, over two
 radii (`rounded` and `rounded-full`), top spelling under 20%.
 
 ### Breakpoints
 
-Viewport breakpoints are Tailwind's ladder plus two names of ours, declared in
+Viewport breakpoints are Tailwind's ladder plus one name of ours, declared in
 `packages/ui/src/styles/theme.css`. The `--breakpoint-*` namespace is **not**
-reset: the stock steps are the right ones, so the two additions sort in by value.
+reset: the stock steps are the right ones, so the addition sorts in by value.
 
 | name | value | what it is for |
 | --- | --- | --- |
-| `xs` | 445px | the donate card's bordered inset (`donate.$id`, `fundraisers.$fund_id.donate`): below this the card runs edge to edge, and `sm` is too wide to start the inset |
 | `sm` | 40rem | |
 | `md` | 48rem | |
 | `lg` | 64rem | |
@@ -1605,8 +1841,8 @@ reset: the stock steps are the right ones, so the two additions sort in by value
 | `xl` | 80rem | |
 | `2xl` | 96rem | |
 
-**Each name replaces a bracket** (`min-[445px]:`, `min-[75rem]:`) that was
-hand-spelled at its call sites, at the same value, so naming them moved nothing.
+**The name replaces a bracket** (`min-[75rem]:`) that was hand-spelled at its
+call sites, at the same value, so naming it moved nothing.
 A new width is a row here and a line in `theme.css`, not a `min-[…]:` at a call
 site. Like every other bracket, `min-[…]:` still compiles, so review is what
 keeps one out.
@@ -1837,16 +2073,20 @@ control.
 
 | segment | takes |
 | --- | --- |
-| grant (cash) | `gray-3` |
+| grant (cash) | `gray-4`, the track rung (*Resting surfaces*: a goal-bar or progress track is step 4) |
 | savings (liq) | `--warning` |
 | investment (lock) | `--success` |
-| disabled | `gray-3`, per the app-wide disabled convention |
+| disabled | `gray-3`, per the app-wide disabled convention, so a disabled track reads a rung flatter than a live one |
+
+The grant segment is the track itself, the part no thumb has claimed, so it
+takes the track's step rather than the component-at-rest step 3 it sat on
+before the role walk.
 
 All three are documented **fills**, which is the only role used here: no ink
 lands on the track.
 
 Adjacent-segment contrast on the token values, the lower of the two polarities:
-grant↔savings **Lc 33.1**, savings↔investment **Lc 24.9**. The second is under
+grant↔savings **Lc 28.4**, savings↔investment **Lc 24.9**. Both are under
 the Lc 30 of semantic non-text, and that is fine rather than overlooked: that
 floor binds a graphic *required to understand the content*, and each segment's value is already printed
 as text in the legend directly above, so the bands are redundant and owe only the Lc 15 both
@@ -1860,10 +2100,13 @@ dims, the track does not. The fix is to omit the inline gradient when disabled s
 the flat `gray-3` fill shows, which is also what makes the disabled state match
 the thumbs, both of which already go `gray-11`.
 
-Unrelated to the literals, and **not** fixed here: thumb 1 is `bg-panel` with a
-`--border` hairline, so at Lc 17.4, under a control boundary's Lc 30, it is a control identified by an edge the
-"decisions that look like bugs" entry deliberately keeps faint. On a draggable
-thumb that call is sharper than on a panel. Recorded, not decided.
+**The thumbs are decided.** Thumb 0 is a `gray-11` solid. Thumb 1 is
+`--surface` with a 2px `gray-11` edge: a control identified by its edge, so the
+edge is held to a control boundary's Lc 30 where it reads least, on the savings
+segment (**Lc 35.7**); on the grant track it is Lc 66.1. The `bg-panel` +
+`--border` hairline it had (Lc 17.4) is gone. An ink step as an edge is off
+role on purpose: steps 7/8 are a resting control's edge on the neutral ramp and
+do not clear Lc 30 on `--warning`.
 
 ## One face, two roles, and four closed ladders
 
@@ -2003,6 +2246,9 @@ should not:
   redundant.
 - **Numeric leading is unaffected.** `leading-5` derives from `--spacing`, not
   from `--leading-*`, and still compiles to `calc(var(--spacing) * 5)`.
+  `hero-heading` spends it at its display rung: `lg:text-6xl/16` sets 3.75rem
+  on 4rem (≈1.07), because no multiplier on the ladder sits between `/none`
+  (1, which crowds a two-line hero) and `/tight` (1.25, which splits it).
 
 Tracking keeps five: the three v4 steps that carry call sites (`tight`
 at -0.025em, `wide` at 0.025em and `wider` at 0.05em) plus the two authored
@@ -2173,8 +2419,8 @@ Two seams this does **not** close, both deliberate:
 
 `colors.css` holds two kinds of name and they are adopted differently.
 
-**The 42 semantic tokens are live** and carry call sites in `apps/platform/src`,
-bar the five `--sidebar-*` aliases noted above. The palette is the whole
+**The semantic tokens are live** and carry call sites in `apps/platform/src`
+(`--background` also through the one ground rule in `src/index.css`). The palette is the whole
 contract: a semantic name that ships here is a name the app paints with.
 
 **The 60 ramp steps are reachable too**,

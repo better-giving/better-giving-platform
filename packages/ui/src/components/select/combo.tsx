@@ -62,10 +62,14 @@ export interface Props<T> extends Omit<FieldProps, "classes">, Opt<T> {
    * an `AsyncSource` does its own matching, so nothing here runs for one.
    */
   filter?: (text: string, q: string) => boolean;
-  /** the thing in the control: a flag, a spinner, the drawer chevron */
+  /** the trigger at the trailing edge: the drawer chevron, a spinner */
   adornment?: (open: boolean, state: "idle" | "loading" | "error") => ReactNode;
-  /** start = country flag, end = drawer chevron. default end */
-  adornment_side?: "start" | "end";
+  /**
+   * decoration at the leading edge — the selected country's flag. not a
+   * trigger and hidden from assistive tech (the input's text already names
+   * the value): a click passes through to the input, which opens the list.
+   */
+  lead?: ReactNode;
   /** offer an X that empties the field */
   clearable?: boolean;
   /** the popup tracks the control's width unless the host says otherwise */
@@ -145,20 +149,18 @@ export function Combo<T>({ ref, ...p }: Props<T>) {
   // keystroke, and taking the input away is the one thing it must not do.
   const disabled =
     p.disabled || (!src.searched && (src.loading || !!src.error));
-  const side = p.adornment_side ?? "end";
   const has_clear = !!p.clearable && p.value != null;
 
-  // the clear X and an end-side adornment are separate lanes, so both being
-  // present is a layout, not a collision — and the input reserves room for the
-  // lanes it actually has instead of one lane's worth either way.
-  const end_lanes =
-    (side === "end" && p.adornment ? 1 : 0) + (has_clear ? 1 : 0);
+  // the clear X and the adornment are separate lanes, so both being present is
+  // a layout, not a collision — and the input reserves room for the lanes it
+  // actually has instead of one lane's worth either way.
+  const end_lanes = (p.adornment ? 1 : 0) + (has_clear ? 1 : 0);
 
   const input_cls =
     p.classes?.input ??
-    `field-input w-full h-full ${
-      side === "start" && p.adornment ? "pl-12" : ""
-    } ${end_lanes === 2 ? "pr-24" : end_lanes === 1 ? "pr-12" : ""}`;
+    `field-input w-full h-full ${p.lead ? "pl-12" : ""} ${
+      end_lanes === 2 ? "pr-24" : end_lanes === 1 ? "pr-12" : ""
+    }`;
 
   return (
     <FieldFrame
@@ -211,14 +213,18 @@ export function Combo<T>({ ref, ...p }: Props<T>) {
             spellCheck={false}
             className={input_cls}
           />
+          {p.lead && (
+            <span
+              aria-hidden
+              className={`${ornament_start_cls} pointer-events-none`}
+            >
+              {p.lead}
+            </span>
+          )}
           {p.adornment && (
             <Combobox.Trigger
               className={
-                side === "start"
-                  ? ornament_start_cls
-                  : has_clear
-                    ? ornament_end_inboard_cls
-                    : ornament_end_cls
+                has_clear ? ornament_end_inboard_cls : ornament_end_cls
               }
             >
               <Combobox.Context>
@@ -237,9 +243,14 @@ export function Combo<T>({ ref, ...p }: Props<T>) {
                     // field isn't left focused over a closed empty list
                     queueMicrotask(() => api.setOpen(true));
                   }}
-                  className={`${ornament_end_cls} disabled:text-gray-11 text-destructive hover:text-destructive active:text-destructive`}
+                  className={`group ${ornament_end_cls} text-gray-11`}
                 >
-                  <X className="icon-md" />
+                  {/* the fill is the glyph's, not the lane's: a full-height
+                      lane painted on hover would cover the field's edge. -m-1
+                      keeps the lane 16px wide, so the inboard lane still abuts */}
+                  <span className="flex -m-1 p-1 rounded group-hover:bg-gray-4 group-active:bg-gray-5">
+                    <X className="icon-md" />
+                  </span>
                 </Combobox.ClearTrigger>
               )}
             </Combobox.Context>

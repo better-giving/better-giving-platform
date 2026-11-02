@@ -6,10 +6,13 @@ const usd = (decimals = 0) =>
     maximumFractionDigits: decimals,
   });
 
-export function to_usd(num: number): string {
+/** "$1,234" — whole dollars by default; `decimals: 2` for a money figure that
+ *  shows cents ("$0.00"). from 1M up it shortens to "$1.20M" / "$3.40B"
+ *  either way. the sign is never followed by a space. */
+export function to_usd(num: number, decimals: 0 | 2 = 0): string {
   const n = Math.abs(num);
   if (n < 1_000_000) {
-    return usd().format(num); // exact whole-dollar amounts
+    return usd(decimals).format(num);
   }
 
   if (n < 1_000_000_000) {

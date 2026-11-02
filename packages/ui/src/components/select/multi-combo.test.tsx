@@ -91,10 +91,10 @@ describe("MultiCombo", () => {
     const screen = await render(<Harness on_change={on_change} />);
 
     await screen.getByRole("combobox").click();
-    await screen.getByRole("button", { name: "Select All" }).click();
+    await screen.getByRole("button", { name: "Select all" }).click();
     expect(on_change).toHaveBeenCalledWith(countries);
 
-    await screen.getByRole("button", { name: "Deselect All" }).click();
+    await screen.getByRole("button", { name: "Deselect all" }).click();
     expect(on_change).toHaveBeenCalledWith([]);
   });
 

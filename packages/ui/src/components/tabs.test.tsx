@@ -133,5 +133,70 @@ describe("Tabs", () => {
       );
       expect(total).toBeGreaterThan(list.clientWidth);
     });
+
+    /** how far the row's mask fades in from each edge, as computed */
+    const fades = (list: HTMLElement) => {
+      const cs = getComputedStyle(list);
+      return {
+        start: Number.parseFloat(cs.getPropertyValue("--scroll-fade-start")),
+        end: Number.parseFloat(cs.getPropertyValue("--scroll-fade-end")),
+      };
+    };
+
+    test("an overflowing row fades the edge it runs past, and moves the fade as it scrolls", async () => {
+      await page.viewport(375, 812);
+      const screen = await render(
+        <Tabs items={many} defaultValue="Profile">
+          <TabPanel value="Profile">Profile panel</TabPanel>
+        </Tabs>
+      );
+      const list = screen.getByRole("tablist").element() as HTMLElement;
+      // at rest only the far edge fades: there is nothing behind the first tab
+      await expect.poll(() => fades(list).end).toBeGreaterThan(0);
+      expect(fades(list).start).toBe(0);
+
+      list.scrollLeft = list.scrollWidth;
+      await expect.poll(() => fades(list).end).toBe(0);
+      expect(fades(list).start).toBeGreaterThan(0);
+    });
+
+    test("a tab focused by keyboard scrolls fully clear of the faded edge", async () => {
+      await page.viewport(375, 812);
+      const screen = await render(
+        <Tabs items={many} defaultValue="Profile">
+          <TabPanel value="Profile">Profile panel</TabPanel>
+        </Tabs>
+      );
+      const list = screen.getByRole("tablist").element() as HTMLElement;
+      await expect.poll(() => fades(list).end).toBeGreaterThan(0);
+      (
+        screen.getByRole("tab", { name: "Profile" }).element() as HTMLElement
+      ).focus();
+      await userEvent.keyboard("{ArrowRight}");
+      await userEvent.keyboard("{ArrowRight}");
+      const tab = screen
+        .getByRole("tab", { name: "Fundraisers and campaigns" })
+        .element() as HTMLElement;
+      await expect.element(tab).toHaveFocus();
+
+      await expect
+        .poll(() => {
+          const fade = fades(list).end;
+          return (
+            list.getBoundingClientRect().right -
+            tab.getBoundingClientRect().right -
+            fade
+          );
+        })
+        .toBeGreaterThanOrEqual(-1);
+    });
+
+    test("a row that fits fades neither edge", async () => {
+      await page.viewport(1440, 900);
+      const screen = await render(<Subject />);
+      const list = screen.getByRole("tablist").element() as HTMLElement;
+      expect(list.scrollWidth).toBeLessThanOrEqual(list.clientWidth);
+      expect(fades(list)).toEqual({ start: 0, end: 0 });
+    });
   });
 });

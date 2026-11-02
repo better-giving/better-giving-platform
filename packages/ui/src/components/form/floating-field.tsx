@@ -59,7 +59,7 @@ export function FloatingInput({
     <Field.Input
       {...props}
       placeholder=""
-      className={`${className} peer w-full py-3.5 text-sm rounded border bg-surface px-4 transition-colors outline-ring data-invalid:border-destructive`}
+      className={`${className} peer w-full py-3.5 text-sm rounded border border-input hover:border-input-hover bg-surface px-4 transition-colors outline-ring data-invalid:border-destructive`}
       ref={ref}
     />
   );

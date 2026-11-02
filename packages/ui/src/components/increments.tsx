@@ -27,7 +27,7 @@ export function Increments({
 }: Props) {
   return (
     <div
-      className={`${classes} grid min-w-0 grid-cols-[auto_auto_minmax(0,1fr)] gap-x-2 gap-y-2`}
+      className={`${classes} grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] gap-x-2 gap-y-2`}
     >
       <div className="flex items-center gap-2 col-span-3">
         <p className="font-semibold text-sm">Donation increments</p>

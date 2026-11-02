@@ -63,4 +63,35 @@ describe("EmptyRow", () => {
     expect(cell?.parentElement?.tagName).toBe("TR");
     await expect.element(screen.getByText("No payouts yet")).toBeVisible();
   });
+
+  test("its line stays inside the visible width of a wide scrolling table", async () => {
+    // a phone-width scroller over a table whose columns are far wider: the
+    // line must land on screen, not centred across the scrolled-away columns
+    const screen = await render(
+      <div className="table-scroll" style={{ width: 358 }}>
+        <table className="table" style={{ width: 1200 }}>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Program</th>
+              <th>Origin</th>
+            </tr>
+          </thead>
+          <tbody>
+            <EmptyRow col_span={3}>No donations found</EmptyRow>
+          </tbody>
+        </table>
+      </div>
+    );
+    const line = screen.getByText("No donations found").element();
+    const range = document.createRange();
+    range.selectNodeContents(line);
+    const text = range.getBoundingClientRect();
+    const box = screen.container
+      .querySelector(".table-scroll")
+      ?.getBoundingClientRect();
+    expect(text.width).toBeGreaterThan(0);
+    expect(text.left).toBeGreaterThanOrEqual(box?.left ?? Number.NaN);
+    expect(text.right).toBeLessThanOrEqual(box?.right ?? Number.NaN);
+  });
 });

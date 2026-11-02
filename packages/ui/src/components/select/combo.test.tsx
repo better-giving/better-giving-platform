@@ -116,6 +116,30 @@ describe("Combo", () => {
     expect(on_change).toHaveBeenCalledWith(undefined);
   });
 
+  test("a lead sits at the leading edge, hidden from assistive tech, and a click on it opens the list", async () => {
+    const screen = await render(
+      <Combo
+        value="Brazil"
+        on_change={() => {}}
+        options={countries}
+        lead={<span data-testid="flag">BR</span>}
+        adornment={() => <span>drawer</span>}
+      />
+    );
+    const input = screen.getByRole("combobox");
+    const flag = screen.getByTestId("flag");
+    expect(flag.element().parentElement?.getAttribute("aria-hidden")).toBe(
+      "true"
+    );
+    const lead_box = flag.element().getBoundingClientRect();
+    const input_box = input.element().getBoundingClientRect();
+    expect(lead_box.left).toBeLessThan(input_box.left + input_box.width / 2);
+    expect(getComputedStyle(input.element()).paddingLeft).toBe("48px");
+    // force: the lead takes no pointer events, so the press lands on the input
+    await flag.click({ force: true });
+    await expect.element(screen.getByRole("listbox")).toBeVisible();
+  });
+
   test("limit caps the rows; a custom filter replaces the matcher", async () => {
     const screen = await render(
       <Combo

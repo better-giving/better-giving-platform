@@ -45,7 +45,7 @@ export function Group({
             </Heading>
           )}
           {description && (
-            <p className="text-lg font-semibold">{description}</p>
+            <p className="text-base text-gray-11">{description}</p>
           )}
         </div>
       )}
