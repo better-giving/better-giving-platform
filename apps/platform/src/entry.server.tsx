@@ -64,7 +64,8 @@ export default async function handle_request(
   _load_context: RouterContextProvider
 ) {
   const markdown = opts_into_markdown(router_context);
-  // rr re-enters with the same headers after a shell error
+  // rr re-enters with the same headers after a shell error, so Accept may
+  // already be listed
   if (markdown) vary_on_accept(response_headers);
   const as_markdown =
     markdown &&

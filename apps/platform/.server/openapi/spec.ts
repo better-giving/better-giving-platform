@@ -474,7 +474,7 @@ const keyed_write = (
     created?: Json;
     /** no body at all reads as `{}` */
     body_optional?: boolean;
-    /** 4xx beyond the key check and validation */
+    /** 4xx beyond the key check, validation and the Idempotency-Key 400 */
     refuses?: number[];
   }
 ): IOperation => ({

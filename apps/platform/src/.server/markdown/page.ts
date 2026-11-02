@@ -18,7 +18,7 @@ const NOT_CONTENT = [
 
 /**
  * an ark/zag accordion renders each question as a `<button>` and each closed
- * answer `hidden`, both on the strip list — the question becomes a paragraph
+ * answer `hidden`, both in NOT_CONTENT — the question becomes a paragraph
  * and the answer is shown before stripping
  */
 function open_accordions(main: HTMLElement) {
@@ -41,7 +41,7 @@ const FLEX = new Set(["flex", "inline-flex"]);
 const has_class = (el: HTMLElement, names: Set<string>) =>
   el.classList.value.some((c) => names.has(c));
 
-/** the mobile copy of a block a page renders once per breakpoint; `max-*:hidden` marks the desktop copy, kept */
+/** classes on the mobile copy of a block a page renders once per breakpoint; the desktop copy's `max-*:hidden` isn't one, so it stays */
 const MOBILE_ONLY = new Set(
   ["sm", "md", "lg", "xl", "2xl"].map((bp) => `${bp}:hidden`)
 );
