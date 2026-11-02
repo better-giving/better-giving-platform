@@ -45,9 +45,11 @@ export function Prompt({
       onClose={close}
       onExitComplete={onExitComplete}
       title={title}
-      classes="grid bg-panel text-gray-12"
+      classes="grid bg-popover text-gray-12"
     >
-      <div className="flex justify-end p-4 border-b">
+      {/* no rule under it: the prompt draws no title, so a ruled header
+          would be an empty band holding only the X */}
+      <div className="flex justify-end p-4">
         <button
           type="button"
           onClick={close}

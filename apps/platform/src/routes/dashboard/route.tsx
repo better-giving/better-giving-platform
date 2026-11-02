@@ -7,7 +7,7 @@ import { linkGroups } from "./routes";
 
 export { ErrorBoundary } from "#/components/error";
 
-export const meta: Route.MetaFunction = () => metas({ title: "My Donations" });
+export const meta: Route.MetaFunction = () => metas({ title: "My donations" });
 
 export const middleware = [auth_mdlwr];
 
@@ -20,7 +20,6 @@ export default function Layout() {
     <DashboardLayout
       rootRoute={`${href("/dashboard")}/`}
       linkGroups={linkGroups}
-      headerVariant="bare"
     />
   );
 }

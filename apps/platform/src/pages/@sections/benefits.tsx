@@ -4,21 +4,13 @@ import type { Benefit as TBenefit } from "#/content/benefits";
 type Props = {
   classes?: string;
   items: TBenefit[];
-  subheading?: string;
   heading: string;
   body: string;
 };
 export function Benefits(props: Props) {
   return (
     <section className={`grid ${props.classes ?? ""}`}>
-      {props.subheading && (
-        <h4 className="text-lg uppercase text-primary text-center mb-4">
-          {props.subheading}
-        </h4>
-      )}
-      <h2 className="text-3xl md:text-4.5xl capitalize text-center text-pretty mb-4">
-        {props.heading}
-      </h2>
+      <h2 className="section-heading text-center mb-4">{props.heading}</h2>
       <p className="text-xl text-center mb-24 text-balance">{props.body}</p>
       <div className="grid gap-y-4 @2xl:gap-y-8">
         {props.items.map((b, i) => (
@@ -46,7 +38,7 @@ function Benefit(props: TBenefit) {
         <h4 className="text-xl @2xl:text-2xl text-center @2xl:text-left mb-6 text-pretty">
           {props.title}
         </h4>
-        <p className="text-lg @2xl:text-xl text-gray-11 text-center @2xl:text-left">
+        <p className="text-lg @2xl:text-xl text-center @2xl:text-left">
           {props.description}
         </p>
       </div>

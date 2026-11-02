@@ -1,28 +1,12 @@
 import { Button, EmptyRow, ExtLink, LoadMoreRow } from "@better-giving/ui";
 import { ArrowDownToLine } from "lucide-react";
 import { href, Link } from "react-router";
-import { CsvExporter } from "#/components/csv-exporter";
 import { Money } from "#/components/money";
 import { PaymentResumer } from "#/pages/user-dashboard/donations/payment-resumer";
 import type { IPaginator } from "#/types/components";
 import { is_reversed, type TStatus } from "@/donations";
 import { toPP } from "@/helpers/date";
 import { type IRow, status_label, status_text_color } from "./helpers";
-
-const csv_headers: { key: keyof IRow; label: string }[] = [
-  { key: "id", label: "id" },
-  { key: "date", label: "date" },
-  { key: "status", label: "status" },
-  { key: "recipient_name", label: "recipient" },
-  { key: "recipient_id", label: "recipient id" },
-  { key: "program_name", label: "program" },
-  { key: "program_id", label: "program id" },
-  { key: "currency", label: "currency" },
-  { key: "amount", label: "amount" },
-  { key: "usd_value", label: "usd value" },
-  { key: "payment_method", label: "payment method" },
-  { key: "frequency", label: "frequency" },
-];
 
 interface Props extends IPaginator<IRow> {
   /** the active status filter, when one is on. a filtered table that came
@@ -40,17 +24,6 @@ export function Table({
 }: Props) {
   return (
     <div className={classes}>
-      <div className="flex items-center justify-end mb-2">
-        <CsvExporter
-          label="Export my donations as CSV"
-          classes="hover:text-primary"
-          headers={csv_headers}
-          data={items}
-          filename="my_donations.csv"
-        >
-          <ArrowDownToLine className="icon-md" />
-        </CsvExporter>
-      </div>
       <table className="table">
         <thead>
           <tr>
@@ -85,7 +58,9 @@ export function Table({
             items.map((row) => {
               return (
                 <tr key={row.id}>
-                  <td>{row.date ? toPP(row.date) : "--"}</td>
+                  <td className="whitespace-nowrap">
+                    {row.date ? toPP(row.date) : "--"}
+                  </td>
                   <td>
                     {row.recipient_type === "npo" ? (
                       <Link
@@ -125,7 +100,7 @@ export function Table({
                   <td>
                     <Money
                       classes={
-                        row.status === "refunded"
+                        is_reversed(row.status)
                           ? "line-through text-destructive-subtle-fg"
                           : ""
                       }
@@ -133,7 +108,9 @@ export function Table({
                       currency={row.currency}
                       amount_usd={row.usd_value}
                     />
-                    <p className="text-2xs uppercase">{row.frequency}</p>
+                    <p className="text-xs first-letter:uppercase">
+                      {row.frequency}
+                    </p>
                   </td>
                   <td className="capitalize">{row.payment_method}</td>
                   <td>

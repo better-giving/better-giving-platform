@@ -206,7 +206,9 @@ describe("the payouts page", () => {
     await expect.element(screen.getByText("Pending")).toBeVisible();
     expect(sent_region(screen).query()).toBeNull();
     expect(
-      screen.getByRole("heading", { name: "Payouts", exact: true }).query()
+      screen
+        .getByRole("heading", { level: 2, name: "Payouts", exact: true })
+        .query()
     ).toBeNull();
   });
 
@@ -274,7 +276,9 @@ describe("the payouts page", () => {
       screen.getByText("No payouts yet", { exact: true }).query()
     ).toBeNull();
     expect(
-      screen.getByRole("heading", { name: "Payouts", exact: true }).query()
+      screen
+        .getByRole("heading", { level: 2, name: "Payouts", exact: true })
+        .query()
     ).toBeNull();
   });
 
@@ -338,7 +342,9 @@ describe("the payouts page", () => {
 
     await expect.element(sent_region(screen).getByText("$90.00")).toBeVisible();
     await expect
-      .element(screen.getByRole("heading", { name: "Payouts", exact: true }))
+      .element(
+        screen.getByRole("heading", { level: 2, name: "Payouts", exact: true })
+      )
       .toBeVisible();
     await expect.element(screen.getByText("$12.50")).toBeVisible();
     await expect.element(screen.getByText("Pending")).toBeVisible();

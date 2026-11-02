@@ -19,7 +19,7 @@ export function FieldCell({
   const id = `__${props.name}`;
 
   return (
-    <td className={`${classes} has-focus:bg-warning/10 relative`}>
+    <td className={`${classes} has-focus:bg-warning-subtle relative`}>
       <input
         ref={ref}
         {...props}
@@ -28,7 +28,7 @@ export function FieldCell({
         spellCheck={false}
         className="focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2 p-2 text-sm placeholder:text-gray-11"
       />
-      <p className="empty:hidden text-2xs text-destructive-subtle-fg right-0 absolute -bottom-1.5">
+      <p className="empty:hidden text-xs text-destructive-subtle-fg right-0 absolute -bottom-1.5">
         {error}
       </p>
     </td>

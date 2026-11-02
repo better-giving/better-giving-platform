@@ -28,9 +28,10 @@ export function Table({
       <table className="table">
         <thead>
           <tr>
-            {/* icons */}
-            <th />
-            <th />
+            {/* icon and description: no header, and no width of their own
+                when there are no rows, so Amount leads an empty table */}
+            <th className="w-0 p-0" />
+            <th className="w-0 p-0" />
             <th>Amount</th>
             <th>Date</th>
             <th>Status</th>
@@ -43,7 +44,7 @@ export function Table({
           {items.map((r, idx) => (
             <tr key={idx}>
               <td>{row_meta(r).icon}</td>
-              <td>{row_meta(r).description}</td>
+              <td className="whitespace-nowrap">{row_meta(r).description}</td>
 
               <td>
                 <div className="relative">
@@ -65,8 +66,10 @@ export function Table({
                   ${humanize(r.amount)}{" "}
                 </div>
               </td>
-              <td>{format(r.date_updated, "PP")}</td>
-              <td className="uppercase text-xs">
+              <td className="whitespace-nowrap">
+                {format(r.date_updated, "PP")}
+              </td>
+              <td className="text-xs">
                 {r.status === "cancelled" ? (
                   <span className="text-destructive-subtle-fg">Cancelled</span>
                 ) : r.status === "pending" ? (

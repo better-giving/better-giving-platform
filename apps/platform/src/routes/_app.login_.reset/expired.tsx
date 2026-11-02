@@ -13,9 +13,9 @@ export function Expired(props: Props) {
         <CircleAlert className="size-8 sm:size-10 text-destructive" />
       </div>
 
-      <h3 className="text-center text-xl sm:text-2xl font-bold mt-5">
+      <h1 className="text-center text-xl sm:text-2xl font-bold mt-5">
         Link expired
-      </h3>
+      </h1>
       <p className="mt-3 max-sm:text-sm leading-relaxed text-center">
         This password reset link has expired or is no longer valid. Request a
         new one and it will be sent to{" "}
@@ -37,7 +37,7 @@ export function Expired(props: Props) {
         to={login_url(props.to)}
         className="mt-5 link max-sm:text-sm font-medium underline text-center"
       >
-        Back to Sign In
+        Back to sign in
       </Link>
     </div>
   );

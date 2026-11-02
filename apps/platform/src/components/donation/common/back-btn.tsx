@@ -11,7 +11,7 @@ export function BackBtn({
       className={`flex relative -left-1.5 text-sm items-center font-medium text-(--form-primary) hover:underline disabled:text-gray-11 aria-disabled:text-gray-11 ${className}`}
     >
       <ChevronLeft className="icon-lg" />
-      <span>Go Back</span>
+      <span>Go back</span>
     </button>
   );
 }

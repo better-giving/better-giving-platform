@@ -1,8 +1,7 @@
-import { Image } from "@better-giving/ui";
+import { GoalBar, Image } from "@better-giving/ui";
 import { to_usd } from "@better-giving/ui/helpers";
 import { Clock } from "lucide-react";
 import { Link } from "react-router";
-import { GoalBar } from "./goal-bar";
 import { ends_label, type IGiveItem } from "./items";
 
 export interface IGiveCard {
@@ -21,10 +20,11 @@ const KIND: Record<IGiveItem["kind"], string> = {
   supporter: "Supporter campaign",
 };
 
-/** a card that is wholly a link: hover firms the edge, press nudges it like
+/** a card that is wholly a link: hover firms its step-6 edge to the step-8
+ * interactive one, press nudges it like
  * `.btn-primary`. children react through the `card` group */
 export const CARD_LINK =
-  "group/card transition-colors hover:border-gray-7 active:translate-y-px";
+  "group/card transition-colors hover:border-gray-8 active:translate-y-px";
 
 /** a campaign or supporter campaign, its 4:1 image across the top at every
  * count and width. the title is the card's one link, stretched over
@@ -36,7 +36,7 @@ export function GiveCard({ item, feature = false, now, show_kind }: IGiveCard) {
   const ends = ends_label(item.ends_at, now);
   return (
     <article
-      className={`${CARD_LINK} relative grid h-full grid-rows-[auto_1fr] overflow-hidden rounded border bg-panel text-gray-12 has-[h3_a:focus-visible]:outline-2 has-[h3_a:focus-visible]:outline-ring has-[h3_a:focus-visible]:-outline-offset-2`}
+      className={`${CARD_LINK} relative grid h-full grid-rows-[auto_1fr] overflow-hidden bg-card rounded-card border border-hairline text-gray-12 has-[h3_a:focus-visible]:outline-2 has-[h3_a:focus-visible]:outline-ring has-[h3_a:focus-visible]:-outline-offset-2`}
     >
       <ImageFrame src={item.image} />
       <div className="flex min-w-0 flex-col gap-2 p-4">

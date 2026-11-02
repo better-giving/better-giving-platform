@@ -4,7 +4,7 @@ import { app_name } from "#/constants/env";
 export function BottomCta({ classes = "" }) {
   return (
     <div
-      className={`${classes} bg-linear-to-br from-primary to-secondary rounded md:rounded px-10 py-12 md:px-16 lg:px-20 lg:py-16`}
+      className={`${classes} surface-primary rounded md:rounded px-10 py-12 md:px-16 lg:px-20 lg:py-16`}
     >
       <h2 className="text-center text-4xl md:text-5xl lg:text-5xl text-primary-fg mb-6 leading-tight">
         Join nonprofits who keep the Giving Tuesday spirit alive, all year.
@@ -16,13 +16,13 @@ export function BottomCta({ classes = "" }) {
       <div className="flex flex-col md:flex-row justify-center items-center gap-6 mb-12">
         <Link
           to={href("/register")}
-          className="btn btn-lg btn-primary font-bold"
+          className="btn btn-lg btn-inverse font-bold"
         >
           Join us today!
         </Link>
         <Link
           to={href("/product")}
-          className="btn btn-lg btn-secondary font-bold"
+          className="btn btn-lg btn-outline font-bold"
         >
           Learn How It Works
         </Link>

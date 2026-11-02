@@ -24,7 +24,7 @@ export function Manifesto({ classes = "" }: IManifesto) {
   return (
     <section className={classes} aria-labelledby="manifesto-heading">
       <div className="page">
-        <p className="text-xs font-bold uppercase tracking-wider text-primary text-center">
+        <p className="text-sm font-semibold text-gray-11 text-center">
           The Better Giving Manifesto
         </p>
         <h2
@@ -35,10 +35,7 @@ export function Manifesto({ classes = "" }: IManifesto) {
         </h2>
         <div className="grid gap-5 md:grid-cols-3 mt-11">
           {rights.map((r) => (
-            <div
-              key={r.num}
-              className="card-on-band shadow-lift-card grid gap-2.5 content-start"
-            >
+            <div key={r.num} className="card grid gap-2.5 content-start">
               <span className="text-3xl font-bold text-primary">{r.num}</span>
               <span className="text-xl font-bold">{r.title}</span>
               <p className="text-sm/relaxed text-gray-11">{r.body}</p>

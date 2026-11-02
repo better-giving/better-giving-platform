@@ -83,3 +83,29 @@ describe("my donations — stripe bank verification link", () => {
     }
   );
 });
+
+describe("my donations — a refunded gift's amount", () => {
+  // text-decoration is not inherited, so the strike sits on some element
+  // between the figure and its cell
+  const struck = (cell: Element) =>
+    [cell, ...cell.querySelectorAll("*")].some((el) =>
+      getComputedStyle(el).textDecorationLine.includes("line-through")
+    );
+
+  test.each(["refunded", "refunded_loss"] as const)(
+    "a %s row strikes its amount",
+    async (status) => {
+      const screen = await render_table([row({ status })]);
+      const amount = screen.getByRole("row").nth(1).getByRole("cell").nth(2);
+      await expect.element(amount).toBeVisible();
+      expect(struck(amount.element())).toBe(true);
+    }
+  );
+
+  test("a settled row does not", async () => {
+    const screen = await render_table([row({ status: "settled" })]);
+    const amount = screen.getByRole("row").nth(1).getByRole("cell").nth(2);
+    await expect.element(amount).toBeVisible();
+    expect(struck(amount.element())).toBe(false);
+  });
+});

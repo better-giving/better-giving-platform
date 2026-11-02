@@ -47,7 +47,7 @@ export function Donate({ base_url, classes = "" }: IDonate) {
   return (
     <section className={classes} aria-labelledby="donate-heading">
       <div className="page grid justify-items-center">
-        <p className="text-xs font-bold uppercase tracking-wider text-primary">
+        <p className="text-sm font-semibold text-gray-11">
           Support Better Giving
         </p>
         <h2
@@ -64,7 +64,7 @@ export function Donate({ base_url, classes = "" }: IDonate) {
         <Steps
           {...donate_mount}
           base_url={base_url}
-          classes="mt-11 max-w-2xl rounded border shadow-lift-card"
+          classes="mt-11 max-w-2xl rounded-card border border-hairline"
         />
       </div>
     </section>

@@ -30,9 +30,9 @@ export function SetPasswordForm(props: Props) {
         aria-hidden
         className="sr-only"
       />
-      <h3 className="text-center text-xl sm:text-2xl font-bold">
+      <h1 className="text-center text-xl sm:text-2xl font-bold">
         Set new password
-      </h3>
+      </h1>
       <p className="text-center max-sm:text-sm mt-2">
         Enter a new password for{" "}
         <span className="font-medium">{props.email}</span>

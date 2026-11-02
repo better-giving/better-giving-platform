@@ -113,7 +113,7 @@ describe("GiveCard", () => {
     const card = (n: number) =>
       screen.getByRole("article").filter({ hasText: `Clean water ${n}` });
 
-    await expect.element(card(1)).toMatchTextContent("Ends in 5 days");
+    await expect.element(card(1)).toMatchTextContent("Ends in 6 days");
     await expect.element(card(2)).toMatchTextContent("Ends today");
     await expect.element(card(3)).not.toMatchTextContent("Ends");
     await expect.element(card(4)).not.toMatchTextContent("Ends");
@@ -192,9 +192,10 @@ describe("card image", () => {
         ).getBoundingClientRect();
         const box = card.getBoundingClientRect();
         expect(Math.abs(slot.width / slot.height - 4) / 4).toBeLessThan(0.01);
-        // across the top of the card, edge to edge, at every count: the
-        // feature card, the halves, the thirds and the program alike
-        expect(slot.top).toBeCloseTo(box.top + 1, 0);
+        // across the top of the card, edge to edge inside its 1px border, at
+        // every count: the feature card, the halves, the thirds and the
+        // program alike
+        expect(slot.top).toBeCloseTo(box.top + card.clientTop, 0);
         expect(slot.width).toBeCloseTo(card.clientWidth, 0);
         const img = card.querySelector("img") as HTMLImageElement;
         await expect.poll(() => img.complete).toBe(true);
@@ -222,8 +223,9 @@ describe("card image", () => {
     expect(bars).toHaveLength(2);
     const [a, b] = bars.map((x) => x.getBoundingClientRect());
     expect(a.top).toBeCloseTo(b.top, 0);
-    const column = (bars[0].parentElement as HTMLElement)
-      .parentElement as HTMLElement;
+    // track → GoalBar root → the figures block → the text column
+    const column = bars[0].parentElement?.parentElement
+      ?.parentElement as HTMLElement;
     const inner = column.getBoundingClientRect().width - 32; // p-4 either side
     expect(a.width).toBeCloseTo(inner, 0);
   });
@@ -440,9 +442,10 @@ describe("ItemsByCount", () => {
     expect(bars).toHaveLength(2);
     const [a, b] = bars.map((x) => x.getBoundingClientRect());
     expect(a.top).toBeCloseTo(b.top, 0);
-    // the figures' line sits on the column's bottom padding plus the border;
-    // the articles' own bottoms match whatever happens, the grid stretches them
-    const edge = 16 + 1; // p-4 below the column, inside the 1px border
+    // the figures' line sits on the column's bottom padding, inside the
+    // card's 1px edge; the articles' own bottoms match whatever happens, the
+    // grid stretches them
+    const edge = 16 + 1; // p-4 below the column, then the border
     const articles = screen.getByRole("article").elements();
     expect(articles).toHaveLength(2);
     for (const [i, figures] of ["$1,200 of $5,000", "$300 of $900"].entries()) {

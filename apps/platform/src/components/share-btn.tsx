@@ -71,7 +71,7 @@ export function ShareButton({ classes = "", ...p }: IShareButton) {
         <Portal>
           <Menu.Positioner>
             <Menu.Content
-              className={`z-floating grid grid-cols-2 w-max p-3 rounded bg-panel text-gray-12 shadow-floating ${popup_anim}`}
+              className={`z-floating grid grid-cols-2 w-max p-3 rounded-card bg-popover text-gray-12 shadow-floating focus:outline-0 ${popup_anim}`}
             >
               {menuItems.map((item) => (
                 <Menu.Item key={item.name} value={item.name} asChild>
@@ -83,7 +83,7 @@ export function ShareButton({ classes = "", ...p }: IShareButton) {
                     target="_blank"
                     rel="noopener noreferrer"
                     className={
-                      "hover:bg-gray-3 data-highlighted:bg-gray-3 data-highlighted:text-gray-12 data-highlighted:outline-2 data-highlighted:outline-ring data-highlighted:-outline-offset-2 flex items-center gap-3 px-3 py-2 rounded text-gray-11 hover:text-gray-12"
+                      "hover:bg-gray-4 data-highlighted:bg-gray-4 data-highlighted:text-gray-12 data-highlighted:outline-2 data-highlighted:outline-ring data-highlighted:-outline-offset-2 flex items-center gap-3 px-3 py-2 rounded text-gray-11 hover:text-gray-12"
                     }
                   >
                     {item.icon}
@@ -98,11 +98,11 @@ export function ShareButton({ classes = "", ...p }: IShareButton) {
                     navigator.clipboard.writeText(p.url);
                   }}
                   className={
-                    "hover:bg-gray-3 data-highlighted:bg-gray-3 data-highlighted:text-gray-12 data-highlighted:outline-2 data-highlighted:outline-ring data-highlighted:-outline-offset-2 border-t text-sm col-span-full flex items-center gap-3 w-full px-3 py-2 rounded hover:text-gray-12"
+                    "hover:bg-gray-4 data-highlighted:bg-gray-4 data-highlighted:text-gray-12 data-highlighted:outline-2 data-highlighted:outline-ring data-highlighted:-outline-offset-2 border-t border-hairline text-sm col-span-full flex items-center gap-3 w-full px-3 py-2 rounded hover:text-gray-12"
                   }
                 >
                   <LinkIcon className="icon-md" />
-                  Copy Link
+                  Copy link
                 </button>
               </Menu.Item>
             </Menu.Content>

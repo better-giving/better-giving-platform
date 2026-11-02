@@ -55,7 +55,7 @@ export function DonateMethods({
         axis="y"
         onReorder={(values) => on_change(values.map((v) => JSON.parse(v)))}
         values={values.map((v) => JSON.stringify(v))}
-        className="border rounded overflow-hidden divide-y"
+        className="border border-hairline rounded overflow-hidden divide-y divide-hairline"
       >
         {values.map((v, i) => (
           <Method
@@ -110,7 +110,7 @@ function Method({ value, index, total, hint_id, move, updator }: IMethod) {
       dragControls={controls}
       id={value.id}
       style={{ y }}
-      className="flex items-center gap-2 p-3 min-h-12 bg-panel data-unchecked:bg-gray-3 data-unchecked:text-gray-11 select-none"
+      className="flex items-center gap-2 px-3 min-h-12 bg-surface hover:bg-gray-4 transition-colors text-gray-12 data-unchecked:text-gray-11 select-none"
     >
       <input
         id={checkbox_id}
@@ -123,8 +123,12 @@ function Method({ value, index, total, hint_id, move, updator }: IMethod) {
       />
       {/* checkbox, label, grip — the label is the checkbox's target and has to
           touch it, so the grip sits at the trailing edge rather than between
-          the two. */}
-      <label htmlFor={checkbox_id} className="text-sm grow">
+          the two. it stretches to the row's height, so the row toggles nearly
+          edge to edge and its step-4 hover is honest. */}
+      <label
+        htmlFor={checkbox_id}
+        className="text-sm grow self-stretch flex items-center py-3 cursor-pointer"
+      >
         {value.name}
       </label>
       <button

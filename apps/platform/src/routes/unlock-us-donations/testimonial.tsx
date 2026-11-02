@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 
 export function Testimonial() {
   return (
-    <section className="bg-panel py-20 md:py-24">
+    <section className="bg-band py-20 md:py-24">
       <div className="page">
         <motion.blockquote
           className="max-w-3xl mx-auto text-center grid gap-6"

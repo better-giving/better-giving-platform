@@ -68,7 +68,7 @@ export function ProbSol({ classes = "" }) {
       className={`${classes} grid justify-items-center gap-10 @6xl:justify-items-start @6xl:grid-cols-[2fr_1fr] py-24`}
     >
       <div className="order-2 @6xl:order-1">
-        <h4 className="text-center @6xl:text-left @6xl:text-lg uppercase text-primary mb-5">
+        <h4 className="text-center @6xl:text-left @6xl:text-lg text-primary mb-5">
           CHALLENGES AND BETTER GIVING SOLUTIONS
         </h4>
         <h1 className="text-center @6xl:text-left text-4.5xl @6xl:text-5xl @6xl:leading-tight text-balance mb-4">
@@ -94,13 +94,15 @@ export function ProbSol({ classes = "" }) {
         className="order-1 @6xl:order-2 justify-self-center @max-6xl:w-40 @6xl:justify-self-start self-center rotate-y-180"
       />
 
-      <article className="col-span-full order-3">
-        <h4 className="text-center @6xl:text-left text-lg @6xl:text-3xl uppercase mb-6">
+      {/* stretched: the grid's start alignment would size it to its content,
+          and the scroller's inline-size containment gives that content no width */}
+      <article className="col-span-full order-3 justify-self-stretch">
+        <h4 className="text-center @6xl:text-left text-lg @6xl:text-3xl mb-6">
           How Better Giving Solves It
         </h4>
         <div className="table-scroll">
           <table className="w-full border-collapse">
-            <thead className="bg-gray-3">
+            <thead>
               <tr className="border-b">
                 <th className="text-left font-semibold pb-2">
                   <div className="text-lg flex items-center gap-2 text-destructive-subtle-fg">

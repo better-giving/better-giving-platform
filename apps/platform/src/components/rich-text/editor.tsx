@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { type Ref, useImperativeHandle, useState } from "react";
 import { is_absolute_web_href } from "@/helpers/safe-href";
-import { list_ordinal, to_document } from "./helpers";
+import { list_ordinal, to_document, to_text } from "./helpers";
 import { pt_schema } from "./schema";
 import type { Editable as EditableProps, Props } from "./types";
 
@@ -67,7 +67,8 @@ function EditableShell({
       />
       <FocusBridge fwdRef={ref} />
       <Toolbar
-        char_count={props.content.length ?? 0}
+        // a form seeded from stored json carries no length until the first edit
+        char_count={props.content.length ?? to_text(props.content.value).length}
         char_limit={props.charLimit}
       />
       <PortableTextEditable
@@ -166,7 +167,7 @@ function Toolbar({
     selectors.isActiveAnnotation("link")
   );
   return (
-    <div className="flex flex-wrap items-center gap-x-0.5 gap-y-1 pb-2 border-b border-gray-3">
+    <div className="flex flex-wrap items-center gap-x-0.5 gap-y-1 pb-2 border-b border-hairline">
       <DecoratorBtn name="strong" icon={<BoldIcon className="icon-md" />} />
       <DecoratorBtn name="em" icon={<ItalicIcon className="icon-md" />} />
       <ListBtn name="number" icon={<ListOrderedIcon className="icon-md" />} />

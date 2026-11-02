@@ -81,7 +81,7 @@ export function Filter({ classes = "", isDisabled }: Props) {
       >
         <Popover.Trigger
           disabled={isDisabled}
-          className="w-full flex justify-center items-center p-3 rounded bg-primary text-primary-fg lg:text-gray-11 lg:bg-surface lg:w-[22.3rem] lg:justify-between disabled:bg-gray-11 disabled:text-gray-11 lg:disabled:bg-gray-3 lg:border focus-visible:outline-none"
+          className="w-full flex justify-center items-center p-3 rounded bg-primary text-primary-fg hover:bg-primary-hover lg:text-gray-11 lg:bg-surface lg:border lg:border-input lg:hover:bg-gray-4 lg:hover:border-input-hover lg:w-[22.3rem] lg:justify-between disabled:bg-gray-3 disabled:text-gray-11 lg:disabled:bg-gray-3 focus-visible:outline-2 focus-visible:outline-ring"
         >
           <FilterIcon className="mr-1 lg:hidden icon-md" />
           <div className="font-semibold text-sm">Filter</div>
@@ -92,7 +92,7 @@ export function Filter({ classes = "", isDisabled }: Props) {
           <Popover.Positioner>
             <Popover.Content
               asChild
-              className={`grid content-start gap-4 w-(--reference-width) rounded border bg-panel text-gray-12 ${popup_anim}`}
+              className={`grid content-start gap-4 w-(--reference-width) bg-popover rounded-card shadow-floating text-gray-12 ${popup_anim}`}
             >
               <form
                 onSubmit={handleSubmit(submit)}

@@ -18,12 +18,14 @@ export function Poster(props: IOrgLayout) {
   const { npo } = props;
   // the card's Donate, which the header waits on before showing its own
   const [hero_donate, set_hero_donate] = useState<HTMLElement | null>(null);
+  // the hero's name, which the header's mark and name wait on
+  const [hero_name, set_hero_name] = useState<HTMLElement | null>(null);
   const has_story = !!to_text(npo.overview_pt).trim();
   const tagline = npo.tagline?.trim();
   const has_more = has_ways_to_help(props) || props.messages.length > 0;
 
   return (
-    <OrgPageFrame page={props} hero_donate={hero_donate}>
+    <OrgPageFrame page={props} hero_donate={hero_donate} hero_name={hero_name}>
       {/* with nothing after it, the band fills main down to the footer and
           centres the hero in it, leaving no bare page between them */}
       <BrandBand
@@ -39,7 +41,7 @@ export function Poster(props: IOrgLayout) {
                 <OrgMark name={npo.name} logo={npo.logo} size="md" ring />
                 <OrgMeta npo={npo} credential={props.credential} />
               </div>
-              <OrgName name={npo.name} scale="lg" />
+              <OrgName ref={set_hero_name} name={npo.name} scale="lg" />
               {tagline && (
                 <p className="text-lg leading-snug md:text-2xl">{tagline}</p>
               )}

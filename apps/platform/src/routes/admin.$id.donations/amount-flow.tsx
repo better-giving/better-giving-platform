@@ -24,15 +24,15 @@ type Acc = keyof IAllocation;
 
 type DescMap = { [acc in Acc]: Desc };
 const desc_map: DescMap = {
-  cash: { Icon: HandCoins, class: "shrink-0 stroke-neutral", text: "Grant" },
+  cash: { Icon: HandCoins, class: "shrink-0", text: "Grant" },
   liq: {
     Icon: PiggyBankIcon,
-    class: "shrink-0 stroke-neutral",
+    class: "shrink-0",
     text: "Savings",
   },
   lock: {
     Icon: SproutIcon,
-    class: "shrink-0 stroke-neutral",
+    class: "shrink-0",
     text: "Investments",
   },
 };
@@ -67,7 +67,7 @@ export function AmountFlow({ total, font_size = 14, allocation }: Props) {
             {item.text && (
               <div
                 className="text-gray-11 whitespace-nowrap"
-                style={{ fontSize: `${font_size * 0.75}px` }}
+                style={{ fontSize: `${Math.max(12, font_size * 0.75)}px` }}
               >
                 - {item.text}
               </div>

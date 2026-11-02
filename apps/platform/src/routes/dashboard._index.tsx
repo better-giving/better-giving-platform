@@ -1,6 +1,6 @@
 import { Image } from "@better-giving/ui";
-import { LogOutIcon, PlusIcon, ShieldIcon, XIcon } from "lucide-react";
-import { Form, href, Link, useFetcher } from "react-router";
+import { PlusIcon, ShieldIcon, XIcon } from "lucide-react";
+import { href, Link, useFetcher } from "react-router";
 import { safeParse } from "valibot";
 import { user_ctx } from "#/.server/auth";
 import { user_bookmarks, user_npos } from "#/.server/user";
@@ -10,7 +10,7 @@ import { $int_gte1 } from "@/schemas";
 import { user_bookmark_del, user_get } from "$/pg/queries/user";
 import type { Route } from "./+types/dashboard._index";
 
-export const meta: Route.MetaFunction = () => metas({ title: "My Account" });
+export const meta: Route.MetaFunction = () => metas({ title: "My account" });
 
 export const loader = async ({ context }: Route.LoaderArgs) => {
   const user = context.get(user_ctx);
@@ -47,71 +47,48 @@ export const action = async ({ request, context }: Route.ActionArgs) => {
 
 export default function Page({ loaderData: d }: Route.ComponentProps) {
   return (
-    <div className="grid grid-cols-1 content-start relative px-6 py-4 md:px-10 md:py-8">
+    <div className="grid grid-cols-1 content-start relative px-4 py-4 md:px-10 md:py-8">
       {/* identity header — name is the page's primary heading */}
-      <div className="flex items-center gap-x-4 mb-8">
-        <UserAvatar avatar={d.avatar_url} classes="size-16" />
+      <div className="flex items-center gap-x-3 mb-8">
+        <UserAvatar avatar={d.avatar_url} classes="size-12" />
         <div className="grid">
-          <h1 className="text-lg font-bold">{d.name}</h1>
+          <h1 className="text-xl font-semibold">{d.name}</h1>
           <span className="text-sm text-gray-11">{d.email}</span>
         </div>
-        <Form
-          method="POST"
-          action={href("/logout")}
-          className="ml-auto shrink-0"
-        >
-          <button
-            type="submit"
-            aria-label="Log Out"
-            className="flex items-center gap-x-2 text-sm text-gray-11 transition-colors hover:text-destructive-subtle-fg focus-visible:outline-2 focus-visible:outline-ring rounded"
-          >
-            <LogOutIcon className="icon-lg shrink-0" />
-            <span className="max-sm:sr-only">Log Out</span>
-          </button>
-        </Form>
       </div>
 
       {/* platform admin — surfaced first for the few users who have it */}
       {d.is_admin && (
         <Link
           to={href("/platform")}
-          className="card flex items-center gap-x-3 mb-8 transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+          className="card flex items-center gap-x-3 mb-8 transition-colors hover:border-gray-8 hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
         >
-          <span className="size-8 rounded-full bg-primary/10 text-primary grid place-items-center shrink-0">
+          <span className="size-8 rounded-full bg-secondary text-blue-11 grid place-items-center shrink-0">
             <ShieldIcon className="icon-lg" />
           </span>
-          <span className="text-sm font-medium">Platform Admin</span>
+          <span className="text-sm font-medium">Platform admin</span>
         </Link>
       )}
 
       {/* organizations */}
       <section aria-labelledby="hub-orgs" className="mb-8">
-        <h2
-          id="hub-orgs"
-          className="uppercase text-xs text-gray-11 tracking-wide mb-3"
-        >
-          My Organizations
+        <h2 id="hub-orgs" className="text-xl font-semibold mb-3">
+          My organizations
         </h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {d.orgs.map((org) => (
             <Link
               key={org.id}
               to={href("/admin/:id", { id: org.id.toString() })}
-              className="card flex items-center gap-x-3 transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+              className="card flex items-center gap-x-3 transition-colors hover:border-gray-8 hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
             >
-              <Image
-                loading="lazy"
-                src={org.logo}
-                className="object-cover aspect-square rounded-full shrink-0"
-                height={32}
-                width={32}
-              />
+              <LogoTile src={org.logo} />
               <span className="text-sm font-medium truncate">{org.name}</span>
             </Link>
           ))}
           <Link
             to={href("/register")}
-            className="flex items-center gap-x-3 border border-dashed border-gray-6 rounded p-3 text-gray-11 transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+            className="flex items-center gap-x-3 border border-dashed border-gray-7 rounded-card p-6 text-gray-11 transition-colors hover:border-gray-8 hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
           >
             {/* placeholder slot sized to match the org logos */}
             <span className="size-8 rounded-full bg-gray-3 grid place-items-center shrink-0">
@@ -126,12 +103,12 @@ export default function Page({ loaderData: d }: Route.ComponentProps) {
 
       {/* favorites — omitted when empty; divider separates it from orgs */}
       {d.bookmarks.length > 0 && (
-        <section aria-labelledby="hub-favorites" className="mb-8 pt-8 border-t">
-          <h2
-            id="hub-favorites"
-            className="uppercase text-xs text-gray-11 tracking-wide mb-3"
-          >
-            My Favorites
+        <section
+          aria-labelledby="hub-favorites"
+          className="mb-8 pt-8 border-t border-hairline"
+        >
+          <h2 id="hub-favorites" className="text-xl font-semibold mb-3">
+            My favorites
           </h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {d.bookmarks.map((b) => (
@@ -141,6 +118,26 @@ export default function Page({ loaderData: d }: Route.ComponentProps) {
         </section>
       )}
     </div>
+  );
+}
+
+interface ILogoTile {
+  src?: string;
+}
+
+/** one fixed tile for every org mark, so a missing or transparent logo still
+ *  holds the slot and the names beside them share an edge */
+function LogoTile({ src }: ILogoTile) {
+  return (
+    <span className="size-8 shrink-0 overflow-hidden rounded-full bg-gray-3">
+      <Image
+        loading="lazy"
+        src={src}
+        className="size-full object-cover"
+        height={32}
+        width={32}
+      />
+    </span>
   );
 }
 
@@ -159,15 +156,9 @@ function FavoriteCard({ fav }: { fav: IFavorite }) {
     <div className="relative">
       <Link
         to={href("/org/:org", { org: fav.id.toString() })}
-        className="card pr-11 flex items-center gap-x-3 transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+        className="card pr-11 flex items-center gap-x-3 transition-colors hover:border-gray-8 hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
       >
-        <Image
-          loading="lazy"
-          src={fav.logo}
-          className="object-cover aspect-square rounded-full shrink-0"
-          height={32}
-          width={32}
-        />
+        <LogoTile src={fav.logo} />
         <span className="text-sm font-medium truncate">{fav.name}</span>
       </Link>
       <fetcher.Form
@@ -179,7 +170,7 @@ function FavoriteCard({ fav }: { fav: IFavorite }) {
         <button
           type="submit"
           aria-label={`Remove ${fav.name} from favorites`}
-          className="grid place-items-center size-7 rounded-full text-gray-11 transition-colors hover:bg-gray-3 hover:text-destructive-subtle-fg focus-visible:outline-2 focus-visible:outline-ring"
+          className="grid place-items-center size-7 rounded-full text-gray-11 transition-colors hover:bg-gray-4 hover:text-destructive-subtle-fg focus-visible:outline-2 focus-visible:outline-ring"
         >
           <XIcon className="icon-md" />
         </button>

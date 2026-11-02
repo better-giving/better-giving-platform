@@ -10,7 +10,7 @@ export { ErrorModal as ErrorBoundary } from "#/components/error";
 export { add_action as action } from "./api";
 
 export const meta: MetaFunction = ({ matches }) =>
-  admin_page_meta("Invite User", matches);
+  admin_page_meta("Invite user", matches);
 
 export default function Page() {
   const navigate = useNavigate();
@@ -20,7 +20,7 @@ export default function Page() {
       onClose={() =>
         navigate("..", { preventScrollReset: true, replace: true })
       }
-      classes="p-6 bg-panel"
+      classes="p-6 bg-popover"
     >
       <Content />
     </Modal>
@@ -49,7 +49,7 @@ function Content() {
       method="POST"
       className="w-full grid gap-4"
     >
-      <h4 className="text-center text-xl font-bold mb-4">Invite User</h4>
+      <h4 className="text-center text-xl font-bold mb-4">Invite user</h4>
       <Field
         {...register("email")}
         label="Email"

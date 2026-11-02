@@ -12,9 +12,8 @@ const BANNER_TARGET = href("/blog/:slug", { slug: BANNER_POST_SLUG });
 // seam (see public-chrome.tsx).
 export function PublicLayout() {
   const { pathname } = useLocation();
-  const banner =
-    chrome_for(pathname) === "marketing" &&
-    pathname.replace(/\/+$/, "") !== BANNER_TARGET;
+  const marketing = chrome_for(pathname) === "marketing";
+  const banner = marketing && pathname.replace(/\/+$/, "") !== BANNER_TARGET;
 
   return (
     // the row template tracks whether the banner renders: grid auto-placement

@@ -126,7 +126,11 @@ describe("QuoteStrip", () => {
         .getByText("Message body 1")
         .element()
         .getBoundingClientRect();
-      const inset = Number.parseFloat(getComputedStyle(section).paddingBottom);
+      // the padding plus whatever edge the tone draws (the light box is a card)
+      const style = getComputedStyle(section);
+      const inset =
+        Number.parseFloat(style.paddingBottom) +
+        Number.parseFloat(style.borderBottomWidth);
       expect(
         section.getBoundingClientRect().bottom - caption.bottom
       ).toBeCloseTo(inset, 0);

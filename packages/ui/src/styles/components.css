@@ -14,8 +14,9 @@
   /* bare .btn is the md tier of the size scale — py-2 / px-6 / text-sm / 36px.
      the other two tiers (btn-sm, btn-lg) and btn-md live in utilities.css as
      @utility so they are variant-capable (`xl:btn-lg`) and win this layer.
-     radius is var(--radius) (4px) — the repo's one corner; a fractional
-     corner shows against .btn-secondary's faint 1px border. */
+     radius is var(--radius) (6px), the control corner of the two (a
+     container's is --radius-card); an integer step, since a fractional corner
+     shows against .btn-secondary's 1px edge. */
   .btn {
     display: flex;
     justify-content: center;
@@ -32,39 +33,36 @@
     border-radius: var(--radius);
   }
 
-  /* gray-7 is the ramp's ELEMENT-BORDER rung and every control recipe in this
-     file spells it — not --border, which is gray-6, the separator rung that
-     dividers, panel hairlines and table rules keep. spelled as the step rather
-     than as a token because a neutral line has no semantic name here: the
-     --color-* comment block in ./theme.css has the rule. */
-
-  /* --surface, not --panel: this is a control, and --surface is the fill a
-     control carries — on a --panel it is what lifts the button off its
-     container. on the bare page it is fill-identical instead and reads by its
-     border alone, the same bargain .field-input takes. */
-  /* a tinted control presses UP its scale: resting tint → -active, which is the
-     ramp's own selected rung. it does not darken toward black, which on a
-     near-white tint would carry the surface away from the ink sitting on it. */
+  /* the neutral control on radix's roles: steps 3 / 4 / 5 are its fill at
+     rest / hovered / pressed, and 7 / 8 its edge at rest / hovered — the
+     interactive-border rungs, the same two a field's edge (--input /
+     --input-hover) points at. spelled as the steps rather than as those
+     tokens: --input names a field's edge, and a button's is not one. */
   .btn-secondary {
-    background-color: var(--surface);
+    background-color: var(--gray-3);
     color: var(--gray-12);
     border: 1px solid var(--gray-7);
-    &:active {
-      background-color: var(--secondary-active);
-    }
     &:hover:not(:disabled):not([aria-disabled="true"]) {
-      background-color: var(--secondary);
+      background-color: var(--gray-4);
+      border-color: var(--gray-8);
+    }
+    /* same specificity as the hover and after it, so a press reads over a
+       hover rather than under it. */
+    &:active:not(:disabled):not([aria-disabled="true"]) {
+      background-color: var(--gray-5);
     }
   }
 
+  /* a neutral control resting transparent: no step at rest, 4 hovered, 5
+     pressed. */
   .btn-ghost {
     background-color: transparent;
     color: inherit;
     &:hover:not(:disabled):not([aria-disabled="true"]) {
-      background-color: var(--secondary);
+      background-color: var(--gray-4);
     }
-    &:active {
-      background-color: var(--secondary-active);
+    &:active:not(:disabled):not([aria-disabled="true"]) {
+      background-color: var(--gray-5);
     }
     &:disabled {
       background-color: var(--gray-3);
@@ -125,6 +123,19 @@
     }
   }
 
+  /* the filled button on a brand fill: --primary on --primary (or on
+     --primary-deep) is no button at all, so it inverts to the fill's own ink.
+     no hover rung — the --primary-fg alpha ladder is unmeasured
+     (design-system.md, "--primary-fg alpha steps") — so it keeps only the
+     filled variants' press. its ring is below the shared one. */
+  .btn-inverse {
+    background-color: var(--primary-fg);
+    color: var(--primary);
+    &:active {
+      transform: translateY(1px);
+    }
+  }
+
   /* an outline button that takes its color from the surface it sits on. the
      four call sites this replaces each hand-spelled the band's ink a second
      time — `border-2 border-primary-fg/40 text-primary-fg hover:bg-primary-fg/10`,
@@ -173,6 +184,13 @@
       outline: 2px solid var(--ring);
       outline-offset: 2px;
     }
+  }
+
+  /* the inverse button's ring is --primary-ring whatever scope it sits in: the
+     offset puts the ring on the brand fill around it, where --ring (blue-8)
+     does not read. after the shared ring, so it wins at equal specificity. */
+  .btn-inverse:focus-visible {
+    outline-color: var(--primary-ring);
   }
 
   .btn-outline,
@@ -235,9 +253,22 @@
     background-color: var(--surface);
     padding: calc(var(--spacing) * 3.5) calc(var(--spacing) * 4);
     min-block-size: var(--field-size);
-    border: 1px solid var(--gray-7);
+    /* --input, radix's interactive-border step 7 (under 1.4.11's 3:1 by PM
+       decision, packages/brand/src/colors.css). the hover leaves an invalid
+       field's destructive edge alone. */
+    border: 1px solid var(--input);
     outline-color: var(--ring);
     color: var(--gray-12);
+
+    &:hover:not(
+        :disabled,
+        [readonly],
+        [aria-disabled="true"],
+        :user-invalid,
+        [aria-invalid="true"]
+      ) {
+      border-color: var(--input-hover);
+    }
 
     &::placeholder {
       color: var(--gray-11);
@@ -268,8 +299,20 @@
       var(--text-sm--line-height) /* calc(1.25 / 0.875) ≈ 1.4286 */
     );
     background-color: var(--surface);
-    border: 1px solid var(--gray-7);
+    border: 1px solid var(--input);
     color: var(--gray-12);
+
+    &:hover:not(
+        :has(
+          input:disabled,
+          input[readonly],
+          input[aria-disabled="true"],
+          input:user-invalid,
+          input[aria-invalid="true"]
+        )
+      ) {
+      border-color: var(--input-hover);
+    }
 
     &:has(input:focus) {
       outline: solid;
@@ -308,17 +351,18 @@
   /* zag's select item emits data-state="checked"|"unchecked", data-highlighted
      and data-disabled — never data-selected. data-highlighted is the keyboard
      equivalent of :hover, so arrow navigation has to key off it or the pointer
-     is the only way to see where you are. */
+     is the only way to see where you are. a tinted option rests transparent,
+     hovers at the tint's step 4 and is selected at its step 5. */
   .selector-opt {
     padding: calc(var(--spacing) * 2) calc(var(--spacing) * 4);
     &[data-state="checked"] {
       background-color: var(--secondary-active);
     }
     &[data-highlighted] {
-      background-color: var(--secondary);
+      background-color: var(--secondary-hover);
     }
     &:hover {
-      background-color: var(--secondary);
+      background-color: var(--secondary-hover);
     }
   }
 
@@ -343,7 +387,9 @@
     left: 0;
     color: var(--ring);
     transition: transform var(--duration-base) var(--ease-out);
-    background-color: var(--panel);
+    /* the field's own fill: the raised label straddles the field's top edge,
+       and its lower half sits on the field. */
+    background-color: var(--surface);
     padding-right: var(--spacing);
     font-weight: var(--font-weight-semibold);
     font-size: var(--text-xs);
@@ -384,16 +430,26 @@
     color: var(--gray-11);
   }
 
+  /* a data table is a card with its inset delegated: the card's fill, edge
+     and corner on the table itself, so a table on the page needs no wrapper to
+     be one. its header row sits on the card's own tone, as radix themes'
+     table does, and is told by its ink and the rule under it; row and column
+     lines are --hairline, the line inside a card. the table is the shell
+     rather than its scroller because several tables have no scroller at all;
+     inside a `table-scroll` the shell moves to the scroller (below).
+     `separate` borders are what let a table take a border-radius. */
   .table {
+    --table-fill: var(--card);
+    /* the control corner, not the card's: a 12px curve clips the header
+       row's first and last labels (PM, 2026-11-02). */
+    --table-corner: var(--radius);
     min-width: 100%;
-    border: 1px solid var(--gray-6);
     border-collapse: separate;
     border-spacing: 0;
     font-feature-settings: "tnum", "zero";
-
-    & thead {
-      background-color: var(--gray-3);
-    }
+    background-color: var(--table-fill);
+    border-radius: var(--table-corner);
+    border: 1px solid var(--hairline);
 
     & th {
       font-weight: var(--font-weight-medium);
@@ -402,19 +458,21 @@
       color: var(--gray-11);
     }
 
+    /* the header row is a well on the table's fill: step 3 on step 2, so
+       the labels read apart from the rows under them (PM, 2026-11-02). */
+    /* biome-ignore lint/style/noDescendingSpecificity: unrelated to the shell selectors above */
+    & thead th {
+      background-color: var(--panel);
+    }
+
     & tbody tr {
       font-size: var(--text-sm);
       line-height: var(--text-sm--line-height);
     }
 
-    /* column dividers */
-    & :is(th, td) + :is(th, td) {
-      border-left: 1px solid var(--gray-6);
-    }
-
     /* row dividers */
     & :is(tbody, tfoot) > tr > :is(th, td) {
-      border-top: 1px solid var(--gray-6);
+      border-top: 1px solid var(--hairline);
     }
 
     & :is(th, td) {
@@ -422,20 +480,59 @@
       text-align: left;
     }
 
+    /* a filled row (a hovered or tinted one) paints in its cells' boxes, which
+       are square: the four corner cells take the shell's corner so the fill
+       stays inside it. --table-corner is 0 wherever the table is not its own
+       shell, so these fall away with it. first/last row group by sibling
+       rather than :first-child, which a <caption> or <colgroup> would take. */
+    &
+      > :is(thead, tbody, tfoot):not(:is(thead, tbody, tfoot) ~ *)
+      > tr:first-child {
+      & > :first-child {
+        border-start-start-radius: var(--table-corner);
+      }
+      & > :last-child {
+        border-start-end-radius: var(--table-corner);
+      }
+    }
+    &
+      > :is(thead, tbody, tfoot):not(:has(~ :is(thead, tbody, tfoot)))
+      > tr:last-child {
+      & > :first-child {
+        border-end-start-radius: var(--table-corner);
+      }
+      & > :last-child {
+        border-end-end-radius: var(--table-corner);
+      }
+    }
+
+    /* a money or count column: header and cells both carry `num`, so the
+       figures line up on the decimal and the label sits over them. */
+    & :is(th, td).num {
+      text-align: right;
+    }
+
+    /* the load-more row: a neutral control resting transparent, 4 hovered and
+       5 pressed. */
     & tfoot button {
       font-size: var(--text-xs);
       font-weight: var(--font-weight-semibold);
       width: 100%;
+      /* the load-more row is the table's last: its hover fill keeps the corner */
+      border-end-start-radius: var(--table-corner);
+      border-end-end-radius: var(--table-corner);
       padding: calc(var(--spacing) * 2);
       display: flex;
       align-items: center;
       justify-content: center;
       gap: calc(var(--spacing) * 2);
       /* biome-ignore lint/style/noDescendingSpecificity: unrelated to .btn-* selectors */
-      &:hover:not(:disabled):not([aria-disabled="true"]),
+      &:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: var(--gray-4);
+      }
       /* biome-ignore lint/style/noDescendingSpecificity: unrelated to .btn-* selectors */
-        &:active {
-        background-color: var(--secondary);
+      &:active {
+        background-color: var(--gray-5);
       }
       /* biome-ignore lint/style/noDescendingSpecificity: unrelated to .btn-* selectors */
       &:disabled,
@@ -445,5 +542,36 @@
         color: var(--gray-11);
       }
     }
+  }
+
+  /* a table already inside a card, or a dialog, is content of that surface: no
+     second fill, edge or corner. same specificity as `.table`, so it has to
+     stay after it. */
+  :where(.card, [role="dialog"]) .table {
+    --table-fill: transparent;
+    --table-corner: 0;
+    border-width: 0;
+  }
+
+  /* a table in a `table-scroll` hands its shell to the scroller: the
+     scroller's box is the table's box, and its overflow is what rounds the
+     table's corners. `>` so only the scroller directly around the table takes
+     it, never an outer wrapper. */
+  .table-scroll:has(> .table) {
+    background-color: var(--card);
+    border-radius: var(--radius);
+    border: 1px solid var(--hairline);
+  }
+  .table-scroll > .table {
+    --table-fill: transparent;
+    --table-corner: 0;
+    border-width: 0;
+  }
+  /* in a card or dialog the scroller is content too. after the rule above,
+     same specificity. */
+  :where(.card, [role="dialog"]) .table-scroll:has(> .table) {
+    background-color: transparent;
+    border-radius: 0;
+    border-width: 0;
   }
 }

@@ -19,11 +19,11 @@ export function PostCta({ cta }: IPostCta) {
   return (
     <div className="@container mt-12">
       <div
-        className={`grid ${img_url ? "@5xl:grid-cols-2" : ""} surface-primary rounded ring-8 @md:ring-[1rem] ring-secondary px-10 py-12 @5xl:px-16 @5xl:py-20`}
+        className={`grid ${img_url ? "@5xl:grid-cols-2" : ""} surface-primary rounded ring-8 @md:ring-[1rem] ring-blue-6 px-10 py-12 @5xl:px-16 @5xl:py-20`}
       >
         <div className="grid order-2 @5xl:order-1">
           {cta.eyebrow && (
-            <h4 className="text-center @5xl:text-left uppercase @md:text-lg text-primary-fg leading-normal mb-6">
+            <h4 className="text-center @5xl:text-left @md:text-lg text-primary-fg leading-normal mb-6">
               {cta.eyebrow}
             </h4>
           )}
@@ -39,10 +39,7 @@ export function PostCta({ cta }: IPostCta) {
           )}
           <div className="flex flex-wrap gap-3.5 justify-center @5xl:justify-start">
             {link1 && (
-              <ExtLink
-                href={link1.href}
-                className="text-primary border border-primary btn btn-lg bg-panel"
-              >
+              <ExtLink href={link1.href} className="btn btn-inverse btn-lg">
                 {link1.label}
               </ExtLink>
             )}

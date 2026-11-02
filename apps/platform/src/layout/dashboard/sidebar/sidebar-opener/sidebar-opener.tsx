@@ -1,11 +1,22 @@
 import { ChevronRight } from "lucide-react";
+import type { ReactNode } from "react";
 import type { LinkGroup } from "../types";
 import { ToggleableSidebar } from "./toggleable-sidebar";
 import { use_sidebar_opener } from "./use-sidebar-opener";
 
-type Props = { classes?: string; linkGroups: LinkGroup[]; rootRoute: string };
+type Props = {
+  classes?: string;
+  linkGroups: LinkGroup[];
+  rootRoute: string;
+  header?: ReactNode;
+};
 
-export function SidebarOpener({ classes = "", linkGroups, rootRoute }: Props) {
+export function SidebarOpener({
+  classes = "",
+  linkGroups,
+  rootRoute,
+  header,
+}: Props) {
   const { open, active_link, set_open } = use_sidebar_opener(
     linkGroups,
     rootRoute
@@ -17,16 +28,18 @@ export function SidebarOpener({ classes = "", linkGroups, rootRoute }: Props) {
       <button
         type="button"
         onClick={() => set_open(true)}
-        className={`flex items-center gap-2 py-5 px-6 border-b font-bold text-sm text-primary ${classes}`}
+        className={`flex items-center gap-2 py-5 px-4 font-bold text-sm text-primary ${classes}`}
       >
-        <Ico {...active_link.icon} />
+        <Ico className="icon-md" />
         {active_link.title}
         <ChevronRight className="ml-auto icon-xl" />
       </button>
       <ToggleableSidebar
         open={open}
         linkGroups={linkGroups}
+        rootRoute={rootRoute}
         set_open={set_open}
+        header={header}
       />
     </>
   );

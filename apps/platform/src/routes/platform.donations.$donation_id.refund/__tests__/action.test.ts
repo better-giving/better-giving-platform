@@ -574,7 +574,7 @@ describe("a gift the action refuses", () => {
     expect(await gift_of(gift.id)).toEqual(untouched);
   });
 
-  it.each(["nowpayments:crypto", "paypal:paypal", "chariot:daf"])(
+  it.each(["crypto:eth", "paypal:paypal", "chariot:daf"])(
     "refuses a %s donation in loader and action, reversing nothing",
     async (via) => {
       const gift = await seed_gift();

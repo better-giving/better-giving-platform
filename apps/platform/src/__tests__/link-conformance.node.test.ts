@@ -107,12 +107,20 @@ const hover_spellings = (text: string) =>
 /** a link that paints a surface of its own — a menu row, a tile, a tab. its
  *  ink shift is one part of a treatment that also moves a fill or an edge, so
  *  it is not the text link this recipe is for, and `link`'s brand ink at rest
- *  would be wrong on every one of them. */
+ *  would be wrong on every one of them. a `card` link is a tile by name: the
+ *  card has no edge to firm, so its hover is a fill shift (`hover:bg-panel`)
+ *  beside the ink. */
 const paints_surface = (text: string) =>
   text.includes("data-highlighted") ||
   tokens(text)
     .map(bare)
-    .some((c) => c.startsWith("bg-") || c === "border" || /^border-/.test(c));
+    .some(
+      (c) =>
+        c === "card" ||
+        c.startsWith("bg-") ||
+        c === "border" ||
+        /^border-/.test(c)
+    );
 
 /**
  * links whose ink is deliberately not the brand colour, by file and by the
@@ -139,14 +147,10 @@ const exempt: Record<string, string[]> = {
   "apps/platform/src/routes/dashboard.forms/table.tsx": [
     "text-destructive-subtle-fg",
   ],
-  // two navs that mark their current item by ink alone: `link` paints every
-  // item the brand colour and the current one stops being visible. the state
-  // table in packages/brand/design-system.md carries the blank.
-  "apps/platform/src/layout/dashboard/sidebar/sidebar.tsx": ["text-primary"],
+  // a nav that marks its current item by ink alone: `link` paints every item
+  // the brand colour and the current one stops being visible. the state table
+  // in packages/brand/design-system.md carries the blank.
   "apps/platform/src/components/header/marketing-header.tsx": ["text-primary"],
-  // campaign identity name rests in gray-12 and shifts to primary on hover.
-  // `link` would paint the name brand blue at rest, which the page spec rejects.
-  "apps/platform/src/routes/org.$org.$campaign/page.tsx": ["text-primary"],
 };
 
 const recipe =
@@ -198,9 +202,10 @@ describe("a link does not hand-spell its own hover", () => {
         false,
       ],
       [
-        '<Link className="card flex items-center hover:border-primary hover:text-primary">',
+        '<Link className="card flex items-center hover:bg-panel hover:text-primary">',
         false,
       ],
+      ['<Link className="card flex items-center hover:text-primary">', false],
       [
         `<Link className={\`px-3 py-1 rounded \${active ? "bg-primary text-primary-fg" : "text-gray-11 hover:text-gray-12"}\`}>`,
         false,

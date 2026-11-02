@@ -21,7 +21,7 @@ export function Card({
     <div className="relative has-[.pending]:grayscale has-[.pending]:pointer-events-none grid grid-rows-subgrid row-span-3 gap-y-0">
       <NavLink
         to={href("/org/:org", { org: id.toString() })}
-        className="grid grid-rows-subgrid row-span-3 h-full overflow-clip bg-panel rounded border hover:border-primary"
+        className="grid grid-rows-subgrid row-span-3 h-full overflow-clip bg-card rounded-card border border-hairline transition-colors hover:border-gray-8"
       >
         <div data-banner className="aspect-4/1 w-full relative bg-secondary">
           {/* no banner is a plain fill: `Image` without a src paints a placeholder glyph */}
@@ -39,7 +39,6 @@ export function Card({
             loading="lazy"
             src={logo || flying_character}
             className="absolute bottom-0 translate-y-1/2 z-10 left-3 size-15 object-cover rounded-full border-2 border-primary bg-panel shadow-lift-media"
-            onError={(e) => e.currentTarget.classList.add("bg-secondary")}
           />
         </div>
 

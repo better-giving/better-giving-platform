@@ -417,18 +417,18 @@ describe("payment_intent.succeeded → settlement → UI", () => {
       .toBeInTheDocument();
     // fee labels conditionally rendered (only when > 0)
     // fiscal_sponsored + hide_bg_tip → all 3 fee types show
-    await expect.element(screen.getByText(/^base$/)).toBeInTheDocument();
+    await expect.element(screen.getByText(/^Base$/)).toBeInTheDocument();
     await expect
-      .element(screen.getByText(/^fiscal sponsorship$/))
+      .element(screen.getByText(/^Fiscal sponsorship$/))
       .toBeInTheDocument();
-    await expect.element(screen.getByText(/^processing$/)).toBeInTheDocument();
+    await expect.element(screen.getByText(/^Processing$/)).toBeInTheDocument();
     // net amount rendered (exact value verified in DB test)
     await expect.element(screen.getByText(/\$86/)).toBeInTheDocument();
     // program attribution
     await expect.element(screen.getByText("Test Program")).toBeInTheDocument();
-    // form origin: source=bg-widget → "Donation Form" heading with form tag below
+    // form origin: source=bg-widget → "Donation form" heading with form tag below
     await expect
-      .element(screen.getByText("Donation Form", { exact: true }))
+      .element(screen.getByText("Donation form", { exact: true }))
       .toBeInTheDocument();
     await expect.element(screen.getByText("user-form-tag")).toBeInTheDocument();
   });

@@ -32,6 +32,7 @@ const LABEL: Record<Exclude<TTab, "give">, string> = {
 export function Hub(props: IOrgLayout) {
   const { failed, now, messages } = props;
   const [hero_donate, set_hero_donate] = useState<HTMLElement | null>(null);
+  const [hero_name, set_hero_name] = useState<HTMLElement | null>(null);
   const lists = {
     give: props.give,
     programs: props.programs,
@@ -87,8 +88,12 @@ export function Hub(props: IOrgLayout) {
   }
 
   return (
-    <OrgPageFrame page={props} hero_donate={hero_donate}>
-      <HubHero page={props} donate_ref={set_hero_donate} />
+    <OrgPageFrame page={props} hero_donate={hero_donate} hero_name={hero_name}>
+      <HubHero
+        page={props}
+        donate_ref={set_hero_donate}
+        name_ref={set_hero_name}
+      />
       <div className="page flex flex-col gap-8 py-8 md:gap-10 md:py-10">
         {featured.length > 0 && (
           <Section heading="Featured">
@@ -130,6 +135,7 @@ export function Hub(props: IOrgLayout) {
 interface IHubHero {
   page: IOrgLayout;
   donate_ref: (el: HTMLElement | null) => void;
+  name_ref: (el: HTMLElement | null) => void;
 }
 
 /** the tint band: the mark, the facts over the name, the tagline and story,
@@ -137,12 +143,12 @@ interface IHubHero {
  * tagline, the card, then the story, so Donate lands in its first screen.
  * from md the mark and the card are columns either side of the text, whose
  * empty last row takes up a taller column's height */
-function HubHero({ page, donate_ref }: IHubHero) {
+function HubHero({ page, donate_ref, name_ref }: IHubHero) {
   const { npo } = page;
   const tagline = npo.tagline?.trim();
   const has_story = !!to_text(npo.overview_pt).trim();
   return (
-    <BrandBand tone="tint" classes="border-b py-6 md:py-10">
+    <BrandBand tone="tint" classes="border-b border-hairline py-6 md:py-10">
       <div className="page grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3.5 md:grid-cols-[auto_minmax(0,1fr)_18rem] md:grid-rows-[auto_auto_auto_auto_1fr] md:items-start md:gap-x-6 md:gap-y-0 lg:grid-cols-[auto_minmax(0,1fr)_24rem] lg:gap-x-8">
         <OrgMark
           name={npo.name}
@@ -156,6 +162,7 @@ function HubHero({ page, donate_ref }: IHubHero) {
           classes="col-span-2 row-start-1 md:col-span-1 md:col-start-2"
         />
         <OrgName
+          ref={name_ref}
           name={npo.name}
           scale="sm"
           classes="row-start-2 md:col-start-2 md:pt-3"

@@ -21,7 +21,9 @@ export function Panel(props: Props) {
     setValue,
   } = useForm<Schema>({
     defaultValues: {
-      source: props.from,
+      // the dashboard offers both sources; a blank select there read as a
+      // control with nothing in it, so it opens on the first like the presets
+      source: props.from ?? sources[0],
       bals: props.bals,
     },
     resolver: valibotResolver(schema),

@@ -342,7 +342,18 @@ describe("payout methods list", () => {
     await expect
       .element(screen.getByText("Approved", { exact: true }))
       .toBeInTheDocument();
-    await expect.element(screen.getByText("USD")).toBeInTheDocument();
+    await expect
+      .element(screen.getByText("USD", { exact: true }))
+      .toBeInTheDocument();
+    // the breadcrumb's last item is the page title, named by the record
+    await expect
+      .element(
+        screen.getByRole("heading", {
+          level: 1,
+          name: "USD account ending in 1234",
+        })
+      )
+      .toBeVisible();
   });
 
   it("shows empty state when no bapps", async () => {

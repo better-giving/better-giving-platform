@@ -9,11 +9,7 @@ export function Program(props: IProgramDb) {
   const isDeleting = fetcher.state !== "idle";
 
   return (
-    <div
-      className={`p-6 rounded border ${
-        isDeleting ? "bg-gray-3" : "bg-panel"
-      } grid @lg:flex items-center gap-x-4 gap-y-4`}
-    >
+    <div className="card grid @lg:flex items-center gap-x-4 gap-y-4">
       <div className="flex items-center gap-x-4 @lg:contents">
         <Image
           src={props.banner}

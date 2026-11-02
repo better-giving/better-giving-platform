@@ -19,18 +19,19 @@ const LEAD =
 export function Letter(props: IOrgLayout) {
   const { npo } = props;
   const [hero_donate, set_hero_donate] = useState<HTMLElement | null>(null);
+  const [hero_name, set_hero_name] = useState<HTMLElement | null>(null);
   const tagline = npo.tagline?.trim();
   const deck = tagline || first_sentence(to_text(npo.overview_pt));
 
   return (
-    <OrgPageFrame page={props} hero_donate={hero_donate}>
+    <OrgPageFrame page={props} hero_donate={hero_donate} hero_name={hero_name}>
       <div className="page pt-6 pb-10 md:pt-12 md:pb-16">
         {/* each block but the banner keeps the reading measure, one level in
             from the page, starting on its left edge with the header's */}
         <article className="flex flex-col gap-5 md:gap-7">
           <div className="flex max-w-3xl flex-col gap-4">
             <OrgMeta npo={npo} credential={props.credential} />
-            <OrgName name={npo.name} scale="lg" />
+            <OrgName ref={set_hero_name} name={npo.name} scale="lg" />
             {/* a deck taken from the story is its opening words again, which
                 the story itself reads out a moment later */}
             {deck && (

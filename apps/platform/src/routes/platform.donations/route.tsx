@@ -6,6 +6,7 @@ import { Money } from "#/components/money";
 import { metas } from "#/helpers/seo";
 import { use_table } from "#/hooks/use-table";
 import type { IPaginator } from "#/types/components";
+import { via_name } from "@/donations/helpers";
 import type { Route } from "./+types/route";
 import type { PaymentRow } from "./api";
 
@@ -28,9 +29,8 @@ function Page({ loaderData: page1 }: Route.ComponentProps) {
   });
 
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8 w-full max-w-5xl grid content-start">
-      <h3 className="font-bold text-2xl mb-4">Donations</h3>
-
+    <div className="px-4 py-4 md:px-10 md:py-8 w-full max-w-5xl grid content-start">
+      <h1 className="sr-only">Donations</h1>
       <div className="table-scroll">{node}</div>
 
       <Outlet />
@@ -119,13 +119,13 @@ function Table({
   return (
     <table className="table">
       <thead>
-        <tr>
+        <tr className="whitespace-nowrap">
           <th>Date</th>
           <th>Email</th>
           <th>NPO</th>
           <th>Amount</th>
           <th>Tip</th>
-          <th>Fee Cover</th>
+          <th>Fee cover</th>
           <th>Fee</th>
           <th>Method</th>
           <th>Match</th>
@@ -152,7 +152,9 @@ function Table({
 }
 
 function Row({ payment: c }: { payment: PaymentRow }) {
-  const method = c.via.replace("stripe:", "").replace("nowpayments:", "");
+  // the method half of the via ("Card" for "stripe:card"); one with no method
+  // names its processor. a crypto via keeps its network, which via_name drops
+  const method = c.via.startsWith("crypto:") ? c.via : via_name(c.via);
   const is_stripe = c.via.startsWith("stripe:");
   return (
     <tr className="text-sm">
@@ -165,24 +167,24 @@ function Row({ payment: c }: { payment: PaymentRow }) {
       <td className="truncate max-w-48" title={c.npo_name ?? ""}>
         {c.npo_name ?? "—"}
       </td>
-      <td className="font-medium">
+      <td className="font-medium whitespace-nowrap">
         <Money amount={c.amount_base} currency={c.currency} />
       </td>
-      <td>
+      <td className="whitespace-nowrap">
         {c.amount_tip ? (
           <Money amount={c.amount_tip} currency={c.currency} />
         ) : (
           "—"
         )}
       </td>
-      <td>
+      <td className="whitespace-nowrap">
         {c.amount_fee_allowance ? (
           <Money amount={c.amount_fee_allowance} currency={c.currency} />
         ) : (
           "—"
         )}
       </td>
-      <td>
+      <td className="whitespace-nowrap">
         {c.sttl_fee ? (
           <Money amount={c.sttl_fee} currency={c.sttl_currency ?? "USD"} />
         ) : (

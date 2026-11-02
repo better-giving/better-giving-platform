@@ -20,7 +20,7 @@ export default CacheRoute(Page);
 const TABS = [
   { id: "donation", name: "Donation" },
   { id: "campaigns", name: "Supporter campaigns" },
-  { id: "donation-form", name: "Donation Form" },
+  { id: "donation-form", name: "Donation form" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -37,8 +37,8 @@ function Page({ loaderData: endow }: Route.ComponentProps) {
   const [params, set_params] = useSearchParams();
   const tab = shown_tab(params.get("tab"));
   return (
-    <div className="w-full max-w-[1112px] px-6 md:px-10">
-      <h1 className="pt-4 md:pt-8 mb-6 text-3xl font-bold">Settings</h1>
+    <div className="w-full max-w-[1400px] px-4 py-4 md:px-10 md:py-8">
+      <h1 className="sr-only">Settings</h1>
       <Tabs
         items={TABS.map((item) => ({ value: item.id, label: item.name }))}
         value={tab}
@@ -48,7 +48,7 @@ function Page({ loaderData: endow }: Route.ComponentProps) {
           set_params(next, { preventScrollReset: true });
         }}
       >
-        <div className="py-4 md:py-8">
+        <div className="card mt-4 md:mt-8">
           <TabPanel value="donation">
             <DonationTab
               receipt_msg={endow.receipt_msg ?? ""}

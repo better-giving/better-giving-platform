@@ -58,7 +58,7 @@ export const Variants = () => (
 // mirrors routes/dashboard.referrals_.payout/form-buttons.tsx — a form footer
 // mid-submit: back stays live, submit takes the spinner.
 export const FormFooter = () => (
-  <div className="w-[30rem] rounded border bg-panel">
+  <div className="w-[30rem] rounded-card bg-card">
     <div className="p-6">
       <p className="text-sm text-gray-12">Payout amount</p>
       <p className="mt-1 text-2xl font-medium text-gray-12">$1,200.00</p>

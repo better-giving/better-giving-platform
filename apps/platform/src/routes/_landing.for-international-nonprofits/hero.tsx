@@ -29,9 +29,6 @@ export function Hero({
             beside it, so it centers on its own axis instead of hugging a left
             edge nothing else shares */}
         <div className="grid gap-5 max-lg:justify-items-center max-lg:text-center max-lg:max-w-3xl max-lg:mx-auto lg:justify-items-start">
-          <p className="eyebrow text-gray-11">
-            For international nonprofits · Fiscal sponsorship
-          </p>
           <h1 className="hero-heading lg:max-w-2xl">
             Unlock U.S. donors without a 501(c)(3)
           </h1>

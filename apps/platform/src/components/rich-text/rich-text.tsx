@@ -19,6 +19,13 @@ function use_is_client() {
 }
 
 type El = Pick<HTMLDivElement, "focus">;
+
+/** the editor is a field: the field fill and the --input edge, hovering a step
+ *  up unless the edge is already saying invalid. read-only content is prose on
+ *  the page and carries none of it. */
+const EDITOR_EDGE =
+  "rounded bg-surface border border-input hover:not-aria-invalid:border-input-hover aria-invalid:border-destructive";
+
 export function RichText({
   classes,
   ref,
@@ -38,7 +45,7 @@ export function RichText({
       <div
         aria-invalid={!!props.error}
         aria-disabled={props.disabled}
-        className={`relative has-focus-within:outline-2 has-focus-within:outline-ring ${style.field}`}
+        className={`relative has-focus-within:outline-2 has-focus-within:outline-ring ${props.readOnly ? "" : EDITOR_EDGE} ${style.field}`}
       >
         {props.readOnly ? (
           <PortableText

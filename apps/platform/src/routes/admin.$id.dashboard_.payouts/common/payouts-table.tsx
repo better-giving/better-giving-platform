@@ -20,7 +20,8 @@ export function PayoutsTable({
       <table className="table">
         <thead>
           <tr>
-            <th />
+            {/* icon: no header, and no width when there are no rows */}
+            <th className="w-0 p-0" />
             <th>Amount</th>
             <th>From</th>
             <th>Date</th>
@@ -48,7 +49,9 @@ export function PayoutsTable({
                   </span>
                 </td>
                 <td>{desc(payout)}</td>
-                <td>{format(payout.date, "PP")}</td>
+                <td className="whitespace-nowrap">
+                  {format(payout.date, "PP")}
+                </td>
                 <td>
                   <PayoutStatus type={payout.type} />
                 </td>

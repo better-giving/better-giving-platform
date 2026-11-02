@@ -1,7 +1,7 @@
-import { ExtLink } from "@better-giving/ui";
+import { Badge, Breadcrumb, ExtLink } from "@better-giving/ui";
 import { CircleAlert, SquareArrowOutUpRight } from "lucide-react";
 import type { PropsWithChildren } from "react";
-import { NavLink, Outlet, useFetcher } from "react-router";
+import { href, NavLink, Outlet, useFetcher } from "react-router";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
 import type { Route } from "./+types/route";
 
@@ -11,7 +11,7 @@ export { default_action as action, loader } from "./api";
 export const meta: Route.MetaFunction = ({ matches, loaderData }) =>
   admin_page_meta(loaderData?.ba.bank_summary || "Bank account", matches);
 
-export default function Page({ loaderData: d }: Route.ComponentProps) {
+export default function Page({ loaderData: d, params }: Route.ComponentProps) {
   const fetcher = useFetcher();
 
   const is_rejected = d.ba.status === "rejected";
@@ -20,24 +20,26 @@ export default function Page({ loaderData: d }: Route.ComponentProps) {
   const is_default = d.ba.status === "default";
 
   return (
-    <div className="grid px-6 py-4 md:px-10 md:py-8">
+    <div className="grid px-4 py-4 md:px-10 md:py-8">
       {/** render success and delete prompt */}
       <Outlet />
+      <Breadcrumb
+        classes="mb-4"
+        items={[
+          {
+            label: "Banking",
+            to: href("/admin/:id/banking", { id: params.id }),
+          },
+          { label: d.ba.bank_summary || "Bank account" },
+        ]}
+      />
       <div className="flex items-center gap-2">
         {prev_verdict && (
-          <div
-            className={`${
-              is_approved ? "bg-success" : "bg-destructive"
-            } ${is_approved ? "text-success-fg" : "text-destructive-fg"} px-2 py-1 text-xs uppercase rounded inline-block`}
-          >
+          <Badge tone={is_approved ? "success" : "destructive"}>
             {is_approved ? "Approved" : "Rejected"}
-          </div>
+          </Badge>
         )}
-        {is_default && (
-          <div className="bg-primary text-primary-fg px-2 py-1 text-xs uppercase rounded inline-block">
-            Default
-          </div>
-        )}
+        {is_default && <Badge tone="primary">Default</Badge>}
       </div>
 
       {is_rejected && (
@@ -47,7 +49,7 @@ export default function Page({ loaderData: d }: Route.ComponentProps) {
         </p>
       )}
 
-      <dl className="grid sm:grid-cols-[auto_auto_1fr] border rounded mt-2">
+      <dl className="grid sm:grid-cols-[auto_auto_1fr] bg-card rounded-card border border-hairline mt-2">
         {/* the wise half of the record; the row below it is our own and
             outlives an outage */}
         {!d.wacc_unavailable && (
@@ -109,19 +111,19 @@ type Props = PropsWithChildren<{
 function Row(props: Props) {
   return (
     <>
-      <dt className="px-3 max-sm:pt-3 sm:p-3 flex items-center text-xs font-semibold uppercase">
+      <dt className="px-3 max-sm:pt-3 sm:p-3 flex items-center text-sm font-semibold text-gray-11">
         {props.label}
       </dt>
       <div
         aria-hidden={true}
-        className="max-sm:hidden w-px border-r last:border-none"
+        className="max-sm:hidden w-px border-r border-hairline last:border-none"
       />
       <dd className="px-3 max-sm:pb-3 sm:p-3 flex items-center text-sm">
         {props.children}
       </dd>
       <div
         aria-hidden={true}
-        className="h-px col-span-full border-b last:border-none"
+        className="h-px col-span-full border-b border-hairline last:border-none"
       />
     </>
   );

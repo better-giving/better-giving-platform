@@ -1,6 +1,7 @@
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { Breadcrumb } from "@better-giving/ui";
+import { RefreshCw } from "lucide-react";
 import { useState } from "react";
-import { Link, useLocation, useParams } from "react-router";
+import { href, useLocation } from "react-router";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
 import type { ISub } from "@/subscriptions";
 import type { Route } from "./+types/route";
@@ -16,17 +17,12 @@ export const meta: Route.MetaFunction = ({ matches, loaderData }) =>
 
 export default function Page({
   loaderData: { name, email, since, subs, dists, pend_month, pend_year },
+  params,
 }: Route.ComponentProps) {
-  const { id: npo_id } = useParams();
   const location = useLocation();
   const from =
     (location.state as { from?: "donors" | "subscribers" } | null)?.from ??
     "donors";
-  const back_label = from === "subscribers" ? "Subscribers" : "Donors";
-  const back_to =
-    from === "subscribers"
-      ? `/admin/${npo_id}/donors/subscribers`
-      : `/admin/${npo_id}/donors`;
 
   const sub_index = Object.fromEntries(subs.map((s, i) => [s.id, i]));
   const settled = dists.filter((d) => d.status === "settled");
@@ -37,18 +33,21 @@ export default function Page({
   const has_subs = active_subs.length > 0 || inactive_count > 0;
 
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8">
-      <Link
-        to={back_to}
-        className="mb-6 inline-flex items-center gap-2 text-sm font-medium link"
-      >
-        <ArrowLeft className="icon-md" />
-        {back_label}
-      </Link>
-
-      <h1 className="text-4xl font-bold leading-tight tracking-tight">
-        {name ?? email}
-      </h1>
+    <div className="px-4 py-4 md:px-10 md:py-8">
+      <Breadcrumb
+        items={[
+          { label: "Donors", to: href("/admin/:id/donors", { id: params.id }) },
+          ...(from === "subscribers"
+            ? [
+                {
+                  label: "Subscribers",
+                  to: href("/admin/:id/donors/subscribers", { id: params.id }),
+                },
+              ]
+            : []),
+          { label: name ?? email },
+        ]}
+      />
       {name && <p className="mt-1.5 text-base text-gray-11">{email}</p>}
 
       <Section heading="Lifetime">
@@ -103,7 +102,7 @@ export default function Page({
         </Section>
       )}
 
-      <div className="mt-14">
+      <div className="mt-14 table-scroll">
         <GiftsTable dists={dists} subs={subs} />
       </div>
     </div>
@@ -117,10 +116,8 @@ interface ISectionProps {
 
 function Section({ heading, children }: ISectionProps) {
   return (
-    <section className="mt-8 border-t border-gray-6 pt-6">
-      <h3 className="text-2xs font-semibold uppercase tracking-wider text-gray-11">
-        {heading}
-      </h3>
+    <section className="mt-8 border-t border-hairline pt-6">
+      <h3 className="text-sm font-semibold text-gray-11">{heading}</h3>
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -194,7 +191,7 @@ function SubscriptionPills({
           <button
             type="button"
             onClick={() => set_show_inactive((v) => !v)}
-            className="inline-flex items-center rounded border border-dashed border-gray-6 px-2.5 py-1 text-xs text-gray-11 hover:text-gray-12"
+            className="inline-flex items-center rounded border border-dashed border-gray-7 px-2.5 py-1 text-xs text-gray-11 hover:border-gray-8 hover:text-gray-12"
           >
             {show_inactive
               ? `hide ${inactive_count} inactive`

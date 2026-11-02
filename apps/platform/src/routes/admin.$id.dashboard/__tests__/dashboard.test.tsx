@@ -476,7 +476,7 @@ describe("dashboard — transfer savings → investments", () => {
 
     // initial balances: savings $1,000, investments $0
     await expect.element(screen.getByText("$1,000.00")).toBeInTheDocument();
-    await expect.element(screen.getByText(/\$ 0\.00/)).toBeInTheDocument();
+    await expect.element(screen.getByText("$0.00")).toBeInTheDocument();
 
     // no activity yet
     await expect
@@ -504,8 +504,11 @@ describe("dashboard — transfer savings → investments", () => {
     ).click();
 
     // dashboard reloads — savings decreased, investments increased
-    await expect.element(screen.getByText("$500.00")).toBeInTheDocument();
-    await expect.element(screen.getByText(/\$ 500\.00/)).toBeInTheDocument();
+    await vi.waitFor(() =>
+      expect(
+        screen.getByText("$500.00", { exact: true }).elements()
+      ).toHaveLength(2)
+    );
 
     // cross-page: investments page shows the transfer tx
     await cleanup();
@@ -525,7 +528,9 @@ describe("dashboard — withdraw dialog", () => {
 
     const screen = await render_dashboard_with_withdraw(npo.id);
 
-    await expect.element(screen.getByText(/\$ 1,000\.00/)).toBeInTheDocument();
+    await expect
+      .element(screen.getByText("$1,000.00", { exact: true }))
+      .toBeInTheDocument();
 
     // click Withdraw link opens dialog
     await screen.getByRole("link", { name: /withdraw/i }).click();
@@ -712,7 +717,9 @@ describe("cross-page — platform admin approves redemption", () => {
       )
       .toBeInTheDocument();
     // investments figure decreased
-    await expect.element(screen.getByText(/\$ 700\.00/)).toBeInTheDocument();
+    await expect
+      .element(screen.getByText("$700.00", { exact: true }))
+      .toBeInTheDocument();
     // grant item created (payout from lock source)
     expect(screen.getByText(/\$300/).elements().length).toBeGreaterThanOrEqual(
       1

@@ -23,17 +23,14 @@ export const meta: Route.MetaFunction = () =>
 
 const split_steps = [
   {
-    n: "1",
     title: "Choose your split",
     body: "e.g. 80% granted to your bank, 15% savings, 5% Sustainability Fund. Whatever fits your needs.",
   },
   {
-    n: "2",
     title: "Donations route automatically",
     body: "Every gift (card, stock, crypto, DAF) follows your split with no extra admin.",
   },
   {
-    n: "3",
     title: "Watch reserves build",
     body: "Track balances in your dashboard. Savings withdrawals are paid out every 3 days once your balance reaches your payout minimum. Sustainability Fund withdrawals are reviewed before payout.",
   },
@@ -45,11 +42,8 @@ export default function Page() {
   return (
     <main>
       <div className="bg-linear-to-b from-background to-band pt-16 pb-20">
-        <div className="page grid gap-12 lg:grid-cols-[1.1fr_0.9fr] items-center">
+        <div className="page grid gap-12 lg:grid-cols-[1.2fr_0.8fr] items-center">
           <div className="grid gap-5 justify-items-start">
-            <p className="text-xs font-bold uppercase tracking-wider text-primary">
-              Fund Management
-            </p>
             <h1 className="hero-heading">
               This quarter's gifts, next decade's reserves
             </h1>
@@ -60,10 +54,7 @@ export default function Page() {
               a guarantee.
             </p>
             <div className="flex max-sm:flex-col max-sm:w-full sm:flex-wrap sm:items-center gap-3.5 mt-1.5">
-              <Link
-                to={href("/register")}
-                className="btn btn-lg btn-primary shadow-lift-cta"
-              >
+              <Link to={href("/register")} className="btn btn-lg btn-primary">
                 Join free forever
               </Link>
               <ExtLink href={BOOK_A_DEMO} className="btn btn-lg btn-secondary">
@@ -91,25 +82,14 @@ export default function Page() {
           >
             Set your split once. We handle the rest.
           </h2>
-          <div className="grid gap-6 md:grid-cols-3 mt-12">
+          <ol className="grid gap-6 md:grid-cols-3 mt-12 max-w-5xl mx-auto">
             {split_steps.map((s) => (
-              <div
-                key={s.n}
-                className="grid gap-2.5 justify-items-center text-center content-start"
-              >
-                <span
-                  className="size-13 rounded-full bg-secondary text-gray-12 grid place-items-center text-xl font-bold"
-                  aria-hidden
-                >
-                  {s.n}
-                </span>
+              <li key={s.title} className="grid gap-2.5 content-start">
                 <span className="text-xl font-bold">{s.title}</span>
-                <p className="text-sm/relaxed text-gray-11 max-w-75">
-                  {s.body}
-                </p>
-              </div>
+                <p className="text-base/relaxed text-gray-12">{s.body}</p>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </section>
 

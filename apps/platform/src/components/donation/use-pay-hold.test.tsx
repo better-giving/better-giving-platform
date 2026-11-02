@@ -36,7 +36,7 @@ describe("use_pay_hold", () => {
         <Screen on_back={on_back} />
       </Context>
     );
-    const back = screen.getByRole("button", { name: "Go Back" });
+    const back = screen.getByRole("button", { name: "Go back" });
     await expect.element(back).toBeDisabled();
     expect(on_pay_busy).toHaveBeenCalledWith(true);
     await back.click({ force: true });

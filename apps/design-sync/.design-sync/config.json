@@ -47,6 +47,7 @@
     "Amount": "../../packages/ui/src/components/amount.tsx",
     "Badge": "../../packages/ui/src/components/badge.tsx",
     "Separator": "../../packages/ui/src/components/separator.tsx",
+    "GoalBar": "../../packages/ui/src/components/goal-bar.tsx",
     "Group": "../../packages/ui/src/components/group.tsx",
     "HeaderButton": "../../packages/ui/src/components/header-button.tsx",
     "EmptyState": "../../packages/ui/src/components/empty-state.tsx",
@@ -55,7 +56,7 @@
     "Copier": "../../packages/ui/src/components/copier/copier.tsx",
     "VerifiedIcon": "../../packages/ui/src/components/verified-icon.tsx",
     "Target": "../../packages/ui/src/components/target.tsx",
-    "Breadcrumbs": "../../packages/ui/src/components/breadcrumbs.tsx",
+    "Breadcrumb": "../../packages/ui/src/components/breadcrumb.tsx",
     "Image": "../../packages/ui/src/components/image/image.tsx",
     "ImagePlaceholder": "../../packages/ui/src/components/image/image-placeholder.tsx",
     "DrawerIcon": "../../packages/ui/src/components/icon/drawer-icon.tsx"
@@ -86,7 +87,7 @@
     "Increments": "  classes?: string;\n  countError?: string;\n  fields: unknown;\n  field: (idx: number) => React.ReactNode;\n  onAdd: (value: string) => void;\n  onRemove: (index: number) => void;",
     "Select": "  value: string | undefined;\n  onChange: (opt: string) => void;\n  options: string[];\n  option_disp: (opt: string) => React.ReactNode;\n  children?: ((selected: string | undefined) => React.ReactNode) | undefined;\n  error?: string;\n  label?: React.ReactNode;\n  required?: boolean;\n  placeholder?: string;\n  disabled?: boolean;\n  classes?: { container?: string; button?: string; options?: string; option?: string; label?: string };\n  ref?: React.Ref<Pick<HTMLButtonElement, \"focus\" | \"scrollTo\">>;",
     "MultiCombo": "  values: readonly T[];\n  on_change: (v: T[]) => void;\n  options: readonly T[];\n  on_reset?: (() => void) | undefined;\n  item_key?: ((v: T) => string) | undefined;\n  item_text?: ((v: T) => string) | undefined;\n  render?: ((v: T) => React.ReactNode) | undefined;\n  label?: React.ReactNode;\n  required?: boolean;\n  error?: string;\n  disabled?: boolean;\n  placeholder?: string;\n  classes?: { container?: string; control?: string; label?: string; options?: string; option?: string };\n  popup_vars?: Record<string, string | undefined>;\n  ref?: React.Ref<HTMLInputElement>;",
-    "Combo": "  value: T | undefined;\n  on_change: (v: T | undefined) => void;\n  options: readonly T[] | { items: readonly T[]; loading?: boolean; error?: string } | { search: (q: string, signal: AbortSignal) => Promise<readonly T[]> };\n  limit?: number;\n  filter?: ((text: string, q: string) => boolean) | undefined;\n  adornment?: ((open: boolean, state: \"idle\" | \"loading\" | \"error\") => React.ReactNode) | undefined;\n  adornment_side?: \"start\" | \"end\";\n  clearable?: boolean;\n  popup_width?: string;\n  indicator?: React.ReactNode;\n  allow_custom?: [T] extends [string] ? boolean : never;\n  on_reset?: (() => void) | undefined;\n  item_key?: ((v: T) => string) | undefined;\n  item_text?: ((v: T) => string) | undefined;\n  render?: ((v: T) => React.ReactNode) | undefined;\n  label?: React.ReactNode;\n  required?: boolean;\n  error?: string;\n  disabled?: boolean;\n  placeholder?: string;\n  classes?: { container?: string; control?: string; label?: string; options?: string; option?: string };\n  popup_vars?: Record<string, string | undefined>;\n  ref?: React.Ref<HTMLInputElement>;",
+    "Combo": "  value: T | undefined;\n  on_change: (v: T | undefined) => void;\n  options: readonly T[] | { items: readonly T[]; loading?: boolean; error?: string } | { search: (q: string, signal: AbortSignal) => Promise<readonly T[]> };\n  limit?: number;\n  filter?: ((text: string, q: string) => boolean) | undefined;\n  adornment?: ((open: boolean, state: \"idle\" | \"loading\" | \"error\") => React.ReactNode) | undefined;\n  lead?: React.ReactNode;\n  clearable?: boolean;\n  popup_width?: string;\n  indicator?: React.ReactNode;\n  allow_custom?: [T] extends [string] ? boolean : never;\n  on_reset?: (() => void) | undefined;\n  item_key?: ((v: T) => string) | undefined;\n  item_text?: ((v: T) => string) | undefined;\n  render?: ((v: T) => React.ReactNode) | undefined;\n  label?: React.ReactNode;\n  required?: boolean;\n  error?: string;\n  disabled?: boolean;\n  placeholder?: string;\n  classes?: { container?: string; control?: string; label?: string; options?: string; option?: string };\n  popup_vars?: Record<string, string | undefined>;\n  ref?: React.Ref<HTMLInputElement>;",
     "Status": "  icon: React.ReactNode;\n  inline?: boolean;\n  classes?: string;\n  gap?: string;\n  /** ...plus the standard props inherited from @types/react */",
     "Info": "  classes?: string;\n  /** ...plus the standard props inherited from @types/react */",
     "Confirmed": "  classes?: string;\n  /** ...plus the standard props inherited from @types/react */",
@@ -105,13 +106,14 @@
     "HoverCard": "  tip: React.ReactNode;\n  children: React.JSX.Element;",
     "Amount": "  /** the primary figure, ALREADY FORMATTED by the caller \u2014 this component never rounds */\n  value: string;\n  /** iso code; uppercased here and shown as the leading chip */\n  currency: string;\n  /** formatted usd magnitude WITHOUT the symbol \u2014 the \"$\" is drawn here, and it is\n   * suppressed when `currency` is already USD */\n  usd?: string | null;\n  chips?: React.ReactNode[];\n  classes?: string;",
     "Separator": "  classes?: string;\n  /** ...plus the standard props inherited from @types/react */",
+    "GoalBar": "  raised: number;\n  goal: number;\n  /** the bar's accessible name */\n  label?: string;\n  classes?: string;",
     "Group": "  title?: string;\n  description?: string;\n  className?: string;\n  /** ...plus the standard props inherited from @types/react */",
     "HeaderButton": "  /** which way the table is ordered right now. */\n  _sortDirection: \"asc\" | \"desc\";\n  /** the key THIS head sorts by. */\n  _sortKey: string;\n  /** the key the table is sorted by \u2014 equal to `_sortKey` on the one active head. */\n  _activeSortKey: string;\n  className?: string;\n  children?: React.ReactNode;\n  /** ...plus the standard props of <button>. generic over the row type in source: `<HeaderButton<Row> \u2026>`. */",
     "ExtLink": "  /** ...plus the standard props inherited from @types/react */",
     "Copier": "  text: string;\n  classes?: unknown;\n  size?: number | { copy?: number; check?: number; };\n  children?: React.ReactNode;\n  /** the trigger's accessible name. name what is being copied wherever a row holds more than one control, so \"Copy\" alone doesn't have to carry it. omit it when `children` supply a visible label \u2014 those name the button themselves. */\n  label?: string;",
     "VerifiedIcon": "  size: number;\n  classes?: string;",
     "Target": "  text?: React.ReactNode;\n  progress: number;\n  target: number | \"smart\" | null;\n  classes?: string;",
-    "Breadcrumbs": "  className?: string;\n  items: { title: string; to: string; end?: boolean; }[];",
+    "Breadcrumb": "  /** ancestors first; the last item is the current page and its `to` is ignored. an ancestor without `to` renders as plain text. */\n  items: { label: string; to?: string; }[];\n  classes?: string;",
     "Image": "  isSrcLoading?: boolean;\n  render?: ((img: React.ReactNode) => React.ReactElement) | undefined;\n  ref?: React.Ref<HTMLImageElement>;\n  /** ...plus the standard props inherited from @types/react */",
     "ImagePlaceholder": "  /** ...plus the standard props inherited from react */",
     "DrawerIcon": "  is_open: boolean;\n  /** ...plus the standard props inherited from @types/react, lucide-react */",
@@ -154,6 +156,9 @@
       "cardMode": "column"
     },
     "ExtLink": {
+      "cardMode": "column"
+    },
+    "GoalBar": {
       "cardMode": "column"
     },
     "Target": {

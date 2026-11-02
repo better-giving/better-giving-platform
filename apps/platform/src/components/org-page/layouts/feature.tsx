@@ -50,6 +50,7 @@ const COLUMNS =
 export function Feature(props: IOrgLayout) {
   const { npo, shape, failed, now } = props;
   const [hero_donate, set_hero_donate] = useState<HTMLElement | null>(null);
+  const [hero_name, set_hero_name] = useState<HTMLElement | null>(null);
   const lists = {
     give: props.give,
     programs: props.programs,
@@ -80,14 +81,19 @@ export function Feature(props: IOrgLayout) {
   }
 
   return (
-    <OrgPageFrame page={props} hero_donate={hero_donate} sections={sections}>
+    <OrgPageFrame
+      page={props}
+      hero_donate={hero_donate}
+      hero_name={hero_name}
+      sections={sections}
+    >
       {/* from md the card's rail overlays the hero, the strip and the story
           as one cell, so the card sticks for all three; its 1fr row grows
           when the card outruns the story */}
       <div className="flex flex-col md:grid md:grid-rows-[auto_auto_1fr]">
-        <FeatureHero page={props} />
+        <FeatureHero page={props} name_ref={set_hero_name} />
         <div
-          className={`page max-md:border-b max-md:bg-band max-md:pb-8 md:pointer-events-none md:col-start-1 md:row-span-full md:row-start-1 md:pt-10 ${COLUMNS}`}
+          className={`page max-md:border-b max-md:border-hairline max-md:bg-band max-md:pb-8 md:pointer-events-none md:col-start-1 md:row-span-full md:row-start-1 md:pt-10 ${COLUMNS}`}
         >
           <GivePanel
             name={npo.name}
@@ -138,22 +144,23 @@ export function Feature(props: IOrgLayout) {
 
 interface IFeatureHero {
   page: IOrgLayout;
+  name_ref: (el: HTMLElement | null) => void;
 }
 
 /** the facts, the name and the lead line (the tagline, or the story's first
  * sentence) on the tint, in the text's column */
-function FeatureHero({ page }: IFeatureHero) {
+function FeatureHero({ page, name_ref }: IFeatureHero) {
   const { npo } = page;
   const lead = npo.tagline?.trim() || first_sentence(to_text(npo.overview_pt));
   return (
     <BrandBand
       tone="tint"
-      classes="pt-8 pb-6 md:col-start-1 md:row-start-1 md:border-b md:py-10"
+      classes="pt-8 pb-6 md:col-start-1 md:row-start-1 md:border-b md:border-hairline md:py-10"
     >
       <div className={`page ${COLUMNS}`}>
         <div className="flex flex-col gap-4">
           <OrgMeta npo={npo} credential={page.credential} />
-          <OrgName name={npo.name} scale="md" />
+          <OrgName ref={name_ref} name={npo.name} scale="md" />
           {lead && (
             <p className="line-clamp-3 max-w-3xl text-lg text-gray-11 md:text-xl">
               {lead}
@@ -175,7 +182,7 @@ function SectionStrip({ sections }: ISectionStrip) {
   return (
     <nav
       aria-label="Sections"
-      className="border-b md:col-start-1 md:row-start-2 lg:hidden"
+      className="border-b border-hairline md:col-start-1 md:row-start-2 lg:hidden"
     >
       <div className={`page ${COLUMNS}`}>
         {/* the first label's text, not its target, on the page's edge */}

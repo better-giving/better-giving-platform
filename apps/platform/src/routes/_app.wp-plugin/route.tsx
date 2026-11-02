@@ -23,7 +23,7 @@ export default function WpPlugin() {
         {app_name} Wordpress plugin documentation
       </h1>
       <div className="py-5">
-        <h2 className="mb-4 text-lg text-primary uppercase text-center">
+        <h2 className="mb-4 text-lg text-primary text-center">
           Installing the WordPress {app_name} Donation Form Plugin
         </h2>
         <ol className="list-decimal">
@@ -36,7 +36,7 @@ export default function WpPlugin() {
               Wordpress Plugin
             </ExtLink>{" "}
             (ZIP file).
-            <p className="text-gray-11">
+            <p className="text-gray-11 break-all">
               SHA256 Checksum:
               34f1aa11ab99e691e290b128d11d019cc9f7cb29f14f01f921b03835316880ce
             </p>
@@ -49,7 +49,7 @@ export default function WpPlugin() {
         </ol>
       </div>
       <div className="py-5">
-        <h2 className="mb-4 text-lg text-primary uppercase text-center">
+        <h2 className="mb-4 text-lg text-primary text-center">
           Using and configuring {app_name} Donation Form Shortcode
         </h2>
         <div>
@@ -62,7 +62,7 @@ export default function WpPlugin() {
           is the number that was assigned to your nonprofit when you signed up
           with {app_name} and is unique to it (ex. 121).
         </div>
-        <div className="mx-auto flex max-w-md gap-4 bg-panel p-4 my-4 rounded">
+        <div className="mx-auto flex max-w-md gap-4 card my-4">
           <Image
             alt="Laira mascot waving"
             src={laira_waiving}

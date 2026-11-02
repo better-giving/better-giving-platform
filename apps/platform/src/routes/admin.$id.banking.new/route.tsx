@@ -1,8 +1,7 @@
-import { Group, use_ask_prompt } from "@better-giving/ui";
-import { ChevronLeft } from "lucide-react";
+import { Breadcrumb, Group, use_ask_prompt } from "@better-giving/ui";
 import { useEffect } from "react";
 import type { MetaFunction } from "react-router";
-import { Link, useFetcher, useParams } from "react-router";
+import { href, useFetcher, useParams } from "react-router";
 import { BankDetails, type OnSubmit } from "#/components/bank-details";
 import { submit_error_prompt } from "#/helpers/error-prompt";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
@@ -54,14 +53,17 @@ export default function Banking() {
   }, [fetcher.state, fetcher.data, ask_prompt]);
 
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8">
-      <Link
-        to={"../banking"}
-        className="flex items-center gap-1 mb-4 link text-sm"
-      >
-        <ChevronLeft className="icon-lg" />
-        <span>Back</span>
-      </Link>
+    <div className="px-4 py-4 md:px-10 md:py-8">
+      <Breadcrumb
+        classes="mb-4"
+        items={[
+          {
+            label: "Banking",
+            to: href("/admin/:id/banking", { id: endowIdParam }),
+          },
+          { label: "Add bank account" },
+        ]}
+      />
       <Group
         classes="max-w-[1112px]"
         title="Bank account details"

@@ -133,6 +133,103 @@ describe("org header", () => {
     expect(counts).toEqual({ made: 1, disconnected: 1 });
   });
 
+  describe("the bar's identity once the hero's has scrolled away", () => {
+    /** an IntersectionObserver the test reports through by hand */
+    function stub_observer() {
+      const watched: { cb: IntersectionObserverCallback; el: Element }[] = [];
+      vi.stubGlobal(
+        "IntersectionObserver",
+        class {
+          constructor(private cb: IntersectionObserverCallback) {}
+          observe(el: Element) {
+            watched.push({ cb: this.cb, el });
+          }
+          disconnect() {}
+          unobserve() {}
+          takeRecords() {
+            return [];
+          }
+        }
+      );
+      /** reports the element as in or out of view to whoever watches it */
+      return (el: Element, in_view: boolean) => {
+        for (const w of watched.filter((w) => w.el === el)) {
+          w.cb(
+            [
+              {
+                target: el,
+                isIntersecting: in_view,
+                intersectionRatio: in_view ? 1 : 0,
+              } as IntersectionObserverEntry,
+            ],
+            {} as IntersectionObserver
+          );
+        }
+      };
+    }
+
+    function Profile() {
+      const [hero_name, set_hero_name] = useState<HTMLElement | null>(null);
+      return (
+        <MemoryRouter>
+          <OrgHeader
+            name="Acme Relief"
+            to="/org/acme"
+            donate_to="/donate/7"
+            identity_after={hero_name}
+          />
+          <main>
+            <h1 ref={set_hero_name}>Acme Relief</h1>
+          </main>
+        </MemoryRouter>
+      );
+    }
+
+    it("hides the bar's mark and name while the hero's name is in view, and shows them once it leaves", async () => {
+      await page.viewport(1280, 900);
+      const report = stub_observer();
+      const screen = await render(<Profile />);
+      const hero = screen.getByRole("heading", { name: "Acme Relief" });
+      await expect.element(hero).toBeVisible();
+      const home = screen.container.querySelector(
+        'header a[href="/org/acme"]'
+      ) as HTMLElement;
+
+      // before any report, and while in view: kept in place, out of sight
+      // and out of reach
+      expect(home).toHaveClass("opacity-0");
+      expect(home).toHaveAttribute("aria-hidden", "true");
+      expect(
+        screen.getByRole("link", { name: "Acme Relief" }).query()
+      ).toBeNull();
+      report(hero.element(), true);
+      expect(home).toHaveClass("opacity-0");
+
+      report(hero.element(), false);
+      const shown = screen
+        .getByRole("banner")
+        .getByRole("link", { name: "Acme Relief" });
+      await expect.element(shown).toBeVisible();
+      expect(home).not.toHaveClass("opacity-0");
+      expect(home).not.toHaveAttribute("aria-hidden");
+
+      report(hero.element(), true);
+      await expect.element(shown).not.toBeInTheDocument();
+      expect(home).toHaveClass("opacity-0");
+    });
+
+    it("keeps the identity in the bar from the start when the page passes no hero to wait on", async () => {
+      await page.viewport(1280, 900);
+      stub_observer();
+      const screen = await render(header());
+      const home = screen
+        .getByRole("banner")
+        .getByRole("link", { name: "Acme Relief" });
+      await expect.element(home).toBeVisible();
+      expect(home.element()).not.toHaveClass("opacity-0");
+    });
+  });
+
   describe("Donate once the hero's has scrolled away", () => {
     /** a hero Donate the header watches, with page enough to scroll it off */
     function Page() {

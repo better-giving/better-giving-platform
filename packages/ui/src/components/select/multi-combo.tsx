@@ -144,10 +144,10 @@ export function MultiCombo<T>({ ref, ...p }: Props<T>) {
           {rows.length > 0 && (
             <div className="flex justify-between p-4">
               {all_selected ? (
-                <Action on_click={() => p.on_change([])}>Deselect All</Action>
+                <Action on_click={() => p.on_change([])}>Deselect all</Action>
               ) : (
                 <Action on_click={() => p.on_change([...p.options])}>
-                  Select All
+                  Select all
                 </Action>
               )}
               {p.on_reset && <Action on_click={p.on_reset}>Reset</Action>}

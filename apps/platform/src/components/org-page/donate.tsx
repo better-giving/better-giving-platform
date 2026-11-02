@@ -23,17 +23,14 @@ type IDonateButton = (IDonateLink | IDonateAction) & {
   classes?: string;
 };
 
-/** the filled Donate. on a brand fill it inverts, since --primary on
- * --primary-deep is no button at all; the inverse has no hover rung of its
- * own, so it copies only `.btn-primary`'s press */
+/** the filled Donate. on a brand fill it inverts (`btn-inverse`), since
+ * --primary on --primary-deep is no button at all */
 export function DonateButton({
   size = "md",
   classes = "",
   ...target
 }: IDonateButton) {
-  const fill = is_brand_ground(use_ground())
-    ? "bg-primary-fg text-primary active:translate-y-px"
-    : "btn-primary";
+  const fill = is_brand_ground(use_ground()) ? "btn-inverse" : "btn-primary";
   const className = `btn ${fill} ${size === "lg" ? "btn-lg" : ""} ${classes}`;
   if (target.on_click) {
     return (

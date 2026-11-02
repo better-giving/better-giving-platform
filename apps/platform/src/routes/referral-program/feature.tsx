@@ -41,7 +41,7 @@ export function Feature({ classes = "" }) {
         Why Share Better Giving?
       </h2>
 
-      <ul className="col-span-full mt-4 lg:divide-x divide-gray-6 grid gap-y-20 lg:gap-y-0 lg:grid-cols-3">
+      <ul className="col-span-full mt-4 lg:divide-x divide-hairline grid gap-y-20 lg:gap-y-0 lg:grid-cols-3">
         {items.map((item, idx) => (
           <ListItem {...item} key={idx} />
         ))}

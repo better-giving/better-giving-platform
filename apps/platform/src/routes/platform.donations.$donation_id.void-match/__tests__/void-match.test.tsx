@@ -69,7 +69,7 @@ async function seed(opts: { event?: boolean; voided_at?: string } = {}) {
     currency: "USD",
     frequency: "one-time",
     source: "bg-marketplace",
-    via: "nowpayments:crypto",
+    via: "crypto:eth",
   });
   if (opts.event !== false) {
     await db.insert(donation_match_events).values({

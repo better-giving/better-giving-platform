@@ -36,12 +36,12 @@ export function Earnings({
         <h2 className="text-2xl capitalize">Earnings</h2>
         {earnings.see_all && (
           <Link to={earnings.see_all} className="text-sm link">
-            View All
+            View all
           </Link>
         )}
       </div>
 
-      <div className="bg-gray-3 rounded border overflow-hidden">
+      <div className="bg-card rounded-card border border-hairline overflow-hidden">
         <div className="p-6 @container">
           <div className="flex flex-wrap items-center justify-between gap-x-2">
             <div className="flex items-center gap-x-2 flex-wrap">
@@ -77,14 +77,14 @@ export function Earnings({
           )}
           {payout ? (
             <div className="mt-4">
-              <p className="text-sm text-gray-11">Default Payout Method</p>
+              <p className="text-sm text-gray-11">Default payout method</p>
 
               <Link to="../banking" className="link">
                 {payout.bank_summary}
               </Link>
             </div>
           ) : (
-            <div className="flex items-center mt-4">
+            <div className="flex flex-wrap items-center gap-x-2 mt-4">
               <Info>No default payout method</Info>
               <Link to="../banking" className="text-sm link">
                 Setup

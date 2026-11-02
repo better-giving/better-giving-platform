@@ -29,7 +29,7 @@ const cards: ICard[] = [
 
 export function Borders() {
   return (
-    <section className="bg-panel py-20 md:py-24">
+    <section className="bg-band py-20 md:py-24">
       <div className="page">
         <motion.h2
           className="section-heading font-bold text-center mb-14"
@@ -51,7 +51,7 @@ export function Borders() {
               viewport={{ once: true, amount: 0.1 }}
               transition={{ duration: 0.4, delay: i * 0.1 }}
             >
-              <div className="size-12 rounded bg-primary/10 flex-center text-primary">
+              <div className="size-12 rounded bg-secondary flex-center text-primary">
                 <card.icon className="icon-2xl" />
               </div>
               <h3 className="text-xl font-bold">{card.title}</h3>

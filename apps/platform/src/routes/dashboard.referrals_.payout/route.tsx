@@ -1,7 +1,6 @@
-import { use_ask_prompt } from "@better-giving/ui";
-import { ChevronLeft } from "lucide-react";
+import { Breadcrumb, use_ask_prompt } from "@better-giving/ui";
 import { useEffect } from "react";
-import { Link, useFetcher } from "react-router";
+import { href, useFetcher } from "react-router";
 import { BankDetails } from "#/components/bank-details";
 import { submit_error_prompt } from "#/helpers/error-prompt";
 import { FormButtons } from "./form-buttons";
@@ -27,14 +26,14 @@ export default function Payout() {
   }, [fetcher.state, fetcher.data, ask_prompt]);
 
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8">
-      <Link
-        to={"../referrals"}
-        className="flex items-center gap-1 mb-4 link text-sm"
-      >
-        <ChevronLeft className="icon-lg" />
-        <span>Back</span>
-      </Link>
+    <div className="px-4 py-4 md:px-10 md:py-8">
+      <Breadcrumb
+        classes="mb-4"
+        items={[
+          { label: "My referrals", to: href("/dashboard/referrals") },
+          { label: "Payout account" },
+        ]}
+      />
       <BankDetails
         FormButtons={FormButtons}
         onSubmit={async ({ id, bg_grant }) =>

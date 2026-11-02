@@ -13,6 +13,8 @@ import { config } from "./config";
 
 export interface LoaderData {
   id: string;
+  /** null until the npo is issued one; every other field is then empty */
+  referral_id: string | null;
   referreds: Referred[];
   earnings: IPageKeyed<INpoDonation>;
   pending_total: number;
@@ -22,14 +24,23 @@ export interface LoaderData {
   base_url: string;
 }
 
-export const loader = async (x: Route.LoaderArgs) => {
+export const loader = async (x: Route.LoaderArgs): Promise<LoaderData> => {
   const id = x.context.get(admin_ctx);
 
   const endow = await npo_get(id);
   if (!endow) throw resp.status(404, `npo:${id} not found`);
 
-  if (!endow.referral_id)
-    throw new Error(`referral_id not found for npo:${id}`);
+  if (!endow.referral_id) {
+    return {
+      id: "",
+      referral_id: null,
+      base_url: x.url.origin,
+      referreds: [],
+      earnings: { items: [] },
+      pending_total: 0,
+      payout_ltd: 0,
+    };
+  }
 
   const [pending_total, referreds, earnings, p, payout_ltd] = await Promise.all(
     [
@@ -43,6 +54,7 @@ export const loader = async (x: Route.LoaderArgs) => {
 
   return {
     id: endow.referral_id,
+    referral_id: endow.referral_id,
     base_url: x.url.origin,
     referreds,
     earnings,
@@ -50,5 +62,5 @@ export const loader = async (x: Route.LoaderArgs) => {
     payout: p,
     payout_min: config.pay_min,
     payout_ltd,
-  } satisfies LoaderData;
+  };
 };

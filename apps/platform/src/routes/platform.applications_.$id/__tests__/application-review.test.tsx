@@ -235,9 +235,10 @@ const test_loader: LoaderFunction = async ({ params }) => {
   return { reg, wacc: MOCK_WACC, wacc_unavailable: false };
 };
 
-async function render_review(id: string) {
+async function render_review(id: string, sub = "") {
   const Stub = createRoutesStub([
     {
+      id: "routes/platform.applications_.$id",
       path: "/platform/applications/:id",
       Component: Page,
       HydrateFallback: () => null,
@@ -252,7 +253,7 @@ async function render_review(id: string) {
     },
   ]);
   return await render(
-    <Stub initialEntries={[`/platform/applications/${id}`]} />
+    <Stub initialEntries={[`/platform/applications/${id}${sub}`]} />
   );
 }
 
@@ -364,6 +365,19 @@ describe("rejection", () => {
     await expect
       .element(screen.getByText(/submitted for review/i))
       .toBeInTheDocument();
+  });
+});
+
+describe("verdict dialog", () => {
+  it("names the org when its URL is opened directly", async () => {
+    const id = await seed_reg(ALL_FIELDS);
+    const screen = await render_review(id, "/rejected");
+
+    await expect
+      .element(
+        screen.getByRole("dialog").getByText("Test Org", { exact: true })
+      )
+      .toBeVisible();
   });
 });
 
@@ -551,5 +565,19 @@ describe("wise outage", () => {
     await expect
       .element(screen.getByText(/banking details/i))
       .not.toBeInTheDocument();
+  });
+
+  it("disables Approve while no account is on file, as it does in an outage", async () => {
+    const id = await seed_reg({ ...ALL_FIELDS, o_bank_id: null });
+
+    const screen = await render_review_live(id);
+
+    await expect.element(screen.getByText("Test Org")).toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("link", { name: /approve/i }))
+      .toHaveAttribute("aria-disabled", "true");
+    await expect
+      .element(screen.getByRole("link", { name: /reject/i }))
+      .not.toHaveAttribute("aria-disabled", "true");
   });
 });

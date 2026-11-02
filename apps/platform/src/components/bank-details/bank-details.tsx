@@ -65,35 +65,46 @@ export function BankDetails({
 
   return (
     <div className="grid gap-6">
-      <Combo
-        value={currency}
-        on_change={(c) => c && setCurrency(c)}
-        options={{
-          items: currencies.data ?? [],
-          loading: currencies.is_loading,
-          error: currencies.is_error ? "Failed to load currencies" : undefined,
-        }}
-        item_key={(c) => c.code}
-        item_text={to_label}
-        filter={matches}
-        // the full list is the point here — a payout currency is picked from
-        // what wise supports, not from the default RESULT_LIMIT of 10 rows
-        limit={Number.POSITIVE_INFINITY}
-        label="Select your bank account currency:"
-        required
-        disabled={is_submitting || is_loading}
-        classes={{ control: "w-full md:w-80" }}
-        adornment={(open, state) =>
-          state === "loading" ? (
-            <LoaderCircle className="text-gray-11 animate-spin icon-xl" />
-          ) : (
-            <DrawerIcon
-              is_open={open}
-              className={`icon-xl ${state === "error" ? "text-destructive" : ""}`}
-            />
-          )
-        }
-      />
+      <div className="grid md:w-80">
+        <Combo
+          value={currency}
+          on_change={(c) => c && setCurrency(c)}
+          options={{
+            items: currencies.data ?? [],
+            loading: currencies.is_loading,
+          }}
+          item_key={(c) => c.code}
+          item_text={to_label}
+          filter={matches}
+          // the full list is the point here — a payout currency is picked from
+          // what wise supports, not from the default RESULT_LIMIT of 10 rows
+          limit={Number.POSITIVE_INFINITY}
+          label="Select your bank account currency:"
+          required
+          disabled={is_submitting || is_loading || currencies.is_error}
+          classes={{ container: "md:w-80", control: "w-full" }}
+          adornment={(open, state) =>
+            state === "loading" ? (
+              <LoaderCircle className="text-gray-11 animate-spin icon-xl" />
+            ) : (
+              <DrawerIcon is_open={open} className="icon-xl" />
+            )
+          }
+        />
+        {/* a failed list can't open, so the reason sits under the field. it is
+          not the field's error: the selected currency is fine, so the edge
+          stays neutral rather than marking the value invalid. announced when
+          it appears, since the disabled control can't carry a description —
+          the region stays mounted so the sentence lands in a live region the
+          screen reader already knows */}
+        <p
+          role="status"
+          className={`text-sm text-destructive-subtle-fg ${currencies.is_error ? "mt-1" : ""}`}
+        >
+          {currencies.is_error &&
+            "Couldn't load currencies. Refresh to try again."}
+        </p>
+      </div>
       <MaskedInput
         id="expected-monthly-donations"
         label="What is the amount you expect to receive monthly on our

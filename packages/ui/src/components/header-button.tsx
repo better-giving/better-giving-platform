@@ -18,7 +18,7 @@ export function HeaderButton<T>(
   return (
     <button
       {...restProps}
-      className={`${className} flex items-center justify-between gap-1`}
+      className={`${className} group/sort flex items-center justify-between gap-1`}
     >
       <span>{children}</span>
 
@@ -29,7 +29,10 @@ export function HeaderButton<T>(
           <ChevronDown className="icon-md shrink-0" />
         )
       ) : (
-        <ChevronsUpDown className="icon-md shrink-0 text-gray-11" />
+        // only the sorted column shows its glyph at rest; the others reveal the
+        // sortable affordance on hover or keyboard focus — and always on a
+        // touch screen, which has no hover to reveal it
+        <ChevronsUpDown className="icon-md shrink-0 text-gray-11 opacity-0 pointer-coarse:opacity-100 group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100" />
       )}
     </button>
   );

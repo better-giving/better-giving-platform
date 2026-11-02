@@ -21,7 +21,7 @@ export function Top({ classes = "" }) {
       </div>
       <div>
         <h1 className="text-4.5xl leading-snug max-lg:text-center text-right">
-          <div className="relative w-fit max-lg:mx-auto lg:ml-auto text-nowrap">
+          <div className="relative w-fit max-lg:mx-auto lg:ml-auto lg:text-nowrap">
             You're Losing Donations{" "}
             <span className="absolute bottom-2 left-0 w-full h-4 bg-secondary -z-10" />
           </div>
@@ -52,7 +52,7 @@ export function Top({ classes = "" }) {
         {open && (
           <Modal
             size="lg"
-            classes="grid bg-panel text-gray-12"
+            classes="grid bg-popover text-gray-12"
             open={open}
             onClose={() => set_open(false)}
           >

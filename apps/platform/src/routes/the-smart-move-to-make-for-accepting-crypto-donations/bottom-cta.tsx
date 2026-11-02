@@ -9,7 +9,7 @@ export function BottomCta({ classes = "" }) {
       className={`${classes} grid sm:grid-cols-[3fr_1fr] bg-linear-to-tr from-primary to-primary-fg rounded sm:rounded px-8 py-8 sm:px-12 sm:py-12`}
     >
       <div className="order-2 sm:order-1">
-        <h4 className="text-center sm:text-left uppercase sm:text-lg text-primary-fg leading-normal mb-6">
+        <h4 className="text-center sm:text-left sm:text-lg text-primary-fg leading-normal mb-6">
           Simple. Sustainable.
         </h4>
         <h3 className="text-center sm:text-left sm:leading-snug  text-2xl text-primary-fg mb-9">

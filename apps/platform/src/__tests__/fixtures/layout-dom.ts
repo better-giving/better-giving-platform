@@ -37,13 +37,12 @@ export function panel_banner(panel: Element): {
   };
 }
 
-/** where the give card's Donate floats on its banner: its insets from the
- * banner's right and bottom edges, and whether it lies wholly within the
- * banner; null with no banner */
-export function donate_on_banner(panel: Element): {
-  right: number;
-  bottom: number;
-  inside: boolean;
+/** where the give card's Donate sits under its banner: the gap from the
+ * banner's bottom edge to Donate's top (negative when they overlap), and
+ * whether Donate spans the banner's width edge to edge; null with no banner */
+export function donate_under_banner(panel: Element): {
+  gap: number;
+  spans: boolean;
 } | null {
   const img = panel.firstElementChild;
   const [donate] = donates(panel);
@@ -51,13 +50,8 @@ export function donate_on_banner(panel: Element): {
   const b = img.getBoundingClientRect();
   const d = donate.getBoundingClientRect();
   return {
-    right: b.right - d.right,
-    bottom: b.bottom - d.bottom,
-    inside:
-      d.left >= b.left &&
-      d.top >= b.top &&
-      d.right <= b.right &&
-      d.bottom <= b.bottom,
+    gap: d.top - b.bottom,
+    spans: Math.abs(d.left - b.left) <= 1 && Math.abs(d.right - b.right) <= 1,
   };
 }
 

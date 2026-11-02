@@ -52,7 +52,7 @@ export function ProgressIndicator({ step, o_type, classes = "" }: Props) {
   return (
     <div
       style={{ "--gutter": "2.5rem" } as React.CSSProperties}
-      className={`pb-4 pt-4 md:pt-2 max-md:pr-(--gutter) pl-12 md:pl-14 max-md:border-b border-gray-6 ${classes}`}
+      className={`pb-4 pt-4 md:pt-2 max-md:pr-(--gutter) pl-12 md:pl-14 max-md:border-b border-hairline ${classes}`}
     >
       <Steps.Root
         step={Math.max(active_index, 0)}
@@ -70,9 +70,12 @@ export function ProgressIndicator({ step, o_type, classes = "" }: Props) {
               data-complete={i < completed || undefined}
               className="group hidden data-curr:block group-data-expanded/root:block md:block"
             >
-              <div className="h-5.5 border-l group-data-complete:border-primary group-data-curr:border-primary my-2 group-first:hidden" />
+              {/* collapsed below md, the current row shows alone: no row above it to connect to */}
+              <div className="h-5.5 border-l group-data-complete:border-primary group-data-curr:border-primary my-2 group-first:hidden max-md:group-[:not([data-expanded])]/root:hidden" />
               <div className="flex items-center w-full">
-                <div className="w-4 aspect-square bg-gray-3 group-data-complete:bg-primary rounded-full transform -translate-x-1/2" />
+                {/* the --primary fill carries "complete"; a pending dot is a
+                    marker on the step-6 line, so it takes the line's step */}
+                <div className="w-4 aspect-square bg-gray-6 group-data-complete:bg-primary rounded-full transform -translate-x-1/2" />
                 <span className="text-sm text-gray-11 group-data-curr:text-primary">
                   {label}
                 </span>

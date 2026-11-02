@@ -62,7 +62,7 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
   return (
     <form className="w-full" onSubmit={handleSubmit(submit)}>
       <h2 className="text-center sm:text-left text-xl mb-2">
-        Organization Details
+        Organization details
       </h2>
 
       <UrlInput

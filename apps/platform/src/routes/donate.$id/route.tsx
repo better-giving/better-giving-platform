@@ -31,16 +31,20 @@ function Page({ loaderData }: Route.ComponentProps) {
   const { endow, program, user, base_url } = loaderData;
   return (
     <div className="w-full">
-      <div className="bg-panel h-14.75 w-full flex items-center justify-between px-10 mb-4">
-        <DappLogo classes="h-12" />
-        <Link
-          to={href("/org/:org", { org: endow.id.toString() })}
-          className="font-semibold link"
-        >
-          Cancel
-        </Link>
-      </div>
-      <div className="md:px-4 max-w-274.5 mx-auto grid md:grid-cols-[1fr_auto] items-start content-start gap-4">
+      <h1 className="sr-only">Donate to {endow.name}</h1>
+      {/* inner box repeats the content column below so logo and Cancel share its edges */}
+      <header className="mb-4">
+        <div className="max-w-274.5 mx-auto px-4 py-2 flex items-center justify-between">
+          <DappLogo classes="h-12" />
+          <Link
+            to={href("/org/:org", { org: endow.id.toString() })}
+            className="font-semibold link"
+          >
+            Cancel
+          </Link>
+        </div>
+      </header>
+      <div className="px-4 max-w-274.5 mx-auto grid md:grid-cols-[1fr_auto] items-start content-start gap-4">
         <div className="@container/org-card col-start-1 row-start-1">
           <OrgCard
             id={endow.id}
@@ -52,39 +56,36 @@ function Page({ loaderData }: Route.ComponentProps) {
           />
         </div>
 
-        {/** small screen but space is still enough to render sidebar */}
-        <div className="mx-0 border-b md:contents xs:border xs:mx-4 rounded">
-          <Steps
-            base_url={base_url}
-            source="bg-marketplace"
-            mode="live"
-            recipient={{
-              id: endow.id.toString(),
-              name: endow.name,
-              hide_bg_tip: endow.hide_bg_tip,
-              members: [],
-              donor_address_required: endow.donor_address_required,
-            }}
-            config={{
-              id: null,
-              method_ids: (endow.donate_methods ?? undefined) as
-                | DonateMethodId[]
-                | undefined,
-              increments: endow.increments ?? undefined,
-              success_redirect: undefined,
-              freq_opts: (endow.donate_frequencies ?? undefined) as
-                | TFrequency[]
-                | undefined,
-            }}
-            program={
-              program ? { id: program.id, name: program.title } : undefined
-            }
-            user={user}
-            classes="md:border rounded row-start-2"
-          />
-        </div>
-        <FAQ classes="max-md:px-4 md:col-start-2 md:row-span-5 md:w-75.5" />
-        <p className="max-md:px-4 mb-4 max-mbcol-start-1 text-sm leading-normal text-left text-gray-11">
+        <Steps
+          base_url={base_url}
+          source="bg-marketplace"
+          mode="live"
+          recipient={{
+            id: endow.id.toString(),
+            name: endow.name,
+            hide_bg_tip: endow.hide_bg_tip,
+            members: [],
+            donor_address_required: endow.donor_address_required,
+          }}
+          config={{
+            id: null,
+            method_ids: (endow.donate_methods ?? undefined) as
+              | DonateMethodId[]
+              | undefined,
+            increments: endow.increments ?? undefined,
+            success_redirect: undefined,
+            freq_opts: (endow.donate_frequencies ?? undefined) as
+              | TFrequency[]
+              | undefined,
+          }}
+          program={
+            program ? { id: program.id, name: program.title } : undefined
+          }
+          user={user}
+          classes="rounded-card border border-hairline row-start-2"
+        />
+        <FAQ classes="md:col-start-2 md:row-span-5 md:w-75.5" />
+        <p className="mb-4 max-md:col-start-1 text-sm leading-normal text-left text-gray-11">
           <span className="block mb-0.5">
             Need help? See{" "}
             <Link to="./#faqs" className="link font-medium">

@@ -1,10 +1,11 @@
+import { EMAILS } from "@better-giving/brand";
 import { createRoutesStub } from "react-router";
 import { describe, expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 import { base_url } from "#/constants/env";
 import { Footer } from "./footer";
 
-const stb = (variant: "full" | "minimal") =>
+const stb = (variant: "full" | "minimal" | "app") =>
   createRoutesStub([
     {
       path: "/",
@@ -57,4 +58,37 @@ describe("footer legal links", () => {
         .toHaveAttribute("href", `${base_url}/terms-of-use-npo/`);
     }
   );
+});
+
+describe("app footer", () => {
+  test("is one line of legal links and a support mailto, with no socials", async () => {
+    const Stub = stb("app");
+    const screen = await render(<Stub />);
+
+    const support = screen.getByRole("link", { name: /^contact support$/i });
+    await expect.element(support).toBeVisible();
+    await expect
+      .element(support)
+      .toHaveAttribute("href", `mailto:${EMAILS.support}`);
+
+    await expect
+      .element(screen.getByRole("link", { name: /^privacy policy$/i }))
+      .toHaveAttribute("href", "/privacy-policy");
+    await expect
+      .element(screen.getByRole("link", { name: /^donor terms$/i }))
+      .toHaveAttribute("href", "/terms-of-use");
+    await expect
+      .element(screen.getByRole("link", { name: /^nonprofit terms$/i }))
+      .toHaveAttribute("href", `${base_url}/terms-of-use-npo/`);
+
+    for (const name of ["LinkedIn", "Facebook", "X", "YouTube", "Instagram"]) {
+      await expect
+        .element(screen.getByRole("link", { name, exact: true }))
+        .not.toBeInTheDocument();
+    }
+    await expect
+      .element(screen.getByRole("img", { name: /better giving/i }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("link").elements()).toHaveLength(4);
+  });
 });

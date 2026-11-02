@@ -1,4 +1,4 @@
-import { ExtLink, Image, Modal } from "@better-giving/ui";
+import { ExtLink, GoalBar, Image, Modal } from "@better-giving/ui";
 import { XIcon } from "lucide-react";
 import {
   type ReactNode,
@@ -20,10 +20,10 @@ import type { RichTextContent } from "#/types/components";
 const ring =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-const donate_inline = `h-16 w-full rounded bg-primary text-2xl font-semibold text-primary-fg hover:bg-blue-10 ${ring}`;
-const donate_bar = `h-12 min-w-0 flex-1 rounded bg-primary text-base font-semibold text-primary-fg hover:bg-blue-10 ${ring}`;
+const donate_inline = `h-16 w-full rounded bg-primary text-2xl font-semibold text-primary-fg hover:bg-primary-hover ${ring}`;
+const donate_bar = `h-12 min-w-0 flex-1 rounded bg-primary text-base font-semibold text-primary-fg hover:bg-primary-hover ${ring}`;
 const close_btn =
-  "grid size-11 place-items-center rounded text-2xl leading-none text-gray-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-9";
+  "grid size-11 place-items-center rounded text-2xl leading-none text-gray-12 enabled:hover:bg-gray-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 /** where a stuck give column sits, and whether it fits there: 2rem clear of
  * the pinned header's bottom edge and of the viewport's bottom */
 function stuck_column(header_bottom: number) {
@@ -142,7 +142,7 @@ export function CampaignPage(props: ICampaignPage) {
       <div
         ref={root_ref}
         inert={dialog ? true : undefined}
-        className="flex min-h-[100dvh] flex-col bg-background text-gray-12"
+        className="flex min-h-[100dvh] flex-col text-gray-12"
       >
         <OrgHeader
           name={props.org_name}
@@ -223,7 +223,7 @@ export function CampaignPage(props: ICampaignPage) {
         {sticky_bar && (
           <div
             data-sticky="bar"
-            className="fixed inset-x-0 bottom-0 z-sticky flex gap-2 border-t border-gray-6 bg-gray-1 px-5 py-3 lg:hidden"
+            className="fixed inset-x-0 bottom-0 z-sticky flex gap-2 bg-popover shadow-floating px-5 py-3 lg:hidden"
           >
             <Share
               trigger="button"
@@ -250,8 +250,7 @@ export function CampaignPage(props: ICampaignPage) {
           set_dialog(false);
         }}
         size="donate"
-        classes="bg-surface"
-        scrim="bg-gray-12/56"
+        classes="bg-popover"
         title="Donate"
         adoptStripeChallenge
         initialFocusEl={() => {
@@ -286,40 +285,23 @@ export function CampaignPage(props: ICampaignPage) {
 function Mast(props: ICampaignPage) {
   return (
     <div className="order-2 flex flex-col gap-3 lg:order-none">
-      <div className="order-2 flex items-center gap-3 lg:order-1">
-        {props.logo && (
-          <Image
-            src={props.logo}
-            alt=""
-            width={48}
-            height={48}
-            className="size-12 shrink-0 rounded-full border border-gray-6 object-cover"
-          />
-        )}
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <Link
-            to={props.org_href}
-            className={`min-w-0 text-base font-semibold text-gray-12 hover:text-primary ${ring}`}
-          >
-            {props.org_name}
-          </Link>
-          {(props.legal || props.website) && (
-            <p className="text-sm text-gray-11">
-              {props.legal}
-              {props.legal && props.website ? " · " : null}
-              {props.website && (
-                <ExtLink
-                  href={props.website.href}
-                  className="link font-semibold underline"
-                >
-                  {props.website.label}
-                </ExtLink>
-              )}
-            </p>
+      {/* the org header above already names the nonprofit with its logo;
+          the mast keeps only what the header doesn't carry */}
+      {(props.legal || props.website) && (
+        <p className="order-2 text-sm text-gray-11 lg:order-2">
+          {props.legal}
+          {props.legal && props.website ? " · " : null}
+          {props.website && (
+            <ExtLink
+              href={props.website.href}
+              className="link font-semibold underline"
+            >
+              {props.website.label}
+            </ExtLink>
           )}
-        </div>
-      </div>
-      <h1 className="order-1 text-3xl font-bold leading-[1.15] tracking-[-0.02em] text-balance break-words lg:order-2 lg:text-4xl">
+        </p>
+      )}
+      <h1 className="order-1 text-3xl font-bold leading-[1.15] tracking-[-0.02em] text-balance break-words lg:text-4xl">
         {props.title}
       </h1>
       {(props.tag || props.program_name) && (
@@ -360,7 +342,7 @@ function Notice(props: ICampaignPage) {
   if (props.gift_failed) {
     return (
       <section className="order-1 lg:order-none">
-        <div className="rounded border border-gray-6 bg-panel">
+        <div className="bg-card rounded-card border border-hairline">
           <div className="flex flex-col gap-2 p-4">
             <h2 className="text-xl font-bold">This gift didn't go through</h2>
             {props.open ? (
@@ -384,7 +366,7 @@ function Notice(props: ICampaignPage) {
   if (!props.open && props.ended_body) {
     return (
       <section className="order-1 lg:order-none">
-        <div className="rounded border border-gray-6 bg-panel">
+        <div className="bg-card rounded-card border border-hairline">
           <div className="flex flex-col gap-2 p-4">
             <h2 className="text-xl font-bold">Giving has ended</h2>
             <p>{props.ended_body}</p>
@@ -403,32 +385,9 @@ function Progress(props: ICampaignPage) {
   return (
     <div className="order-3 flex flex-col gap-2 lg:order-none">
       <p className="text-base">{props.raised_line}</p>
-      {props.bar && (
-        <RaisedBar raised={props.bar.raised} goal={props.bar.goal} />
-      )}
+      {props.bar && <GoalBar raised={props.bar.raised} goal={props.bar.goal} />}
       <p className="text-base">{props.donor_line}</p>
       {props.no_gifts && <p className="text-base">No gifts yet</p>}
-    </div>
-  );
-}
-
-function RaisedBar({ raised, goal }: { raised: number; goal: number }) {
-  const percent = goal > 0 ? Math.min(100, (raised / goal) * 100) : 0;
-  const square = percent < 1;
-  const fill = raised <= 0 ? "0px" : `max(4px, ${percent}%)`;
-  return (
-    <div
-      role="progressbar"
-      aria-valuemin={0}
-      aria-valuemax={goal}
-      aria-valuenow={Math.min(raised, goal)}
-      aria-label="Amount raised"
-      className={`h-2 w-full bg-gray-3 ${square ? "rounded-none" : "rounded"}`}
-    >
-      <div
-        className={`h-full bg-success ${square ? "rounded-none" : "rounded"}`}
-        style={{ width: fill }}
-      />
     </div>
   );
 }

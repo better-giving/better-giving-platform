@@ -12,7 +12,7 @@ export function Top({ classes = "" }) {
       className={`${classes} grid justify-items-center gap-10 @6xl:justify-items-start @6xl:grid-cols-2 pt-12 pb-24`}
     >
       <div className="max-w-2xl order-2 @6xl:order-1 grid">
-        <h4 className="text-center @6xl:text-left @6xl:text-lg uppercase text-primary mb-5">
+        <h4 className="text-center @6xl:text-left @6xl:text-lg text-primary mb-5">
           Setup Today, Grow Forever
         </h4>
         <h1 className="text-center @6xl:text-left text-4xl @6xl:text-5xl @6xl:leading-tight text-balance mb-4">

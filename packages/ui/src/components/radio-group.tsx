@@ -34,15 +34,15 @@ const radio_item =
   "group flex cursor-pointer items-center gap-2 text-sm data-disabled:cursor-default data-disabled:text-gray-11";
 
 const radio_control =
-  "flex size-5 shrink-0 items-center justify-center rounded-full border bg-surface transition-colors data-[state=checked]:not-data-disabled:bg-primary data-disabled:bg-gray-3 data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-ring";
+  "flex size-5 shrink-0 items-center justify-center rounded-full border border-input hover:not-data-disabled:border-input-hover bg-surface transition-colors data-[state=checked]:not-data-disabled:bg-primary data-disabled:bg-gray-3 data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-ring";
 
 const radio_dot =
-  "invisible size-2 rounded-full bg-panel group-data-[state=checked]:visible group-data-disabled:bg-gray-11";
+  "invisible size-2 rounded-full bg-primary-fg group-data-[state=checked]:visible group-data-disabled:bg-gray-11";
 
 // the label keeps its resting ink when checked: the fill, border and check
 // carry the state, and `--primary` on `--secondary-active` has no ledger entry.
 const tile_item =
-  "group flex cursor-pointer items-center gap-3 rounded border p-4 transition-colors hover:not-data-disabled:border-primary data-[state=checked]:border-primary data-[state=checked]:not-data-disabled:bg-secondary-active data-disabled:cursor-default data-disabled:bg-gray-3 data-disabled:text-gray-11 data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-ring";
+  "group flex cursor-pointer items-center gap-3 rounded border border-gray-7 p-4 transition-colors hover:not-data-disabled:border-primary data-[state=checked]:border-primary data-[state=checked]:not-data-disabled:bg-secondary-active data-disabled:cursor-default data-disabled:bg-gray-3 data-disabled:text-gray-11 data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-ring";
 
 export function RadioGroup<T extends string>({
   items,

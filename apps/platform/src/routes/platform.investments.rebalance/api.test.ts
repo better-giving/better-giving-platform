@@ -13,7 +13,9 @@ vi.mock("$/pg/db", () => ({
   db: { transaction: (fn: (tx: unknown) => unknown) => fn({}) },
 }));
 vi.mock("#/.server/toast", () => ({
-  dataWithError: vi.fn((_d: unknown, msg: string) => ({ error: msg })),
+  dataWithError: vi.fn((_d: unknown, msg: string, init?: ResponseInit) =>
+    init ? { error: msg, status: init.status } : { error: msg }
+  ),
 }));
 
 // --- imports (after mocks hoisted) ---
@@ -65,6 +67,22 @@ describe("rebalance", () => {
     const res = await call(TXS);
 
     expect(res).toEqual({ error: "A ticker's balance would go negative" });
+    expect(q.rebalance_log_put).not.toHaveBeenCalled();
+    expect(q.nav_log_put).not.toHaveBeenCalled();
+  });
+
+  it("a portfolio with no units is refused with a 4xx and writes nothing", async () => {
+    q.nav_ltd.mockResolvedValue({
+      units: 0,
+      composition: { CASH: ticker("CASH", 100), IVV: ticker("IVV", 0) },
+    });
+
+    const res = await call(TXS);
+
+    expect(res).toEqual({
+      error: "Can't rebalance: the portfolio has no units yet.",
+      status: 400,
+    });
     expect(q.rebalance_log_put).not.toHaveBeenCalled();
     expect(q.nav_log_put).not.toHaveBeenCalled();
   });

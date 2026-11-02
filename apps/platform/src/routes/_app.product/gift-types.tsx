@@ -17,12 +17,9 @@ export function GiftTypes({ classes = "" }: IGiftTypes) {
   return (
     <section className={classes} aria-labelledby="gift-types-heading">
       <div className="page">
-        <p className="text-xs font-bold uppercase tracking-wider text-primary text-center">
-          Payment aggregation
-        </p>
         <h2
           id="gift-types-heading"
-          className="section-heading text-center mt-3 max-w-2xl mx-auto"
+          className="section-heading text-center max-w-2xl mx-auto"
         >
           Every way to give, in one flow
         </h2>
@@ -32,10 +29,7 @@ export function GiftTypes({ classes = "" }: IGiftTypes) {
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mt-11">
           {gift_types.map((g) => (
-            <div
-              key={g.title}
-              className="bg-secondary border border-gray-6 rounded px-6 py-6"
-            >
+            <div key={g.title} className="card">
               <span className="block font-bold">{g.title}</span>
               <span className="text-sm/normal text-gray-11">{g.body}</span>
             </div>

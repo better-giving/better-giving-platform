@@ -18,9 +18,7 @@ export function Volunteer({ classes = "" }: IVolunteer) {
           className="w-full max-w-xs justify-self-center max-lg:order-2"
         />
         <div className="grid gap-4 justify-items-start">
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">
-            Contribute
-          </p>
+          <p className="text-sm font-semibold text-gray-11">Contribute</p>
           <h2 id="volunteer-heading" className="section-heading">
             Lend your skills
           </h2>

@@ -48,7 +48,7 @@ function Incrementer({
       disabled={disabled}
       data-testid="incrementer"
       type="button"
-      className="grid group/incrementer has-data-label:grid-rows-subgrid gap-y-1 row-span-2 rounded p-2 bg-(--form-secondary) disabled:bg-gray-6 disabled:text-gray-11"
+      className="grid group/incrementer has-data-label:grid-rows-subgrid gap-y-1 row-span-2 rounded p-2 bg-(--form-secondary) disabled:bg-gray-3 disabled:text-gray-11"
       onClick={() => on_increment(value)}
     >
       <span className="text-left text-sm font-medium text-(--form-primary) group-active/incrementer:translate-x-1">

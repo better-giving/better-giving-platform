@@ -50,7 +50,7 @@ export function PayQr({ classes = "", ...props }: Props) {
           icon: "size-5",
         }}
       >
-        <span className="text-sm">Copy Address</span>
+        <span className="text-sm">Copy address</span>
       </Copier>
       {props.extraId && (
         <Memo classes="mt-4" val={props.extraId} label={label} />

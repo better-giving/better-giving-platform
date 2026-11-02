@@ -64,7 +64,7 @@ export function CampaignTab({ fund_opt_in }: Props) {
         </p>
       </div>
 
-      <div className="mt-8">
+      <div>
         <SaveAlert data={fetcher.data} />
         <Actions>
           <button

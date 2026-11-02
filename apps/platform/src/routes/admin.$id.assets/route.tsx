@@ -11,7 +11,7 @@ export { loader } from "./api";
 export const clientLoader = createClientLoaderCache<Route.ClientLoaderArgs>();
 
 export const meta: Route.MetaFunction = ({ matches }) =>
-  admin_page_meta("Alliance Member Badges", matches);
+  admin_page_meta("Alliance member badges", matches);
 
 export default CacheRoute(Page);
 function Page({ loaderData: d, params }: Route.ComponentProps) {
@@ -25,8 +25,8 @@ function Page({ loaderData: d, params }: Route.ComponentProps) {
   };
 
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8 max-w-[1400px]">
-      <h1 className="text-2xl font-bold mb-8">Alliance Member Badges</h1>
+    <div className="px-4 py-4 md:px-10 md:py-8 max-w-[1400px]">
+      <h1 className="sr-only">Alliance member badges</h1>
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-12">
         <div className="card grid gap-y-2 justify-items-center xl:col-start-1 xl:row-start-1">
           <img

@@ -24,7 +24,7 @@ export default function Countries() {
           <span>{c}</span>
         </>
       )}
-      classes={{ label: "font-bold text-xs uppercase" }}
+      classes={{ label: "text-sm font-semibold text-gray-11" }}
     />
   );
 }

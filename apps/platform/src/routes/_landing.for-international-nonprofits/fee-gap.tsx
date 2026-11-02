@@ -2,7 +2,6 @@ export function FeeGap({ classes = "" }) {
   return (
     <section className={classes}>
       <div className="page">
-        <p className="eyebrow text-gray-11 mb-3">The math</p>
         <h2 className="section-heading max-w-3xl">
           On a $100,000 year, the fee gap reaches $7,100.
         </h2>
@@ -14,14 +13,14 @@ export function FeeGap({ classes = "" }) {
 
         <div className="grid gap-4 sm:grid-cols-2 max-w-3xl figures slashed-zero">
           <div className="card">
-            <p className="eyebrow text-gray-11">Typical fiscal sponsor</p>
+            <p className="font-bold text-gray-11">Typical fiscal sponsor</p>
             <p className="text-5xl/tight font-bold mt-3">4-10%</p>
             <p className="text-sm text-gray-11">as of 2026</p>
             <p className="text-sm text-gray-11 mt-2">You keep</p>
             <p className="text-xl font-bold">$90,000-$96,000</p>
           </div>
-          <div className="bg-panel border-2 border-primary rounded p-6">
-            <p className="eyebrow text-primary">Better Giving</p>
+          <div className="card border-2 border-primary">
+            <p className="font-bold text-primary">Better Giving</p>
             <p className="text-5xl/tight font-bold mt-3 text-primary">2.9%</p>
             <p className="text-sm text-gray-11 mt-2">You keep</p>
             <p className="text-xl font-bold text-success-subtle-fg">$97,100</p>

@@ -34,8 +34,8 @@ function Content({ recipient_name }: { recipient_name: string }) {
       className="contents"
     >
       <div className="relative w-full">
-        <p className="sm:text-xl font-bold text-center border-b bg-gray-3 p-5">
-          Cancel Recurring Donation
+        <p className="sm:text-xl font-bold text-center border-b border-hairline p-5">
+          Cancel recurring donation
         </p>
         <Dialog.CloseTrigger asChild>
           <Link
@@ -44,9 +44,9 @@ function Content({ recipient_name }: { recipient_name: string }) {
             preventScrollReset
             replace
             to=".."
-            className="border p-2 rounded absolute top-1/2 right-4 transform -translate-y-1/2 aria-disabled:text-gray-11 aria-disabled:pointer-events-none"
+            className="btn btn-icon btn-secondary absolute top-1/2 right-4 -translate-y-1/2 aria-disabled:pointer-events-none"
           >
-            <X className="size-4.5 sm:size-6" />
+            <X className="icon-xl" />
           </Link>
         </Dialog.CloseTrigger>
       </div>
@@ -100,7 +100,7 @@ export default function CancelPrompt({
     <RouteModal
       title="Cancel recurring donation"
       busy={fetcher.state !== "idle"}
-      classes="grid content-start justify-items-center bg-panel"
+      classes="grid content-start justify-items-center bg-popover"
     >
       <Content recipient_name={recipient_name} />
     </RouteModal>

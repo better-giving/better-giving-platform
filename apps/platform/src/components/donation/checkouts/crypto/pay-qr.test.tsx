@@ -77,7 +77,7 @@ describe("PayQr", () => {
     );
 
     await expect
-      .element(screen.getByRole("button", { name: "Copy Address" }))
+      .element(screen.getByRole("button", { name: "Copy address" }))
       .toBeVisible();
     expect(screen.getByText("Include this").query()).toBeNull();
     expect(

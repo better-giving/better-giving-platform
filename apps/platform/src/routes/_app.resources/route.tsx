@@ -48,7 +48,7 @@ export default function Resources() {
   return (
     <div className="w-full grid content-start pb-16">
       {/* hero */}
-      <section className="bg-gray-3 py-16">
+      <section className="bg-band py-16">
         <div className="page grid gap-4 justify-items-center text-center">
           <h1 className="text-3xl sm:text-4xl font-bold">Resource Hub</h1>
           <p className="text-gray-11 max-w-xl">
@@ -122,7 +122,9 @@ function FilterTab({
       type="button"
       onClick={onClick}
       className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-        active ? "bg-primary text-primary-fg" : "bg-gray-3 hover:bg-gray-3"
+        active
+          ? "bg-primary text-primary-fg"
+          : "bg-gray-3 hover:bg-gray-4 active:bg-gray-5"
       }`}
     >
       {children}

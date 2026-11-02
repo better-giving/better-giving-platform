@@ -45,7 +45,7 @@ function CRUDBtn({
     <button
       {...props}
       type="button"
-      className={`text-lg size-8 flex-center rounded-full hover:bg-secondary group disabled:text-gray-11 ${className}`}
+      className={`text-lg size-8 flex-center rounded-full hover:bg-secondary-hover group disabled:text-gray-11 ${className}`}
     >
       {children}
     </button>

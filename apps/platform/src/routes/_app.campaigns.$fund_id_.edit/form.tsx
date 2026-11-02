@@ -97,7 +97,7 @@ export function Sections({ fund, init_slug = "", base_url }: Props) {
                 charLimit={MAX_DESCRIPTION_CHARS}
                 classes={{
                   field:
-                    "rich-text-toolbar border text-sm grid grid-rows-[auto_1fr] rounded bg-surface p-3 min-h-60",
+                    "rich-text-toolbar text-sm grid grid-rows-[auto_1fr] p-3 min-h-60",
                   counter: "text-gray-11",
                   error: "text-right",
                 }}
@@ -138,11 +138,12 @@ export function Sections({ fund, init_slug = "", base_url }: Props) {
                   media.resetField("banner");
                 }}
                 spec={img_spec([4, 1])}
+                hint="Shown at 4:1 — wider images crop to fit."
                 classes={{ dropzone: "w-full aspect-4/1" }}
                 error={media.errors.banner?.message}
               />
             </div>
-            <div className="grid gap-2">
+            <div className="grid gap-2 max-w-80">
               <label htmlFor="fund-logo" className="label">
                 Logo
               </label>
@@ -160,7 +161,7 @@ export function Sections({ fund, init_slug = "", base_url }: Props) {
                   media.resetField("logo");
                 }}
                 spec={img_spec([1, 1])}
-                classes={{ dropzone: "w-full max-w-80 aspect-square" }}
+                classes={{ dropzone: "w-full aspect-square" }}
                 error={media.errors.logo?.message}
               />
             </div>
@@ -211,7 +212,7 @@ export function Sections({ fund, init_slug = "", base_url }: Props) {
                       <input
                         type="number"
                         {...goal.register(`increments.${idx}.value`)}
-                        className="w-full h-full  outline-ring rounded text-sm font-medium bg-surface pl-8 pr-4 py-3.5 placeholder:text-gray-11 border disabled:pointer-events-none disabled:bg-gray-3 disabled:text-gray-11"
+                        className="field-input h-full pl-8 font-medium"
                       />
                     </div>
 
@@ -223,7 +224,7 @@ export function Sections({ fund, init_slug = "", base_url }: Props) {
                     <textarea
                       {...goal.register(`increments.${idx}.label`)}
                       rows={2}
-                      className="w-full  outline-ring rounded text-sm font-medium bg-surface px-4 py-3.5 placeholder:text-gray-11 border disabled:pointer-events-none disabled:bg-gray-3 disabled:text-gray-11"
+                      className="field-input font-medium"
                     />
                     <p
                       data-error={

@@ -72,10 +72,14 @@ const p = (
   miss,
 });
 
-// the page ground is gray-1, not #ffffff: every figure but the two the ledger
-// explicitly measures on white is against the real ground.
-const page = colors.background;
+// gray-1 is the page: --background, and with it --surface (a field's fill) and
+// --popover (a floating layer's). the figures recorded "on gray-1" are on all
+// three, and on the embedded donation form and the emails, which sit on the
+// same step. the card is a rung down at gray-2 and the well a rung below that
+// at gray-3, so each dark ink loses a few Lc per step inward.
+const page = colors.gray_1;
 const white = "#ffffff";
+const card = colors.card;
 
 // tailwind's `/<alpha>` modifier, composited over the ground the ledger names.
 const tint = (hex: string, alpha: number, ground: string | Rgb = page) =>
@@ -85,79 +89,148 @@ const tint = (hex: string, alpha: number, ground: string | Rgb = page) =>
 const scrim = tint(colors.primary_deep, 0.7, white);
 
 const pairings: Pairing[] = [
-  // --- borders, the focus ring, neutral ink on the page
+  // --- the surface model on its radix steps: --card (gray-2), a well
+  // (--panel, gray-3), and the edges drawn on them
+  p("gray-12 on --card", colors.gray_12, card, 99.5, min.body_preferred),
+  p("gray-11 on --card", colors.gray_11, card, 75.8, min.content),
+  p("--hairline (gray-6) on --card", colors.hairline, card, 15.5, min.hairline),
+  p("--hairline (gray-6) on gray-1", colors.hairline, page, 17.4, min.hairline),
   p(
-    "gray-6 (--border) on --background",
-    colors.gray_6,
-    page,
-    17.4,
-    min.hairline
-  ),
-  p(
-    "gray-6 (--border) on --panel",
-    colors.gray_6,
-    colors.panel,
-    15.5,
-    min.hairline
-  ),
-  p(
-    "gray-7 control boundary on --background",
+    "gray-7 button edge on --card",
     colors.gray_7,
-    page,
-    23.8,
-    min.spot,
-    "radix's element-border rung taken as generated; gray-8 clears and was declined 2026-09-13"
-  ),
-  p(
-    "gray-7 control boundary on --panel",
-    colors.gray_7,
-    colors.panel,
+    card,
     21.8,
     min.spot,
-    "same rung, one surface down"
+    "radix's interactive-border rung on .btn-secondary, taken as generated: a button's label identifies it, so the edge is not the boundary WCAG 1.4.11 asks to be findable"
   ),
-  p("gray-8 on --background", colors.gray_8, page, 34.3, min.spot),
-  p("gray-8 on --panel", colors.gray_8, colors.panel, 32.4, min.spot),
-  p("gray-11 on --background", colors.gray_11, page, 77.7, min.content),
-  p("gray-12 on --background", colors.gray_12, page, 101.5, min.body_preferred),
-  p("--ring (blue-8) on --background", colors.ring, page, 44.6, min.spot),
+  p(
+    "gray-8 button edge, hovered, on --card",
+    colors.gray_8,
+    card,
+    32.4,
+    min.spot
+  ),
+  p(
+    "--input (gray-7) on --card",
+    colors.input,
+    card,
+    21.8,
+    min.spot,
+    "radix's interactive-border rung, kept by PM decision (2026-11-01): the field's label, placeholder and step-1 fill also identify it"
+  ),
+  p(
+    "--input (gray-7) on --surface",
+    colors.input,
+    colors.surface,
+    23.8,
+    min.spot,
+    "radix's interactive-border rung, kept by PM decision (2026-11-01)"
+  ),
+  p(
+    "--input (gray-7) on --panel",
+    colors.input,
+    colors.panel,
+    16.9,
+    min.spot,
+    "radix's interactive-border rung inside a well, kept by PM decision (2026-11-01)"
+  ),
+  p(
+    "--input-hover (gray-8) on --card",
+    colors.input_hover,
+    card,
+    32.4,
+    min.spot
+  ),
+  p(
+    "--input-hover (gray-8) on --panel",
+    colors.input_hover,
+    colors.panel,
+    27.5,
+    min.spot,
+    "the hovered field edge inside a well, kept by PM decision (2026-11-01); transient"
+  ),
+  // the steps that would clear 1.4.11, recorded beside the field edge's and
+  // held to nothing: no edge spends them (fields and switches are radix gray-7).
+  p("gray-9 on --card", colors.gray_9, card, 56.3, null),
+  p("gray-9 on --surface", colors.gray_9, colors.surface, 58.3, null),
+  p("gray-10 on --card", colors.gray_10, card, 61.6, null),
+  p("gray-10 on --surface", colors.gray_10, colors.surface, 63.5, null),
+  p("--ring on --card", colors.ring, card, 42.7, min.spot),
+  p("--primary on --card", colors.primary, card, 73.2, min.content),
+  p(
+    "gray-11 on --panel (a well)",
+    colors.gray_11,
+    colors.panel,
+    70.9,
+    min.content
+  ),
+  p(
+    "gray-12 on --panel (a well)",
+    colors.gray_12,
+    colors.panel,
+    94.6,
+    min.body_preferred
+  ),
+  // the neutral hover and pressed rungs a row or ghost control paints
+  p(
+    "gray-11 on gray-4 (hovered)",
+    colors.gray_11,
+    colors.gray_4,
+    66.1,
+    min.content
+  ),
+  p(
+    "gray-11 on gray-5 (pressed, current)",
+    colors.gray_11,
+    colors.gray_5,
+    62.1,
+    min.content
+  ),
+  p(
+    "gray-12 on gray-5 (pressed, current)",
+    colors.gray_12,
+    colors.gray_5,
+    85.8,
+    min.body
+  ),
+  p(
+    "gray-12 on --secondary-hover (blue-4)",
+    colors.gray_12,
+    colors.secondary_hover,
+    90.6,
+    min.body
+  ),
+
+  // --- borders, the focus ring, neutral ink on the page
+  p("gray-8 on gray-1", colors.gray_8, page, 34.3, min.spot),
+  p("gray-11 on gray-1", colors.gray_11, page, 77.7, min.content),
+  p("gray-12 on gray-1", colors.gray_12, page, 101.5, min.body_preferred),
+  p("--ring (blue-8) on gray-1", colors.ring, page, 44.6, min.spot),
   // on the line and not over it, which is what surface-primary's ring rebind
   // exists for.
   p("--ring on --primary", colors.ring, colors.primary, 30.0, min.spot),
   p("gray-6 on --primary", colors.gray_6, colors.primary, 58.6, min.spot),
 
   // --- fill or ink: every token measured on the real page ground
-  p("--primary on --background", colors.primary, page, 75.1, min.content),
+  p("--primary on gray-1", colors.primary, page, 75.1, min.content),
   // the hover rung of the `link` recipe, and the first place step 10 is spent
   // as ink rather than as a fill. the ramp pairs a step 10 with nothing, so
   // this is the palette's own combination and is measured rather than inferred
   // from the step below it.
-  p(
-    "--primary-hover on --background",
-    colors.primary_hover,
-    page,
-    80.7,
-    min.content
-  ),
+  p("--primary-hover on gray-1", colors.primary_hover, page, 80.7, min.content),
   // fill only by rule (gray-12 is the app's dark ink), so no threshold binds.
-  p("--primary-deep on --background", colors.primary_deep, page, 93.9, null),
-  p("--success glyph on --background", colors.success, page, 67.0, min.detail),
+  p("--primary-deep on gray-1", colors.primary_deep, page, 93.9, null),
+  p("--success glyph on gray-1", colors.success, page, 67.0, min.detail),
   p(
-    "--success-subtle-fg on --background",
+    "--success-subtle-fg on gray-1",
     colors.success_subtle_fg,
     page,
     72.0,
     min.content
   ),
+  p("--destructive on gray-1", colors.destructive, page, 74.1, min.content),
   p(
-    "--destructive on --background",
-    colors.destructive,
-    page,
-    74.1,
-    min.content
-  ),
-  p(
-    "--warning glyph on --background",
+    "--warning glyph on gray-1",
     colors.warning,
     page,
     39.9,
@@ -173,20 +246,20 @@ const pairings: Pairing[] = [
     "same fill, on white"
   ),
   p(
-    "--warning-subtle-fg on --background",
+    "--warning-subtle-fg on gray-1",
     colors.warning_subtle_fg,
     page,
-    69.3,
+    94.2,
     min.content
   ),
   p(
     "--warning-subtle-fg on white",
     colors.warning_subtle_fg,
     white,
-    71.2,
+    96.0,
     min.content
   ),
-  p("--warning-fg on --background", colors.warning_fg, page, 94.2, min.content),
+  p("--warning-fg on gray-1", colors.warning_fg, page, 94.2, min.content),
   p("gray-11 on gray-3", colors.gray_11, colors.gray_3, 70.9, min.content),
   p(
     "gray-11 on --secondary",
@@ -245,13 +318,7 @@ const pairings: Pairing[] = [
     66.7,
     min.content
   ),
-  p(
-    "--destructive on --panel",
-    colors.destructive,
-    colors.panel,
-    72.2,
-    min.content
-  ),
+  p("--destructive on --card", colors.destructive, card, 72.2, min.content),
 
   // --- the authored bands, and the step-11 inks across surfaces
   p(
@@ -262,9 +329,9 @@ const pairings: Pairing[] = [
     min.content
   ),
   p(
-    "--destructive-subtle-fg on --panel",
+    "--destructive-subtle-fg on --card",
     colors.destructive_subtle_fg,
-    colors.panel,
+    card,
     70.3,
     min.content
   ),
@@ -302,9 +369,9 @@ const pairings: Pairing[] = [
     min.content
   ),
   p(
-    "--success-subtle-fg on --panel",
+    "--success-subtle-fg on --card",
     colors.success_subtle_fg,
-    colors.panel,
+    card,
     70.0,
     min.content
   ),
@@ -319,44 +386,43 @@ const pairings: Pairing[] = [
     "--warning-subtle-fg on --warning-subtle",
     colors.warning_subtle_fg,
     colors.warning_subtle,
-    62.5,
+    87.3,
     min.content
   ),
   p(
-    "--warning-subtle-fg on --panel",
+    "--warning-subtle-fg on --card",
     colors.warning_subtle_fg,
-    colors.panel,
-    67.4,
+    card,
+    92.2,
     min.content
   ),
   p(
     "--warning-subtle-fg on amber-2",
     colors.warning_subtle_fg,
     colors.amber_2,
-    67.2,
+    92.0,
     min.content
   ),
   p(
     "--warning-subtle-fg on --secondary",
     colors.warning_subtle_fg,
     colors.secondary,
-    63.2,
+    88.0,
     min.content
   ),
   p(
     "--warning-subtle-fg on gray-3",
     colors.warning_subtle_fg,
     colors.gray_3,
-    62.5,
+    87.3,
     min.content
   ),
   p(
     "--warning-subtle-fg on --secondary-active",
     colors.warning_subtle_fg,
     colors.secondary_active,
-    52.5,
-    min.content,
-    "cross-scale, on the pressed rung: the tightest ink in the palette and the one surface it misses"
+    77.3,
+    min.content
   ),
   p(
     "gray-12 on --warning-subtle",
@@ -395,6 +461,14 @@ const pairings: Pairing[] = [
     82.3,
     min.body
   ),
+  // btn-inverse: the brand ink as a label on the brand fill's own ink
+  p(
+    "btn-inverse label (--primary on --primary-fg)",
+    colors.primary,
+    colors.primary_fg,
+    76.9,
+    min.body
+  ),
   p(
     "--warning-fg on --warning",
     colors.warning_fg,
@@ -427,9 +501,9 @@ const pairings: Pairing[] = [
     "--warning-subtle-fg on --primary",
     colors.warning_subtle_fg,
     colors.primary,
-    0.0,
+    17.1,
     min.content,
-    "invisible"
+    "under any text threshold: a dark ink on the dark fill"
   ),
   p(
     "--success-subtle-fg on --primary",
@@ -610,10 +684,10 @@ const pairings: Pairing[] = [
   // legend above prints each value as text, so only the hairline floor binds;
   // the lower of the two polarities is the one recorded.
   p(
-    "slider grant (gray-3) beside savings (--warning)",
+    "slider grant (gray-4) beside savings (--warning)",
     colors.warning,
-    colors.gray_3,
-    33.1,
+    colors.gray_4,
+    28.4,
     min.hairline
   ),
   p(
@@ -622,6 +696,22 @@ const pairings: Pairing[] = [
     colors.warning,
     24.9,
     min.hairline
+  ),
+  // a thumb's gray-11 edge where it reads least: on the savings segment. a
+  // control boundary, so the spot floor binds.
+  p(
+    "slider thumb edge (gray-11) on savings (--warning)",
+    colors.gray_11,
+    colors.warning,
+    35.7,
+    min.spot
+  ),
+  p(
+    "slider thumb edge (gray-11) on the grant track (gray-4)",
+    colors.gray_11,
+    colors.gray_4,
+    66.1,
+    min.spot
   ),
 ];
 
@@ -727,8 +817,8 @@ describe("--overlay, the dialog scrim", () => {
     expect(second).toBe("transparent");
   });
 
-  // composited over the page it scrims. no ledger figure exists for it either:
-  // the token's job is to dim, and this pins how far it does.
+  // composited over the gray-1 page it scrims. no ledger figure exists for it
+  // either: the token's job is to dim, and this pins how far it does.
   it("dims the page by a recorded amount", () => {
     const dimmed = over(rgb(hex_of(first)), pct / 100, rgb(page));
     expect(to_hex(dimmed)).toBe("#b8babe");
@@ -742,5 +832,62 @@ describe("--overlay, the dialog scrim", () => {
 describe("the hero scrim composites to the recorded color", () => {
   it("is #60778c over a pure-white region", () => {
     expect(to_hex(scrim)).toBe("#60778c");
+  });
+});
+
+// WCAG 2 ratio, for the pairings an outside audit holds to 1.4.3 / 1.4.11
+// rather than to APCA: the success and warning inks on their bands, and a
+// switch's ring.
+describe("the audited WCAG 2 pairings clear", () => {
+  // wcag's piecewise relative luminance, not apca's sRGBtoY (a plain 2.4 power)
+  const lum = (hex: string) => {
+    const [r, g, b] = rgb(hex).map((n) => {
+      const c = n / 255;
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a: string, b: string) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  // 1.4.11: a field's, checkbox's or radio's boundary is what identifies it,
+  // and radix's step 7 does not reach 3:1 on any ground it sits on. kept on
+  // role by PM decision (2026-11-01), as --ring is: pinned under 3:1 so a step
+  // move lands back here as a new decision rather than a silent fix.
+  it("--input is radix gray-7 (radix sets no edge target); WCAG reference stays under 3:1", () => {
+    expect(colors.input).toBe(colors.gray_7);
+    expect(colors.input_hover).toBe(colors.gray_8);
+    expect(ratio(colors.input, colors.card)).toBeLessThan(3);
+    expect(ratio(colors.input, colors.surface)).toBeLessThan(3);
+    expect(ratio(colors.input, colors.panel)).toBeLessThan(3);
+  });
+  // 1.4.11: a switch's off state reads by its ring alone, and the ring is
+  // radix's interactive border, gray-7 — under 3:1, kept on role by PM
+  // decision (2026-11-01, "stay true to radix"), pinned so a step move is a
+  // new decision rather than a silent fix.
+  it("a switch's off-state ring is radix gray-7 (no edge target); WCAG reference under 3:1", () => {
+    expect(ratio(colors.gray_7, colors.card)).toBeLessThan(3);
+  });
+  // 1.4.11: a registration step's completion reads by its --primary dot alone
+  // (the pending dot is a gray-6 marker, not the state's carrier)
+  it("a complete step's --primary dot is at least 3:1 on --card and the page", () => {
+    expect(ratio(colors.primary, colors.card)).toBeGreaterThanOrEqual(3);
+    expect(ratio(colors.primary, colors.background)).toBeGreaterThanOrEqual(3);
+  });
+  it("--warning-subtle-fg on --warning-subtle is at least 4.5:1", () => {
+    expect(
+      ratio(colors.warning_subtle_fg, colors.warning_subtle)
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+  // the success band is radix's component background, step 3; on step 2 it
+  // had no visible fill on the gray-2 card. kept on role by PM rule
+  // (2026-11-01): APCA Lc 66.1 clears content, and the WCAG figure is pinned
+  // just under 4.5:1 so a step move lands back here as a new decision.
+  it("--success-subtle is radix green-3; its ink's WCAG reference is just under 4.5:1", () => {
+    expect(colors.success_subtle).toBe(colors.green_3);
+    expect(ratio(colors.success_subtle_fg, colors.success_subtle)).toBeLessThan(
+      4.5
+    );
   });
 });

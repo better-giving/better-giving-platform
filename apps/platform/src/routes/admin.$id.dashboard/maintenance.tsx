@@ -39,10 +39,10 @@ export default function Component() {
   };
 
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8 w-full max-w-[1400px] grid content-start">
-      <h3 className="font-bold text-2xl mb-4">Dashboard</h3>
+    <div className="px-4 py-4 md:px-10 md:py-8 w-full max-w-[1400px] grid content-start">
+      <h1 className="sr-only">Dashboard</h1>
       <div className="flex items-center gap-2">
-        <p className="mt-4 text-gray-11">
+        <p className="text-gray-11">
           Your new dashboard experience is underway
         </p>
         <img

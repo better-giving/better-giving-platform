@@ -27,7 +27,7 @@ export function IdentitySummary({ reg, classes = "" }: Props) {
 
   return (
     <div
-      className={`${classes} flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-3 text-sm text-gray-11 border-t border-gray-6`}
+      className={`${classes} flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-3 text-sm text-gray-11 border-t border-hairline`}
     >
       <span>
         {label ?? "Organization type not set"}

@@ -1,8 +1,8 @@
 import { Menu } from "@ark-ui/react/menu";
 import { Portal } from "@ark-ui/react/portal";
 import { Image, popup_anim } from "@better-giving/ui";
-import { CheckIcon, ChevronsUpDownIcon, PlusIcon } from "lucide-react";
-import { href, Link, useParams } from "react-router";
+import { CheckIcon, ChevronsUpDownIcon } from "lucide-react";
+import { href, Link, useNavigate, useParams } from "react-router";
 import flying_character from "#/assets/images/flying-character.webp";
 import { use_user } from "#/hooks/use-user";
 
@@ -11,9 +11,10 @@ interface IEndow {
   logo?: string | null;
 }
 
-export function Loader({ name, logo = flying_character }: IEndow) {
+export function OrgSwitcher({ name, logo = flying_character }: IEndow) {
   const { user } = use_user();
   const { id: current_id } = useParams();
+  const navigate = useNavigate();
 
   const orgs = user && user !== "loading" ? user.orgs : [];
   // trigger always reflects the SSR-loaded current org; fall back to it as the
@@ -22,17 +23,43 @@ export function Loader({ name, logo = flying_character }: IEndow) {
     ? orgs
     : [{ id: Number(current_id), name, logo: logo || undefined }];
 
+  const face = (
+    <>
+      <Image
+        className="size-8 shrink-0 rounded object-cover"
+        src={logo || flying_character}
+      />
+      <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+        {name}
+      </span>
+    </>
+  );
+
+  // one org is nothing to switch between: show it, offer no control
+  if (list.length < 2) {
+    return (
+      <div className="flex items-center gap-2 min-w-0 max-w-80 px-3 py-2">
+        {face}
+      </div>
+    );
+  }
+
   return (
-    <Menu.Root positioning={{ placement: "bottom", gutter: 4 }}>
-      <Menu.Trigger className="group flex items-center gap-2 w-full py-4 px-5 border-b text-left focus-visible:outline-2 focus-visible:outline-ring">
-        <Image className="size-14 shrink-0" src={logo || flying_character} />
-        <h5 className="text-sm font-bold truncate flex-1">{name}</h5>
+    <Menu.Root
+      positioning={{ placement: "bottom-start", gutter: 4 }}
+      // keyboard selection of a link item navigates client-side, not by a reload
+      navigate={({ node }) => navigate(node.getAttribute("href") ?? "/")}
+    >
+      {/* the app header's leading slot, in the logo's place; capped so a long
+          name truncates */}
+      <Menu.Trigger className="group flex items-center gap-2 min-w-0 max-w-80 px-3 py-2 rounded text-left hover:bg-gray-4 active:bg-gray-5 transition-colors focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2">
+        {face}
         <ChevronsUpDownIcon className="shrink-0 text-gray-11 group-hover:text-gray-12 icon-md" />
       </Menu.Trigger>
       <Portal>
         <Menu.Positioner>
           <Menu.Content
-            className={`z-floating grid w-max min-w-56 p-2 rounded bg-panel text-gray-12 shadow-floating ${popup_anim}`}
+            className={`z-floating grid w-max min-w-56 p-2 rounded-card bg-popover text-gray-12 shadow-floating focus:outline-0 ${popup_anim}`}
           >
             {list.map((org) => {
               const is_current = org.id.toString() === current_id;
@@ -40,7 +67,7 @@ export function Loader({ name, logo = flying_character }: IEndow) {
                 <Menu.Item key={org.id} value={org.id.toString()} asChild>
                   <Link
                     to={href("/admin/:id", { id: org.id.toString() })}
-                    className="hover:bg-gray-3 data-highlighted:bg-gray-3 data-highlighted:text-gray-12 data-highlighted:outline-2 data-highlighted:outline-ring data-highlighted:-outline-offset-2 flex items-center gap-2 px-2 py-2 rounded text-gray-11 hover:text-gray-12"
+                    className="hover:bg-gray-4 data-highlighted:bg-gray-4 data-highlighted:text-gray-12 data-highlighted:outline-2 data-highlighted:outline-ring data-highlighted:-outline-offset-2 flex items-center gap-2 px-2 py-2 rounded text-gray-11 hover:text-gray-12"
                   >
                     <Image
                       src={org.logo || flying_character}
@@ -54,15 +81,6 @@ export function Loader({ name, logo = flying_character }: IEndow) {
                 </Menu.Item>
               );
             })}
-            <Menu.Item value="register" asChild>
-              <Link
-                to={href("/register")}
-                className="hover:bg-gray-3 data-highlighted:bg-gray-3 data-highlighted:text-gray-12 data-highlighted:outline-2 data-highlighted:outline-ring data-highlighted:-outline-offset-2 border-t mt-1 flex items-center gap-2 px-2 py-2 rounded text-gray-11 hover:text-gray-12"
-              >
-                <PlusIcon className="shrink-0 icon-md" />
-                <span className="text-sm">Register another org</span>
-              </Link>
-            </Menu.Item>
           </Menu.Content>
         </Menu.Positioner>
       </Portal>

@@ -56,9 +56,7 @@ export function IraQcdCheckout(props: IraQcdDonationDetails) {
         type="button"
         onClick={() => to_step("ira_qcd", props, "form", don_set)}
       />
-      <p className="mt-4 text-center text-gray-11 uppercase">
-        IRA Donation Pending
-      </p>
+      <p className="mt-4 text-center text-gray-11">IRA donation pending</p>
       <p className="mt-4 text-center">
         To complete this donation, please provide your IRA custodian with the
         following information.
@@ -90,14 +88,14 @@ export function IraQcdCheckout(props: IraQcdDonationDetails) {
           href={email_link(reference, project, total)}
           className="btn btn-sm btn-secondary font-normal"
         >
-          Generate Email
+          Generate email
         </a>
         <Copier
           text={instructions_text}
           size={14}
           classes="btn btn-sm btn-secondary font-normal inline-flex items-center gap-1"
         >
-          Copy Instructions
+          Copy instructions
         </Copier>
       </div>
 
@@ -174,7 +172,10 @@ export function IraQcdCheckout(props: IraQcdDonationDetails) {
         </button>
       )}
 
-      <DonationTerms endowName={grantee} classes="mt-5 border-t pt-4" />
+      <DonationTerms
+        endowName={grantee}
+        classes="mt-5 border-t border-hairline pt-4"
+      />
     </div>
   );
 }

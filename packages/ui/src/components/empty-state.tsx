@@ -57,7 +57,11 @@ export function EmptyRow({ col_span, ...rest }: IRow) {
     <tr>
       {/* override .table td padding: the state owns its own rhythm */}
       <td colSpan={col_span} className="p-0">
-        <EmptyState {...rest} />
+        {/* pinned to the visible width of the `table-scroll` around it, so the
+            line centres on screen, not across the scrolled-away columns */}
+        <div className="sticky left-0 w-full max-w-[100cqi]">
+          <EmptyState {...rest} />
+        </div>
       </td>
     </tr>
   );

@@ -57,7 +57,7 @@ export function Preview({
         ) : (
           previews.map((p, idx) => (
             <div key={idx}>
-              <h4 className="text-xs font-semibold text-gray-11 uppercase tracking-wide mb-2">
+              <h4 className="text-sm font-semibold text-gray-11 mb-2">
                 {p.npo_name}
               </h4>
               <RecordsTabs preview={p} />
@@ -134,7 +134,7 @@ function RecordsTabs({ preview }: { preview: ISettlementPreview }) {
         </TabPanel>
 
         <TabPanel value="json" className="mt-3">
-          <pre className="text-xs bg-gray-3 rounded p-3 overflow-x-auto max-h-60 overflow-y-auto scrollbars">
+          <pre className="text-xs bg-panel rounded p-3 overflow-x-auto max-h-60 overflow-y-auto scrollbars">
             {JSON.stringify(preview.txs, null, 2)}
           </pre>
         </TabPanel>
@@ -221,9 +221,7 @@ function RecordSection({
 }) {
   return (
     <section className="mb-4">
-      <h4 className="text-xs font-semibold text-gray-11 uppercase tracking-wide mb-2">
-        {title}
-      </h4>
+      <h4 className="text-sm font-semibold text-gray-11 mb-2">{title}</h4>
       <div className="grid gap-1">{children}</div>
     </section>
   );

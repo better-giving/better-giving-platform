@@ -28,7 +28,7 @@ const base: PaymentRow = {
   sttl_currency: null,
   // crypto: the processor-side refund this void exists to record, and a row
   // with no Refund link of its own to confuse the assertion
-  via: "nowpayments:crypto",
+  via: "crypto:eth",
   created_at: new Date("2026-01-01").toISOString(),
   status: "settled",
   match_event_id: null,
@@ -60,13 +60,13 @@ const items: PaymentRow[] = [
   },
 ];
 
-function render_list() {
+function render_list(rows = items) {
   const Stub = createRoutesStub([
     {
       path: "/platform/donations",
       Component: Page,
       HydrateFallback: () => null,
-      loader: () => ({ items, next: undefined }),
+      loader: () => ({ items: rows, next: undefined }),
     },
   ]);
   return render(<Stub initialEntries={["/platform/donations"]} />);
@@ -83,5 +83,20 @@ describe("donations table — match cell", () => {
     const links = screen.getByRole("link", { name: "Void" }).elements();
     expect(links.length).toBe(1);
     expect(links[0].getAttribute("href")).toContain("don_2/void-match");
+  });
+});
+
+describe("donations table — method cell", () => {
+  it.each([
+    ["crypto:eth", "crypto:eth"],
+    ["stripe:card", "Card"],
+    ["paypal:paypal", "PayPal"],
+  ])("a %s gift reads %s", async (via, label) => {
+    const screen = await render_list([{ ...base, via }]);
+
+    const row = screen.getByRole("row").nth(1);
+    await expect.element(row).toBeVisible();
+    const method = row.element().children[7];
+    expect(method.textContent).toBe(label);
   });
 });

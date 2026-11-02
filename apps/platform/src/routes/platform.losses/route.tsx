@@ -17,64 +17,67 @@ function Page({ loaderData }: Route.ComponentProps) {
   const total = ltd?.total ?? 0;
 
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8 w-full max-w-4xl grid content-start">
-      <h3 className="font-bold text-2xl mb-4">Losses</h3>
-
+    <div className="px-4 py-4 md:px-10 md:py-8 w-full max-w-4xl grid content-start gap-6">
+      <h1 className="sr-only">Losses</h1>
       {/* summary */}
       <div className="grid grid-cols-2 gap-4">
         <Card label="Total Losses" value={total} />
       </div>
 
       {/* per-npo breakdown */}
-      <h4 className="font-bold text-lg mt-8 mb-1">Losses per nonprofit</h4>
-      {npo_losses.length > 0 ? (
-        <div className="table-scroll">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>NPO</th>
-                <th className="text-right">Loss</th>
-              </tr>
-            </thead>
-            <tbody>
-              {npo_losses.map((n: NpoLoss) => (
-                <tr key={n.id} className="text-sm">
-                  <td className="truncate max-w-56" title={n.name}>
-                    {n.name}
-                  </td>
-                  <td className="text-right font-medium">
-                    ${humanize(n.amount)}
-                  </td>
+      <section className="card">
+        <h2 className="font-bold text-lg mb-1">Losses per nonprofit</h2>
+        {npo_losses.length > 0 ? (
+          <div className="table-scroll">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>NPO</th>
+                  <th className="text-right">Loss</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <EmptyState>No per-NPO data yet</EmptyState>
-      )}
+              </thead>
+              <tbody>
+                {npo_losses.map((n: NpoLoss) => (
+                  <tr key={n.id} className="text-sm">
+                    <td className="truncate max-w-56" title={n.name}>
+                      {n.name}
+                    </td>
+                    <td className="text-right font-medium">
+                      ${humanize(n.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState>No per-NPO data yet</EmptyState>
+        )}
+      </section>
 
       {/* recent loss logs */}
-      <div className="flex items-center justify-between mt-8">
-        <h4 className="font-bold text-lg mb-1">Recent loss logs</h4>
-        {logs_next && (
-          <Link to="logs" className="text-sm link">
-            See All
-          </Link>
+      <section className="card">
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold text-lg mb-1">Recent loss logs</h2>
+          {logs_next && (
+            <Link to="logs" className="text-sm link">
+              See all
+            </Link>
+          )}
+        </div>
+        {logs.length > 0 ? (
+          <LogsTable items={logs} />
+        ) : (
+          <EmptyState>No loss logs yet</EmptyState>
         )}
-      </div>
-      {logs.length > 0 ? (
-        <LogsTable items={logs} />
-      ) : (
-        <EmptyState>No loss logs yet</EmptyState>
-      )}
+      </section>
     </div>
   );
 }
 
 function Card({ label, value }: { label: string; value: number }) {
   return (
-    <div>
+    <div className="card">
       <p className="text-gray-11 text-sm mb-1">{label}</p>
       <p className="text-xl font-bold">${humanize(value)}</p>
     </div>

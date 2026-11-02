@@ -1,4 +1,5 @@
 import { NpoName } from "#/components/npo-name";
+import { share_pct } from "#/routes/platform.investments/share";
 import { humanize } from "@/helpers/decimal";
 
 interface Props {
@@ -21,17 +22,22 @@ export function Review({ classes = "", amount, per_npo_credit_usd }: Props) {
         <tbody>
           {Object.entries(per_npo_credit_usd)
             .sort(([, a], [, b]) => b - a)
-            .map(([npo, npo_usd]) => (
-              <tr key={npo} className="text-sm">
-                <td>
-                  <NpoName id={npo} />
-                </td>
-                <td className="text-right">
-                  {humanize((npo_usd / amount) * 100)} %
-                </td>
-                <td className="text-right">${humanize(npo_usd)}</td>
-              </tr>
-            ))}
+            .map(([npo, npo_usd]) => {
+              const pct = share_pct(npo_usd, amount);
+              return (
+                <tr key={npo} className="text-sm">
+                  <td>
+                    <NpoName id={npo} />
+                  </td>
+                  <td className="text-right whitespace-nowrap">
+                    {pct === null ? "—" : `${humanize(pct)} %`}
+                  </td>
+                  <td className="text-right whitespace-nowrap">
+                    ${humanize(npo_usd)}
+                  </td>
+                </tr>
+              );
+            })}
         </tbody>
       </table>
     </div>

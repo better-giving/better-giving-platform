@@ -3,13 +3,10 @@ import { StepsCarousel } from "#/components/donation";
 export function DonationFormInfo({ classes = "" }) {
   return (
     <section className={`${classes} grid content-start py-20`}>
-      <h4 className="mb-4 col-span-full text-primary pre-heading uppercase text-center">
-        Your all-in-one donation form
-      </h4>
-      <h2 className="col-span-full text-center hero-heading mb-4">
+      <h1 className="col-span-full text-center hero-heading mb-4">
         Raise more. Save more. Do less.
-      </h2>
-      <p className="col-span-full mb-4 text-center text-xl text-navy">
+      </h1>
+      <p className="col-span-full mb-4 text-center text-xl max-w-2xl mx-auto text-pretty">
         No setup costs and no recurring charges. No platform fee while the
         optional donor contribution stays on. Turning that ask off is a 1.5%
         fee.

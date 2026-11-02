@@ -251,7 +251,7 @@ export function Checkout({ order_id, donor, bank_only, ...intent }: Props) {
       type="submit"
     >
       <LoadText text="Processing..." is_loading={status === "submitting"}>
-        Donate Now
+        Donate now
       </LoadText>
     </button>
   );

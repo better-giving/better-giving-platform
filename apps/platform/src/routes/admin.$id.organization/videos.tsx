@@ -193,7 +193,7 @@ export function VideosGroup({ npo_id, videos }: IVideosGroup) {
           }
         />
         {!empty && (
-          <ul className="mt-2 divide-y border rounded bg-surface">
+          <ul className="mt-2 divide-y divide-hairline rounded border border-hairline">
             {items.map((v) => {
               const spot = featured.findIndex((f) => f.id === v.id) + 1;
               return (
@@ -277,7 +277,7 @@ function Spot({ npo_id, video, n, on_take_off }: ISpot) {
 
 function OpenSpot() {
   return (
-    <div className="aspect-video grid place-content-center gap-1 p-2 text-center border border-dashed border-gray-8 rounded text-xs text-gray-11">
+    <div className="aspect-video grid place-content-center gap-1 p-2 text-center border border-dashed border-hairline rounded text-xs text-gray-11">
       <b className="text-sm font-semibold text-gray-12">Open spot</b>
       <span>Choose “Show on page” on a video below</span>
     </div>
@@ -604,8 +604,10 @@ function UndoRow({ npo_id, removed, on_restore, on_settled }: IUndoRow) {
   }, [removed.refusal]);
 
   return (
-    <li className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-sm bg-gray-3">
-      <span className="flex-1 min-w-0 break-all">Removed {url}</span>
+    <li className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-sm">
+      <span className="flex-1 min-w-0 break-all text-gray-11">
+        Removed {url}
+      </span>
       {removed.refusal ? (
         <p
           ref={refusal_ref}

@@ -10,7 +10,7 @@ export const Fund = (props: IFundRow) => {
     props.donation_total_usd
   );
   return (
-    <div className="grid grid-rows-subgrid row-span-4 content-start gap-y-0 items-center border p-3 rounded">
+    <div className="grid grid-rows-subgrid row-span-4 content-start gap-y-0 items-center card">
       <div className="flex items-start justify-between">
         <img
           src={props.logo}

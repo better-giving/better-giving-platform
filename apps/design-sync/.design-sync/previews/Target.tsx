@@ -43,7 +43,7 @@ export const Inline = () => (
 
 // how it sits inside a marketplace card: no prompt text, narrow column.
 export const InCard = () => (
-  <div className="w-64 bg-panel border rounded p-3">
+  <div className="w-64 bg-card rounded-card p-3">
     <h3 className="text-center mb-2">Ocean Conservancy</h3>
     <p className="text-gray-11 text-sm text-center mb-4">
       Protecting the ocean from today's greatest global challenges.

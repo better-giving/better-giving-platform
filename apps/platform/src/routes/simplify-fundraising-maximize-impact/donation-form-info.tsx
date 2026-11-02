@@ -41,7 +41,7 @@ export function DonationFormInfo({ classes = "" }) {
     <section
       className={`${classes} grid @6xl:grid-cols-2 gap-x-16 content-start`}
     >
-      <h4 className="mb-4 col-span-full text-lg text-primary uppercase text-center">
+      <h4 className="mb-4 col-span-full text-lg text-primary text-center">
         Your all-in-one donation form
       </h4>
       <h2 className="col-span-full text-center text-3xl @3xl:text-4.5xl mb-4">
@@ -54,7 +54,7 @@ export function DonationFormInfo({ classes = "" }) {
 
       <StepsCarousel classes="w-full max-w-lg self-center justify-self-center" />
 
-      <ul className="divide-y divide-gray-6 mt-6 @6xl:mt-0 grid grid-cols-[auto_1fr]">
+      <ul className="divide-y divide-hairline mt-6 @6xl:mt-0 grid grid-cols-[auto_1fr]">
         {items.map((item, idx) => (
           <ListItem {...item} key={idx} />
         ))}

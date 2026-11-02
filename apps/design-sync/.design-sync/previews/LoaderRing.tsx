@@ -48,7 +48,7 @@ export const Thickness = () => (
 
 export const RingToColor = () => (
   <div className="flex items-start gap-6">
-    <div className="flex flex-col items-center gap-3 rounded border bg-panel p-6">
+    <div className="flex flex-col items-center gap-3 rounded-card bg-card p-6">
       <LoaderRing
         thickness={12}
         classes={{ container: "w-20", ringToColor: "to-primary" }}
@@ -70,7 +70,7 @@ export const RingToColor = () => (
 // mirrors routes/admin.$id.programs/program.tsx — the ring sits at the end of a
 // row while that program saves.
 export const InRow = () => (
-  <div className="w-96 rounded border bg-panel">
+  <div className="w-96 rounded-card bg-card">
     <div className="flex items-center gap-3 border-b p-4">
       <span className="text-sm text-gray-12">Clean water wells, Malawi</span>
       <LoaderRing thickness={10} classes="ml-auto w-6" />
@@ -85,7 +85,7 @@ export const InRow = () => (
 // mirrors prompt/prompt-icon.tsx's loading branch — the largest usage in the
 // app, sized by height rather than width.
 export const PageLoading = () => (
-  <div className="grid justify-items-center gap-4 rounded border bg-panel px-10 py-10">
+  <div className="grid justify-items-center gap-4 rounded-card bg-card px-10 py-10">
     <LoaderRing thickness={12} classes="h-24" />
     <p className="text-sm text-gray-11">Submitting your payout request...</p>
   </div>

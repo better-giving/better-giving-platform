@@ -173,6 +173,16 @@ describe("user creates donation form", () => {
       .toBeVisible();
   });
 
+  it("opens with focus on the first field, not Close", async () => {
+    await seed_npo({ name: "Save the Whales" });
+
+    const screen = await render_page();
+
+    await expect
+      .element(screen.getByRole("combobox", { name: /nonprofit/i }))
+      .toHaveFocus();
+  });
+
   it("shows npo options on click without searching", async () => {
     await seed_npo({ name: "Save the Whales" });
     await seed_npo({ name: "Plant a Tree" });

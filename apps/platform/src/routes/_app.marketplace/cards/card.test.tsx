@@ -88,6 +88,17 @@ describe("marketplace card body and actions", () => {
     );
   });
 
+  it("a logo that fails to load shows the placeholder, not a broken image", async () => {
+    const screen = await card({ logo: "data:image/png;base64,iVBORw0KGgo=" });
+    await expect.element(screen.getByText(org.name)).toBeVisible();
+    await vi.waitFor(() =>
+      expect(
+        screen.container.querySelector("[data-banner] .lucide-image")
+      ).not.toBeNull()
+    );
+    expect(logo(screen.container)).toBeNull();
+  });
+
   it("renders no tagline line when the tagline is empty or the placeholder", async () => {
     let screen = await card();
     await expect.element(screen.getByText(TAGLINE)).toBeVisible();

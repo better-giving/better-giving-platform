@@ -46,7 +46,7 @@ export const FooterLinks = () => (
 
 // the profile card: the org's own site, opened away from the app.
 export const WithIcon = () => (
-  <div className="w-96 bg-panel border rounded p-4 grid gap-2">
+  <div className="w-96 bg-card rounded-card p-4 grid gap-2">
     <h3 className="text-lg font-semibold">Books for Kids</h3>
     <p className="text-sm text-gray-11">
       EIN 87-3758939 &bull; Raised $1,200.00 since Nov 14, 2025

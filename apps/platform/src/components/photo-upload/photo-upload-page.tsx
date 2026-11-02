@@ -174,7 +174,7 @@ export function PhotoUploadPage({
               </>
             }
           >
-            <figure className="border rounded overflow-hidden bg-gray-3 aspect-video">
+            <figure className="rounded overflow-hidden bg-gray-3 aspect-video">
               <img
                 src={view.photo}
                 alt={`The new banner for ${view.campaign}`}
@@ -223,7 +223,7 @@ function Shell({ chip, foot, status, children }: IShell) {
   return (
     <div className="min-h-dvh flex flex-col">
       {/* logo only: the visitor has no account here, so no auth slot */}
-      <header className="border-b bg-surface">
+      <header>
         <div className="page flex items-center justify-between h-18">
           <DappLogo classes="h-10" />
           {chip && (
@@ -411,7 +411,7 @@ function UploadForm({ view, on_submit, on_pick }: IUploadForm) {
             }
           }}
           onDrop={drop}
-          className="group grid place-items-center gap-1 min-h-54 px-6 py-10 text-center rounded border border-dashed border-gray-8 bg-surface cursor-pointer hover:bg-secondary has-aria-invalid:border-destructive has-focus-visible:outline-2 has-focus-visible:outline-ring has-focus-visible:-outline-offset-2 data-dragging:bg-secondary data-dragging:border-primary data-dragging:outline-2 data-dragging:outline-ring data-dragging:-outline-offset-2"
+          className="group grid place-items-center gap-1 min-h-54 px-6 py-10 text-center rounded border border-dashed border-gray-8 bg-surface cursor-pointer hover:bg-secondary-hover has-aria-invalid:border-destructive has-focus-visible:outline-2 has-focus-visible:outline-ring has-focus-visible:-outline-offset-2 data-dragging:bg-secondary data-dragging:border-primary data-dragging:outline-2 data-dragging:outline-ring data-dragging:-outline-offset-2"
         >
           <input
             ref={input}
@@ -505,7 +505,7 @@ function Progress({
       ? Math.min(100, Math.max(0, Math.round((loaded / total) * 100)))
       : 0;
   return (
-    <div className="grid grid-cols-[auto_1fr] items-center gap-4 rounded border border-gray-7 bg-surface p-3">
+    <div className="grid grid-cols-[auto_1fr] items-center gap-4 rounded bg-panel p-3">
       <div className="w-18 h-12 rounded overflow-hidden bg-gray-3">
         <img src={preview_url} alt="" className="size-full object-cover" />
       </div>
@@ -517,7 +517,7 @@ function Progress({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={pct}
-          className="h-2 rounded-full overflow-hidden bg-gray-3 inset-shadow-track"
+          className="h-2 rounded-full overflow-hidden bg-gray-4 inset-shadow-track"
         >
           <div
             className="h-full rounded-full bg-primary shadow-track-fill"

@@ -23,24 +23,27 @@ export function DonateFrequencies({
       <p className="text-destructive-subtle-fg text-xs mb-2 empty:hidden">
         {p.error}
       </p>
-      <div className="border rounded overflow-hidden divide-y">
+      {/* the box is a container (hairline); each row is a whole label, so the
+          row is the control: it rests on the field fill and hovers at step 4.
+          the checkbox carries checked; an unchecked row's label drops to the
+          low-contrast ink beside it. */}
+      <div className="border border-hairline rounded overflow-hidden divide-y divide-hairline">
         {Array.from({ length: 4 }).map((_, idx) => (
-          <Field.Root
-            key={idx}
-            data-unchecked={p.value[idx] ? undefined : ""}
-            className="flex items-center gap-2 p-3 min-h-12 bg-panel data-unchecked:bg-gray-3 data-unchecked:text-gray-11"
-          >
-            <Field.Input
-              type="checkbox"
-              className="checkbox"
-              checked={p.value[idx] || false}
-              onChange={(e) => {
-                const new_values = [...p.value];
-                new_values[idx] = e.target.checked;
-                p.on_change(new_values);
-              }}
-            />
-            <Field.Label className="text-sm grow">
+          <Field.Root key={idx}>
+            <Field.Label
+              data-unchecked={p.value[idx] ? undefined : ""}
+              className="flex items-center gap-2 p-3 min-h-12 bg-surface hover:bg-gray-4 transition-colors text-sm text-gray-12 data-unchecked:text-gray-11 cursor-pointer"
+            >
+              <Field.Input
+                type="checkbox"
+                className="checkbox"
+                checked={p.value[idx] || false}
+                onChange={(e) => {
+                  const new_values = [...p.value];
+                  new_values[idx] = e.target.checked;
+                  p.on_change(new_values);
+                }}
+              />
               {idx === 0
                 ? "One time"
                 : idx === 1

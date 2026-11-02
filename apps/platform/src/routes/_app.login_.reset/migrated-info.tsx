@@ -11,15 +11,15 @@ export function MigratedInfo(props: Props) {
         <KeyRound className="size-8 sm:size-10 text-primary" />
       </div>
 
-      <h3 className="text-center text-xl sm:text-2xl font-bold mt-5">
+      <h1 className="text-center text-xl sm:text-2xl font-bold mt-5">
         Welcome back!
-      </h3>
+      </h1>
       <p className="mt-3 max-sm:text-sm leading-relaxed text-center">
         We've upgraded our platform and need you to set a new password to keep
         your account secure.
       </p>
 
-      <div className="mt-5 w-full rounded bg-secondary/60 px-4 py-3 flex items-start gap-3">
+      <div className="mt-5 w-full rounded bg-secondary px-4 py-3 flex items-start gap-3">
         <Mail className="icon-xl shrink-0 text-primary mt-0.5" />
         <p className="max-sm:text-sm leading-relaxed">
           A reset link was sent to{" "}
@@ -37,7 +37,7 @@ export function MigratedInfo(props: Props) {
         to={login_url(props.to)}
         className="btn btn-lg btn-primary mt-6 w-full"
       >
-        Back to Sign In
+        Back to sign in
       </Link>
     </div>
   );

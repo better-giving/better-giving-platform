@@ -35,8 +35,8 @@ export function Milestone(props: Props) {
   const fetcher = useFetcher();
 
   return (
-    <Collapsible.Root className="bg-panel border rounded overflow-hidden">
-      <div className="relative py-3 px-4 text-center bg-gray-3">
+    <Collapsible.Root className="bg-panel rounded overflow-hidden">
+      <div className="relative py-3 px-4 text-center">
         <span className="text-xl font-bold ">{props.title}</span>
         <Collapsible.Trigger className="absolute right-4 top-1/2 -translate-y-1/2 group">
           <DrawerIcon
@@ -48,7 +48,7 @@ export function Milestone(props: Props) {
 
       <Collapsible.Content
         asChild
-        className="data-[state=open]:border-t bg-panel py-6 px-4 grid content-start gap-6"
+        className="data-[state=open]:border-t border-hairline py-6 px-4 grid content-start gap-6"
       >
         <Form
           disabled={isSubmitting}
@@ -89,6 +89,7 @@ export function Milestone(props: Props) {
               resetField("media");
             }}
             spec={img_spec([4, 1])}
+            hint="Shown at 4:1 — wider images crop to fit."
             classes={{
               container: "mb-4",
               dropzone: "w-full @md:aspect-4/1 h-36 @md:h-auto",
@@ -119,7 +120,7 @@ export function Milestone(props: Props) {
             charLimit={MAX_CHARS}
             classes={{
               field:
-                "rich-text-toolbar border text-sm grid grid-rows-[auto_1fr] rounded bg-surface p-3 min-h-60",
+                "rich-text-toolbar text-sm grid grid-rows-[auto_1fr] p-3 min-h-60",
               counter: "text-gray-11",
             }}
             error={

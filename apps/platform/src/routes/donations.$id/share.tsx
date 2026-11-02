@@ -56,7 +56,7 @@ export function ShareBtn(props: IShareBtn) {
         type="button"
         aria-label={`Share on ${props.title}`}
         onClick={() => set_open(true)}
-        className="relative size-10 grid place-items-center"
+        className="relative size-10 grid place-items-center rounded btn-ghost"
       >
         <img
           src={props.src}
@@ -93,19 +93,20 @@ function Prompt({
     <Modal
       open={open}
       onClose={() => set_open(false)}
-      title={`Share on ${social.title}`}
       size="md"
-      classes="grid content-start border bg-background"
+      classes="grid content-start bg-popover"
     >
-      <div className="grid place-items-center relative h-16  font-bold bg-gray-3 border-b">
-        Share on {social.title}
+      <div className="relative">
+        <h2 className="sm:text-xl font-bold text-center border-b border-hairline p-5">
+          Share on {social.title}
+        </h2>
         <button
           type="button"
           aria-label="Close"
           onClick={() => set_open(false)}
-          className="absolute top-1/2 transform -translate-y-1/2 right-4 size-10 border rounded "
+          className="btn btn-icon btn-secondary absolute top-1/2 right-4 -translate-y-1/2"
         >
-          <X className="absolute-center icon-xl" />
+          <X className="icon-xl" />
         </button>
       </div>
       <p
@@ -113,7 +114,7 @@ function Prompt({
           if (!node) return;
           set_share_txt(node.innerText);
         }}
-        className="my-6 sm:my-10 mx-4 sm:mx-12 text-sm leading-normal p-3 border rounded"
+        className="my-6 sm:my-10 mx-4 sm:mx-12 text-sm leading-normal p-3 bg-panel rounded"
       >
         I just donated to <span className="font-bold">{recipient.name}</span> on{" "}
         <span className="font-bold">@BetterDotGiving</span>!{" "}

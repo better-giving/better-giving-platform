@@ -65,7 +65,7 @@ function SegGroup({ index, invalid }: { index: number; invalid: boolean }) {
   return (
     <DateInput.SegmentGroup
       index={index}
-      className="flex-1 min-w-0 flex items-center gap-0.5 px-2 py-3.5 rounded border border-gray-6 bg-surface text-sm text-gray-12 data-invalid:border-destructive focus-within:outline-2 focus-within:outline-ring focus-within:outline-offset-2"
+      className="flex-1 min-w-0 flex items-center gap-0.5 px-2 py-3.5 rounded border border-input hover:border-input-hover bg-surface text-sm text-gray-12 data-invalid:border-destructive focus-within:outline-2 focus-within:outline-ring focus-within:outline-offset-2"
       data-invalid={invalid || undefined}
     >
       <DateInput.SegmentContext>

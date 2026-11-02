@@ -193,12 +193,11 @@ describe("donor messages", () => {
     const quiet = screen.getByText("Quiet Donor").element().closest("article");
     expect(quiet?.textContent).toBe("Quiet Donor$8");
     const card = screen.getByText("Ada Lovelace").element().closest("article");
-    expect(card?.classList.contains("bg-gray-2")).toBe(true);
-    expect(card?.classList.contains("border-gray-6")).toBe(true);
-    expect(card?.classList.contains("rounded")).toBe(true);
-    expect(card?.classList.contains("p-3")).toBe(true);
-    expect(card?.classList.contains("bg-panel")).toBe(false);
-    expect(card?.classList.contains("card")).toBe(false);
+    // a supporter sits on the page, so it is the `card` itself, whose edge is
+    // the recipe's — no second border or fill spelled beside it
+    expect(card?.classList.contains("card")).toBe(true);
+    expect(card?.classList.contains("border")).toBe(false);
+    expect(card?.classList.contains("bg-gray-2")).toBe(false);
     const heading = screen.getByRole("heading", {
       name: "Recent supporters",
       exact: true,

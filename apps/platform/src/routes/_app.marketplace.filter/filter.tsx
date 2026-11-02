@@ -27,10 +27,10 @@ export default function Filter({ classes = "" }: { classes?: string }) {
         <Dialog.Backdrop className="fixed z-scrim inset-0 bg-overlay" />
         <Dialog.Positioner className="contents">
           <Dialog.Content
-            className={`${classes} ${modal_box.panel} isolate border bg-background`}
+            className={`${classes} ${modal_box.panel} isolate bg-popover`}
           >
-            <div className="bg-gray-3 flex items-center p-4 border-b">
-              <p className="font-bold  uppercase mr-auto">Filters</p>
+            <div className="flex items-center p-4 border-b border-hairline">
+              <p className="font-bold mr-auto">Filters</p>
               <button
                 type="button"
                 title="Reset all filters to their default values."
@@ -40,7 +40,7 @@ export default function Filter({ classes = "" }: { classes?: string }) {
                     { replace: true, preventScrollReset: true }
                   )
                 }
-                className="text-gray-11 text-sm mr-4"
+                className="btn-ghost rounded px-2 py-1 text-gray-11 text-sm mr-2"
               >
                 Clear Filters
               </button>
@@ -49,7 +49,7 @@ export default function Filter({ classes = "" }: { classes?: string }) {
                 replace
                 preventScrollReset
                 aria-label="Close filters"
-                className="active:text-primary"
+                className="btn-ghost glyph-btn size-8 active:text-primary"
               >
                 <X className="icon-xl" />
               </Link>
@@ -59,7 +59,7 @@ export default function Filter({ classes = "" }: { classes?: string }) {
               <Countries />
             </div>
 
-            <div className="px-2 divide-y divide-gray-6">
+            <div className="px-2 divide-y divide-hairline">
               <Designations />
               <KYCFilter classes="mt-2" />
               <Categories classes="mt-2" />

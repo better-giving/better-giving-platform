@@ -15,7 +15,7 @@ export const Lines = () => (
 // mirrors routes/_app.marketplace_.$id/skeleton.tsx — the nonprofit profile
 // while its loader resolves.
 export const ProfileSkeleton = () => (
-  <div className="w-full max-w-2xl rounded border bg-panel p-6">
+  <div className="w-full max-w-2xl rounded-card bg-card p-6">
     <div className="flex items-center gap-4">
       <ContentLoader className="size-16 rounded-full" />
       <div className="flex flex-1 flex-col gap-2">
@@ -35,7 +35,7 @@ export const ProfileSkeleton = () => (
 // a donations table waiting on its page of rows: the header is real, the
 // cells are loaders.
 export const TableRows = () => (
-  <div className="w-full max-w-2xl overflow-hidden rounded border bg-panel">
+  <div className="w-full max-w-2xl overflow-hidden rounded-card bg-card">
     <div className="flex items-center gap-4 border-b bg-gray-3 px-4 py-3 text-xs font-medium text-gray-11">
       <span className="flex-1">Donor</span>
       <span className="w-32">Date</span>
@@ -74,11 +74,11 @@ export const CardGrid = () => (
 // page keeps its meaning while the number arrives.
 export const StatTile = () => (
   <div className="flex gap-6">
-    <div className="w-56 rounded border bg-panel p-5">
+    <div className="w-56 rounded-card bg-card p-5">
       <p className="text-sm text-gray-11">Raised this month</p>
       <ContentLoader className="mt-3 h-8 w-32" />
     </div>
-    <div className="w-56 rounded border bg-panel p-5">
+    <div className="w-56 rounded-card bg-card p-5">
       <p className="text-sm text-gray-11">Next payout</p>
       <ContentLoader className="mt-3 h-8 w-40" />
     </div>

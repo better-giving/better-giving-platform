@@ -71,8 +71,8 @@ export function Panel({
 
   return (
     <>
-      <div className="p-6 md:p-8 border-b relative">
-        <h2 className="text-2xl font-bold mb-2">Deposit Funds</h2>
+      <div className="p-6 md:p-8 border-b border-hairline relative">
+        <h2 className="text-2xl font-bold mb-2">Deposit funds</h2>
         <p className="text-sm text-gray-11">
           Transfer funds to your Better Giving account
         </p>
@@ -80,9 +80,9 @@ export function Panel({
           type="button"
           aria-label="Close"
           onClick={onClose}
-          className="absolute top-6 md:top-8 right-6 md:right-8 p-2 rounded border hover:bg-gray-3 transition-colors"
+          className="absolute top-6 md:top-8 right-6 md:right-8 btn btn-icon btn-secondary"
         >
-          <X className="text-gray-11 icon-2xl" />
+          <X className="icon-xl" />
         </button>
       </div>
 
@@ -157,7 +157,7 @@ function AccountSelector({
 
 function InfoSection({ title, children, classes = "" }: InfoSectionProps) {
   return (
-    <div className={`bg-gray-3 rounded p-5 ${classes}`}>
+    <div className={`bg-panel rounded p-5 ${classes}`}>
       <h3 className="font-bold mb-4">{title}</h3>
       <div className="grid gap-4">{children}</div>
     </div>
@@ -167,9 +167,7 @@ function InfoSection({ title, children, classes = "" }: InfoSectionProps) {
 function MemoSection({ memo, account_type, classes = "" }: MemoSectionProps) {
   const account_label = account_type === "savings" ? "Savings" : "Investments";
   return (
-    <div
-      className={`bg-warning-subtle border border-warning rounded p-5 ${classes}`}
-    >
+    <div className={`bg-warning-subtle rounded p-5 ${classes}`}>
       <div className="flex items-center justify-between mb-2">
         <h3 className="font-bold text-warning-subtle-fg">
           Your Reference Memo
@@ -182,7 +180,7 @@ function MemoSection({ memo, account_type, classes = "" }: MemoSectionProps) {
         You must include this code when making your transfer, or we won't be
         able to identify your deposit.
       </p>
-      <div className="bg-panel rounded p-4 border border-warning">
+      <div className="bg-surface rounded p-4 border border-hairline">
         <div className="flex items-center justify-between gap-4">
           <code className="text-lg font-bold font-mono tracking-wide break-all">
             {memo}
@@ -190,8 +188,7 @@ function MemoSection({ memo, account_type, classes = "" }: MemoSectionProps) {
           <Copier
             text={memo}
             classes={{
-              container:
-                "shrink-0 px-4 py-2 text-sm font-semibold text-warning-fg bg-warning hover:bg-warning rounded transition-colors flex items-center gap-2",
+              container: "btn btn-warning shrink-0 gap-2",
             }}
           >
             Copy
@@ -201,6 +198,10 @@ function MemoSection({ memo, account_type, classes = "" }: MemoSectionProps) {
     </div>
   );
 }
+
+// a control on a well rests on the field fill, so it is not step 3 on step 3
+const copy_btn =
+  "shrink-0 px-2.5 py-1.5 text-xs text-gray-11 bg-surface border border-gray-7 rounded hover:bg-gray-4 hover:border-gray-8 active:bg-gray-5 transition-colors";
 
 function InfoRow({ label, value, copyable = true }: InfoRowProps) {
   return (
@@ -214,8 +215,7 @@ function InfoRow({ label, value, copyable = true }: InfoRowProps) {
           <Copier
             text={value}
             classes={{
-              container:
-                "shrink-0 px-2.5 py-1.5 text-xs text-gray-11 bg-panel border rounded hover:bg-gray-3 transition-colors",
+              container: copy_btn,
             }}
           />
         )}
@@ -237,8 +237,7 @@ function InfoRowWithDetails({
         <Copier
           text={value}
           classes={{
-            container:
-              "shrink-0 px-2.5 py-1.5 text-xs text-gray-11 bg-panel border rounded hover:bg-gray-3 transition-colors",
+            container: copy_btn,
           }}
         />
       </div>

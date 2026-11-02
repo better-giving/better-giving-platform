@@ -38,7 +38,7 @@ const tones: Record<TSentStanding["kind"], ITone> = {
   unknown: {
     label: "Status unavailable",
     ink: "text-gray-11",
-    dot: "bg-gray-11",
+    dot: "bg-gray-9",
   },
 };
 

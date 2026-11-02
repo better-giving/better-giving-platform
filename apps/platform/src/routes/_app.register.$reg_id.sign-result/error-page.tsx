@@ -6,15 +6,17 @@ export default function ErrorPage(props: ErrorQueryParams) {
   const fetcher = useFetcher();
 
   const isRedirecting = fetcher.state === "submitting";
+  // the redirect's query carries these, and either can arrive empty or absent
+  const detail = [props.error, props.message].filter(Boolean).join(": ");
   return (
     <fetcher.Form method="POST">
       <div className="bg-destructive rounded-full aspect-square grid place-items-center mb-4 size-16">
         <CircleAlert className="text-destructive-fg pictogram-sm" />
       </div>
-      <h1 className="text-2xl uppercase text-center">Signing failed</h1>
-      <p className="bg-gray-3 p-4 text-sm text-gray-11 mt-4">
-        {props.error}: {props.message}
-      </p>
+      <h1 className="text-2xl text-center">Signing failed</h1>
+      {detail && (
+        <p className="bg-gray-3 p-4 text-sm text-gray-11 mt-4">{detail}</p>
+      )}
       <button
         name="signer_eid"
         value={props.signerEid}

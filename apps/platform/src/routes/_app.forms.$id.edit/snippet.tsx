@@ -14,10 +14,13 @@ export function Snippet({ classes = "", form_id, base_url }: Props) {
       <p className="text-sm gap-x-1 mb-1">
         Copy snippet below and paste into your website
       </p>
-      <div className="flex p-4 rounded bg-gray-3 divide-x divide-gray-6">
-        <code className="w-full text-sm font-mono break-all block pr-2 whitespace-pre-line">
-          {iframe_url}
-        </code>
+      <div className="flex p-4 rounded bg-gray-3 divide-x divide-hairline">
+        {/* wraps at the snippet's spaces; a src longer than the well scrolls */}
+        <div className="flex-1 min-w-0 overflow-x-auto scrollbars pr-2">
+          <code className="block text-sm font-mono whitespace-pre-wrap">
+            {iframe_url}
+          </code>
+        </div>
         <Copier
           classes={{
             icon: "size-5 hover:text-primary",

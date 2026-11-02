@@ -16,7 +16,7 @@ export interface IQuoteStrip {
 
 const TONE = {
   light: {
-    ground: "rounded bg-band p-5 text-gray-12 md:p-6",
+    ground: "card text-gray-12",
     mark: "text-primary",
     quote: "md:text-lg",
     column_mark: true,

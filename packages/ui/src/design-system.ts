@@ -11,7 +11,7 @@
 export { Accordion } from "./components/accordion";
 export { Amount } from "./components/amount";
 export { Badge } from "./components/badge";
-export { Breadcrumbs } from "./components/breadcrumbs";
+export { Breadcrumb } from "./components/breadcrumb";
 export { Button } from "./components/button";
 export { ContentLoader } from "./components/content-loader";
 export { Copier } from "./components/copier/copier";
@@ -31,6 +31,7 @@ export { Label } from "./components/form/label";
 export { MaskedInput } from "./components/form/masked-input";
 export { PasswordInput } from "./components/form/password-input";
 export { UrlInput } from "./components/form/url-input";
+export { GoalBar } from "./components/goal-bar";
 export { Group } from "./components/group";
 export { HeaderButton } from "./components/header-button";
 export { HoverCard } from "./components/hover-card";

@@ -4,12 +4,12 @@ import { href, Link } from "react-router";
 
 export function BottomCta() {
   return (
-    <section className="surface-primary py-20 md:py-24 relative overflow-hidden">
+    <section className="bg-band border-t border-hairline py-20 md:py-24 relative overflow-hidden">
       <div
         className="absolute inset-0 opacity-[0.03]"
         style={{
           backgroundImage:
-            "radial-gradient(circle, var(--primary-fg) 1px, transparent 1px)",
+            "radial-gradient(circle, var(--primary) 1px, transparent 1px)",
           backgroundSize: "32px 32px",
         }}
       />
@@ -25,20 +25,20 @@ export function BottomCta() {
           <h2 className="section-heading font-bold">
             Ready to expand your reach?
           </h2>
-          <p className="section-body text-primary-fg/80">
+          <p className="section-body text-gray-11">
             It costs nothing to explore. Sign up today and add a global revenue
             stream to your local mission.
           </p>
 
           <Link
             to={href("/register")}
-            className="btn btn-lg btn-primary bg-primary-fg text-primary hover:bg-primary-fg/90 active:bg-primary-fg/80 capitalize inline-flex items-center gap-2 mt-2"
+            className="btn btn-lg btn-primary capitalize inline-flex items-center gap-2 mt-2"
           >
             Join Us Today!
             <ArrowRight className="icon-lg" />
           </Link>
 
-          <p className="text-sm text-primary-fg/50">
+          <p className="text-sm text-gray-11">
             Free to sign up. No interference with your existing UK Gift Aid or
             fundraising.
           </p>

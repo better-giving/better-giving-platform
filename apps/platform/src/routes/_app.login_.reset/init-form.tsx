@@ -21,9 +21,9 @@ export function InitForm(props: Props) {
 
   return (
     <fetcher.Form method="POST" onSubmit={handleSubmit} className="solo-card">
-      <h3 className="text-center text-xl sm:text-2xl font-bold">
-        Reset your Password
-      </h3>
+      <h1 className="text-center text-xl sm:text-2xl font-bold">
+        Reset your password
+      </h1>
       <p className="mt-2 text-center max-sm:text-sm">
         Enter your registered email to reset password
       </p>
@@ -49,7 +49,7 @@ export function InitForm(props: Props) {
         className="mt-5 link aria-disabled:text-gray-11 max-sm:text-sm font-medium underline text-center"
         aria-disabled={fetcher.state !== "idle"}
       >
-        Back to Sign In
+        Back to sign in
       </Link>
     </fetcher.Form>
   );

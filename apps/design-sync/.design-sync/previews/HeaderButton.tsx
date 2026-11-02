@@ -1,10 +1,9 @@
 import { HeaderButton } from "@better-giving/ui";
 
-// a sortable column head. the caret is the whole point: every sortable column
-// shows one, so the affordance is visible before the first click, and only
-// the column the table is actually ordered by shows a direction. the inactive
-// caret is the muted double chevron — dimmer than the active one, never
-// absent.
+// a sortable column head. only the column the table is actually ordered by
+// shows its caret at rest, with a direction. the others show the muted double
+// chevron on hover or keyboard focus, and always on a touch screen — so in a
+// static card the unsorted heads show no glyph at all (see NOTES.md).
 //
 // it goes inside the `<th>`, not in place of it: `.table` styles the cell and
 // this styles the control in it.

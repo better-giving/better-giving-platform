@@ -23,8 +23,8 @@ const market_bar_bg = `repeating-linear-gradient(
   45deg,
   var(--color-secondary),
   var(--color-secondary) 8px,
-  var(--color-border) 8px,
-  var(--color-border) 16px
+  var(--color-hairline) 8px,
+  var(--color-hairline) 16px
 )`;
 
 const audiences = [
@@ -61,9 +61,6 @@ export default function Page() {
       <div className="bg-linear-to-b from-background to-band pt-16 pb-20">
         <div className="page grid gap-12 lg:grid-cols-[1.1fr_0.9fr] items-center">
           <div className="grid gap-5 justify-items-start">
-            <p className="text-xs font-bold uppercase tracking-wider text-primary">
-              Fiscal Sponsorship
-            </p>
             <h1 className="hero-heading">
               Unlock U.S. donors, wherever you are
             </h1>
@@ -74,10 +71,7 @@ export default function Page() {
               incorporating.
             </p>
             <div className="flex max-sm:flex-col max-sm:w-full sm:flex-wrap sm:items-center gap-3.5 mt-1.5">
-              <Link
-                to={href("/register")}
-                className="btn btn-lg btn-primary shadow-lift-cta"
-              >
+              <Link to={href("/register")} className="btn btn-lg btn-primary">
                 Apply online
               </Link>
               <ExtLink href={BOOK_A_DEMO} className="btn btn-lg btn-secondary">
@@ -108,8 +102,10 @@ export default function Page() {
             <div className="grid sm:grid-cols-[220px_1fr] gap-x-5 gap-y-1.5 items-center">
               <span className="font-bold sm:text-right">Better Giving</span>
               <div className="flex items-center gap-3">
-                <div className="w-[29%] h-9.5 rounded bg-primary" />
-                <span className="text-lg font-bold">2.9%</span>
+                <div className="flex-1">
+                  <div className="w-[29%] h-9.5 rounded bg-primary" />
+                </div>
+                <span className="w-14 shrink-0 text-lg font-bold">2.9%</span>
               </div>
             </div>
             <div className="grid sm:grid-cols-[220px_1fr] gap-x-5 gap-y-1.5 items-center">
@@ -117,11 +113,16 @@ export default function Page() {
                 Typical market range (as of 2026)
               </span>
               <div className="flex items-center gap-3">
-                <div
-                  className="w-[70%] h-9.5 rounded"
-                  style={{ background: market_bar_bg }}
-                />
-                <span className="text-lg font-bold text-gray-11">4-10%</span>
+                {/* one column per percent, on the same 0-10% track as the bar above */}
+                <div className="flex-1 grid grid-cols-10">
+                  <div
+                    className="col-start-5 col-span-6 h-9.5 rounded"
+                    style={{ background: market_bar_bg }}
+                  />
+                </div>
+                <span className="w-14 shrink-0 text-lg font-bold text-gray-11">
+                  4-10%
+                </span>
               </div>
             </div>
           </div>
@@ -135,12 +136,9 @@ export default function Page() {
           </h2>
           <div className="grid gap-6 md:grid-cols-2 mt-11">
             {audiences.map((a) => (
-              <div
-                key={a.title}
-                className="card-on-band shadow-lift-card grid gap-2.5 content-start"
-              >
+              <div key={a.title} className="card grid gap-2.5 content-start">
                 <span className="text-xl font-bold">{a.title}</span>
-                <p className="text-sm/relaxed text-gray-11">{a.body}</p>
+                <p className="text-base/relaxed text-gray-12">{a.body}</p>
               </div>
             ))}
           </div>
@@ -152,25 +150,14 @@ export default function Page() {
           <h2 className="section-heading text-center max-w-2xl mx-auto">
             How it works
           </h2>
-          <div className="grid gap-6 md:grid-cols-3 mt-12">
-            {steps.map((s, i) => (
-              <div
-                key={s.title}
-                className="grid gap-2.5 justify-items-center text-center content-start"
-              >
-                <span
-                  className="size-13 rounded-full bg-secondary text-gray-12 grid place-items-center text-xl font-bold"
-                  aria-hidden
-                >
-                  {i + 1}
-                </span>
+          <ol className="grid gap-6 md:grid-cols-3 mt-12 max-w-5xl mx-auto">
+            {steps.map((s) => (
+              <li key={s.title} className="grid gap-2.5 content-start">
                 <span className="text-xl font-bold">{s.title}</span>
-                <p className="text-sm/relaxed text-gray-11 max-w-75">
-                  {s.body}
-                </p>
-              </div>
+                <p className="text-base/relaxed text-gray-12">{s.body}</p>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </div>
 

@@ -47,7 +47,7 @@ export function Summary({ Amount, frequency = "one-time", ...props }: Props) {
       {props.pre_split_content}
 
       <dl
-        className={`grid grid-cols-[1fr_auto] items-center justify-between border-y divide-y divide-gray-6 ${splitClass}`}
+        className={`grid grid-cols-[1fr_auto] items-center justify-between border-y border-hairline divide-y divide-hairline ${splitClass}`}
       >
         {props.program?.value && (
           <p className="text-gray-11 col-span-full py-2 text-sm">

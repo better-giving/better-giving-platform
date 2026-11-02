@@ -1,8 +1,9 @@
-import { Actions, ExtLink } from "@better-giving/ui";
+import { Actions, Badge, ExtLink } from "@better-giving/ui";
 import { SquareArrowOutUpRight } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { href, NavLink } from "react-router";
 import type { LoaderData } from "#/pages/platform-admin/banking-applications/api";
+import { is_approvable } from "./approvable";
 
 export function Loaded(props: LoaderData) {
   // "default" is an approved account promoted to the npo's primary one
@@ -14,13 +15,12 @@ export function Loaded(props: LoaderData) {
   return (
     <>
       {prev_verdict && (
-        <div
-          className={`${
-            is_approved ? "bg-success" : "bg-destructive"
-          } ${is_approved ? "text-success-fg" : "text-destructive-fg"} px-2 py-1 text-xs uppercase rounded justify-self-start -mt-3`}
+        <Badge
+          tone={is_approved ? "success" : "destructive"}
+          className="justify-self-start -mt-3"
         >
           {is_approved ? "Approved" : "Rejected"}
-        </div>
+        </Badge>
       )}
       {is_rejected && (
         <p className="text-destructive-subtle-fg text-sm -mt-3">
@@ -28,23 +28,23 @@ export function Loaded(props: LoaderData) {
         </p>
       )}
       <div className="flex max-sm:flex-col gap-x-4">
-        <span className="text-sm font-semibold uppercase">Account ID:</span>
-        <span className="uppercase text-sm">{props.id}</span>
+        <span className="text-sm font-semibold">Account ID:</span>
+        <span className="text-sm">{props.id}</span>
       </div>
       <div className="flex max-sm:flex-col gap-x-4 -mt-2 lg:-mt-4">
-        <span className="text-sm font-semibold uppercase">Date submitted:</span>
-        <span className="uppercase text-sm">
+        <span className="text-sm font-semibold">Date submitted:</span>
+        <span className="text-sm">
           {new Date(props.ba.date_created).toLocaleDateString()}
         </span>
       </div>
       <div className="flex max-sm:flex-col gap-x-4 -mt-2 lg:-mt-4">
-        <span className="text-sm font-semibold uppercase">Last updated:</span>
-        <span className="uppercase text-sm">
+        <span className="text-sm font-semibold">Last updated:</span>
+        <span className="text-sm">
           {new Date(props.ba.updated_at).toLocaleDateString()}
         </span>
       </div>
 
-      <dl className="grid sm:grid-cols-[auto_auto_1fr] border rounded">
+      <dl className="grid sm:grid-cols-[auto_auto_1fr] bg-card rounded-card border border-hairline">
         {/* the wise half of the record; the rows below it are our own and
             outlive an outage */}
         {!props.wacc_unavailable && (
@@ -95,7 +95,7 @@ export function Loaded(props: LoaderData) {
         <NavLink
           replace
           preventScrollReset
-          aria-disabled={!!prev_verdict || props.wacc_unavailable}
+          aria-disabled={!is_approvable(props)}
           to="approve"
           className="min-w-24 btn btn-success"
         >
@@ -112,19 +112,19 @@ type Props = PropsWithChildren<{
 function Row(props: Props) {
   return (
     <>
-      <dt className="px-3 max-sm:pt-3 sm:p-3 flex items-center text-xs font-semibold uppercase">
+      <dt className="px-3 max-sm:pt-3 sm:p-3 flex items-center text-sm font-semibold text-gray-11">
         {props.label}
       </dt>
       <div
         aria-hidden={true}
-        className="max-sm:hidden w-px border-r last:border-none"
+        className="max-sm:hidden w-px border-r border-hairline last:border-none"
       />
       <dd className="px-3 max-sm:pb-3 sm:p-3 flex items-center text-sm">
         {props.children}
       </dd>
       <div
         aria-hidden={true}
-        className="h-px col-span-full border-b last:border-none"
+        className="h-px col-span-full border-b border-hairline last:border-none"
       />
     </>
   );

@@ -1,8 +1,9 @@
 import { Field } from "@better-giving/ui";
 import { valibotResolver } from "@hookform/resolvers/valibot";
+import { X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import type { MetaFunction } from "react-router";
-import { useFetcher, useSearchParams } from "react-router";
+import { Link, useFetcher, useSearchParams } from "react-router";
 import * as v from "valibot";
 import { RouteModal } from "#/components/route-modal";
 import { endowUpdate } from "#/pages/admin/endow-update-action";
@@ -28,19 +29,30 @@ export const amount = v.pipe(
 export const meta: MetaFunction = ({ matches }) =>
   admin_page_meta("Payout threshold", matches);
 
+// keyed, so the modal shell reads the submission Content makes
+const fetcher_key = "payout-min";
+
 export default function PayoutMin() {
   const [params] = useSearchParams();
   const { min = min_payout_amount } = search(params);
+  const fetcher = useFetcher({ key: fetcher_key });
 
   return (
-    <RouteModal classes="grid bg-panel text-gray-12 p-6">
+    <RouteModal
+      busy={fetcher.state !== "idle"}
+      classes="grid bg-popover text-gray-12 p-6"
+    >
       <Content prev={+min} />
     </RouteModal>
   );
 }
 
 function Content(props: IContent) {
-  const fetcher = useFetcher();
+  const fetcher = useFetcher({ key: fetcher_key });
+  const busy = fetcher.state !== "idle";
+  const hold = (e: { preventDefault(): void }) => {
+    if (busy) e.preventDefault();
+  };
 
   const {
     handleSubmit,
@@ -61,12 +73,25 @@ function Content(props: IContent) {
       })}
       className="contents"
     >
-      <h4 className="mb-2">Payout threshold</h4>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <h4>Payout threshold</h4>
+        <Link
+          to=".."
+          replace
+          preventScrollReset
+          aria-label="Close"
+          aria-disabled={busy}
+          onClick={hold}
+          className="btn btn-icon btn-secondary aria-disabled:pointer-events-none"
+        >
+          <X className="icon-xl" />
+        </Link>
+      </div>
 
       <Field
         sub="Grant amount to accumulate to trigger payout"
         required
-        label="Amount"
+        label="Amount (USD)"
         placeholder="e.g. $100"
         {...register("amount")}
         error={errors.amount?.message}
@@ -75,10 +100,10 @@ function Content(props: IContent) {
 
       <button
         type="submit"
-        disabled={fetcher.state !== "idle" || !isDirty}
+        disabled={busy || !isDirty}
         className="btn btn-primary"
       >
-        {fetcher.state !== "idle" ? "Submitting..." : "Submit"}
+        {busy ? "Submitting..." : "Submit"}
       </button>
     </form>
   );

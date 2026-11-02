@@ -17,7 +17,7 @@ const org_type_opts = [
 ] as const;
 
 const seg_opt =
-  "flex-1 flex items-center justify-center text-center text-sm font-bold rounded px-3 py-2.5 select-none cursor-pointer hover:not-data-[state=checked]:bg-secondary-active data-[state=checked]:bg-primary data-[state=checked]:text-primary-fg";
+  "flex-1 flex items-center justify-center text-center text-sm font-bold rounded px-3 py-2.5 select-none cursor-pointer hover:not-data-[state=checked]:bg-gray-4 data-[state=checked]:bg-primary data-[state=checked]:text-primary-fg";
 
 interface IIdentityForm {
   /** owned by the caller so it can read `duplicate` off `fetcher.data` and

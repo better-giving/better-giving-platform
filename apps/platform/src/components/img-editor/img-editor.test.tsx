@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useController, useForm } from "react-hook-form";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { cdp, page, userEvent } from "vitest/browser";
-import { render } from "vitest-browser-react";
+import { cleanup, render } from "vitest-browser-react";
 // the preview branch hides its controls in css (`sr-only` until hover or a
 // keyboard focus inside), and whether they can take focus and then show is the point
 // of several cases — so the real stylesheet must be loaded to observe it.
@@ -227,13 +227,13 @@ describe("ImgEditor", () => {
     await expect.element(screen.getByText("invalid file type")).toBeVisible();
   });
 
-  // the preview writes `value` straight into `background: url(...)`, so a
+  // the preview writes `value` straight into an <img src>, so a
   // sentinel reaching that branch requests a relative path that does not exist
   // and hides the upload prompt behind a bare icon control in a state the
   // user never chose. reachable without a local `file`:
   // a value restored from the server, or written back after the file cleared.
   test.each(["loading", "invalid-type", "exceeds-size", "failure"] as const)(
-    "the %s sentinel is not rendered as a background url",
+    "the %s sentinel is not rendered as a preview url",
     async (sentinel) => {
       const props = make_props({ value: sentinel });
       const screen = await render_editor(props);
@@ -241,20 +241,38 @@ describe("ImgEditor", () => {
       await vi.waitFor(() => {
         const dropzone =
           screen.container.querySelector<HTMLElement>("[data-drag]");
-        expect(dropzone?.style.background).toBe("");
+        expect(dropzone).not.toBeNull();
+        expect(dropzone?.querySelector("img")).toBeNull();
       });
       // no preview means the upload prompt, not the bare icon control
       await expect.element(screen.getByText("Upload file")).toBeVisible();
     }
   );
+
+  // a saved logo whose url no longer loads: the dropzone holds the image
+  // placeholder rather than an empty box
+  test("a preview url that fails to load shows the placeholder", async () => {
+    const props = make_props({
+      value: "data:image/png;base64,iVBORw0KGgo=",
+      classes: { dropzone: "w-48 aspect-square" },
+    });
+    const screen = await render_editor(props);
+
+    await vi.waitFor(() => {
+      const dropzone =
+        screen.container.querySelector<HTMLElement>("[data-drag]");
+      expect(dropzone?.querySelector("img")).toBeNull();
+      expect(dropzone?.querySelector(".lucide-image")).not.toBeNull();
+    });
+  });
 });
 
 /** what the call sites render immediately before the editor. the editor's own
  * root carries no accessible name, so the visible label is the only stable
  * handle on one specific editor. */
 const LABEL = "Banner image of your organization";
-/** a 1x1 gif: the preview goes into `background: url(...)`, and a http url
- * there is a real unmocked fetch out of the test browser */
+/** a 1x1 gif: the preview goes into an <img src>, and a http url there is a
+ * real unmocked fetch out of the test browser */
 const PIXEL =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
@@ -578,6 +596,27 @@ describe("ImgEditor: description", () => {
       expect(error_id).toBe(region.element().id);
     }
   );
+
+  test("a hint renders under the dropzone and describes the input; none is drawn without one", async () => {
+    const hint = "Shown at 4:1 — wider images crop to fit.";
+    const screen = await render(
+      <>
+        <label htmlFor="banner">Banner</label>
+        <ImgEditor id="banner" hint={hint} {...make_props()} />
+      </>
+    );
+    const input = screen.getByLabelText("Banner", { exact: true });
+
+    await expect.element(screen.getByText(hint, { exact: true })).toBeVisible();
+    await expect.element(input).toHaveAccessibleDescription(/JPEG, PNG/);
+    await expect
+      .element(input)
+      .toHaveAccessibleDescription(/wider images crop to fit\.$/);
+
+    await cleanup();
+    const bare = await render_editor(make_props());
+    expect(bare.getByText(hint, { exact: true }).query()).toBeNull();
+  });
 
   test("the live region is mounted before any error, so its first message is a change", async () => {
     const screen = await render(<CaptionedEditor />);

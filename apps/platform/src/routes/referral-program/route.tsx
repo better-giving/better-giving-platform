@@ -35,7 +35,7 @@ export default function Referrals() {
           const observer = new IntersectionObserver(
             ([e]) => {
               const isIntersecting = e.intersectionRatio < 1;
-              e.target.classList.toggle("bg-panel", isIntersecting);
+              e.target.classList.toggle("bg-background", isIntersecting);
               e.target.classList.toggle("shadow-floating", isIntersecting);
             },
             { threshold: [1] }
@@ -63,7 +63,7 @@ export default function Referrals() {
               aria-label="Your dashboard"
               className="contents"
             >
-              <UserAvatar avatar={session.avatar_url} classes="size-7" />
+              <UserAvatar avatar={session.avatar_url} classes="size-6" />
             </Link>
           )}
         </div>

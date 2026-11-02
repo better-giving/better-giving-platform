@@ -30,7 +30,7 @@ export function Crypto(props: CryptoDonationDetails) {
       }
       pre_split_content={
         <>
-          <dl className="py-3 flex items-center justify-between border-b">
+          <dl className="py-3 flex items-center justify-between border-b border-hairline">
             <dt className="mr-auto">Currency</dt>
             <Image
               className="ml-auto object-cover size-4 rounded-full mr-1"

@@ -36,7 +36,7 @@ export function AllocationGovernance({ classes = "" }: IAllocationGovernance) {
   return (
     <section className={classes} aria-labelledby="governance-heading">
       <div className="page grid gap-14 lg:grid-cols-2 items-center">
-        <div className="card-on-band shadow-lift-card grid gap-6 justify-items-center">
+        <div className="card grid gap-6 justify-items-center">
           <span className="text-lg font-bold">Target allocation</span>
           <div
             className="size-55 rounded-full grid place-items-center"
@@ -64,18 +64,12 @@ export function AllocationGovernance({ classes = "" }: IAllocationGovernance) {
         </div>
 
         <div className="grid gap-5 content-start">
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">
-            Governance
-          </p>
           <h2 id="governance-heading" className="section-heading">
             Managed like an endowment, open like a commons
           </h2>
           <div className="grid gap-3.5">
             {pillars.map((p) => (
-              <div
-                key={p.title}
-                className="card-on-band flex gap-3.5 items-start"
-              >
+              <div key={p.title} className="card flex gap-3.5 items-start">
                 <span
                   className="flex-none size-9.5 rounded bg-secondary grid place-items-center font-bold"
                   aria-hidden
@@ -84,7 +78,9 @@ export function AllocationGovernance({ classes = "" }: IAllocationGovernance) {
                 </span>
                 <div>
                   <span className="font-bold">{p.title}</span>
-                  <p className="mt-0.5 text-sm/normal text-gray-11">{p.body}</p>
+                  <p className="mt-0.5 text-base/normal text-gray-12">
+                    {p.body}
+                  </p>
                 </div>
               </div>
             ))}

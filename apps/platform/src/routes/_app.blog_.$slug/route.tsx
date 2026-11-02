@@ -174,7 +174,7 @@ export default function Post({ loaderData: post }: Route.ComponentProps) {
       {post.author?.name && (
         <p className="text-gray-11 text-sm">Author: {post.author.name}</p>
       )}
-      <div className="w-full h-px bg-gray-3 my-4" />
+      <div className="w-full h-px bg-hairline my-4" />
 
       <div className="prose lg:prose-lg prose-a:text-primary hover:prose-a:text-primary">
         {Array.isArray(post.body) && (

@@ -1,29 +1,24 @@
+import { ExtLink } from "@better-giving/ui";
 import { href, Link } from "react-router";
 import { BOOK_A_DEMO } from "#/constants/urls";
 
 export function BottomCta({ classes = "" }) {
   return (
-    <div
-      className={`${classes} grid bg-linear-to-br from-primary to-secondary rounded md:rounded px-10 py-12 md:px-16`}
-    >
-      <h3 className="text-center md:text-left article-heading text-primary-fg mb-9">
-        The all-in-one fundraising solution you deserve is only a few clicks
-        away
-      </h3>
-      <div className="flex flex-col md:flex-row justify-center md:justify-start items-center gap-6">
-        <Link
-          to={href("/register")}
-          className="btn md:btn-lg btn-primary font-bold"
-        >
-          Join us today!
-        </Link>
-        <Link
-          to={BOOK_A_DEMO}
-          className="btn md:btn-lg btn-secondary font-bold"
-        >
-          Book a Demo
-        </Link>
+    <section className={`${classes} surface-primary py-20`}>
+      <div className="page grid justify-items-center text-center">
+        <h2 className="section-heading text-primary-fg max-w-3xl text-balance">
+          The all-in-one fundraising solution you deserve is only a few clicks
+          away
+        </h2>
+        <div className="flex max-sm:flex-col sm:flex-wrap justify-center gap-3.5 mt-8">
+          <Link to={href("/register")} className="btn btn-inverse btn-lg">
+            Join us today!
+          </Link>
+          <ExtLink href={BOOK_A_DEMO} className="btn btn-lg btn-outline">
+            Book a demo
+          </ExtLink>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

@@ -5,6 +5,7 @@ export const Tones = () => (
     <Badge tone="neutral">Templates</Badge>
     <Badge tone="primary">Whitepapers</Badge>
     <Badge tone="success">Guides</Badge>
+    <Badge tone="warning">Pending review</Badge>
     <Badge tone="destructive">closed</Badge>
     <Badge tone="secondary">ends in 3 days</Badge>
   </div>

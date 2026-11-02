@@ -90,7 +90,7 @@ describe("org hero", () => {
     });
     // the system's corner, not a circle that would cut the wide logo's ends
     for (const el of [img, monogram]) {
-      expect(getComputedStyle(el).borderRadius).toBe("4px");
+      expect(getComputedStyle(el).borderRadius).toBe("6px");
     }
 
     // contain draws the 3:1 picture at the frame's full width and a third of

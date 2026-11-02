@@ -7,7 +7,7 @@ import laira_yellow from "#/assets/laira/laira-yellow.webp";
 export const Top = ({ classes = "" }) => {
   return (
     <section className={`${classes} relative grid pt-36 pb-20`}>
-      <p className="text-sm md:text-lg  uppercase font-bold text-center mb-5 tracking-wider text-primary">
+      <p className="text-sm md:text-lg font-bold text-center mb-5 text-primary">
         By a nonprofit, for nonprofits
       </p>
       <h1 className="mx-auto text-3xl/tight md:text-4xl/tight lg:text-5xl/tight text-center text-pretty mb-6 px-6 ">

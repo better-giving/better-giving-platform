@@ -70,10 +70,10 @@ export const LeadingAdornment = () => {
       value={value}
       on_change={set}
       options={COUNTRIES}
-      adornment_side="start"
-      adornment={(open) =>
-        value ? <span className="text-2xl">{flags[value]}</span> : drawer(open)
+      lead={
+        value ? <span className="text-2xl">{flags[value]}</span> : undefined
       }
+      adornment={drawer}
       render={(c) => (
         <>
           <span className="text-2xl">{flags[c]}</span>

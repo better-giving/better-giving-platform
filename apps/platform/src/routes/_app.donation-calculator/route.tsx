@@ -70,14 +70,18 @@ export default function Page() {
           Export to pdf
         </Link>
 
-        <div className="grid sm:grid-cols-subgrid col-span-2 bg-panel p-4 rounded">
-          <Form1 state={state} setState={setState} classes="sm:border-r" />
+        <div className="grid sm:grid-cols-subgrid col-span-2 card">
+          <Form1
+            state={state}
+            setState={setState}
+            classes="sm:border-r border-hairline"
+          />
           <Result1 {...view} classes="" />
         </div>
       </div>
       <div className="grid content-center surface-primary py-8">
         <div className="max-md:grid max-md:justify-items-center max-md:gap-y-2 md:relative justify-self-center">
-          <div className="md:absolute md:-left-4 md:-bottom-2 shrink-0">
+          <div className="relative md:absolute md:-left-4 md:-bottom-2 shrink-0">
             <Image
               alt="laira announce"
               src={laira_announce}
@@ -102,7 +106,7 @@ export default function Page() {
                 rx="40"
                 ry="6"
                 filter="url(#blur)"
-                className="fill-neutral/30"
+                className="fill-black"
               />
             </svg>
           </div>
@@ -117,8 +121,12 @@ export default function Page() {
           Savings & Investment Calculator
         </h2>
 
-        <div className="grid sm:grid-cols-subgrid col-span-2 bg-panel p-4 rounded">
-          <Form2 state={state} setState={setState} classes="sm:border-r" />
+        <div className="grid sm:grid-cols-subgrid col-span-2 card">
+          <Form2
+            state={state}
+            setState={setState}
+            classes="sm:border-r border-hairline"
+          />
           <Table {...view} classes="" />
         </div>
         <h2 className="text-balance text-2xl sm:text-3xl text-primary mt-12 mb-1 text-center col-span-2">

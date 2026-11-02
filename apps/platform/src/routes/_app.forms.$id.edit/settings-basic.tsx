@@ -62,7 +62,7 @@ export function SettingsBasic({
   return (
     <Form
       disabled={isSubmitting}
-      className={`${classes} @container/configurer bg-panel rounded p-4 self-start`}
+      className={`${classes} @container/configurer card self-start`}
       onSubmit={handleSubmit((x) => on_submit(x), console.error)}
       onReset={(e) => {
         e.preventDefault();
@@ -134,7 +134,7 @@ export function SettingsBasic({
               <textarea
                 rows={2}
                 {...register(`increments.${idx}.label`)}
-                className="w-full  outline-ring rounded text-sm font-medium bg-surface px-4 py-3.5 placeholder:text-gray-11 border disabled:pointer-events-none disabled:bg-gray-3 disabled:text-gray-11"
+                className="field-input font-medium"
               />
               <p
                 data-error={!!errors.increments?.[idx]?.label?.message}
