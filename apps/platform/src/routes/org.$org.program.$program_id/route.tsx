@@ -1,10 +1,8 @@
-import { Image } from "@better-giving/ui";
+import { GoalBar, Image } from "@better-giving/ui";
 import { to_usd } from "@better-giving/ui/helpers";
-import { ArrowLeft } from "lucide-react";
 import { href, Link } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { OrgFooterMinimal } from "#/components/org-page/footer";
-import { GoalBar } from "#/components/org-page/goal-bar";
 import { OrgHeader } from "#/components/org-page/header";
 import { RichText, richtext_styles, to_text } from "#/components/rich-text";
 import { app_name } from "#/constants/env";
@@ -44,7 +42,7 @@ function Page({ loaderData: d }: Route.ComponentProps) {
   const profile = org_href(npo);
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-background text-gray-12">
+    <div className="flex min-h-[100dvh] flex-col text-gray-12">
       <OrgHeader
         name={npo.name}
         logo={npo.logo}
@@ -52,15 +50,7 @@ function Page({ loaderData: d }: Route.ComponentProps) {
         donate_to={donate_to}
       />
       <main className="page flex flex-1 flex-col gap-6 pt-4 pb-6 lg:gap-8 lg:pt-8 lg:pb-20">
-        {/* -my-3 keeps the 44px target off the rhythm: the gaps meet the text */}
-        <Link
-          to={profile}
-          className="link -my-3 inline-flex min-h-11 items-center gap-1 self-start text-sm font-semibold"
-        >
-          <ArrowLeft aria-hidden className="icon-sm" />
-          Back to {npo.name}
-        </Link>
-        <section className="flex flex-col overflow-hidden rounded border bg-panel">
+        <section className="flex flex-col overflow-hidden bg-card rounded-card border border-hairline">
           {prog.banner && (
             <Image
               src={prog.banner}
@@ -164,7 +154,7 @@ function Campaigns({ campaigns }: ICampaigns) {
 function CampaignCard(c: TCampaign) {
   const goal = goal_amount(c.target, c.raised);
   return (
-    <article className="relative flex h-full flex-col overflow-hidden rounded border bg-panel has-focus-visible:outline-2 has-focus-visible:outline-ring has-focus-visible:-outline-offset-2">
+    <article className="relative flex h-full flex-col overflow-hidden bg-card rounded-card border border-hairline transition-colors hover:border-gray-8 has-focus-visible:outline-2 has-focus-visible:outline-ring has-focus-visible:-outline-offset-2">
       {/* stacked in one grid cell, not positioned, so the card stays the
           box the link's ::after covers. grid-rows-1 makes the row the
           definite 160px, which size-full resolves against; an auto row

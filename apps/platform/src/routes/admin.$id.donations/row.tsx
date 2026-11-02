@@ -1,19 +1,22 @@
+import { to_usd } from "@better-giving/ui/helpers";
 import { Arrow, Content, Tooltip } from "@better-giving/ui/tooltip";
 import { InfoIcon, TagIcon } from "lucide-react";
 import { href, Link } from "react-router";
 import { Money } from "#/components/money";
 import { default_allocation } from "@/constants/common";
+import { is_reversed } from "@/donations";
 import { toPP } from "@/helpers/date";
-import { humanize } from "@/helpers/decimal";
+import { rd2num } from "@/helpers/decimal";
 import { AmountFlow } from "./amount-flow";
 import { Fees } from "./fees";
 import { type IRow, origin_text } from "./helpers";
 
 export function Row(props: IRow) {
+  const reversed = !!props.status && is_reversed(props.status);
   return (
     <>
       <td className="whitespace-nowrap">
-        {props.date ? toPP(props.date) : "--"}
+        {props.date ? toPP(props.date) : <Missing />}
       </td>
       <td>
         {props.program_id ? (
@@ -27,13 +30,13 @@ export function Row(props: IRow) {
             {props.program_name}
           </Link>
         ) : (
-          "--"
+          <Missing />
         )}
       </td>
       <td>
         {props.donation_origin === "bg-widget" ? (
           <div>
-            <span className="whitespace-nowrap">Donation Form</span>
+            <span className="whitespace-nowrap">Donation form</span>
             <span className="text-xs mt-0.5 flex items-center gap-1 whitespace-nowrap">
               <TagIcon className="shrink-0 icon-xs" />
               {props.donation_origin_tag || props.donation_origin_id}
@@ -43,29 +46,26 @@ export function Row(props: IRow) {
           origin_text(props.donation_origin)
         )}
       </td>
-      <td>{props.payment_method ?? "--"}</td>
-      <td>
+      <td>{props.payment_method ?? <Missing />}</td>
+      <td className="num">
         <Money
           amount={+props.amount}
           currency={props.currency}
           amount_usd={+props.amount_usd}
         />
-        <p className="text-2xs uppercase">{props.frequency}</p>
+        <p className="text-xs first-letter:uppercase">{props.frequency}</p>
       </td>
-      <td>
+      <td className="num">
         <Fees {...props.fees} />
       </td>
-      <td>
+      <td className="num whitespace-nowrap">
         <span
-          className={
-            props.status === "refunded"
-              ? "line-through text-destructive-subtle-fg"
-              : ""
-          }
+          className={reversed ? "line-through text-destructive-subtle-fg" : ""}
         >
-          ${humanize(props.net_usd, 2)}
+          {/* rounded down, as AmountFlow rounds each branch */}
+          {to_usd(rd2num(props.net_usd), 2)}
         </span>
-        {props.status === "refunded" && (
+        {reversed && (
           <Tooltip
             tip={
               <Content className="max-w-xs text-xs">
@@ -85,7 +85,7 @@ export function Row(props: IRow) {
         />
       </td>
       <td>
-        <div>{props?.donor_name ?? "--"}</div>
+        <div>{props?.donor_name ?? <Missing />}</div>
         <div className="text-xs">{props.donor_email}</div>
         <p className="text-xs mt-0.5">
           {[
@@ -102,4 +102,8 @@ export function Row(props: IRow) {
       </td>
     </>
   );
+}
+
+function Missing() {
+  return <span className="text-gray-11">—</span>;
 }

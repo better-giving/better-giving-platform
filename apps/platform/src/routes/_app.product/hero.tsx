@@ -14,9 +14,6 @@ export function Hero({ classes = "" }: IHero) {
     >
       <div className="page grid gap-12 lg:grid-cols-[minmax(22rem,1fr)_minmax(18rem,32.5rem)] items-center">
         <div className="grid gap-5 justify-items-start">
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">
-            Product
-          </p>
           <h1 className="hero-heading">
             One form that turns visitors into donors, and donors into monthly
             givers
@@ -27,10 +24,7 @@ export function Hero({ classes = "" }: IHero) {
             on your own website.
           </p>
           <div className="flex max-sm:flex-col max-sm:w-full sm:flex-wrap sm:items-center gap-3.5 mt-1.5">
-            <Link
-              to={href("/register")}
-              className="btn btn-lg btn-primary shadow-lift-cta"
-            >
+            <Link to={href("/register")} className="btn btn-lg btn-primary">
               Join free forever
             </Link>
             <ExtLink href={BOOK_A_DEMO} className="btn btn-lg btn-secondary">
@@ -44,7 +38,7 @@ export function Hero({ classes = "" }: IHero) {
             className="absolute size-45 bg-secondary rounded-full -top-7 -right-4"
             aria-hidden
           />
-          <div className="relative bg-panel border border-gray-6 rounded shadow-lift-media overflow-hidden">
+          <div className="relative bg-card rounded-card shadow-lift-media overflow-hidden">
             <img
               src={donation_form}
               alt="Better Giving embeddable donation form"

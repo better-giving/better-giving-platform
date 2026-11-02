@@ -64,10 +64,10 @@ export function Preview({
             <Steps
               key={JSON.stringify(init_state)}
               init={init_state}
-              classes="rounded"
+              classes="rounded-card"
             />
           </div>
-          <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded">
+          <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-card">
             <p className="font-medium">This form has been disabled</p>
           </div>
         </div>
@@ -75,7 +75,7 @@ export function Preview({
         <Steps
           key={JSON.stringify(init_state)}
           init={init_state}
-          classes="rounded border"
+          classes="rounded-card border"
         />
       )}
     </div>

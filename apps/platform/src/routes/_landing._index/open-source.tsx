@@ -23,9 +23,6 @@ export function OpenSource({ classes = "" }: IOpenSource) {
     <section className={classes} aria-labelledby="open-source-heading">
       <div className="page grid gap-14 lg:grid-cols-[1.1fr_0.9fr] items-center">
         <div className="grid gap-5 justify-items-start">
-          <p className="text-xs font-bold uppercase tracking-wider text-secondary">
-            Open source
-          </p>
           <h2
             id="open-source-heading"
             className="section-heading text-primary-fg"

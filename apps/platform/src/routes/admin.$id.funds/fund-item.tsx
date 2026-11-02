@@ -99,7 +99,7 @@ export const FundItem = (props: Props) => {
             // would drop the dialog's return focus onto `<body>`
             <button
               type="button"
-              className={`btn btn-sm btn-ghost text-destructive gap-2${busy ? " pending" : ""}`}
+              className={`btn btn-sm btn-ghost text-destructive-subtle-fg gap-2${busy ? " pending" : ""}`}
               disabled={!props.active}
               aria-disabled={busy || undefined}
               aria-busy={busy}
@@ -150,7 +150,7 @@ function LeaveConfirm({
         const heading = document.querySelector("h1");
         return heading instanceof HTMLElement ? heading : null;
       }}
-      classes="bg-panel text-gray-12"
+      classes="bg-popover text-gray-12"
     >
       <div className="p-6 sm:p-8 grid gap-2">
         <h3 className="text-lg font-bold">Leave {name}?</h3>

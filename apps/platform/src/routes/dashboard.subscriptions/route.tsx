@@ -77,33 +77,36 @@ function Page({ loaderData: { subs } }: Route.ComponentProps) {
               {format(new Date(s.updated_at), "PP")}
             </div>
           )}
+          {/* a narrow table folds the actions column in here, so Cancel is
+              never past the scroller's edge */}
+          {can_cancel && (
+            <div className="@lg:hidden">
+              <CancelLink
+                sub_id={s.id}
+                to_name={s.to_name}
+                classes="-ml-2 mt-1"
+              />
+            </div>
+          )}
         </td>
 
         <td className="text-sm">
           {s.status === "active" ? format(new Date(s.next_billing), "PP") : "—"}
         </td>
 
-        <td className="text-sm">
-          {can_cancel ? (
-            <Link
-              to={`cancel/${s.id}`}
-              className="inline-block px-2 py-1 rounded text-xs font-bold uppercase text-destructive-subtle-fg hover:bg-destructive-subtle active:bg-destructive-subtle-active"
-            >
-              Cancel
-            </Link>
-          ) : null}
+        <td className="text-sm @max-lg:hidden">
+          {can_cancel ? <CancelLink sub_id={s.id} to_name={s.to_name} /> : null}
         </td>
       </tr>
     );
   });
 
   return (
-    <div className="grid px-6 py-4 md:px-10 md:py-8">
-      <h2 className="text-3xl">Recurring Donations</h2>
-
+    <div className="grid px-4 py-4 md:px-10 md:py-8">
+      <h1 className="sr-only">Recurring donations</h1>
       <div
         role="tablist"
-        className="mt-6 inline-flex gap-1 border border-gray-6 rounded p-1 bg-panel w-fit"
+        className="inline-flex gap-1 rounded p-1 bg-gray-3 w-fit"
       >
         {FILTERS.map((f) => {
           const active = f.key === filter;
@@ -118,8 +121,8 @@ function Page({ loaderData: { subs } }: Route.ComponentProps) {
               preventScrollReset
               className={`px-3 py-1 text-sm rounded ${
                 active
-                  ? "bg-primary text-primary-fg"
-                  : "text-gray-11 hover:text-gray-12"
+                  ? "bg-secondary-active text-gray-12"
+                  : "text-gray-11 hover:bg-gray-4 hover:text-gray-12"
               }`}
             >
               {f.label}
@@ -129,31 +132,54 @@ function Page({ loaderData: { subs } }: Route.ComponentProps) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-scroll bg-panel rounded mt-6">
+        <div className="table-scroll mt-6">
           <table className="table">
             <thead>
               <tr>
                 <th scope="col">Recipient</th>
                 <th scope="col">Amount</th>
                 <th scope="col">Status</th>
-                <th scope="col">Next Payment</th>
-                <th scope="col">Actions</th>
+                <th scope="col">Next payment</th>
+                <th scope="col" className="@max-lg:hidden">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>{rows}</tbody>
           </table>
         </div>
       ) : (
-        <EmptyState classes="mt-6">
-          {filter === "inactive"
-            ? "No cancelled donations found"
-            : filter === "active"
-              ? "No active recurring donations found"
-              : "No recurring donations found"}
-        </EmptyState>
+        <div className="card mt-6">
+          <EmptyState>
+            {filter === "inactive"
+              ? "No cancelled donations found"
+              : filter === "active"
+                ? "No active recurring donations found"
+                : "No recurring donations found"}
+          </EmptyState>
+        </div>
       )}
       {/** cancel prompt */}
       <Outlet />
     </div>
+  );
+}
+
+interface ICancelLink {
+  sub_id: string;
+  /** names the row's recipient, so each row's Cancel is told apart */
+  to_name: string;
+  classes?: string;
+}
+
+function CancelLink({ sub_id, to_name, classes = "" }: ICancelLink) {
+  return (
+    <Link
+      to={`cancel/${sub_id}`}
+      aria-label={`Cancel ${to_name}`}
+      className={`${classes} inline-block px-2 py-1 rounded text-xs font-bold text-destructive-subtle-fg hover:bg-red-4 active:bg-destructive-subtle-active focus-visible:outline-2 focus-visible:outline-ring`}
+    >
+      Cancel
+    </Link>
   );
 }

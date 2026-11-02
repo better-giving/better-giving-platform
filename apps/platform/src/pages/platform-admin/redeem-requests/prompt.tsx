@@ -1,11 +1,6 @@
-import { Actions } from "@better-giving/ui";
+import { Actions, Badge } from "@better-giving/ui";
 import { ChevronRight, X } from "lucide-react";
-import {
-  type FormEvent,
-  type PropsWithChildren,
-  useEffect,
-  useRef,
-} from "react";
+import { type FormEvent, useEffect, useRef } from "react";
 import { Link, useFetcher, useParams } from "react-router";
 import { RouteModal } from "#/components/route-modal";
 
@@ -18,7 +13,7 @@ export function Prompt(props: Props) {
   const fetcher_key = `tx-request-${tx_id}-${props.verdict}`;
   const in_flight = useFetcher({ key: fetcher_key }).state !== "idle";
   return (
-    <RouteModal classes="bg-panel" busy={in_flight}>
+    <RouteModal classes="bg-popover" busy={in_flight}>
       {/* keyed: the route stays mounted across requests, and the latch from
           one must not swallow the first press on the next */}
       <Content key={tx_id} fetcher_key={fetcher_key} {...props} />
@@ -57,7 +52,7 @@ function Content({ verdict, fetcher_key }: IContent) {
     >
       <input type="hidden" value={verdict} name="verdict" />
       <div className="relative w-full">
-        <h2 className="sm:text-xl font-bold text-center border-b bg-gray-3 p-5">
+        <h2 className="sm:text-xl font-bold text-center border-b border-hairline p-5">
           Redeem units request
         </h2>
         <Link
@@ -65,9 +60,9 @@ function Content({ verdict, fetcher_key }: IContent) {
           aria-label="Close"
           aria-disabled={busy}
           onClick={hold}
-          className="border p-2 rounded absolute top-1/2 right-4 transform -translate-y-1/2 aria-disabled:text-gray-11"
+          className="btn btn-icon btn-secondary absolute top-1/2 right-4 -translate-y-1/2 aria-disabled:pointer-events-none"
         >
-          <X className="size-4.5 sm:size-6" />
+          <X className="icon-xl" />
         </Link>
       </div>
       <p className="px-6 pb-4 text-center text-gray-11 mt-4 font-semibold">
@@ -75,12 +70,12 @@ function Content({ verdict, fetcher_key }: IContent) {
       </p>
 
       <div className="flex items-center gap-2 mb-6">
-        <Status classes="bg-gray-11">Pending</Status>
+        <Badge>Pending</Badge>
         <ChevronRight className="icon-xl" />
         {verdict === "approve" ? (
-          <Status classes="bg-success">Approved</Status>
+          <Badge tone="success">Approved</Badge>
         ) : (
-          <Status classes="bg-destructive">Cancelled</Status>
+          <Badge tone="destructive">Cancelled</Badge>
         )}
       </div>
 
@@ -105,17 +100,5 @@ function Content({ verdict, fetcher_key }: IContent) {
         </button>
       </Actions>
     </fetcher.Form>
-  );
-}
-
-function Status(props: PropsWithChildren<{ classes?: string }>) {
-  return (
-    <div
-      className={`${
-        props.classes ?? ""
-      } text-primary-fg px-2 py-1 text-xs uppercase rounded`}
-    >
-      {props.children}
-    </div>
   );
 }

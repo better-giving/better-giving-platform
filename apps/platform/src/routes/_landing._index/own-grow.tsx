@@ -10,12 +10,9 @@ export function OwnGrow({ classes = "" }: IOwnGrow) {
   return (
     <section className={classes} aria-labelledby="own-grow-heading">
       <div className="page">
-        <p className="text-xs font-bold uppercase tracking-wider text-primary text-center">
-          Why we're different
-        </p>
         <h2
           id="own-grow-heading"
-          className="section-heading text-center mt-3 max-w-2xl mx-auto"
+          className="section-heading text-center max-w-2xl mx-auto"
         >
           Own it. Grow it.
         </h2>
@@ -24,7 +21,7 @@ export function OwnGrow({ classes = "" }: IOwnGrow) {
           opposite: infrastructure you can own, and reserves that grow.
         </p>
         <div className="grid gap-6 md:grid-cols-2 mt-12">
-          <div className="card-on-band shadow-lift-card flex flex-col gap-4">
+          <div className="card flex flex-col gap-4">
             <Image
               src={laira_shaking_hands}
               width={120}
@@ -43,7 +40,7 @@ export function OwnGrow({ classes = "" }: IOwnGrow) {
               donors to your new platform, free, no exit toll.
             </p>
           </div>
-          <div className="card-on-band shadow-lift-card flex flex-col gap-4">
+          <div className="card flex flex-col gap-4">
             <Image
               src={laira_presentation}
               width={120}

@@ -1,5 +1,7 @@
-import { type ActionFunction, redirect } from "react-router";
+import { type ActionFunction, href, redirect } from "react-router";
 import { literal, object, safeParse, variant } from "valibot";
+import { review_get } from "#/routes/platform.applications_.$id/api";
+import { is_approvable } from "#/routes/platform.applications_.$id/approvable";
 import { resp } from "@/helpers/https";
 import { msg } from "@/queue";
 import { Progress } from "@/reg/progress";
@@ -8,6 +10,7 @@ import { $ } from "@/schemas";
 import { enqueue, in_dedupe_window } from "$/kit/queue";
 import { db } from "$/pg/db";
 import { reg_get, reg_update_from } from "$/pg/queries/registration";
+import type { Route } from "./+types/route";
 import { announce_approval, npo_new } from "./npo-new";
 
 export { ErrorModal as ErrorBoundary } from "#/components/error";
@@ -19,6 +22,16 @@ const rejection = object({
   reason: $,
 });
 export const schema = variant("type", [approval, rejection]);
+
+/** the detail page disables Approve; this keeps the URL from going around it */
+export const loader = async (args: Route.LoaderArgs) => {
+  if (args.params.verdict !== "approved") return null;
+  const { reg, wacc } = await review_get(args.params.id);
+  if (!is_approvable(reg, wacc)) {
+    throw redirect(href("/platform/applications/:id", { id: args.params.id }));
+  }
+  return null;
+};
 
 export const action: ActionFunction = async ({ request, params }) => {
   const fv: { reason?: string } | null | undefined = await request

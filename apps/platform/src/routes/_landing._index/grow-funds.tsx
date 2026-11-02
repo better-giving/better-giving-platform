@@ -24,9 +24,6 @@ export function GrowFunds({ classes = "" }: IGrowFunds) {
     <section className={classes} aria-labelledby="grow-funds-heading">
       <div className="page grid gap-14 lg:grid-cols-2 items-center">
         <div className="grid gap-5 content-start">
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">
-            Grow your funds
-          </p>
           <h2 id="grow-funds-heading" className="section-heading">
             This quarter's gifts, next decade's reserves
           </h2>
@@ -34,25 +31,25 @@ export function GrowFunds({ classes = "" }: IGrowFunds) {
             Route any share of your donations into two places money grows:
           </p>
           <div className="grid gap-3.5">
-            <div className="card-on-band flex gap-3.5 items-start">
+            <div className="card flex gap-3.5 items-start">
               <span className="flex-none size-9.5 rounded bg-secondary grid place-items-center font-bold">
                 <PercentIcon aria-hidden className="icon-xl" />
               </span>
               <div>
                 <span className="font-bold">High-yield savings</span>
-                <p className="mt-0.5 text-sm/normal text-gray-11">
+                <p className="mt-0.5 text-base/normal text-gray-12">
                   FDIC-insured. Withdrawals are paid out every 3 days once your
                   balance reaches your payout minimum.
                 </p>
               </div>
             </div>
-            <div className="card-on-band flex gap-3.5 items-start">
+            <div className="card flex gap-3.5 items-start">
               <span className="flex-none size-9.5 rounded bg-secondary grid place-items-center font-bold">
                 <TrendingUpIcon aria-hidden className="icon-xl" />
               </span>
               <div>
                 <span className="font-bold">Sustainability Fund</span>
-                <p className="mt-0.5 text-sm/normal text-gray-11">
+                <p className="mt-0.5 text-base/normal text-gray-12">
                   Professionally managed, investment-committee governed,
                   rebalanced quarterly.
                 </p>
@@ -64,7 +61,7 @@ export function GrowFunds({ classes = "" }: IGrowFunds) {
           </p>
         </div>
 
-        <div className="card-on-band shadow-lift-card grid gap-6 justify-items-center">
+        <div className="card grid gap-6 justify-items-center">
           <span className="text-lg font-bold">
             Sustainability Fund target allocation as of 2026
           </span>

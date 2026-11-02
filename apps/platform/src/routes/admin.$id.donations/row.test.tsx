@@ -1,0 +1,116 @@
+import { createRoutesStub } from "react-router";
+import { describe, expect, test } from "vitest";
+import { render } from "vitest-browser-react";
+import type { IRow } from "./helpers";
+import { Row } from "./row";
+
+// $15 at 1.5% base + 3% processing: the fees print $0.23 and $0.45, and the
+// net is 14.325 before any rounding
+const fees = {
+  base: 0.225,
+  fsa: 0,
+  processing: 0.45,
+  processing_allowance: 0,
+};
+const refunded = {
+  id: "qa-05",
+  date: "2026-08-01T00:00:00.000Z",
+  currency: "USD",
+  amount: 15,
+  amount_usd: 15,
+  net_usd: 14.325,
+  fees,
+  fee_base: fees.base,
+  fee_fsa: fees.fsa,
+  fee_processing: fees.processing,
+  fee_covered_by_donor: false,
+  payment_method: "Card",
+  frequency: "one-time",
+  program_name: "",
+  donation_origin: "bg-marketplace",
+  donation_origin_id: "",
+  donation_origin_tag: "",
+  donor_name: "Jane Doe",
+  donor_email: "jane@example.com",
+  donor_company: "",
+  street: "",
+  city: "",
+  state: "",
+  zip_code: "",
+  country: "",
+  program_id: "",
+  recipient_id: 1,
+  allocation: { cash: 100, liq: 0, lock: 0 },
+  status: "refunded",
+} satisfies IRow;
+
+describe("a refunded donation row", () => {
+  test("nets the same figure the allocation shows", async () => {
+    const Stub = createRoutesStub([
+      {
+        path: "/",
+        Component: () => (
+          <table>
+            <tbody>
+              <tr>
+                <Row {...refunded} />
+              </tr>
+            </tbody>
+          </table>
+        ),
+      },
+    ]);
+    const screen = await render(<Stub initialEntries={["/"]} />);
+
+    const cells = screen.getByRole("cell");
+    await expect.element(cells.first()).toBeVisible();
+    const [net, allocation] = cells.elements().slice(6, 8);
+    expect(net.firstElementChild?.textContent).toBe("$14.32");
+    expect(allocation.textContent).toMatch(/^\$14\.32- Grant$/);
+  });
+});
+
+describe("a reversed donation's net", () => {
+  async function render_row(row: IRow) {
+    const Stub = createRoutesStub([
+      {
+        path: "/",
+        Component: () => (
+          <table>
+            <tbody>
+              <tr>
+                <Row {...row} />
+              </tr>
+            </tbody>
+          </table>
+        ),
+      },
+    ]);
+    const screen = await render(<Stub initialEntries={["/"]} />);
+    const net = screen.getByRole("cell").nth(6);
+    await expect.element(net).toBeVisible();
+    const figure = net.element().firstElementChild as HTMLElement;
+    return {
+      struck: getComputedStyle(figure).textDecorationLine === "line-through",
+      // the "Refunded" tooltip's trigger
+      flagged: net.element().querySelector("svg") !== null,
+    };
+  }
+
+  test.each(["refunded", "refunded_loss"] as const)(
+    "a %s row strikes its net and flags it refunded",
+    async (status) => {
+      expect(await render_row({ ...refunded, status })).toEqual({
+        struck: true,
+        flagged: true,
+      });
+    }
+  );
+
+  test("a settled row does neither", async () => {
+    expect(await render_row({ ...refunded, status: "settled" })).toEqual({
+      struck: false,
+      flagged: false,
+    });
+  });
+});

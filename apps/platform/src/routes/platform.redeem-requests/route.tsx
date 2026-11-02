@@ -10,7 +10,7 @@ import { Table } from "./table";
 export { loader } from "./api";
 export const clientLoader = createClientLoaderCache<Route.ClientLoaderArgs>();
 export const meta: Route.MetaFunction = () =>
-  metas({ title: "Redemption Requests" });
+  metas({ title: "Redemption requests" });
 
 export default CacheRoute(Page);
 function Page({ loaderData: page1 }: Route.ComponentProps) {
@@ -27,9 +27,9 @@ function Page({ loaderData: page1 }: Route.ComponentProps) {
     },
   });
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8 w-full max-w-4xl grid content-start">
+    <div className="px-4 py-4 md:px-10 md:py-8 w-full max-w-4xl grid content-start">
+      <h1 className="sr-only">Redemption requests</h1>
       <div className="flex items-center gap-x-4 mb-4">
-        <h3 className="font-bold text-2xl">Redemption Requests</h3>
         <Select
           options={["pending", "final", "cancelled"]}
           onChange={(x) =>

@@ -39,66 +39,69 @@ function Page({ loaderData }: Route.ComponentProps) {
     pct: g.pct,
   }));
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8 w-full max-w-4xl grid content-start">
-      <div className="font-bold text-2xl mb-4 flex items-baseline gap-x-2">
-        <h3>Investments</h3>{" "}
-        <HoverCard
-          tip={
-            <HoverContent className="text-sm w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] overflow-y-auto scrollbars">
-              <span className="block mb-2 font-medium">
-                Portfolio composition
-              </span>
-              <PieChart width={150} height={150} className="mx-auto">
-                <Pie
-                  data={pie_data}
-                  dataKey="pct"
-                  nameKey="category"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={30}
-                  outerRadius={55}
-                  strokeWidth={0}
-                >
-                  {pie_data.map((d) => (
-                    <Cell
-                      key={d.category}
-                      fill={
-                        category_colors[d.category as TickerCategory] ??
-                        category_colors.other
-                      }
-                    />
-                  ))}
-                </Pie>
-              </PieChart>
-              {groups.map((g) => (
-                <div key={g.category} className="mb-2 last:mb-0">
-                  <div className="flex items-center justify-between font-medium">
-                    <span className="flex items-center gap-1.5 capitalize">
-                      <span
-                        className="inline-block size-2.5 rounded-full"
-                        style={{
-                          backgroundColor:
-                            category_colors[g.category as TickerCategory] ??
-                            category_colors.other,
-                        }}
+    <div className="px-4 py-4 md:px-10 md:py-8 w-full max-w-4xl grid content-start">
+      <h1 className="sr-only">Investments</h1>
+      <div className="card">
+        <div className="flex items-center mb-2">
+          <p className="text-sm font-medium text-gray-11">Investments</p>
+          <HoverCard
+            tip={
+              <HoverContent className="text-sm w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] overflow-y-auto scrollbars">
+                <span className="block mb-2 font-medium">
+                  Portfolio composition
+                </span>
+                <PieChart width={150} height={150} className="mx-auto">
+                  <Pie
+                    data={pie_data}
+                    dataKey="pct"
+                    nameKey="category"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={30}
+                    outerRadius={55}
+                    strokeWidth={0}
+                  >
+                    {pie_data.map((d) => (
+                      <Cell
+                        key={d.category}
+                        fill={
+                          category_colors[d.category as TickerCategory] ??
+                          category_colors.other
+                        }
                       />
-                      {g.category.replace("_", " ")}
-                    </span>
-                    <span>{g.pct.toFixed(1)}%</span>
+                    ))}
+                  </Pie>
+                </PieChart>
+                {groups.map((g) => (
+                  <div key={g.category} className="mb-2 last:mb-0">
+                    <div className="flex items-center justify-between font-medium">
+                      <span className="flex items-center gap-1.5 capitalize">
+                        <span
+                          className="inline-block size-2.5 rounded-full"
+                          style={{
+                            backgroundColor:
+                              category_colors[g.category as TickerCategory] ??
+                              category_colors.other,
+                          }}
+                        />
+                        {g.category.replace("_", " ")}
+                      </span>
+                      <span>{g.pct.toFixed(1)}%</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-              <HoverArrow />
-            </HoverContent>
-          }
-        >
-          <CircleHelp className="text-gray-11 ml-1 icon-md" />
-        </HoverCard>
+                ))}
+                <HoverArrow />
+              </HoverContent>
+            }
+          >
+            <CircleHelp className="text-gray-11 ml-1 icon-sm" />
+          </HoverCard>
+        </div>
+        <div className="text-xl font-semibold">
+          ${humanize(bal_lock)} <SfPerf id={id} />
+        </div>
       </div>
-      <div className="card text-xl font-semibold">
-        ${humanize(bal_lock)} <SfPerf id={id} />
-      </div>
-      <div className="flex items-center gap-4 mt-4">
+      <div className="flex flex-wrap items-center gap-4 mt-4">
         <NavLink to="deposit" className="btn btn-secondary gap-2">
           <ArrowUpFromLineIcon className="icon-md" />
           Deposit

@@ -3,6 +3,7 @@ import {
   ticker_colors,
   unmapped_ticker_color,
 } from "#/pages/platform-admin/investments/common";
+import { fmt_share, share_pct } from "#/routes/platform.investments/share";
 import { humanize } from "@/helpers/decimal";
 import type { ILog } from "@/nav";
 import { prices_fn } from "../helpers";
@@ -31,7 +32,7 @@ export function Review(props: Props) {
 
       return {
         ...t,
-        pct: (t.value / props.ltd.value) * 100,
+        pct: share_pct(t.value, props.ltd.value),
         qty2,
         price2,
         value2,
@@ -41,7 +42,7 @@ export function Review(props: Props) {
 
   const total_value_2 = tickers.reduce((a, b) => a + b.value2, 0);
   const tickers2 = tickers.map((t) => {
-    return { ...t, pct2: (t.value2 / total_value_2) * 100 };
+    return { ...t, pct2: share_pct(t.value2, total_value_2) };
   });
 
   return (
@@ -55,27 +56,31 @@ export function Review(props: Props) {
         formatter={(x) => `$${humanize(x)}`}
       />
       <p className="text-gray-11 text-sm font-semibold">Unit price</p>
-      <Diff
-        classes="text-2xl font-bold mb-4"
-        el="div"
-        a={props.ltd.price}
-        b={total_value_2 / props.ltd.units}
-        formatter={(x) => `$${humanize(x)}`}
-      />
+      {props.ltd.units === 0 ? (
+        <div className="text-2xl font-bold mb-4">—</div>
+      ) : (
+        <Diff
+          classes="text-2xl font-bold mb-4"
+          el="div"
+          a={props.ltd.price}
+          b={total_value_2 / props.ltd.units}
+          formatter={(x) => `$${humanize(x)}`}
+        />
+      )}
       <table className="table">
         <thead>
-          <tr>
+          <tr className="whitespace-nowrap">
             <th>Symbol</th>
             <th>Units</th>
             <th>Price</th>
-            <th>Price Date</th>
+            <th>Price date</th>
             <th>Value</th>
             <th>%</th>
           </tr>
         </thead>
         <tbody>
           {tickers2.map((t) => (
-            <tr key={t.id} className="text-sm">
+            <tr key={t.id} className="text-sm whitespace-nowrap">
               <td
                 style={{ color: ticker_colors[t.id] || unmapped_ticker_color }}
                 className="font-bold"
@@ -106,13 +111,17 @@ export function Review(props: Props) {
                 b={t.value2}
                 formatter={(x) => `$${humanize(x)}`}
               />
-              <Diff
-                el="td"
-                classes="text-right"
-                a={t.pct}
-                b={t.pct2}
-                formatter={(x) => `${humanize(x)}%`}
-              />
+              {t.pct === null || t.pct2 === null ? (
+                <td className="text-right">{fmt_share(t.pct2)}</td>
+              ) : (
+                <Diff
+                  el="td"
+                  classes="text-right"
+                  a={t.pct}
+                  b={t.pct2}
+                  formatter={(x) => `${humanize(x)}%`}
+                />
+              )}
             </tr>
           ))}
         </tbody>

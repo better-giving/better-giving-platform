@@ -8,7 +8,7 @@ export function BottomCta({ classes = "" }) {
       id="register-nonprofit"
       className={`${classes} grid @4xl:grid-cols-2 gap-4 content-start scroll-mt-10`}
     >
-      <h4 className="col-span-full text-lg text-primary uppercase text-center">
+      <h4 className="col-span-full text-lg text-primary text-center">
         Simple. Sustainable. Free.
       </h4>
       <h2 className="col-span-full text-center text-3xl @4xl:text-4xl leading-snug max-w-2xl justify-self-center mb-12 capitalize">

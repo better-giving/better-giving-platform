@@ -469,7 +469,7 @@ describe("donation form tab — pre-filled", () => {
     await expect.element(screen.getByLabelText(/monthly/i)).toBeChecked();
     await expect.element(screen.getByLabelText(/weekly/i)).not.toBeChecked();
 
-    const panel = screen.getByRole("tabpanel", { name: "Donation Form" });
+    const panel = screen.getByRole("tabpanel", { name: "Donation form" });
     expect(panel.getByText("Donation goal").query()).toBeNull();
     expect(panel.getByRole("radio", { name: /goal/i }).query()).toBeNull();
     expect(panel.getByLabelText(/how much money/i).query()).toBeNull();
@@ -641,7 +641,7 @@ describe("donation form tab — save without a goal", () => {
     await screen.getByLabelText(/weekly/i).click();
 
     const submit = screen
-      .getByRole("tabpanel", { name: "Donation Form" })
+      .getByRole("tabpanel", { name: "Donation form" })
       .getByRole("button", { name: /submit changes/i });
     await submit.click();
     await expect.element(submit).toBeDisabled();

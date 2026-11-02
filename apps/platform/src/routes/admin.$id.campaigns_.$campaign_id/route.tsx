@@ -1,4 +1,4 @@
-import { Breadcrumbs } from "@better-giving/ui";
+import { Breadcrumb } from "@better-giving/ui";
 import { href, type LinksFunction } from "react-router";
 import { richtext_styles } from "#/components/rich-text";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
@@ -31,21 +31,14 @@ export default function Page({ loaderData }: Route.ComponentProps) {
   } = loaderData;
   const id = String(endow.id);
   return (
-    <div className="grid min-w-0 px-6 py-4 md:px-10 md:py-8 gap-6 max-w-4xl">
-      <Breadcrumbs
+    <div className="grid min-w-0 px-4 py-4 md:px-10 md:py-8 gap-6 max-w-4xl">
+      <Breadcrumb
         items={[
           {
-            title: "Campaigns",
+            label: "Campaigns",
             to: href("/admin/:id/campaigns", { id }),
-            end: true,
           },
-          {
-            title: campaign.name,
-            to: href("/admin/:id/campaigns/:campaign_id", {
-              id,
-              campaign_id: campaign.id,
-            }),
-          },
+          { label: campaign.name },
         ]}
       />
       <StatusBadge

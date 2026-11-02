@@ -1,16 +1,18 @@
-import { Actions, Field } from "@better-giving/ui";
+import { Actions, Badge, Field } from "@better-giving/ui";
 import { valibotResolver } from "@hookform/resolvers/valibot";
-import { ChevronRight, CircleAlert, X } from "lucide-react";
-import type { PropsWithChildren } from "react";
+import { ChevronRight, CircleAlert, Info, X } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { Link, useFetcher, useParams, useSearchParams } from "react-router";
+import { Link, useFetcher, useParams, useRouteLoaderData } from "react-router";
 import { nonEmpty, object, pipe, string, trim } from "valibot";
 import { RouteModal } from "#/components/route-modal";
+import type { LoaderData } from "#/routes/platform.applications_.$id/api";
 
 function Content() {
   const { verdict } = useParams();
-  const [params] = useSearchParams();
-  const orgName = params.get("org_name") ?? "";
+  const review = useRouteLoaderData<LoaderData>(
+    "routes/platform.applications_.$id"
+  );
+  const org_name = review?.reg.o_name ?? "";
 
   const fetcher = useFetcher({ key: "application-review" });
 
@@ -42,8 +44,8 @@ function Content() {
       className="contents"
     >
       <div className="relative w-full">
-        <p className="sm:text-xl font-bold text-center border-b bg-gray-3 p-5">
-          Changing Application Status
+        <p className="sm:text-xl font-bold text-center border-b border-hairline p-5">
+          Changing application status
         </p>
         <Link
           aria-label="Close"
@@ -51,15 +53,19 @@ function Content() {
           preventScrollReset
           replace
           to=".."
-          className="border p-2 rounded absolute top-1/2 right-4 transform -translate-y-1/2 disabled:text-gray-11"
+          className="btn btn-icon btn-secondary absolute top-1/2 right-4 -translate-y-1/2 aria-disabled:pointer-events-none"
         >
-          <X className="size-4.5 sm:size-6" />
+          <X className="icon-xl" />
         </Link>
       </div>
-      <CircleAlert className="my-6 text-destructive pictogram-lg" />
+      {verdict === "approved" ? (
+        <Info className="my-6 text-primary pictogram-lg" />
+      ) : (
+        <CircleAlert className="my-6 text-destructive pictogram-lg" />
+      )}
 
       <h3 className="text-center text-2xl mb-2 leading-tight px-3 sm:px-8">
-        <div className="uppercase">{verdict}</div>
+        <div className="first-letter:uppercase">{verdict}</div>
         <div>Nonprofit</div>
       </h3>
 
@@ -67,7 +73,7 @@ function Content() {
         <span className="block">
           You are about to {verdict} the Application for
         </span>
-        <span className="font-semibold block">{orgName}</span>
+        <span className="font-semibold block">{org_name}</span>
       </p>
 
       {verdict === "approved" ? (
@@ -83,12 +89,12 @@ function Content() {
       </div>
 
       <div className="flex items-center gap-2 mb-6">
-        <Status classes="bg-gray-11">Pending</Status>
+        <Badge>Pending</Badge>
         <ChevronRight className="icon-xl" />
         {verdict === "approved" ? (
-          <Status classes="bg-success">Approved</Status>
+          <Badge tone="success">Approved</Badge>
         ) : (
-          <Status classes="bg-destructive">Rejected</Status>
+          <Badge tone="destructive">Rejected</Badge>
         )}
       </div>
 
@@ -129,20 +135,8 @@ function Content() {
 
 export default function Prompt() {
   return (
-    <RouteModal classes="grid content-start justify-items-center bg-panel">
+    <RouteModal classes="grid content-start justify-items-center bg-popover">
       <Content />
     </RouteModal>
-  );
-}
-
-function Status(props: PropsWithChildren<{ classes?: string }>) {
-  return (
-    <div
-      className={`${
-        props.classes ?? ""
-      } text-primary-fg px-2 py-1 text-xs uppercase rounded`}
-    >
-      {props.children}
-    </div>
   );
 }

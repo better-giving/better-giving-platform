@@ -14,7 +14,7 @@ export default function Reference({ id, classes = "" }: Props) {
 
   return (
     <div
-      className={`${classes} w-full py-4 px-6 text-sm text-left md:text-center bg-background md:text-gray-11 md: md:border-t rounded-b`}
+      className={`${classes} w-full py-4 px-6 text-sm text-left md:text-center md:text-gray-11 md:border-t md:border-hairline`}
     >
       <div className="relative">
         <span className="font-semibold mr-2">Your registration number:</span>

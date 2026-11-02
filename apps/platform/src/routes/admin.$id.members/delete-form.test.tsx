@@ -14,9 +14,7 @@ describe("member remove", () => {
     const Stub = createRoutesStub([
       {
         path: "/admin/:id/members",
-        Component: () => (
-          <DeleteForm user="keeper" to_remove="ada" label="ada@example.com" />
-        ),
+        Component: () => <DeleteForm to_remove="ada" label="ada@example.com" />,
         HydrateFallback: () => null,
       },
     ]);

@@ -36,7 +36,7 @@ export default function Page({ loaderData }: Route.ComponentProps) {
     <main>
       <div className="bg-linear-to-b from-background to-band pt-20 pb-20 text-center">
         <div className="page">
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">
+          <p className="text-sm font-semibold text-gray-11">
             About Better Giving
           </p>
           <h1 className="hero-heading mt-4 max-w-4xl mx-auto">
@@ -54,7 +54,7 @@ export default function Page({ loaderData }: Route.ComponentProps) {
         <div className="page">
           <div className="max-w-3xl mx-auto grid justify-items-center gap-5 text-center">
             <span
-              className="text-6xl/none font-bold text-secondary h-9"
+              className="text-6xl/none font-bold text-primary-fg/40 h-9"
               aria-hidden
             >
               “

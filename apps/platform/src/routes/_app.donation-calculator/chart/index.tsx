@@ -28,9 +28,7 @@ export function Chart({ classes = "", ...v }: Props) {
   });
 
   return (
-    <div
-      className={`${classes} p-6 rounded grid content-start bg-panel @container`}
-    >
+    <div className={`${classes} card grid content-start @container`}>
       <h2 className="text-lg sm:text-xl font-bold mb-4 text-primary">
         {yrs}-Year Financial Advantage
       </h2>
@@ -85,7 +83,7 @@ export function Chart({ classes = "", ...v }: Props) {
         </span>
       </div>
 
-      <div className="mt-4 p-4 bg-gray-3 rounded">
+      <div className="mt-4 p-4 bg-panel rounded">
         <h3 className="font-medium text-gray-12 mb-2">
           The Power of Compound Growth
         </h3>

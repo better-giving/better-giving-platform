@@ -127,7 +127,7 @@ export function Form({ init, profile, id, base_url, videos }: IProps) {
       // saves go through each group's button; an untyped nested button or an
       // enter keypress must not fire a native GET submission
       onSubmit={(e) => e.preventDefault()}
-      className="px-6 py-4 md:px-10 md:py-8 w-full max-w-[1112px] grid grid-cols-1 content-start gap-6"
+      className="px-4 py-4 md:px-10 md:py-8 w-full max-w-[1112px] grid grid-cols-1 content-start gap-6"
     >
       {prompt && <Prompt {...prompt} onClose={() => set_prompt(undefined)} />}
       <h1 className="sr-only">Organization</h1>
@@ -257,6 +257,7 @@ export function Form({ init, profile, id, base_url, videos }: IProps) {
               page.resetField("image");
             }}
             spec={bannerSpec}
+            hint="Shown at 4:1 — wider images crop to fit."
             classes={{ container: "mb-4", dropzone: "w-full aspect-4/1" }}
             error={page.errors.image?.message}
           />
@@ -269,7 +270,7 @@ export function Form({ init, profile, id, base_url, videos }: IProps) {
             charLimit={MAX_CHARS}
             classes={{
               field:
-                "rich-text-toolbar border text-sm grid grid-rows-[auto_1fr] rounded bg-surface p-3 min-h-60",
+                "rich-text-toolbar text-sm grid grid-rows-[auto_1fr] p-3 min-h-60",
               counter: "text-gray-11",
               error: "text-right",
             }}
@@ -291,7 +292,7 @@ export function Form({ init, profile, id, base_url, videos }: IProps) {
         </Fieldset>
         {/* below the Save: videos apply right away, so they aren't what it
             saves. a rule on the fieldset itself would run through its legend */}
-        <div className="mt-2 border-t pt-6">
+        <div className="mt-2 border-t border-hairline pt-6">
           <VideosGroup npo_id={id} videos={videos} />
         </div>
       </section>
@@ -335,7 +336,7 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
         open={lock_open}
         size="panel"
         onClose={() => set_lock_open(false)}
-        classes="grid gap-4 bg-panel p-6"
+        classes="grid gap-4 bg-popover p-6"
         initialFocusEl={() => cancel_ref.current}
       >
         <h2 className="text-xl font-bold">Lock your profile link?</h2>
@@ -459,10 +460,7 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
             ref={form.active_in_countries.ref}
             on_reset={() => form.resetField("active_in_countries")}
             options={country_names}
-            classes={{
-              container: "bg-surface",
-              options: "text-sm",
-            }}
+            classes={{ options: "text-sm" }}
           />
           <SaveButton
             group={form}

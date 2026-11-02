@@ -12,9 +12,9 @@ interface Props {
 }
 export function Allocation(props: Props) {
   return (
-    <div className={`grid rounded ${props.classes ?? ""}`}>
+    <div className={`grid gap-4 rounded ${props.classes ?? ""}`}>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="mb-1">Distribution</h2>
+        <h2>Distribution</h2>
 
         <NavLink
           title="Edit allocation settings"
@@ -29,7 +29,7 @@ export function Allocation(props: Props) {
         {props.exporter}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 w-full">
         <Row
           icon={<HandCoins className="icon-md mr-2 text-gray-11" />}
           title={
@@ -38,7 +38,7 @@ export function Allocation(props: Props) {
               <Tooltip
                 tip={
                   <Content className="max-w-xs text-sm">
-                    Donations received through Better Giving that will
+                    Donations received through Better Giving that will be
                     distributed to your bank account.
                     <Arrow />
                   </Content>
@@ -76,8 +76,8 @@ function Row(props: IRow) {
     <div className="card flex items-center">
       {props.icon}
       {props.title}
-      <span className="ml-12 text-gray-11 font-medium text-sm ">
-        {props.pct ?? 50} %
+      <span className="ml-auto text-gray-12 font-medium text-sm">
+        {props.pct == null ? "—" : `${props.pct}%`}
       </span>
     </div>
   );

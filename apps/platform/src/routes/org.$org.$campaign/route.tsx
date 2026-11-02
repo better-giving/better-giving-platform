@@ -89,7 +89,7 @@ export function ErrorBoundary() {
 
 function NotFound() {
   return (
-    <div className="min-h-screen bg-background text-gray-12">
+    <div className="min-h-screen text-gray-12">
       <div className="mx-auto w-full max-w-[80rem]">
         <div className="page flex flex-col" data-group="page">
           <div
@@ -119,14 +119,13 @@ function NotFound() {
 function Footer() {
   return (
     <footer
-      className="mt-10 flex w-full items-center gap-3 border-t py-6 lg:mt-16"
+      className="mt-10 flex w-full items-center py-6 lg:mt-16"
       data-group="footer"
       data-section="footer"
       data-shell=""
       data-block="footer"
     >
       <DappLogo classes="h-8" />
-      <span className="text-sm font-semibold">Better Giving</span>
     </footer>
   );
 }

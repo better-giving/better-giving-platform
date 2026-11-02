@@ -26,7 +26,7 @@ export function VideoModal(props: IVideoModal) {
     <Modal
       open={props.open}
       onClose={() => props.set_open(false)}
-      classes="grid bg-panel"
+      classes="grid bg-popover"
     >
       <form
         className="contents"
@@ -40,16 +40,16 @@ export function VideoModal(props: IVideoModal) {
         }}
       >
         <div className="relative">
-          <h2 className="text-xl font-bold text-center border-b bg-gray-3 p-5">
+          <h2 className="text-xl font-bold text-center border-b border-hairline p-5">
             {props.initUrl ? "Edit" : "Add"} video
           </h2>
           <button
             type="button"
             aria-label="Close"
             onClick={() => props.set_open(false)}
-            className="border p-2 rounded absolute top-1/2 right-4 transform -translate-y-1/2"
+            className="btn btn-icon btn-secondary absolute top-1/2 right-4 -translate-y-1/2"
           >
-            <X className="icon-2xl" />
+            <X className="icon-xl" />
           </button>
         </div>
         <div className="p-4">

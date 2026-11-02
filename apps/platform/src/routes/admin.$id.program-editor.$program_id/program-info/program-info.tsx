@@ -62,7 +62,11 @@ export function ProgramInfo(props: IProgram) {
             resetField("image");
           }}
           spec={img_spec([4, 1])}
-          classes={{ container: "mb-4", dropzone: "w-full aspect-4/1" }}
+          hint="Shown at 4:1 — wider images crop to fit."
+          classes={{
+            container: "mb-4",
+            dropzone: "w-full aspect-4/1 min-h-32",
+          }}
           error={errors.image?.message}
         />
 
@@ -76,7 +80,7 @@ export function ProgramInfo(props: IProgram) {
           charLimit={MAX_CHARS}
           classes={{
             field:
-              "rich-text-toolbar border text-sm grid grid-rows-[auto_1fr] rounded bg-surface p-3 min-h-60",
+              "rich-text-toolbar text-sm grid grid-rows-[auto_1fr] p-3 min-h-60",
             counter: "text-gray-11",
           }}
           error={

@@ -1,11 +1,6 @@
-import { Actions } from "@better-giving/ui";
+import { Actions, Badge } from "@better-giving/ui";
 import { ChevronRight, X } from "lucide-react";
-import {
-  type FormEvent,
-  type PropsWithChildren,
-  useEffect,
-  useRef,
-} from "react";
+import { type FormEvent, useEffect, useRef } from "react";
 import { Link, useFetcher } from "react-router";
 import { useRemixForm } from "remix-hook-form";
 import { RouteModal } from "#/components/route-modal";
@@ -23,7 +18,7 @@ export function Prompt(props: Props) {
   const in_flight =
     useFetcher({ key: fetcher_key(props.verdict) }).state !== "idle";
   return (
-    <RouteModal classes="bg-panel" busy={in_flight}>
+    <RouteModal classes="bg-popover" busy={in_flight}>
       <Content {...props} />
     </RouteModal>
   );
@@ -63,7 +58,7 @@ function Content({ verdict }: Props) {
     >
       <input type="hidden" value={verdict} name="type" />
       <div className="relative w-full">
-        <h2 className="sm:text-xl font-bold text-center border-b bg-gray-3 p-5">
+        <h2 className="sm:text-xl font-bold text-center border-b border-hairline p-5">
           Banking application
         </h2>
         <Link
@@ -71,9 +66,9 @@ function Content({ verdict }: Props) {
           aria-label="Close"
           aria-disabled={busy}
           onClick={hold}
-          className="border p-2 rounded absolute top-1/2 right-4 transform -translate-y-1/2 aria-disabled:text-gray-11"
+          className="btn btn-icon btn-secondary absolute top-1/2 right-4 -translate-y-1/2 aria-disabled:pointer-events-none"
         >
-          <X className="size-4.5 sm:size-6" />
+          <X className="icon-xl" />
         </Link>
       </div>
       <p className="px-6 pb-4 text-center text-gray-11 mt-4 font-semibold">
@@ -88,12 +83,12 @@ function Content({ verdict }: Props) {
       ) : null}
 
       <div className="flex items-center gap-2 mb-6">
-        <Status classes="bg-gray-11">Under review</Status>
+        <Badge>Under review</Badge>
         <ChevronRight className="icon-xl" />
         {verdict === "approved" ? (
-          <Status classes="bg-success">Approved</Status>
+          <Badge tone="success">Approved</Badge>
         ) : (
-          <Status classes="bg-destructive">Rejected</Status>
+          <Badge tone="destructive">Rejected</Badge>
         )}
       </div>
 
@@ -134,17 +129,5 @@ function Content({ verdict }: Props) {
         </button>
       </Actions>
     </fetcher.Form>
-  );
-}
-
-function Status(props: PropsWithChildren<{ classes?: string }>) {
-  return (
-    <div
-      className={`${
-        props.classes ?? ""
-      } text-primary-fg px-2 py-1 text-xs uppercase rounded`}
-    >
-      {props.children}
-    </div>
   );
 }

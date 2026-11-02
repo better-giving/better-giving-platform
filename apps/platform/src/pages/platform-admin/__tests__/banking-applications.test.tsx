@@ -119,6 +119,9 @@ beforeEach(async () => {
   await test_db.current!.db.delete(banking_apps);
   await test_db.current!.db.delete(npos);
   counter = 0;
+  // wise answers by default; the outage cases override it once. the approve
+  // action re-checks the account before writing, so it needs one too.
+  vi.mocked(wise.v2_account).mockResolvedValue(WISE_FIXTURE as never);
 });
 
 // --- helpers ---
@@ -283,7 +286,7 @@ describe("application detail", () => {
     );
 
     await expect
-      .element(screen.getByText("Banking Application Review"))
+      .element(screen.getByText("Banking application review"))
       .toBeVisible();
 
     await expect.element(screen.getByText("USD")).toBeInTheDocument();
@@ -393,7 +396,7 @@ describe("approve flow", () => {
     const screen = await render_with_approve(bapp_id, row);
 
     await expect
-      .element(screen.getByText("Banking Application Review"))
+      .element(screen.getByText("Banking application review"))
       .toBeVisible();
     await screen.getByRole("link", { name: /approve/i }).click();
     await expect
@@ -424,7 +427,7 @@ describe("approve flow", () => {
     const screen = await render_with_approve(bapp_id, row);
 
     await expect
-      .element(screen.getByText("Banking Application Review"))
+      .element(screen.getByText("Banking application review"))
       .toBeVisible();
     await screen.getByRole("link", { name: /approve/i }).click();
     await expect
@@ -500,7 +503,7 @@ describe("reject flow", () => {
     const screen = await render_with_reject(bapp_id, row);
 
     await expect
-      .element(screen.getByText("Banking Application Review"))
+      .element(screen.getByText("Banking application review"))
       .toBeVisible();
     await screen.getByRole("link", { name: /reject/i }).click();
     await expect
@@ -537,7 +540,7 @@ describe("reject flow", () => {
     const screen = await render_with_reject(bapp_id, row);
 
     await expect
-      .element(screen.getByText("Banking Application Review"))
+      .element(screen.getByText("Banking application review"))
       .toBeVisible();
     await screen.getByRole("link", { name: /reject/i }).click();
     await expect
@@ -623,6 +626,14 @@ describe("list loader", () => {
 
     const approved = await list("?status=approved");
     expect(approved.items.map((x: any) => x.id)).toContain(bapp_id);
+  });
+
+  it("names each row's org", async () => {
+    const npo = await seed_npo({ name: "Harbor Lights Shelter" });
+    await seed_bapp(npo.id);
+
+    const page = await list("?status=under-review");
+    expect(page.items[0].npo_name).toBe("Harbor Lights Shelter");
   });
 
   it("keeps default out of under-review and rejected", async () => {

@@ -25,7 +25,7 @@ export function DeleteBtn({
       </button>
       <dialog
         ref={dialog_ref}
-        className={`p-6 backdrop:bg-overlay ${modal_box.panel}`}
+        className={`p-6 bg-popover text-gray-12 backdrop:bg-overlay ${modal_box.panel}`}
       >
         <h2 className="text-lg font-semibold mb-2">Delete campaign</h2>
         <p className="mb-4 whitespace-normal">

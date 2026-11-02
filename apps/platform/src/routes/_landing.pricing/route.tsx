@@ -1,5 +1,7 @@
-import { href } from "react-router";
+import { ExtLink } from "@better-giving/ui";
+import { href, Link } from "react-router";
 import { app_name, base_url } from "#/constants/env";
+import { BOOK_A_DEMO } from "#/constants/urls";
 import { metas } from "#/helpers/seo";
 import { CtaBand } from "#/pages/@sections/cta-band";
 import type { Route } from "./+types/route";
@@ -22,27 +24,32 @@ export const handle = { markdown: true };
 export default function Page() {
   return (
     <main>
-      <div className="bg-linear-to-b from-background to-band pt-20 pb-16 text-center">
+      <div className="bg-linear-to-b from-background to-band pt-20 pb-16 text-center max-sm:text-left">
         <div className="page">
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">
-            Pricing
-          </p>
-          <h1 className="hero-heading mt-4 max-w-3xl mx-auto">
+          <h1 className="hero-heading max-w-3xl sm:mx-auto">
             Free. Forever. <span className="text-primary">Really.</span>
           </h1>
-          <p className="mt-5 text-lg text-gray-11 max-w-2xl mx-auto text-pretty">
+          <p className="mt-5 text-lg text-gray-11 max-w-2xl sm:mx-auto text-pretty">
             Not free-then-paid. Not free-with-gated-features. We're a nonprofit
             like you. There is no platform fee while donors can add an optional
             contribution. Turning that ask off is a 1.5% fee. Fiscal sponsorship
             is 2.9% of each sponsored gift.
           </p>
+          <div className="mt-7 flex max-sm:flex-col sm:justify-center gap-3.5">
+            <Link to={href("/register")} className="btn btn-lg btn-primary">
+              Join free forever
+            </Link>
+            <ExtLink href={BOOK_A_DEMO} className="btn btn-lg btn-secondary">
+              Book a demo
+            </ExtLink>
+          </div>
         </div>
       </div>
 
       <PriceCards classes="bg-band pt-4 pb-24" />
 
       <div className="page py-24">
-        <div className="max-w-3xl mx-auto grid gap-5 justify-items-center text-center">
+        <div className="max-w-3xl mx-auto grid gap-5 justify-items-start">
           <h2 className="section-heading">How much does Better Giving cost?</h2>
           <p className="text-gray-11 leading-relaxed max-w-2xl text-pretty">
             There is no platform fee while the optional donor contribution stays
@@ -55,7 +62,7 @@ export default function Page() {
             processing fees? Most donors choose to cover them, so the vast
             majority of every gift reaches you.
           </p>
-          <div className="bg-secondary border border-gray-6 rounded px-7 py-5 max-w-xl">
+          <div className="card max-w-xl">
             <p className="text-sm/relaxed text-gray-11 text-pretty">
               <strong className="text-gray-12">
                 Prefer no contribution ask on your form?

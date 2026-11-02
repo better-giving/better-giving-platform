@@ -25,8 +25,8 @@ function Page({ loaderData: page1 }: Route.ComponentProps) {
   });
 
   return (
-    <div className="grid content-start gap-y-4 gap-x-3 px-6 py-4 md:px-10 md:py-8 w-full">
-      <h3 className="font-bold text-2xl">Campaigns</h3>
+    <div className="grid content-start gap-y-4 gap-x-3 px-4 py-4 md:px-10 md:py-8 w-full">
+      <h1 className="sr-only">Campaigns</h1>
       <div className="grid col-span-full table-scroll">{node}</div>
     </div>
   );

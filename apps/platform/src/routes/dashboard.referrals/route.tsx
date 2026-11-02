@@ -6,7 +6,7 @@ import { Earnings } from "./earnings";
 
 export const meta: Route.MetaFunction = () => {
   return metas({
-    title: "My Referrals",
+    title: "My referrals",
     description: "Track your referrals and earnings on Better Giving.",
   });
 };
@@ -27,10 +27,11 @@ function Page({ loaderData }: Route.ComponentProps) {
     w_form,
   } = loaderData;
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8">
+    <div className="px-4 py-4 md:px-10 md:py-8">
+      <h1 className="sr-only">My referrals</h1>
       <Explainer classes="mb-4" />
       <Hub classes="mb-8" />
-      <h3 className="mt-8 mb-4 text-2xl">My Referral ID and Link</h3>
+      <h3 className="mt-8 mb-4 text-2xl">My referral ID and link</h3>
       <ReferralId
         classes="mb-8"
         referral_id={referral_code}

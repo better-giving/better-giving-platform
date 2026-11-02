@@ -1,8 +1,12 @@
 import { createRoutesStub } from "react-router";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { reset_viewport } from "#/__tests__/fixtures/viewport";
 import type { IReg } from "@/reg";
 import { ProgressIndicator } from "./progress-indicator";
+
+afterEach(reset_viewport);
 
 async function render_at(
   url_step: number,
@@ -110,5 +114,30 @@ describe("ProgressIndicator", () => {
       false,
       false,
     ]);
+  });
+
+  // collapsed below md the current row shows alone, so a connector above it
+  // would hang off nothing
+  it("draws no connector above the lone row when collapsed on a phone", async () => {
+    await page.viewport(390, 844);
+    const Stub = createRoutesStub([
+      {
+        path: "/register/:reg_id/:step",
+        HydrateFallback: () => null,
+        Component: () => <ProgressIndicator step={2} o_type="501c3" />,
+      },
+    ]);
+    const screen = await render(<Stub initialEntries={["/register/abc/2"]} />);
+    const connector = () =>
+      screen.container.querySelector<HTMLElement>(
+        "[data-curr] > div:first-child"
+      );
+    await expect.poll(() => connector()).not.toBeNull();
+    expect(getComputedStyle(connector()!).display).toBe("none");
+
+    await userEvent.click(screen.getByRole("button", { name: "Expand steps" }));
+    await expect
+      .poll(() => getComputedStyle(connector()!).display)
+      .not.toBe("none");
   });
 });

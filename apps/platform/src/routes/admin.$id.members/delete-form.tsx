@@ -1,9 +1,7 @@
-import { show_toast } from "@better-giving/ui";
 import { LoaderCircle, Minus } from "lucide-react";
 import { useFetcher } from "react-router";
 
 interface Props {
-  user: string;
   // user id for existing member, null for pending non-user invite
   to_remove: string | null;
   // for pending rows, the invitee email used to delete the invite row
@@ -11,7 +9,7 @@ interface Props {
   label: string;
 }
 
-export function DeleteForm({ user, to_remove, pending_email, label }: Props) {
+export function DeleteForm({ to_remove, pending_email, label }: Props) {
   const key = to_remove ?? pending_email ?? label;
   const fetcher = useFetcher({ key: `admin-${key}` });
 
@@ -20,9 +18,6 @@ export function DeleteForm({ user, to_remove, pending_email, label }: Props) {
       <button
         disabled={fetcher.state !== "idle"}
         onClick={() => {
-          if (to_remove && to_remove === user) {
-            return show_toast({ type: "error", message: "Can't delete self" });
-          }
           if (!window.confirm(`Are you sure you want to remove ${label}?`))
             return;
           const body: Record<string, string> = pending_email
@@ -36,7 +31,7 @@ export function DeleteForm({ user, to_remove, pending_email, label }: Props) {
         }}
         type="button"
         aria-label={`Remove ${label}`}
-        className=" disabled:text-gray-11 hover:text-destructive active:text-destructive absolute-center"
+        className="disabled:text-gray-11 hover:text-destructive-subtle-fg active:text-destructive-subtle-fg absolute-center"
       >
         {fetcher.state !== "idle" ? (
           <LoaderCircle className="animate-spin icon-md" />

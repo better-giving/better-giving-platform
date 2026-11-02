@@ -118,6 +118,31 @@ describe("campaign page", () => {
     expect(screen.getByRole("contentinfo").elements()).toHaveLength(1);
   });
 
+  test("the nonprofit's name and logo sit in the owner's header alone, not again above the title", async () => {
+    const screen = await mount(
+      page({ logo: "https://example.com/harbor-logo.png" })
+    );
+    const banner = screen.getByRole("banner").element();
+    await expect
+      .element(
+        screen
+          .getByRole("banner")
+          .getByRole("link", { name: "Harbor Clinic", exact: true })
+      )
+      .toBeVisible();
+
+    const links = screen
+      .getByRole("link", { name: "Harbor Clinic" })
+      .elements();
+    expect(links).toHaveLength(1);
+    expect(banner.contains(links[0])).toBe(true);
+
+    const main = screen.getByRole("main").element();
+    expect(main.querySelector('a[href="/org/harbor"]')).toBeNull();
+    expect(main.querySelector('img[src*="harbor-logo"]')).toBeNull();
+    expect(banner.querySelectorAll('img[src*="harbor-logo"]')).toHaveLength(1);
+  });
+
   test.each([375, 768, 1024, 1280, 1536, 1920])(
     "at %ipx the header and the content share both edges, centered",
     async (width) => {

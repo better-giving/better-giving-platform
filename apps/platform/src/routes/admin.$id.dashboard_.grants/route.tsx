@@ -1,5 +1,5 @@
-import { ChevronLeft } from "lucide-react";
-import { Link, useSearchParams } from "react-router";
+import { Breadcrumb } from "@better-giving/ui";
+import { href, useSearchParams } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { admin_ctx } from "#/.server/auth";
 import { use_table } from "#/hooks/use-table";
@@ -49,7 +49,7 @@ export const meta: Route.MetaFunction = ({ matches }) =>
   admin_page_meta("Grants", matches);
 
 export default CacheRoute(Page);
-function Page({ loaderData }: Route.ComponentProps) {
+function Page({ loaderData, params }: Route.ComponentProps) {
   const [search] = useSearchParams();
   const { node } = use_table({
     page1: loaderData,
@@ -62,11 +62,17 @@ function Page({ loaderData }: Route.ComponentProps) {
   });
 
   return (
-    <div className="grid content-start px-6 py-4 md:px-10 md:py-8">
-      <Link to=".." className="flex items-center gap-1 link text-sm -ml-1 mb-3">
-        <ChevronLeft className="icon-lg" />
-        <span>Back</span>
-      </Link>
+    <div className="grid content-start px-4 py-4 md:px-10 md:py-8">
+      <Breadcrumb
+        classes="mb-3"
+        items={[
+          {
+            label: "Dashboard",
+            to: href("/admin/:id/dashboard", { id: params.id }),
+          },
+          { label: "Payout history" },
+        ]}
+      />
       {node}
       <OwedHistory
         rows={loaderData.owed ?? []}

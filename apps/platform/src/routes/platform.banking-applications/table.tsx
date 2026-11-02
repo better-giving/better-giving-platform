@@ -6,7 +6,12 @@ import type { IPaginator } from "#/types/components";
 import type { IBapp, TStatus } from "@/banking";
 import { toPP } from "@/helpers/date";
 
-interface Props extends IPaginator<IBapp> {
+export interface IBappRow extends IBapp {
+  /** absent when the npo row is gone */
+  npo_name?: string;
+}
+
+interface Props extends IPaginator<IBappRow> {
   empty_msg?: string;
 }
 
@@ -27,7 +32,7 @@ export function Table({
     <div className={`${classes} table-scroll`}>
       <table className="table">
         <thead>
-          <tr>
+          <tr className="whitespace-nowrap">
             <th>
               <HeaderButton
                 onClick={handleHeaderClick("updated_at")}
@@ -61,8 +66,14 @@ export function Table({
           ) : (
             sorted.map((row) => (
               <tr key={row.id} className="text-sm">
-                <td>{toPP(row.updated_at)}</td>
-                <td>{row.npo_id}</td>
+                <td className="whitespace-nowrap">{toPP(row.updated_at)}</td>
+                <td>
+                  {row.npo_name ?? (
+                    <span className="font-mono whitespace-nowrap">
+                      {row.npo_id}
+                    </span>
+                  )}
+                </td>
                 <td>{row.bank_summary}</td>
                 <td>
                   <Status status={row.status} />
@@ -115,7 +126,7 @@ const text_color: Record<TStatus, string> = {
 
 const text: Record<TStatus, string> = {
   approved: "Approved",
-  "under-review": "Under Review",
+  "under-review": "Under review",
   rejected: "Rejected",
   default: "Approved",
 };

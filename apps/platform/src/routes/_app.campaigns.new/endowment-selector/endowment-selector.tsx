@@ -127,7 +127,7 @@ export function EndowmentSelector(props: Props) {
           {props.values.map((v) => (
             <div
               key={v.id}
-              className="flex items-center px-3 gap-2 h-10 border rounded font-semibold text-gray-11"
+              className="flex items-center px-3 gap-2 h-10 bg-gray-3 rounded font-semibold text-gray-11"
             >
               <Image src={v.logo} className="w-8" />
               <span className="max-w-50 truncate">{v.name}</span>
@@ -154,7 +154,7 @@ export function EndowmentSelector(props: Props) {
         <Portal>
           <Combobox.Positioner>
             <Combobox.Content
-              className={`${popup_anim} z-floating w-(--reference-width) bg-panel text-gray-12 text-sm border max-h-40 scrollbars overflow-y-auto rounded shadow-floating`}
+              className={`${popup_anim} z-floating w-(--reference-width) bg-popover text-gray-12 text-sm max-h-40 scrollbars overflow-y-auto rounded-card shadow-floating`}
             >
               {get_status() ? (
                 <p className="p-2 text-sm text-gray-11">{get_status()}</p>
@@ -163,7 +163,7 @@ export function EndowmentSelector(props: Props) {
                   <Combobox.Item
                     key={item.id}
                     item={item}
-                    className="flex gap-x-2 p-2 items-center data-[state=checked]:text-primary data-highlighted:bg-secondary hover:bg-secondary select-none cursor-default"
+                    className="flex gap-x-2 p-2 items-center data-[state=checked]:text-primary data-highlighted:bg-secondary-hover hover:bg-secondary-hover select-none cursor-default"
                   >
                     <Combobox.ItemIndicator className="w-5">
                       <Check className="icon-md" />

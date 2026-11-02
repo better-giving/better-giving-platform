@@ -55,28 +55,26 @@ export function GiftsTable({ dists, subs }: IProps) {
               <Tooltip
                 tip={
                   <Content className="max-w-sm text-sm">
-                    <p className="text-xs uppercase font-semibold">
+                    <p className="text-xs font-semibold">
                       Base fee{" "}
                       <span className="text-primary text-xs font-bold">
                         1.5%
                       </span>
                     </p>
                     <p className="mb-4">
-                      charged when {app_name} tip screen is disabled at the time
+                      Charged when {app_name} tip screen is disabled at the time
                       of donation
                     </p>
-                    <p className="text-xs uppercase font-semibold">
+                    <p className="text-xs font-semibold">
                       Fiscal sponsorship fee{" "}
                       <span className="text-primary text-xs font-bold">
                         2.9%
                       </span>
                     </p>
-                    <p className="text-xs uppercase font-semibold mt-4">
-                      Processing fee
-                    </p>
-                    <p>charged by payment processor (Stripe, Chariot, etc.)</p>
+                    <p className="text-xs font-semibold mt-4">Processing fee</p>
+                    <p>Charged by payment processor (Stripe, Chariot, etc.)</p>
                     <p>
-                      covered by donor
+                      Covered by donor
                       <SparklesIcon className="fill-success stroke-success ml-1 inline icon-xs" />
                     </p>
                     <Arrow />
@@ -98,6 +96,12 @@ export function GiftsTable({ dists, subs }: IProps) {
           const m = d.subscription_id ? meta[d.subscription_id] : undefined;
           const total_fees =
             (d.fee_base ?? 0) + (d.fee_fsa ?? 0) + (d.fee_processing ?? 0);
+          // the donor's own list marks a refunded gift the same way
+          const refunded =
+            d.status === "refunded" || d.status === "refunded_loss";
+          const strike = refunded
+            ? "line-through text-destructive-subtle-fg"
+            : "";
           return (
             <tr key={d.id}>
               <td className="w-px whitespace-nowrap pr-0">
@@ -124,6 +128,7 @@ export function GiftsTable({ dists, subs }: IProps) {
               <td>
                 {d.amount != null && d.amount_usd != null ? (
                   <Money
+                    classes={strike}
                     amount={+d.amount}
                     currency={d.amount_denom}
                     amount_usd={+d.amount_usd}
@@ -163,7 +168,7 @@ export function GiftsTable({ dists, subs }: IProps) {
                     ]}
                   />
                 ) : d.amount_usd != null ? (
-                  `$${humanize(d.amount_usd, 2)}`
+                  <span className={strike}>${humanize(d.amount_usd, 2)}</span>
                 ) : (
                   "—"
                 )}
@@ -182,12 +187,20 @@ export function GiftsTable({ dists, subs }: IProps) {
                     </Content>
                   }
                 >
-                  <span className="cursor-help underline decoration-dotted">
+                  <span
+                    className={`cursor-help ${strike || "underline decoration-dotted"}`}
+                  >
                     ${humanize(total_fees, 2)}
                   </span>
                 </Tooltip>
               </td>
-              <td>{d.net != null ? `$${humanize(d.net, 2)}` : "—"}</td>
+              <td>
+                {d.net != null ? (
+                  <span className={strike}>${humanize(d.net, 2)}</span>
+                ) : (
+                  "—"
+                )}
+              </td>
             </tr>
           );
         })}

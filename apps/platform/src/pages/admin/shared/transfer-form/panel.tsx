@@ -62,9 +62,11 @@ export function Panel(props: Props) {
           </p>
         </div>
       ) : (
-        <div className="grid items-center grid-cols-[1fr_auto_1fr] gap-x-4 border-y py-4">
-          <p className=" justify-self-end">
-            <span className="text-gray-11 text-xs mr-1">from</span>
+        <div className="grid items-center grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-x-4 border-y border-hairline py-4">
+          {/* flex-wrap: the spans hold no whitespace between them, so as
+              inline text the side is one unbreakable word at 390 */}
+          <p className="justify-self-end flex flex-wrap items-baseline justify-end gap-x-1">
+            <span className="text-gray-11 text-xs">from</span>
             {source.value === "liq" ? (
               <span className="text-warning-subtle-fg font-semibold">
                 Savings
@@ -74,7 +76,7 @@ export function Panel(props: Props) {
                 Investments
               </span>
             )}
-            <span className="text-sm font-semibold text-gray-11 ml-2">
+            <span className="text-sm font-semibold text-gray-11 ml-1">
               ${humanize(props.bals[source.value])}
             </span>
           </p>
@@ -89,7 +91,7 @@ export function Panel(props: Props) {
             onClick={() =>
               source.onChange(source.value === "liq" ? "lock" : "liq")
             }
-            className="relative p-6 border-t hover:outline hover:outline-primary outline-primary rounded-full group"
+            className="relative p-6 border border-gray-7 hover:border-gray-8 hover:bg-gray-4 active:bg-gray-5 transition-colors rounded-full group focus-visible:outline-2 focus-visible:outline-ring"
           >
             <div className="absolute-center">
               <MoveLeft
@@ -102,8 +104,8 @@ export function Panel(props: Props) {
               />
             </div>
           </button>
-          <p className=" justify-self-start">
-            <span className="text-gray-11 text-xs mr-1">to</span>
+          <p className="justify-self-start flex flex-wrap items-baseline gap-x-1">
+            <span className="text-gray-11 text-xs">to</span>
             {source.value === "liq" ? (
               <span className="text-success-subtle-fg font-semibold">
                 Investments

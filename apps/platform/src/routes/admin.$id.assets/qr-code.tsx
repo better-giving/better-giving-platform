@@ -1,10 +1,23 @@
 import { QrCode as Ark } from "@ark-ui/react/qr-code";
 import { Group, TabPanel, Tabs } from "@better-giving/ui";
 import { ArrowDownToLineIcon } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import org_building from "#/assets/icons/org-building.svg";
 
 type QRCodeType = "profile" | "donation" | "campaign";
+
+/** a break opportunity after each `/`, so a long address wraps between its parts */
+const url_wrapped = (url: string) =>
+  url.split("/").map((part, i, parts) => (
+    <Fragment key={i}>
+      {part}
+      {i < parts.length - 1 && (
+        <>
+          /<wbr />
+        </>
+      )}
+    </Fragment>
+  ));
 
 interface Props {
   classes?: string;
@@ -36,6 +49,17 @@ export function QrCode({
   const [color, set_color] = useState("#000000");
   const [show_logo, set_show_logo] = useState(true);
   const [selected_tab, set_selected_tab] = useState<QRCodeType>(tabs[0].id);
+  // the logo that failed, not a flag: a new logo gets its own attempt
+  const [failed_logo, set_failed_logo] = useState<string>();
+  const logo_src = logo && logo !== failed_logo ? logo : org_building;
+  const logo_ref = useRef<HTMLImageElement>(null);
+
+  // a logo that fails before hydration fires its error event before react
+  // attaches onError; a loaded image with no intrinsic width is that failure
+  useEffect(() => {
+    const img = logo_ref.current;
+    if (logo && img?.complete && img.naturalWidth === 0) set_failed_logo(logo);
+  }, [logo]);
 
   const urls: Record<QRCodeType, string> = {
     profile: profile_url,
@@ -90,7 +114,7 @@ export function QrCode({
             download_link.href = png_file;
             download_link.click();
           };
-          logo_img.src = logo || org_building;
+          logo_img.src = logo_src;
         } else {
           const png_file = canvas.toDataURL("image/png");
           const download_link = document.createElement("a");
@@ -119,7 +143,14 @@ export function QrCode({
         </Ark.Frame>
         {show_logo && (
           <Ark.Overlay className="bg-white p-1">
-            <img src={logo || org_building} alt="" width={48} height={48} />
+            <img
+              ref={logo_ref}
+              src={logo_src}
+              alt=""
+              width={48}
+              height={48}
+              onError={() => set_failed_logo(logo)}
+            />
           </Ark.Overlay>
         )}
       </Ark.Root>
@@ -130,12 +161,14 @@ export function QrCode({
             href={urls[tab.id]}
             target="_blank"
             rel="noopener noreferrer"
-            className="link font-mono text-xs break-all"
+            className="link font-mono text-xs break-words"
           >
-            {urls[tab.id]}
+            {url_wrapped(urls[tab.id])}
           </a>
         ) : (
-          <span className="font-mono text-xs break-all">{urls[tab.id]}</span>
+          <span className="font-mono text-xs break-words">
+            {url_wrapped(urls[tab.id])}
+          </span>
         )}
       </p>
     </>
@@ -152,7 +185,7 @@ export function QrCode({
           type="color"
           value={color}
           onChange={(e) => set_color(e.target.value)}
-          className="h-(--field-size) w-(--field-size) cursor-pointer rounded border bg-panel p-1"
+          className="h-(--field-size) w-(--field-size) cursor-pointer rounded border border-input hover:border-input-hover bg-surface p-1"
         />
 
         <div className="flex items-center gap-x-1">
@@ -212,7 +245,7 @@ export function QrCode({
 
   return (
     <div className={classes}>
-      <h2 className="text-2xl font-bold mb-2">QR Code</h2>
+      <h2 className="text-2xl font-bold mb-2">QR code</h2>
       {body}
     </div>
   );

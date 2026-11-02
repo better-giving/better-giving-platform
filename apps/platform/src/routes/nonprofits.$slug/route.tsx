@@ -78,7 +78,7 @@ export default function Page({ loaderData: ctx }: Route.ComponentProps) {
           const observer = new IntersectionObserver(
             ([e]) => {
               const isIntersecting = e.intersectionRatio < 1;
-              e.target.classList.toggle("bg-panel", isIntersecting);
+              e.target.classList.toggle("bg-background", isIntersecting);
               e.target.classList.toggle("shadow-floating", isIntersecting);
             },
             { threshold: [1] }
@@ -97,7 +97,7 @@ export default function Page({ loaderData: ctx }: Route.ComponentProps) {
       <Features classes="page my-10 xl:my-20" />
       <Underdog classes="page my-10 xl:my-20" />
       <Testimonials classes="page my-10 xl:my-20" />
-      <div className="bg-gray-3 pb-24">
+      <div className="bg-band pb-24">
         <Faq classes="page mt-24" />
       </div>
       <div className="page my-10 xl:my-20">

@@ -28,7 +28,7 @@ export default function DeletePrompt({ loaderData }: Route.ComponentProps) {
     <RouteModal
       title="Delete payout method"
       busy={fetcher.state !== "idle"}
-      classes="grid content-start justify-items-center bg-panel"
+      classes="grid content-start justify-items-center bg-popover"
     >
       <Content {...loaderData} />
     </RouteModal>
@@ -53,7 +53,7 @@ function Content({ is_default, is_guarded }: IContent) {
   return (
     <>
       <div className="relative w-full">
-        <p className="sm:text-xl font-bold text-center border-b bg-gray-3 p-5">
+        <p className="sm:text-xl font-bold text-center border-b border-hairline p-5">
           Delete payout method
         </p>
         <NavLink
@@ -61,9 +61,9 @@ function Content({ is_default, is_guarded }: IContent) {
           aria-label="Close"
           aria-disabled={is_submitting}
           onClick={hold}
-          className="[.pending]:text-gray-11 border p-2 rounded absolute top-1/2 right-4 transform -translate-y-1/2 aria-disabled:text-gray-11"
+          className="btn btn-icon btn-secondary [.pending]:text-gray-11 absolute top-1/2 right-4 -translate-y-1/2 aria-disabled:text-gray-11"
         >
-          <X className="size-4.5 sm:size-6" />
+          <X className="icon-xl" />
         </NavLink>
       </div>
       <CircleAlert className="mt-6 text-destructive pictogram-lg" />
@@ -75,7 +75,11 @@ function Content({ is_default, is_guarded }: IContent) {
           <Button variant="secondary" nav to=".." disabled={is_submitting}>
             Cancel
           </Button>
-          <Button variant="primary" type="submit" is_loading={is_submitting}>
+          <Button
+            variant="destructive"
+            type="submit"
+            is_loading={is_submitting}
+          >
             Proceed
           </Button>
         </fetcher.Form>

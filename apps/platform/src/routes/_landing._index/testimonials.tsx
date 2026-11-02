@@ -60,7 +60,7 @@ export function Testimonials({ classes = "" }: ITestimonials) {
               src={laira_sitting}
               width={92}
               alt="Laira sitting"
-              className="absolute -top-23 right-6 max-md:hidden"
+              className="absolute bottom-full right-6 translate-y-2 max-md:hidden"
             />
           </div>
         </div>

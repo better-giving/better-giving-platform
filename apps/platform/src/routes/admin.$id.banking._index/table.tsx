@@ -1,3 +1,4 @@
+import { Badge, type BadgeTone } from "@better-giving/ui";
 import { FolderIcon } from "lucide-react";
 import { NavLink } from "react-router";
 import type { IBapp, TStatus } from "@/banking";
@@ -13,7 +14,7 @@ export function Table({ methods, classes = "" }: Props) {
     <table className={`${classes} table`}>
       <thead>
         <tr>
-          <th>Date Submitted</th>
+          <th>Date submitted</th>
           <th>Account</th>
           <th className="text-center">Status</th>
           <th className="text-center">Details</th>
@@ -45,11 +46,11 @@ export function Table({ methods, classes = "" }: Props) {
   );
 }
 
-const style: { [key in TStatus]: string } = {
-  default: "bg-primary text-primary-fg",
-  approved: "bg-success text-success-fg",
-  "under-review": "bg-gray-11 text-primary-fg",
-  rejected: "bg-destructive text-destructive-fg",
+const tone: { [key in TStatus]: BadgeTone } = {
+  default: "primary",
+  approved: "success",
+  "under-review": "neutral",
+  rejected: "destructive",
 };
 
 const text: { [key in TStatus]: string } = {
@@ -60,11 +61,5 @@ const text: { [key in TStatus]: string } = {
 };
 
 function Status({ status }: { status: TStatus }) {
-  return (
-    <p
-      className={`${style[status]} rounded px-3 py-1 inline-block uppercase text-xs`}
-    >
-      {text[status]}
-    </p>
-  );
+  return <Badge tone={tone[status]}>{text[status]}</Badge>;
 }

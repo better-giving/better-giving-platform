@@ -7,7 +7,6 @@ export const headers: Route.HeadersFunction = () => ({
   "cache-control": "public, s-maxage=60, stale-while-revalidate=300",
 });
 
-const imgSrc = "https://placehold.co/400x200";
 export default function Component() {
   return (
     <div className="page">
@@ -95,44 +94,19 @@ const steps = [
   },
   {
     title: "Create new Zap",
-    content: (
-      <>
-        <p>From your Zapier dashboard, click on the Create Zap button:</p>
-        <img
-          src={imgSrc}
-          alt="Create Zap button"
-          width={400}
-          height={200}
-          className="mt-2 rounded w-full h-auto"
-        />
-      </>
-    ),
+    content: <p>From your Zapier dashboard, click on the Create Zap button.</p>,
   },
   {
     title: "Select the Trigger",
     content: (
       <>
         <p>Search for the Better Giving app and click on it.</p>
-        <img
-          src={imgSrc}
-          alt="Select Trigger"
-          width={400}
-          height={200}
-          className="mt-2 rounded w-full h-auto"
-        />
         <p>We support the following trigger:</p>
         <ul className="list-disc list-inside ml-4">
           <li>New donation is made</li>
         </ul>
         <p>Select the trigger and press continue.</p>
-        <p>To connect to Better Giving, click Sign in with API Key:</p>
-        <img
-          src={imgSrc}
-          alt="Sign in with API Key"
-          width={400}
-          height={200}
-          className="mt-2 rounded w-full h-auto"
-        />
+        <p>To connect to Better Giving, click Sign in with API Key.</p>
         <p>
           Enter the API key you obtained from your Better Giving NPO dashboard
           and click Yes, Continue.
@@ -141,13 +115,6 @@ const steps = [
           Continue
         </button>
         <p>Click Test trigger button.</p>
-        <img
-          src={imgSrc}
-          alt="Test trigger button"
-          width={400}
-          height={200}
-          className="mt-2 rounded w-full h-auto"
-        />
         <p>When the trigger is tested successfully, press Continue.</p>
       </>
     ),

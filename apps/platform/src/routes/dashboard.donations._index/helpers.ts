@@ -41,7 +41,7 @@ export const to_row = (x: IUserDonation): IRow => ({
 /** human-readable status labels */
 const status_labels: Record<TStatus, string> = {
   created: "Created",
-  intent: "Awaiting Payment",
+  intent: "Awaiting payment",
   expired: "Expired",
   confirmed: "Confirmed",
   settled: "Settled",

@@ -4,9 +4,9 @@ import { href, NavLink } from "react-router";
 export function Items({ classes = "" }) {
   return (
     <div className={`${classes} grid md:grid-cols-3 gap-8`}>
-      <article className="grid p-4 pb-8 rounded bg-panel justify-items-center">
+      <article className="card grid justify-items-center">
         <LayoutPanelLeftIcon aria-hidden="true" />
-        <h3 className="mt-2 capitalize text-center font-bold text-lg md:text-xl">
+        <h3 className="mt-2 text-center font-bold text-lg md:text-xl">
           All-in one donation form
         </h3>
         <p className="text-center mt-4">
@@ -17,9 +17,9 @@ export function Items({ classes = "" }) {
           Learn more about donation forms
         </NavLink>
       </article>
-      <article className="grid p-4 pb-8 rounded bg-panel justify-items-center">
+      <article className="card grid justify-items-center">
         <SproutIcon className="stroke-success icon-2xl" aria-hidden="true" />
-        <h3 className="mt-2 capitalize text-center font-bold text-lg md:text-xl">
+        <h3 className="mt-2 text-center font-bold text-lg md:text-xl">
           Sustainability fund management
         </h3>
         <p className="text-center mt-4">
@@ -30,9 +30,9 @@ export function Items({ classes = "" }) {
           Learn more about fund management
         </NavLink>
       </article>
-      <article className="grid p-4 pb-8 rounded bg-panel justify-items-center">
+      <article className="card grid justify-items-center">
         <GlobeIcon className="stroke-primary" aria-hidden="true" />
-        <h3 className="mt-2 capitalize text-center font-bold text-lg md:text-xl">
+        <h3 className="mt-2 text-center font-bold text-lg md:text-xl">
           Fiscal sponsorship
         </h3>
         <p className="text-center mt-4">

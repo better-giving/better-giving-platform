@@ -1,4 +1,5 @@
 import { EmptyState } from "@better-giving/ui";
+import { to_usd } from "@better-giving/ui/helpers";
 import {
   Arrow as HoverArrow,
   Content as HoverContent,
@@ -13,7 +14,6 @@ import { NavLink } from "react-router";
 import { Cell, Pie, PieChart } from "recharts";
 import { category_colors } from "#/pages/admin/ticker-category-colors";
 import { use_admin_data } from "#/pages/admin/use-admin-data";
-import { humanize } from "@/helpers/decimal";
 import type { TickerCategory } from "@/nav/interfaces";
 import { group_by_category } from "@/nav/interfaces";
 import { min_payout_amount } from "@/npo/schema";
@@ -44,7 +44,7 @@ export function Loaded({ classes = "", ...props }: Props) {
               <Arrow />
             </Content>
           }
-          amount={`$${humanize(props.bal_liq, 2)}`}
+          amount={to_usd(props.bal_liq, 2)}
         />
         <Figure
           title="Investments"
@@ -112,7 +112,7 @@ export function Loaded({ classes = "", ...props }: Props) {
               <HoverArrow />
             </HoverContent>
           }
-          amount={`$ ${humanize(props.bal_lock, 2)}`}
+          amount={to_usd(props.bal_lock, 2)}
         />
       </div>
       <div className="grid grid-cols-3 gap-3 mt-4">
@@ -131,60 +131,53 @@ export function Loaded({ classes = "", ...props }: Props) {
       </div>
 
       {/** div scopes when the sticky header ends */}
-      <div className="@container/period mt-10">
-        <div className="flex items-center gap-x-2 mb-2">
-          <h4 className="text-lg">Grant items</h4>
-          {props.recent_payouts.items.length > 0 && (
-            <NavLink to="payouts" className="text-primary text-sm">
-              see all
-            </NavLink>
-          )}
-        </div>
-
-        {props.recent_payouts.items.length > 0 ? (
-          <PayoutsTable
-            classes="mt-2 mb-3"
-            items={props.recent_payouts.items}
-          />
-        ) : (
-          <EmptyState
-            classes="mt-2 mb-3"
-            heading="No grant items yet"
-            icon={<ArrowUpFromLineIcon className="icon-xl" />}
-          >
-            Grant items will show up here.
-          </EmptyState>
-        )}
-
-        {props.recent_payouts.items.length > 0 && (
-          <Payout
-            next_payout={props.next_payout}
-            bal_cash={props.bal_cash}
-            threshold={payout_min}
-            pm={props.pm}
-            classes=""
-          />
-        )}
-
-        <div className="flex items-center gap-x-2 mb-2 mt-8">
-          <h4 className="text-lg">Payout history</h4>
-          {props.recent_settlements.next &&
-            props.recent_settlements.items.length > 0 && (
-              <NavLink to="grants" className="text-primary text-sm">
+      <div className="@container/period mt-10 grid gap-6">
+        <section className="card">
+          <div className="flex items-center gap-x-2 mb-2">
+            <h4 className="text-lg">Grant items</h4>
+            {props.recent_payouts.items.length > 0 && (
+              <NavLink to="payouts" className="text-primary text-sm">
                 see all
               </NavLink>
             )}
-        </div>
-        {props.recent_settlements.items.length > 0 ? (
-          <GrantsTable items={props.recent_settlements.items} />
-        ) : (
-          <EmptyState
-            heading="No payout records yet"
-            icon={<ArrowDownToLineIcon className="icon-xl" />}
-          >
-            Payout records will show up here.
-          </EmptyState>
-        )}
+          </div>
+
+          {props.recent_payouts.items.length > 0 ? (
+            <PayoutsTable
+              classes="mt-2 mb-3"
+              items={props.recent_payouts.items}
+            />
+          ) : (
+            <EmptyState classes="mt-2 mb-3">No grant items yet</EmptyState>
+          )}
+
+          {props.recent_payouts.items.length > 0 && (
+            <Payout
+              next_payout={props.next_payout}
+              bal_cash={props.bal_cash}
+              threshold={payout_min}
+              pm={props.pm}
+              classes=""
+            />
+          )}
+        </section>
+
+        <section className="card">
+          <div className="flex items-center gap-x-2 mb-2">
+            <h4 className="text-lg">Payout history</h4>
+            {props.recent_settlements.next &&
+              props.recent_settlements.items.length > 0 && (
+                <NavLink to="grants" className="text-primary text-sm">
+                  see all
+                </NavLink>
+              )}
+          </div>
+          {props.recent_settlements.items.length > 0 ? (
+            <GrantsTable items={props.recent_settlements.items} />
+          ) : (
+            <EmptyState>No payout records yet</EmptyState>
+          )}
+        </section>
       </div>
     </div>
   );

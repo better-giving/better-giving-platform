@@ -15,7 +15,7 @@ export function FormNotice({ classes = "", ref, children }: IFormNotice) {
       ref={ref}
       role="alert"
       tabIndex={-1}
-      className={`${classes} grid gap-2.5 bg-gray-3 border border-gray-6 rounded p-4 text-sm/relaxed focus-visible:outline-2 focus-visible:outline-offset-2`}
+      className={`${classes} grid gap-2.5 bg-gray-3 rounded p-4 text-sm/relaxed focus-visible:outline-2 focus-visible:outline-offset-2`}
     >
       {children}
     </div>

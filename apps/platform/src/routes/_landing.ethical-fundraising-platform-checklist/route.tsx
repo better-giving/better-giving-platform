@@ -27,12 +27,9 @@ export default function Page() {
     <main>
       {/* paper has its own margin — the screen's breathing room above the fold
           is just a shorter first page */}
-      <header className="border-b border-gray-6 px-6 py-14 md:py-16 print:border-0 print:pt-4 print:pb-0">
+      <header className="border-b border-hairline px-6 py-14 md:py-16 print:border-0 print:pt-4 print:pb-0">
         <div className="mx-auto max-w-3xl">
-          <p className="eyebrow text-primary">
-            Member-powered ethical fundraising
-          </p>
-          <h1 className="hero-heading mt-4">
+          <h1 className="hero-heading">
             Does your donation platform pass the ethics test?
           </h1>
           <p className="mt-5 text-base/relaxed text-gray-11 text-pretty">
@@ -81,7 +78,7 @@ export default function Page() {
             state's charitable-solicitation rules or ask a nonprofit attorney
             about your specific situation.
           </p>
-          <p className="mt-5 border-t border-gray-6 pt-4 text-xs print:hidden">
+          <p className="mt-5 border-t border-hairline pt-4 text-xs print:hidden">
             <Link
               to={href("/blog/:slug", { slug: BANNER_POST_SLUG })}
               className="font-bold link"

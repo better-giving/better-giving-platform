@@ -82,7 +82,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
   const status = fund_status(fund, now);
 
   return (
-    <main className="grid pb-10 bg-gray-3">
+    <main className="grid pb-10">
       <div className="group relative page grid md:grid-cols-[3fr_2fr] gap-4">
         <div className="self-start mt-14 z-10 grid gap-4 relative">
           <div className="absolute -top-8 flex items-center justify-between w-full">
@@ -105,7 +105,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
             />
           </div>
 
-          <div className="bg-panel rounded p-4">
+          <div className="card">
             <div className="grid max-md:gap-y-4 items-center max-md:justify-items-center md:grid-cols-[auto_1fr]">
               <div className="mr-4 md:row-span-2">
                 <Image
@@ -139,7 +139,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
             </div>
           </div>
 
-          <div className="rounded overflow-hidden bg-panel">
+          <div className="bg-card rounded-card border border-hairline overflow-hidden">
             {fund.banner && (
               <img
                 src={fund.banner}
@@ -169,7 +169,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
         </div>
         <div
           id="info-card"
-          className="md:sticky md:top-30 bg-panel self-start flex flex-col content-start z-10 rounded p-4"
+          className="md:sticky md:top-30 card self-start flex flex-col content-start z-10"
         >
           {" "}
           <DonateSection
@@ -177,7 +177,7 @@ function Fund({ loaderData }: Route.ComponentProps) {
             open={status.active}
             classes={{ container: "max-md:hidden", link: "mb-4 order-first" }}
           />
-          <p className="text-gray-11 md:mt-8 mb-2 font-bold uppercase text-xs">
+          <p className="text-gray-11 md:mt-8 mb-2 text-sm font-semibold">
             Donations go to
           </p>
           <div className="grid gap-y-4 mb-4 grid-cols-[auto_1fr]">

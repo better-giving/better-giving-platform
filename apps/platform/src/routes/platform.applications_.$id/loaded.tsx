@@ -1,9 +1,10 @@
-import { Actions, ExtLink } from "@better-giving/ui";
+import { Actions, Badge, ExtLink } from "@better-giving/ui";
 import { SquareArrowOutUpRight } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { href, NavLink, Outlet } from "react-router";
 import type { V2RecipientAccount } from "#/types/bank-details";
 import type { IReg } from "@/reg";
+import { is_approvable } from "./approvable";
 import { Container } from "./container";
 
 export default function Loaded(
@@ -22,15 +23,13 @@ export default function Loaded(
 
   return (
     <>
-      <h3 className="text-lg">{props.o_name}</h3>
       {prev_verdict && (
-        <div
-          className={`${
-            prev_verdict === "approved" ? "bg-success" : "bg-destructive"
-          } ${prev_verdict === "approved" ? "text-success-fg" : "text-destructive-fg"} px-2 py-1 text-xs uppercase rounded justify-self-start -mt-3`}
+        <Badge
+          tone={prev_verdict === "approved" ? "success" : "destructive"}
+          className="justify-self-start -mt-3"
         >
           {prev_verdict === "approved" ? "Approved" : "Rejected"}
-        </div>
+        </Badge>
       )}
       {props.status_approved_npo_id && (
         <NavLink
@@ -44,21 +43,17 @@ export default function Loaded(
       )}
       {props.status_rejected_reason && (
         <div className="flex max-sm:flex-col gap-x-4">
-          <span className="text-sm font-semibold uppercase">
-            Rejection reason:
-          </span>
-          <span className="uppercase text-sm">
-            {props.status_rejected_reason}
-          </span>
+          <span className="text-sm font-semibold">Rejection reason:</span>
+          <span className="text-sm">{props.status_rejected_reason}</span>
         </div>
       )}
       <div className="flex max-sm:flex-col gap-x-4">
-        <span className="text-sm font-semibold uppercase">Application ID:</span>
+        <span className="text-sm font-semibold">Application ID:</span>
         <span className="text-sm">{props.id}</span>
       </div>
       <div className="flex max-sm:flex-col gap-x-4 -mt-2 lg:-mt-4">
-        <span className="text-sm font-semibold uppercase">Date submitted:</span>
-        <span className="uppercase text-sm">
+        <span className="text-sm font-semibold">Date submitted:</span>
+        <span className="text-sm">
           {new Date(props.updated_at).toLocaleDateString()}
         </span>
       </div>
@@ -131,15 +126,16 @@ export default function Loaded(
         </NavLink>
         <NavLink
           aria-disabled={!!prev_verdict}
-          to={`rejected?org_name=${props.o_name}`}
+          to="rejected"
           className="min-w-24 btn btn-destructive"
           preventScrollReset
         >
           Reject
         </NavLink>
         <NavLink
-          aria-disabled={!!prev_verdict || props.bank_unavailable}
-          to={`approved?org_name=${props.o_name}`}
+          // approval reads the account: none on file, or wise unreachable
+          aria-disabled={!is_approvable(props, props.bank)}
+          to="approved"
           className="min-w-24 btn btn-success"
           preventScrollReset
         >
@@ -167,19 +163,19 @@ type Props = PropsWithChildren<{
 function Row(props: Props) {
   return (
     <>
-      <dt className="px-3 max-sm:pt-3 sm:p-3 flex items-center text-xs font-semibold uppercase">
+      <dt className="px-3 max-sm:pt-3 sm:p-3 flex items-center text-sm font-semibold text-gray-11">
         {props.label}
       </dt>
       <div
         aria-hidden={true}
-        className="max-sm:hidden w-px border-r last:border-none"
+        className="max-sm:hidden w-px border-r border-hairline last:border-none"
       />
       <dd className="px-3 max-sm:pb-3 sm:p-3 flex items-center text-sm">
         {props.children}
       </dd>
       <div
         aria-hidden={true}
-        className="h-px col-span-full border-b last:border-none"
+        className="h-px col-span-full border-b border-hairline last:border-none"
       />
     </>
   );

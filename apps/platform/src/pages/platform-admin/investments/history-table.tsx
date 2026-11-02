@@ -1,4 +1,4 @@
-import { LoadMoreRow } from "@better-giving/ui";
+import { EmptyRow, LoadMoreRow } from "@better-giving/ui";
 import { format } from "date-fns";
 import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
@@ -35,15 +35,19 @@ export function HistoryTable({
           </tr>
         </thead>
         <tbody>
-          {items.map((r, idx) => (
-            <tr key={idx} className="text-sm">
-              <td>{format(r.date, "PP")}</td>
-              <td>{r.reason}</td>
-              <td>${humanize(r.value)}</td>
-              <td>{humanize(r.units)}</td>
-              <td>${humanize(r.price)}</td>
-            </tr>
-          ))}
+          {items.length === 0 ? (
+            <EmptyRow col_span={5}>No changes yet</EmptyRow>
+          ) : (
+            items.map((r, idx) => (
+              <tr key={idx} className="text-sm">
+                <td>{format(r.date, "PP")}</td>
+                <td>{r.reason}</td>
+                <td>${humanize(r.value)}</td>
+                <td>{humanize(r.units)}</td>
+                <td>${humanize(r.price)}</td>
+              </tr>
+            ))
+          )}
         </tbody>
         {load_next && (
           <LoadMoreRow

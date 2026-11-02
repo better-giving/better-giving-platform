@@ -29,67 +29,69 @@ export function DonorsTable({ items, load_next, loading, disabled }: IProps) {
   const dir: TDir = is_dir(raw_dir) ? raw_dir : "desc";
 
   return (
-    <table className="table">
-      <thead>
-        <tr>
-          <Th k="name" sort={sort} dir={dir}>
-            Name
-          </Th>
-          <Th k="count" sort={sort} dir={dir} align="right">
-            Donations
-          </Th>
-          <Th k="total" sort={sort} dir={dir} align="right">
-            Lifetime total
-          </Th>
-        </tr>
-      </thead>
-      <tbody>
-        {items.length === 0 ? (
-          <EmptyRow col_span={3}>No donors yet</EmptyRow>
-        ) : (
-          items.map((d) => {
-            const to = `/admin/${npo_id}/donors/${encodeURIComponent(d.email)}`;
-            const state = { from: "donors" };
-            return (
-              <tr key={d.email} className="hover:bg-gray-3">
-                <td className="p-0">
-                  <Link to={to} state={state} className="block px-2 py-2">
-                    <div className="font-medium leading-tight">
-                      {d.name ?? d.email}
-                    </div>
-                    <div className="text-xs leading-snug text-gray-11">
-                      {d.email}
-                    </div>
-                  </Link>
-                </td>
-                <td className="p-0 text-right">
-                  <Link to={to} state={state} className="block px-2 py-2">
-                    {d.count}
-                  </Link>
-                </td>
-                <td className="p-0 text-right">
-                  <Link
-                    to={to}
-                    state={state}
-                    className="block px-2 py-2 font-medium"
-                  >
-                    {fmt$(d.total)}
-                  </Link>
-                </td>
-              </tr>
-            );
-          })
+    <div className="table-scroll">
+      <table className="table">
+        <thead>
+          <tr>
+            <Th k="name" sort={sort} dir={dir}>
+              Name
+            </Th>
+            <Th k="count" sort={sort} dir={dir} align="right">
+              Donations
+            </Th>
+            <Th k="total" sort={sort} dir={dir} align="right">
+              Lifetime total
+            </Th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.length === 0 ? (
+            <EmptyRow col_span={3}>No donors yet</EmptyRow>
+          ) : (
+            items.map((d) => {
+              const to = `/admin/${npo_id}/donors/${encodeURIComponent(d.email)}`;
+              const state = { from: "donors" };
+              return (
+                <tr key={d.email} className="hover:bg-gray-4">
+                  <td className="p-0">
+                    <Link to={to} state={state} className="block px-2 py-2">
+                      <div className="font-medium leading-tight">
+                        {d.name ?? d.email}
+                      </div>
+                      <div className="text-xs leading-snug text-gray-11">
+                        {d.email}
+                      </div>
+                    </Link>
+                  </td>
+                  <td className="p-0 text-right">
+                    <Link to={to} state={state} className="block px-2 py-2">
+                      {d.count}
+                    </Link>
+                  </td>
+                  <td className="p-0 text-right">
+                    <Link
+                      to={to}
+                      state={state}
+                      className="block px-2 py-2 font-medium"
+                    >
+                      {fmt$(d.total)}
+                    </Link>
+                  </td>
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+        {load_next && (
+          <LoadMoreRow
+            col_span={3}
+            disabled={disabled}
+            loading={loading}
+            on_load_next={load_next}
+          />
         )}
-      </tbody>
-      {load_next && (
-        <LoadMoreRow
-          col_span={3}
-          disabled={disabled}
-          loading={loading}
-          on_load_next={load_next}
-        />
-      )}
-    </table>
+      </table>
+    </div>
   );
 }
 

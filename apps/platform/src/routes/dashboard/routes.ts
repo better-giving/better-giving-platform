@@ -31,31 +31,27 @@ export const linkGroups: LinkGroup[] = [
         end: true,
         icon: {
           fn: HomeIcon,
-          size: 22,
         },
       },
       {
-        title: "My Donations",
+        title: "My donations",
         to: routes.donations,
         icon: {
           fn: CircleDollarSign,
-          size: 22,
         },
       },
       {
-        title: "Recurring Donations",
+        title: "Recurring donations",
         to: routes.subscriptions,
         icon: {
           fn: RefreshCw,
-          size: 20,
         },
       },
       {
-        title: "Edit Profile",
+        title: "Edit profile",
         to: routes.edit_profile,
         icon: {
           fn: CircleUserRound,
-          size: 21,
         },
       },
       {
@@ -63,7 +59,6 @@ export const linkGroups: LinkGroup[] = [
         to: routes.settings,
         icon: {
           fn: Settings,
-          size: 22,
         },
       },
       {
@@ -71,23 +66,20 @@ export const linkGroups: LinkGroup[] = [
         to: routes.funds,
         icon: {
           fn: Heart,
-          size: 21,
         },
       },
       {
-        title: "My Referrals",
+        title: "My referrals",
         to: routes.referrals,
         icon: {
           fn: MegaphoneIcon,
-          size: 22,
         },
       },
       {
-        title: "My Donation Forms",
+        title: "My donation forms",
         to: routes.forms,
         icon: {
           fn: BlocksIcon,
-          size: 25,
         },
       },
     ],

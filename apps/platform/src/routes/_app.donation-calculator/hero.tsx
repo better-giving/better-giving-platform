@@ -6,7 +6,7 @@ export function Hero({ classes = "" }) {
       className={`${classes} grid justify-items-center gap-10 xl:justify-items-start xl:grid-cols-2 py-12`}
     >
       <div className="max-w-2xl order-2 xl:order-1">
-        <h4 className="text-center xl:text-left xl:text-lg uppercase mb-5">
+        <h4 className="text-center xl:text-left xl:text-lg mb-5">
           Save More. Raise More. Do More.
         </h4>
         <h1 className="text-center xl:text-left text-4.5xl xl:text-5xl xl:leading-tight text-balance mb-4">

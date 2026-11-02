@@ -3,7 +3,7 @@ import { href, Link } from "react-router";
 
 interface ICheck {
   children: React.ReactNode;
-  /** on-navy featured card uses success accent for contrast */
+  /** on the blue featured card the check takes the fill's own ink; a green check measured 1.29:1 there */
   dark?: boolean;
 }
 
@@ -11,7 +11,7 @@ function Check({ children, dark }: ICheck) {
   return (
     <span className="flex gap-2.5 text-sm/normal">
       <CheckIcon
-        className={`flex-none icon-md mt-0.5 ${dark ? "text-success" : "text-primary"}`}
+        className={`flex-none icon-md mt-0.5 ${dark ? "text-primary-fg" : "text-primary"}`}
         strokeWidth={3}
         aria-hidden
       />
@@ -28,7 +28,7 @@ export function PriceCards({ classes = "" }: IPriceCards) {
   return (
     <div className={`${classes}`}>
       <div className="page grid gap-6 md:grid-cols-2">
-        <div className="bg-primary rounded p-8 flex flex-col gap-3.5 shadow-lift-cta text-primary-fg">
+        <div className="surface-primary rounded-card p-6 flex flex-col gap-3.5">
           <span className="text-lg font-bold">
             Fundraising &amp; fund management
           </span>
@@ -50,12 +50,12 @@ export function PriceCards({ classes = "" }: IPriceCards) {
             </Check>
             <Check dark>Full donor data, exports, portability guarantee</Check>
           </div>
-          <Link to={href("/register")} className="btn btn-secondary mt-auto">
+          <Link to={href("/register")} className="btn btn-inverse mt-auto">
             Join free forever
           </Link>
         </div>
 
-        <div className="card-on-band flex flex-col gap-3.5">
+        <div className="card flex flex-col gap-3.5">
           <span className="text-lg font-bold">Fiscal sponsorship</span>
           <span className="text-5xl font-bold">
             2.9%

@@ -7,10 +7,7 @@ export function Hero({ classes = "" }: { classes?: string }) {
       className={`${classes} grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4 justify-items-center lg:content-start`}
     >
       <div className="self-center">
-        <p className="max-lg:text-center uppercase mb-2 text-primary font-bold ">
-          Fund nonprofits that matter
-        </p>
-        <h1 className="mb-4 capitalize text-center text-2xl lg:text-4xl text-balance lg:text-left">
+        <h1 className="mb-4 text-center text-2xl lg:text-4xl text-balance lg:text-left">
           Giving made smarter. Impact made stronger.
         </h1>
 

@@ -174,13 +174,10 @@ describe("campaign list", () => {
     await expect
       .element(screen.getByRole("heading", { level: 1, name: "Campaigns" }))
       .toBeVisible();
+    // one create action: the empty state's, not a second one in the header
     expect(
-      (
-        screen
-          .getByRole("link", { name: "New campaign" })
-          .element() as HTMLAnchorElement
-      ).getAttribute("href")
-    ).toBe("/admin/7/campaigns/new");
+      screen.getByRole("link", { name: "New campaign" }).query()
+    ).toBeNull();
     expect(
       screen
         .getByRole("tab")
@@ -328,6 +325,13 @@ describe("campaign list", () => {
     ]);
 
     expect(screen.getByText("No campaigns yet").query()).toBeNull();
+    expect(
+      (
+        screen
+          .getByRole("link", { name: "New campaign" })
+          .element() as HTMLAnchorElement
+      ).getAttribute("href")
+    ).toBe("/admin/7/campaigns/new");
     await expect
       .element(screen.getByRole("tab", { name: "Your campaigns", exact: true }))
       .toHaveAttribute("aria-selected", "true");

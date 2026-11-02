@@ -257,9 +257,9 @@ export default function Page({ loaderData: to }: Route.ComponentProps) {
   return (
     <div className="grid justify-items-center gap-3.5 px-4 py-14 text-gray-11">
       <div className="solo-card">
-        <h3 className="text-center text-2xl font-bold">
-          Philanthropy for Everyone
-        </h3>
+        <h1 className="text-center text-3xl font-bold text-gray-12">
+          Philanthropy for everyone
+        </h1>
         <p className="text-center max-sm:text-sm mt-2">
           Log in to support great causes or register and manage your nonprofit.
         </p>
@@ -282,7 +282,7 @@ export default function Page({ loaderData: to }: Route.ComponentProps) {
             name="intent"
             value="oauth"
             type="submit"
-            className="btn btn-secondary gap-2 mt-6"
+            className="btn btn-secondary btn-field gap-2 mt-6"
           >
             <Image src={googleIcon} height={18} width={18} />
             <span className="font-semibold">Continue with Google</span>
@@ -299,15 +299,22 @@ export default function Page({ loaderData: to }: Route.ComponentProps) {
           disabled={is_submitting}
           className="grid gap-3"
         >
-          <Input
-            {...register("email")}
-            placeholder="Email address"
-            autoComplete="username"
-            icon={Mail}
-            error={errors.email?.message}
-          />
+          <div>
+            <label htmlFor="login-email" className="label mb-1">
+              Email
+            </label>
+            <Input
+              {...register("email")}
+              id="login-email"
+              placeholder="Email address"
+              autoComplete="username"
+              icon={Mail}
+              error={errors.email?.message}
+            />
+          </div>
           <PasswordInput
             {...register("password")}
+            label="Password"
             error={errors.password?.message}
             placeholder="Password"
           />
@@ -322,9 +329,9 @@ export default function Page({ loaderData: to }: Route.ComponentProps) {
           disabled={is_submitting}
           form={form_id}
           type="submit"
-          className="btn btn-lg btn-primary w-full mt-4"
+          className="btn btn-field btn-primary w-full mt-4"
         >
-          Log In
+          Log in
         </button>
         <span className="flex-center gap-1 max-sm:text-sm mt-8">
           Don't have an account?

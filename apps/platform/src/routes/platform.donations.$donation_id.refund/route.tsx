@@ -16,7 +16,7 @@ export default function Page({ loaderData }: Route.ComponentProps) {
     navigate("..", { preventScrollReset: true, replace: true });
 
   return (
-    <RouteModal size="lg" classes="bg-panel">
+    <RouteModal size="lg" classes="bg-popover">
       <Content data={loaderData} on_close={close} />
     </RouteModal>
   );
@@ -65,7 +65,7 @@ function Content({
           <div className="table-scroll">
             <table className="table">
               <thead>
-                <tr>
+                <tr className="whitespace-nowrap">
                   <th>NPO</th>
                   <th className="text-right">Gross</th>
                   <th className="text-right">Net</th>
@@ -211,10 +211,10 @@ function RefundOutcome({ held }: IRefundOutcome) {
 function PreviewRow({ preview: p }: { preview: DistPreview }) {
   return (
     <tr className="text-sm">
-      <td>{p.npo_name || p.npo_id || "—"}</td>
-      <td className="text-right">${humanize(p.amount)}</td>
-      <td className="text-right">${humanize(p.net)}</td>
-      <td>
+      <td className="min-w-32">{p.npo_name || p.npo_id || "—"}</td>
+      <td className="text-right whitespace-nowrap">${humanize(p.amount)}</td>
+      <td className="text-right whitespace-nowrap">${humanize(p.net)}</td>
+      <td className="min-w-40">
         <div className="flex flex-col gap-0.5">
           {p.effects.map((e, i) => (
             <span key={i} className="flex items-center gap-1 text-xs">
@@ -232,7 +232,7 @@ function PreviewRow({ preview: p }: { preview: DistPreview }) {
           )}
         </div>
       </td>
-      <td>
+      <td className="min-w-40">
         <div className="flex flex-col gap-0.5">
           {p.warnings.map((w, i) => (
             <span key={i} className="flex items-center gap-1 text-xs">
@@ -250,7 +250,7 @@ function PreviewRow({ preview: p }: { preview: DistPreview }) {
           )}
         </div>
       </td>
-      <td>
+      <td className="min-w-40">
         <div className="flex flex-col gap-0.5">
           {p.blockers.map((b, i) => (
             <span key={i} className="flex items-center gap-1 text-xs">

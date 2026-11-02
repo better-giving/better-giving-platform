@@ -10,8 +10,7 @@ export function Hero({ classes = "" }: IHero) {
     <div
       className={`${classes} grid max-lg:justify-items-center max-lg:text-center`}
     >
-      <p className="eyebrow text-primary">For U.S. nonprofits</p>
-      <h1 className="hero-heading mt-4 max-w-4xl">
+      <h1 className="hero-heading max-w-4xl">
         Fundraising you can audit. Free, forever.
       </h1>
       <p className="section-body mt-5 max-w-2xl text-gray-11">

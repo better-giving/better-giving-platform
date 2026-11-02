@@ -24,10 +24,10 @@ function Page({ loaderData }: Route.ComponentProps) {
   use_strip_connect_params(connect_routing && !!stripe.notice);
 
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8 max-w-[1400px]">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <h1 className="text-3xl font-bold">Banking</h1>
-        <NavLink to="new" className="btn btn-primary shrink-0 self-start">
+    <div className="px-4 py-4 md:px-10 md:py-8 max-w-[1400px]">
+      <h1 className="sr-only">Banking</h1>
+      <div className="flex justify-end mb-4">
+        <NavLink to="new" className="btn btn-primary shrink-0">
           <Plus className="mr-2 icon-md" />
           <span className="whitespace-nowrap">Add bank account</span>
         </NavLink>
@@ -35,12 +35,14 @@ function Page({ loaderData }: Route.ComponentProps) {
       {connect_routing && <StripeConnectCard {...stripe} classes="mb-8" />}
 
       {methods.length === 0 ? (
-        <EmptyState
-          heading="No payout methods yet"
-          icon={<Landmark className="icon-xl" />}
-        >
-          Payout methods you add will show up here.
-        </EmptyState>
+        <div className="card">
+          <EmptyState
+            heading="No payout methods yet"
+            icon={<Landmark className="icon-xl" />}
+          >
+            Payout methods you add will show up here.
+          </EmptyState>
+        </div>
       ) : (
         <div className="grid col-span-full table-scroll">
           <Table methods={methods} />

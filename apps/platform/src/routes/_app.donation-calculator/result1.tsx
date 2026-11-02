@@ -22,13 +22,13 @@ export function Result1({ classes = "", ...v }: Props) {
         <p className="text-lg sm:text-xl font-bold">{to_usd(v.amount)}</p>
       </div>
 
-      <div className="border-t my-6" />
+      <div className="border-t border-hairline my-6" />
 
       <h3 className="text-lg sm:text-xl font-bold mb-4">
         Donation Processing Impact
       </h3>
 
-      <div className="grid @md:grid-cols-2 @md:bg-gray-3 rounded mb-6 divide-gray-6 divide-y @md:divide-x @md:divide-y-0">
+      <div className="grid @md:grid-cols-2 @md:bg-panel rounded mb-6 divide-hairline divide-y @md:divide-x @md:divide-y-0">
         <div className="@md:p-5 pb-2">
           <p className="max-sm:text-sm text-gray-11 mb-2">
             Current Amount Received

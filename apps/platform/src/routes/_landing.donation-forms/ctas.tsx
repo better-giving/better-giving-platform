@@ -12,7 +12,7 @@ const images = [
 export function Ctas({ classes = "" }) {
   return (
     <section
-      className={`${classes} grid gap-y-20 md:gap-y-32 py-14 md:py-28`}
+      className={`${classes} grid gap-y-20 md:gap-y-32 py-14 md:py-28 overflow-x-clip`}
       aria-label="Key benefits"
     >
       <article className="grid md:grid-cols-2 gap-x-4 items-center">
@@ -45,7 +45,7 @@ export function Ctas({ classes = "" }) {
                 to={BOOK_A_DEMO}
                 className="text-sm indent-3 mt-2 underline link"
               >
-                Get a Demo
+                Get a demo
               </Link>
             </div>
           </div>
@@ -93,7 +93,7 @@ export function Ctas({ classes = "" }) {
                 to={BOOK_A_DEMO}
                 className="text-sm indent-3 mt-2 underline link"
               >
-                Get a Demo
+                Get a demo
               </Link>
             </div>
           </div>
@@ -130,7 +130,7 @@ export function Ctas({ classes = "" }) {
                 to={BOOK_A_DEMO}
                 className="text-sm indent-3 mt-2 underline link"
               >
-                Get a Demo
+                Get a demo
               </Link>
             </div>
           </div>
@@ -178,7 +178,7 @@ export function Ctas({ classes = "" }) {
                 to={BOOK_A_DEMO}
                 className="text-sm indent-3 mt-2 underline link"
               >
-                Get a Demo
+                Get a demo
               </Link>
             </div>
           </div>

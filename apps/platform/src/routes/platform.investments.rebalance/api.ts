@@ -7,7 +7,7 @@ import { NEGATIVE_BAL_MSG } from "@/nav/schemas";
 import { db } from "$/pg/db";
 import { nav_log_put, nav_ltd, rebalance_log_put } from "$/pg/queries/nav";
 import type { Route } from "./+types/route";
-import { prices_fn, to_bals } from "./helpers";
+import { NO_UNITS_MSG, prices_fn, to_bals } from "./helpers";
 import { fv as schema, ticker_nets } from "./types";
 
 export const loader = async (_: Route.LoaderArgs) => {
@@ -19,6 +19,9 @@ export const action = async ({ request }: Route.ActionArgs) => {
   if (txs === undefined) throw resp.status(400, "body is not json");
 
   const ltd = await nav_ltd();
+  if (ltd.units === 0) {
+    return dataWithError(null, NO_UNITS_MSG, { status: 400 });
+  }
   const bals = to_bals(ltd.composition);
 
   const p = safeParse(schema, { txs, bals });

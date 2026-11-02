@@ -1,5 +1,5 @@
-import { ChevronLeftIcon } from "lucide-react";
-import { Link, useSearchParams } from "react-router";
+import { Breadcrumb } from "@better-giving/ui";
+import { href, useSearchParams } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { metas } from "#/helpers/seo";
 import { use_table } from "#/hooks/use-table";
@@ -9,7 +9,7 @@ import type { Route } from "./+types/route";
 export { loader } from "./api";
 export const clientLoader = createClientLoaderCache<Route.ClientLoaderArgs>();
 export const meta: Route.MetaFunction = () =>
-  metas({ title: "Investments - NAV History" });
+  metas({ title: "Investments - NAV history" });
 
 export default CacheRoute(Page);
 function Page({ loaderData: page1 }: Route.ComponentProps) {
@@ -26,11 +26,14 @@ function Page({ loaderData: page1 }: Route.ComponentProps) {
   });
 
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8">
-      <Link to={".."} className="flex items-center gap-1 mb-4 link text-sm">
-        <ChevronLeftIcon className="icon-lg" />
-        <span>Back</span>
-      </Link>
+    <div className="px-4 py-4 md:px-10 md:py-8">
+      <Breadcrumb
+        classes="mb-4"
+        items={[
+          { label: "Investments", to: href("/platform/investments") },
+          { label: "NAV history" },
+        ]}
+      />
       {node}
     </div>
   );

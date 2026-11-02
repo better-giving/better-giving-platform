@@ -98,9 +98,11 @@ describe("program page", () => {
       .element(screen.getByRole("link", { name: "Donate to this program" }))
       .toHaveAttribute("href", DONATE_TO);
 
+    // the masthead's mark is the way back; the page carries no second one
     await expect
-      .element(screen.getByRole("link", { name: "Back to Acme Relief" }))
+      .element(header.getByRole("link", { name: "Acme Relief" }))
       .toHaveAttribute("href", "/org/acme");
+    expect(screen.getByRole("link", { name: /back to/i }).query()).toBeNull();
   });
 
   it("tags the page Program, and shows a banner only when the program has one", async () => {

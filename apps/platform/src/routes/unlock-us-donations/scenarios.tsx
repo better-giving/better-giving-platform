@@ -29,7 +29,7 @@ const scenarios: IScenario[] = [
 
 export function Scenarios() {
   return (
-    <section className="bg-panel py-20 md:py-24">
+    <section className="bg-band py-20 md:py-24">
       <div className="page">
         <motion.div
           className="text-center mb-14 grid gap-4"
@@ -55,7 +55,7 @@ export function Scenarios() {
               viewport={{ once: true, amount: 0.1 }}
               transition={{ duration: 0.4, delay: i * 0.1 }}
             >
-              <div className="size-12 rounded bg-primary/10 flex-center text-primary">
+              <div className="size-12 rounded bg-secondary flex-center text-primary">
                 <scenario.icon className="icon-2xl" />
               </div>
               <h3 className="text-xl font-bold">{scenario.title}</h3>

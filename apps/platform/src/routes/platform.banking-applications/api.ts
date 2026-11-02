@@ -3,7 +3,9 @@ import type { TStatus } from "@/banking";
 import { resp, search } from "@/helpers/https";
 import { $int_gte1 } from "@/schemas";
 import { bapps_by_status } from "$/pg/queries/banking";
+import { npos_batch_get } from "$/pg/queries/npo";
 import type { Route } from "./+types/route";
+import type { IBappRow } from "./table";
 
 export const loader = async ({ url }: Route.LoaderArgs) => {
   const { status = "under-review", nextPageKey, endowmentID } = search(url);
@@ -29,5 +31,14 @@ export const loader = async ({ url }: Route.LoaderArgs) => {
     next: nextPageKey as string | undefined,
     npo_id,
   });
-  return page;
+  const ids = [...new Set(page.items.map((b) => b.npo_id))];
+  const names = new Map(
+    (await npos_batch_get(ids)).map((npo) => [npo.id, npo.name])
+  );
+  return {
+    ...page,
+    items: page.items.map(
+      (b): IBappRow => ({ ...b, npo_name: names.get(b.npo_id) })
+    ),
+  };
 };

@@ -33,16 +33,20 @@ function Page({
   const is_open = fund_is_open(fund, now);
   return (
     <div className="w-full">
-      <div className="bg-panel h-14.75 w-full flex items-center justify-between px-10 mb-4">
-        <DappLogo classes="h-12" />
-        <Link
-          to={href("/campaigns/:fund_id", { fund_id: fund.id })}
-          className="font-semibold link"
-        >
-          Cancel
-        </Link>
-      </div>
-      <div className="md:px-4 max-w-274.5 mx-auto grid md:grid-cols-[1fr_auto] items-start content-start gap-4">
+      <h1 className="sr-only">Donate to {fund.name}</h1>
+      {/* inner box repeats the content column below so logo and Cancel share its edges */}
+      <header className="mb-4">
+        <div className="max-w-274.5 mx-auto px-4 py-2 flex items-center justify-between">
+          <DappLogo classes="h-12" />
+          <Link
+            to={href("/campaigns/:fund_id", { fund_id: fund.id })}
+            className="font-semibold link"
+          >
+            Cancel
+          </Link>
+        </div>
+      </header>
+      <div className="px-4 max-w-274.5 mx-auto grid md:grid-cols-[1fr_auto] items-start content-start gap-4">
         <div className="@container/fund-card col-start-1 row-start-1">
           <FundCard
             id={fund.id}
@@ -54,44 +58,40 @@ function Page({
             target={fund.target ?? "0"}
           />
         </div>
-        {/** small screen but space is still enough to render sidebar */}
-        <div className="mx-0 border-b md:contents xs:border xs:mx-4 rounded">
-          {!is_open ? (
-            <Info classes="row-start-2 self-center bg-panel rounded h-80 content-center justify-items-center grid">
-              This campaign is already closed and can't accept any more
-              donations
-            </Info>
-          ) : (
-            <Steps
-              source="bg-marketplace"
-              mode="live"
-              base_url={base_url}
-              recipient={{
-                id: fund.id,
-                name: fund.name,
-                hide_bg_tip: fund.hide_bg_tip,
-                members: fund.members.map((x) => x.id.toString()),
-                donor_address_required: false,
-              }}
-              config={{
-                id: null,
-                success_redirect: undefined,
-                freq_opts: undefined,
-                method_ids: fund.fund_donate_methods ?? undefined,
-                increments: fund.increments ?? undefined,
-              }}
-              program={undefined}
-              user={user}
-              classes="md:border rounded row-start-2"
-            />
-          )}
-        </div>
+        {!is_open ? (
+          <Info classes="row-start-2 self-center bg-card rounded-card border border-hairline h-80 content-center justify-items-center grid">
+            This campaign is already closed and can't accept any more donations
+          </Info>
+        ) : (
+          <Steps
+            source="bg-marketplace"
+            mode="live"
+            base_url={base_url}
+            recipient={{
+              id: fund.id,
+              name: fund.name,
+              hide_bg_tip: fund.hide_bg_tip,
+              members: fund.members.map((x) => x.id.toString()),
+              donor_address_required: false,
+            }}
+            config={{
+              id: null,
+              success_redirect: undefined,
+              freq_opts: undefined,
+              method_ids: fund.fund_donate_methods ?? undefined,
+              increments: fund.increments ?? undefined,
+            }}
+            program={undefined}
+            user={user}
+            classes="rounded-card border border-hairline row-start-2"
+          />
+        )}
         <FAQ
-          classes="max-md:px-4 md:col-start-2 md:row-span-5 md:w-75.5"
+          classes="md:col-start-2 md:row-span-5 md:w-75.5"
           //TODO: endowId={1}
           endowId={1}
         />
-        <p className="max-md:px-4 mb-4 max-md:col-start-1 text-sm leading-normal text-left text-gray-11">
+        <p className="mb-4 max-md:col-start-1 text-sm leading-normal text-left text-gray-11">
           <span className="block mb-0.5">
             Need help? See{" "}
             <Link to="./#faqs" className="link font-medium">

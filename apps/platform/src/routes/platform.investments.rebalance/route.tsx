@@ -5,6 +5,7 @@ import { RouteModal } from "#/components/route-modal";
 import type { ILog } from "@/nav";
 import type { Route } from "./+types/route";
 import { RebalanceForm } from "./form";
+import { NO_UNITS_MSG } from "./helpers";
 import { Review } from "./review";
 import type { State } from "./types";
 
@@ -21,7 +22,7 @@ export default function Page({ loaderData: data }: Route.ComponentProps) {
       size="lg"
       title="Rebalance investments"
       busy={fetcher.state !== "idle"}
-      classes="bg-panel"
+      classes="bg-popover"
     >
       <Content {...data} />
     </RouteModal>
@@ -34,6 +35,8 @@ function Content(props: ILog) {
   const hold = (e: { preventDefault(): void }) => {
     if (fetcher.state !== "idle") e.preventDefault();
   };
+  // the action refuses a portfolio with no units: there is no unit price
+  const unpriceable = state.type === "review" && props.units === 0;
 
   return (
     <div>
@@ -47,6 +50,14 @@ function Content(props: ILog) {
       {state.type === "review" && <Review fv={state.data} ltd={props} />}
 
       <Actions band>
+        {unpriceable && (
+          <p
+            id="rebalance-no-units"
+            className="text-sm text-gray-11 sm:mr-auto"
+          >
+            {NO_UNITS_MSG}
+          </p>
+        )}
         {state.type === "form" ? (
           <Link
             replace
@@ -68,7 +79,8 @@ function Content(props: ILog) {
           </button>
         )}
         <button
-          disabled={fetcher.state !== "idle"}
+          disabled={fetcher.state !== "idle" || unpriceable}
+          aria-describedby={unpriceable ? "rebalance-no-units" : undefined}
           form={state.type === "form" ? "rebalance-form" : undefined}
           type={state.type === "form" ? "submit" : "button"}
           onClick={

@@ -14,7 +14,7 @@ interface IPartnersStrip {
 export function PartnersStrip({ classes = "" }: IPartnersStrip) {
   return (
     <section className={`${classes} overflow-hidden py-8`}>
-      <p className="text-center text-xs font-bold uppercase tracking-wider text-gray-11 px-6">
+      <p className="text-center text-sm text-gray-11 px-6">
         Trusted by nonprofits, faith charities, schools &amp; universities
         worldwide
       </p>
@@ -25,7 +25,10 @@ export function PartnersStrip({ classes = "" }: IPartnersStrip) {
         pauseOnInteraction
         className="group relative w-full mt-5"
       >
-        <Marquee.Viewport className="w-full overflow-hidden">
+        {/* the edges fade by mask, not by a fill laid over them: a fill would
+            have to match the ground, which is white on a marketing page and
+            gray on an org page */}
+        <Marquee.Viewport className="w-full overflow-hidden mask-x-from-90%">
           <Marquee.Content className="animate-marquee-x group-data-paused:[animation-play-state:paused] motion-reduce:animate-none">
             <Marquee.Item className="flex items-center gap-16 px-8">
               {partners.map((p) => (
@@ -41,14 +44,6 @@ export function PartnersStrip({ classes = "" }: IPartnersStrip) {
             </Marquee.Item>
           </Marquee.Content>
         </Marquee.Viewport>
-        <Marquee.Edge
-          side="start"
-          className="absolute left-0 top-0 bottom-0 w-24 z-10 pointer-events-none bg-linear-to-r from-background to-transparent"
-        />
-        <Marquee.Edge
-          side="end"
-          className="absolute right-0 top-0 bottom-0 w-24 z-10 pointer-events-none bg-linear-to-l from-background to-transparent"
-        />
       </Marquee.Root>
     </section>
   );

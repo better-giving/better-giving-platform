@@ -55,7 +55,7 @@ const Testimonials = ({ classes = "" }) => {
         <button
           type="button"
           onClick={() => ref.current && scroll_carousel(ref.current, -1)}
-          className="p-4 bg-panel text-primary rounded-full z-10 absolute top-1/2 -translate-y-1/2 left-0 md:-left-5"
+          className="p-4 bg-gray-3 hover:bg-gray-4 active:bg-gray-5 border border-gray-7 hover:border-gray-8 text-primary rounded-full z-10 absolute top-1/2 -translate-y-1/2 left-0 md:-left-5"
           aria-label="Previous slide"
         >
           <ChevronLeft className="icon-2xl" />
@@ -63,7 +63,7 @@ const Testimonials = ({ classes = "" }) => {
         <button
           type="button"
           onClick={() => ref.current && scroll_carousel(ref.current, 1)}
-          className="p-4 bg-panel text-primary rounded-full z-10 absolute top-1/2 -translate-y-1/2 right-0 md:-right-5"
+          className="p-4 bg-gray-3 hover:bg-gray-4 active:bg-gray-5 border border-gray-7 hover:border-gray-8 text-primary rounded-full z-10 absolute top-1/2 -translate-y-1/2 right-0 md:-right-5"
           aria-label="Next slide"
         >
           <ChevronRight className="icon-2xl" />

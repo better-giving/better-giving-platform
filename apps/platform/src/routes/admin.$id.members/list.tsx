@@ -5,7 +5,7 @@ import { DeleteForm } from "./delete-form";
 interface IList extends LoaderData {}
 export function List(props: IList) {
   return (
-    <div className="table-scroll col-span-2">
+    <div className="table-scroll">
       <Loaded {...props} />
       {/** render add form */}
       <Outlet />
@@ -23,20 +23,21 @@ function Loaded({ admins, classes = "", user }: LoadedProps) {
         <tr>
           <th className="w-8" />
           <th>Email</th>
-          <th>First Name</th>
-          <th>Last Name</th>
+          <th>First name</th>
+          <th>Last name</th>
         </tr>
       </thead>
       <tbody>
         {admins.map((member) => (
           <tr key={member.email} className="text-sm">
             <td>
-              <DeleteForm
-                user={user.id}
-                to_remove={member.id}
-                pending_email={member.pending ? member.email : undefined}
-                label={member.email}
-              />
+              {member.id !== user.id && (
+                <DeleteForm
+                  to_remove={member.id}
+                  pending_email={member.pending ? member.email : undefined}
+                  label={member.email}
+                />
+              )}
             </td>
             <td>
               {member.email}

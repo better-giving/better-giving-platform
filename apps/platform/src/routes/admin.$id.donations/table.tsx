@@ -17,35 +17,33 @@ export function Table({ items, load_next, loading, disabled }: Props) {
           <th>Program</th>
           <th>Origin</th>
           <th>Method</th>
-          <th>Amount</th>
-          <th>
-            <div className="flex items-center gap-x-1">
+          <th className="num">Amount</th>
+          <th className="num">
+            <div className="flex items-center justify-end gap-x-1">
               <span>Fees </span>
               <Tooltip
                 tip={
                   <Content className="max-w-sm text-sm">
-                    <p className="text-xs uppercase font-semibold">
+                    <p className="text-xs font-semibold">
                       Base fee{" "}
                       <span className="text-primary text-xs font-bold">
                         1.5%
                       </span>
                     </p>
                     <p className="mb-4">
-                      charged when {app_name} tip screen is disabled at the time
+                      Charged when {app_name} tip screen is disabled at the time
                       of donation
                     </p>
-                    <p className="text-xs uppercase font-semibold">
+                    <p className="text-xs font-semibold">
                       Fiscal sponsorship fee{" "}
                       <span className="text-primary text-xs font-bold">
                         2.9%
                       </span>
                     </p>
-                    <p className="text-xs uppercase font-semibold mt-4">
-                      Processing fee
-                    </p>
-                    <p>charged by payment processor (Stripe, Chariot, etc.)</p>
+                    <p className="text-xs font-semibold mt-4">Processing fee</p>
+                    <p>Charged by payment processor (Stripe, Chariot, etc.)</p>
                     <p>
-                      covered by donor
+                      Covered by donor
                       <SparklesIcon className="fill-success stroke-success ml-1 inline icon-xs" />
                     </p>
                     <Arrow />
@@ -56,7 +54,7 @@ export function Table({ items, load_next, loading, disabled }: Props) {
               </Tooltip>
             </div>
           </th>
-          <th>Net</th>
+          <th className="num">Net</th>
           <th>Allocation</th>
           <th>Donor</th>
         </tr>

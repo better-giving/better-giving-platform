@@ -128,7 +128,7 @@ export function FsaForm(props: Props) {
           className="text-sm link flex items-center gap-2"
         >
           <SquareArrowOutUpRight className="icon-xl" />
-          <span>Signed Fiscal sponsorship agreement</span>
+          <span>Signed fiscal sponsorship agreement</span>
         </ExtLink>
       ) : null}
 

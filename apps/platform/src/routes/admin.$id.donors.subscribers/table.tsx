@@ -84,7 +84,7 @@ export function SubscribersTable({
     <div className="table-scroll">
       <table className="table">
         <thead>
-          <tr>
+          <tr className="whitespace-nowrap">
             <Th
               k="name"
               sort={sort}
@@ -137,7 +137,7 @@ export function SubscribersTable({
               return (
                 <tr
                   key={r.from_email}
-                  className={`hover:bg-gray-3 ${r.active_count === 0 ? "text-gray-11" : ""}`}
+                  className={`hover:bg-gray-4 ${r.active_count === 0 ? "text-gray-11" : ""}`}
                 >
                   <td className="p-0">
                     <Link
@@ -164,7 +164,7 @@ export function SubscribersTable({
         {(rows.length > 0 || load_next) && (
           <tfoot>
             {rows.length > 0 && (
-              <tr className="bg-gray-3">
+              <tr>
                 <td className="text-xs font-medium text-gray-11">Total</td>
                 <FootMoney n={totals.billed_month} />
                 <FootMoney n={totals.pend_month} />
@@ -211,20 +211,28 @@ function Th({
   const Glyph = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ChevronsUpDown;
   return (
     <th className={`p-0 ${align === "right" ? "text-right" : "text-left"}`}>
-      <button
-        type="button"
-        onClick={() => on_click(k)}
-        disabled={disabled}
-        className={`inline-flex w-full select-none items-center gap-1 px-2 py-2 focus-visible:outline-2 focus-visible:-outline-offset-2 outline-ring ${
-          disabled ? "cursor-default" : "cursor-pointer"
-        } ${align === "right" ? "justify-end" : ""} ${active ? "text-gray-12" : ""}`}
-      >
-        {children}
-        {info && <InfoTip label={info} />}
-        {!disabled && (
-          <Glyph className={`size-3 ${active ? "" : "opacity-40"}`} />
+      {/* the tip's trigger is a button of its own, so it sits beside the sort
+          button: a button inside a button is invalid html and fails hydration */}
+      <div className="flex items-center">
+        <button
+          type="button"
+          onClick={() => on_click(k)}
+          disabled={disabled}
+          className={`inline-flex flex-1 select-none items-center gap-1 py-2 pl-2 ${info ? "pr-1" : "pr-2"} focus-visible:outline-2 focus-visible:-outline-offset-2 outline-ring ${
+            disabled ? "cursor-default" : "cursor-pointer"
+          } ${align === "right" ? "justify-end" : ""} ${active ? "text-gray-12" : ""}`}
+        >
+          {children}
+          {!disabled && (
+            <Glyph className={`size-3 ${active ? "" : "opacity-40"}`} />
+          )}
+        </button>
+        {info && (
+          <span className="inline-flex pr-2">
+            <InfoTip label={info} />
+          </span>
         )}
-      </button>
+      </div>
     </th>
   );
 }
@@ -238,7 +246,7 @@ interface IMoneyProps {
 function Money({ n, to, bold }: IMoneyProps) {
   const zero = n === 0;
   return (
-    <td className="p-0 text-right">
+    <td className="p-0 text-right whitespace-nowrap">
       <Link
         to={to}
         state={{ from: "subscribers" }}
@@ -251,5 +259,7 @@ function Money({ n, to, bold }: IMoneyProps) {
 }
 
 function FootMoney({ n }: { n: number }) {
-  return <td className="text-right font-semibold">{fmt$(n)}</td>;
+  return (
+    <td className="text-right font-semibold whitespace-nowrap">{fmt$(n)}</td>
+  );
 }

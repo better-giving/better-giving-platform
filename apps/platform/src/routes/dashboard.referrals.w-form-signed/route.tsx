@@ -9,7 +9,7 @@ export { loader } from "./api";
 
 export default function Page({ loaderData: data }: Route.ComponentProps) {
   return (
-    <RouteModal classes="grid bg-panel text-gray-12 p-6 text-center">
+    <RouteModal classes="grid bg-popover text-gray-12 p-6 text-center">
       <Content {...data} />
     </RouteModal>
   );
@@ -22,9 +22,9 @@ function Content(props: LoaderData) {
   return (
     <>
       <CircleCheck className="text-success mx-auto pictogram-lg" />
-      <h1 className="text-2xl uppercase text-center mt-10 mb-4">
-        Tax Form submission saved!
-      </h1>
+      <h2 className="text-2xl text-center mt-10 mb-4">
+        Tax form submission saved!
+      </h2>
 
       <a
         download

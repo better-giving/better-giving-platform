@@ -87,8 +87,8 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
           Banking details
         </h2>
 
-        <p className="mt-6 mb-1">
-          <span className="uppercase text-sm font-semibold">account id: </span>
+        <p className="mt-6 mb-1 first-letter:uppercase">
+          <span className="text-sm font-semibold">account id: </span>
           <span className="text-gray-11 ">{reg.o_bank_id}</span>
         </p>
         <ExtLink

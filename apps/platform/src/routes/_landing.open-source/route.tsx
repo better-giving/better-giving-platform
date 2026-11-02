@@ -49,9 +49,6 @@ export default function Page() {
       <div className="surface-primary pt-20 pb-24">
         <div className="page grid gap-14 lg:grid-cols-[1.05fr_0.95fr] items-center">
           <div className="grid gap-5 justify-items-start">
-            <p className="text-xs font-bold uppercase tracking-wider text-secondary">
-              Open Source
-            </p>
             <h1 className="hero-heading text-primary-fg">Trust you can read</h1>
             <p className="text-lg/relaxed text-primary-fg/90 max-w-lg text-pretty">
               Every part of Better Giving is public code: the donation form, the
@@ -61,7 +58,7 @@ export default function Page() {
             <div className="flex max-sm:flex-col max-sm:w-full sm:flex-wrap sm:items-center gap-3.5 mt-1.5">
               <ExtLink
                 href={GITHUB_REPO}
-                className="btn btn-lg btn-secondary gap-2"
+                className="btn btn-inverse btn-lg gap-2"
               >
                 View the repository
                 <ArrowRight className="icon-md" />
@@ -87,12 +84,9 @@ export default function Page() {
           </h2>
           <div className="grid gap-5 md:grid-cols-3 mt-11">
             {why.map((w) => (
-              <div
-                key={w.title}
-                className="bg-secondary border border-gray-6 rounded p-8 grid gap-2.5 content-start"
-              >
+              <div key={w.title} className="card grid gap-2.5 content-start">
                 <span className="text-xl font-bold">{w.title}</span>
-                <p className="text-sm/relaxed text-gray-11">{w.body}</p>
+                <p className="text-base/relaxed text-gray-12">{w.body}</p>
               </div>
             ))}
           </div>

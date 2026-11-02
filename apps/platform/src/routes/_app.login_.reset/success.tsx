@@ -7,9 +7,9 @@ export function Success(props: { to: string }) {
     <div className="solo-card justify-items-center">
       <CircleCheck className="text-primary size-16 sm:size-20" />
 
-      <h3 className="text-center text-xl sm:text-2xl font-bold mt-6">
+      <h1 className="text-center text-xl sm:text-2xl font-bold mt-6">
         Password reset successful
-      </h3>
+      </h1>
       <p className="text-center max-sm:text-sm mt-2">
         Your account’s password has been successfully updated.
       </p>
@@ -18,7 +18,7 @@ export function Success(props: { to: string }) {
         to={login_url(props.to)}
         className="btn btn-lg btn-primary mt-9 w-full"
       >
-        Back to Sign in
+        Back to sign in
       </Link>
     </div>
   );

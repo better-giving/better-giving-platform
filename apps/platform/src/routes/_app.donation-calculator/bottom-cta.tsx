@@ -47,7 +47,7 @@ export function CtaCard({ classes = "", title, to, img }: ICtaCard) {
       </h3>
       <Link
         to={to.href}
-        className="btn btn-lg btn-primary shadow-lift-cta active:translate-x-1 self-start justify-self-start"
+        className="btn btn-lg btn-primary active:translate-x-1 self-start justify-self-start"
       >
         {to.title}
       </Link>

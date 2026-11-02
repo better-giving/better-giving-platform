@@ -22,15 +22,13 @@ const fund_management: LinkGroup = {
       to: routes.investments,
       icon: {
         fn: LineChartIcon,
-        size: 18,
       },
     },
     {
-      title: "Redeem Requests",
+      title: "Redeem requests",
       to: routes.redeem_requests,
       icon: {
         fn: BookOpenCheckIcon,
-        size: 18,
       },
     },
     {
@@ -38,7 +36,6 @@ const fund_management: LinkGroup = {
       to: routes.savings,
       icon: {
         fn: PiggyBankIcon,
-        size: 20,
       },
     },
   ],
@@ -48,44 +45,44 @@ export const link_groups: LinkGroup[] = [
   {
     links: [
       {
-        title: "NPO Applications",
+        title: "NPO applications",
         to: routes.applications,
-        icon: { fn: Building2Icon, size: 18 },
+        icon: { fn: Building2Icon },
       },
       {
-        title: "Banking Applications",
+        title: "Banking applications",
         to: routes.banking_applications,
-        icon: { fn: LandmarkIcon, size: 18 },
+        icon: { fn: LandmarkIcon },
       },
       {
         title: "Donations",
         to: routes.donations,
-        icon: { fn: ReceiptIcon, size: 18 },
+        icon: { fn: ReceiptIcon },
       },
       {
-        title: "Settle Donations",
+        title: "Settle donations",
         to: routes.donation_settlements,
-        icon: { fn: BanknoteIcon, size: 18 },
+        icon: { fn: BanknoteIcon },
       },
       {
         title: "Revenue",
         to: routes.revenue,
-        icon: { fn: DollarSignIcon, size: 18 },
+        icon: { fn: DollarSignIcon },
       },
       {
         title: "Losses",
         to: routes.losses,
-        icon: { fn: TrendingDownIcon, size: 18 },
+        icon: { fn: TrendingDownIcon },
       },
       {
         title: "Amounts owed",
         to: routes.owed,
-        icon: { fn: HandCoinsIcon, size: 18 },
+        icon: { fn: HandCoinsIcon },
       },
       {
         title: "Campaign moderation",
         to: routes.campaign_moderation,
-        icon: { fn: HatGlassesIcon, size: 18 },
+        icon: { fn: HatGlassesIcon },
       },
     ],
   },

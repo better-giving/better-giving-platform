@@ -2,6 +2,7 @@ import { safeParse } from "valibot";
 import { fund_id } from "@/campaign/schema";
 import { resp, search } from "@/helpers/https";
 import { fund_delete, funds_list } from "$/pg/queries/fund";
+import { user_names_by_ids } from "$/pg/queries/user";
 import type { Route } from "./+types/route";
 
 export const loader = async ({ url }: Route.LoaderArgs) => {
@@ -9,7 +10,16 @@ export const loader = async ({ url }: Route.LoaderArgs) => {
   const page = await funds_list({
     next,
   });
-  return page;
+  const names = await user_names_by_ids([
+    ...new Set(page.items.map((x) => x.creator_id)),
+  ]);
+  return {
+    ...page,
+    items: page.items.map((x) => ({
+      ...x,
+      creator_name: names.get(x.creator_id) ?? null,
+    })),
+  };
 };
 
 export const action = async ({ request }: Route.ActionArgs) => {

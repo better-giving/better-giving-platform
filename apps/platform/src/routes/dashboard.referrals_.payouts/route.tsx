@@ -1,5 +1,5 @@
-import { ChevronLeft } from "lucide-react";
-import { Link, useSearchParams } from "react-router";
+import { Breadcrumb } from "@better-giving/ui";
+import { href, useSearchParams } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { use_table } from "#/hooks/use-table";
 import { OwedHistory } from "#/routes/_helpers/owed-history";
@@ -24,14 +24,14 @@ function Page({ loaderData }: Route.ComponentProps) {
   });
 
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8">
-      <Link
-        to="../referrals"
-        className="flex items-center gap-1s link text-sm -ml-2 mb-2"
-      >
-        <ChevronLeft className="icon-lg" />
-        <span>Back</span>
-      </Link>
+    <div className="px-4 py-4 md:px-10 md:py-8">
+      <Breadcrumb
+        classes="mb-2"
+        items={[
+          { label: "My referrals", to: href("/dashboard/referrals") },
+          { label: "Payouts" },
+        ]}
+      />
       {node}
       <OwedHistory
         rows={loaderData.owed ?? []}

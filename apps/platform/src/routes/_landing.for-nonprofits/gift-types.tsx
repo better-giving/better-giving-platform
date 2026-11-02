@@ -46,7 +46,7 @@ export function GiftTypes({ classes = "" }: IGiftTypes) {
 
           <div className="card flex flex-col justify-center">
             <h3 className="text-lg">Own your donors</h3>
-            <p className="mt-2 text-sm leading-relaxed text-gray-11 text-pretty">
+            <p className="mt-2 text-base/relaxed text-gray-12 text-pretty">
               Your donor data belongs to you, full stop. No unauthorized
               listings, no marketing to your donors, no lock-in. Nonprofit
               consent is principle #1, and we live it.
@@ -55,7 +55,7 @@ export function GiftTypes({ classes = "" }: IGiftTypes) {
 
           <div className="card flex flex-col justify-center">
             <h3 className="text-lg">Add the form to your site</h3>
-            <p className="mt-2 text-sm leading-relaxed text-gray-11 text-pretty">
+            <p className="mt-2 text-base/relaxed text-gray-12 text-pretty">
               Embed the form and connect your bank from the dashboard. Tax
               receipts and donor records are handled in the platform.
             </p>

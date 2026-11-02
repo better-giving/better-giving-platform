@@ -38,12 +38,12 @@ export function Earnings({
         <h2 className="text-2xl capitalize">My earnings</h2>
         {earnings.see_all && (
           <Link to={earnings.see_all} className="text-sm link">
-            View All
+            View all
           </Link>
         )}
       </div>
 
-      <div className="bg-background rounded overflow-hidden">
+      <div className="card">
         <div className="@container">
           <div className="flex flex-wrap items-center justify-between gap-x-2">
             <div className="flex items-center gap-x-2 flex-wrap">
@@ -102,7 +102,7 @@ export function Earnings({
                 to={w_form ? "payout" : "w-form"}
                 className="btn btn-primary mt-2"
               >
-                Setup Payout Method
+                Set up payout method
               </Link>
               {w_form && <ExtLink download href={`/api/anvil-doc/${w_form}`} />}
             </div>

@@ -366,7 +366,7 @@ export function CampaignForm({
           open
           onClose={() => set_ask(null)}
           initialFocusEl={() => cancel_ref.current}
-          classes="bg-panel"
+          classes="bg-popover"
         >
           <div className="p-6 grid gap-4">
             <h2 className="text-lg font-bold">{ASK[ask].title}</h2>
@@ -432,7 +432,7 @@ export function CampaignForm({
           classes={{
             container: "min-w-0",
             field:
-              "rich-text-toolbar border text-sm grid min-w-0 grid-rows-[auto_1fr] rounded bg-surface p-3 min-h-60",
+              "rich-text-toolbar text-sm grid min-w-0 grid-rows-[auto_1fr] p-3 min-h-60",
             counter: "text-gray-11",
             error: "text-right",
           }}
@@ -451,6 +451,7 @@ export function CampaignForm({
           ref={banner.ref}
           value={banner.value}
           spec={img_spec([4, 1])}
+          hint="Shown at 4:1 — wider images crop to fit."
           on_change={(v) => {
             banner.onChange(v);
             trigger("banner");
@@ -540,7 +541,7 @@ export function CampaignForm({
                 <input
                   type="number"
                   {...register(`increments.${idx}.value`)}
-                  className="w-full h-full outline-ring rounded text-sm font-medium bg-surface pl-8 pr-4 py-3.5 border"
+                  className="w-full h-full outline-ring rounded text-sm font-medium bg-surface pl-8 pr-4 py-3.5 border border-input hover:border-input-hover"
                 />
               </div>
               <p className="mt-1 empty:hidden text-left text-xs text-destructive-subtle-fg">
@@ -551,7 +552,7 @@ export function CampaignForm({
               <textarea
                 {...register(`increments.${idx}.label`)}
                 rows={2}
-                className="w-full outline-ring rounded text-sm font-medium bg-surface px-4 py-3.5 border"
+                className="w-full outline-ring rounded text-sm font-medium bg-surface px-4 py-3.5 border border-input hover:border-input-hover"
               />
               <p className="mt-1 text-left text-xs text-gray-11">
                 {incs[idx]?.label.length ?? 0}/{increment_label_max_chars}
@@ -564,6 +565,7 @@ export function CampaignForm({
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
+            className="checkbox"
             checked={init.hide_bg_tip}
             disabled
             aria-describedby="hide-bg-tip"

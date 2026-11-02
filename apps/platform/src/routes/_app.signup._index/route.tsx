@@ -26,7 +26,7 @@ interface Context {
 
 const context: { [id: string]: Context } = {
   registration: {
-    title: `Become a ${app_name} Member`,
+    title: `Become a ${app_name} member`,
     description:
       "Join the nonprofit-powered fundraising platform. Raise more and grow funds together.",
     terms: [
@@ -35,7 +35,7 @@ const context: { [id: string]: Context } = {
   },
 
   referrals: {
-    title: "Empower More Nonprofits",
+    title: "Empower more nonprofits",
     description: `Sign up to refer organizations to ${app_name} and help them grow their impact make a difference with every connection.`,
     terms: [
       {
@@ -61,7 +61,7 @@ const context: { [id: string]: Context } = {
   },
 
   fallback: {
-    title: "Philanthropy for Everyone",
+    title: "Philanthropy for everyone",
     description:
       "Sign up to support great causes or register and manage your nonprofit.",
     terms: [
@@ -106,9 +106,9 @@ export default function Page({ loaderData: to }: Route.ComponentProps) {
   return (
     <div className="grid justify-items-center gap-3.5">
       <div className="solo-card">
-        <h3 className="text-center text-balance text-2xl font-bold">
+        <h1 className="text-center text-balance text-2xl font-bold">
           {ctx.title}
-        </h3>
+        </h1>
         <p className="text-center text-pretty max-sm:text-sm mt-2">
           {ctx.description}
         </p>
@@ -126,7 +126,7 @@ export default function Page({ loaderData: to }: Route.ComponentProps) {
             type="submit"
           >
             <Image src={googleIcon} height={18} width={18} />
-            <span className="font-semibold">Sign Up with Google</span>
+            <span className="font-semibold">Sign up with Google</span>
           </button>
         </RmxForm>
 

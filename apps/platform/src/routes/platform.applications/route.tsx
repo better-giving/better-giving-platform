@@ -6,7 +6,7 @@ import { use_table } from "#/hooks/use-table";
 import type { IReg } from "@/reg";
 import type { Route } from "./+types/route";
 import { Filter } from "./filter";
-import { statuses } from "./filter/constants";
+import type { statuses } from "./filter/constants";
 import { Table } from "./table";
 
 export { loader } from "./api";
@@ -14,7 +14,15 @@ export const clientLoader = createClientLoaderCache<Route.ClientLoaderArgs>();
 
 export { ErrorBoundary } from "#/components/error";
 export const meta: Route.MetaFunction = () =>
-  metas({ title: "Applications Review - Dashboard" });
+  metas({ title: "NPO applications" });
+
+const empty_msgs: Record<keyof typeof statuses, string> = {
+  "": "No applications",
+  "01": "No incomplete applications",
+  "02": "No applications under review",
+  "03": "No approved applications",
+  "04": "No rejected applications",
+};
 
 export default CacheRoute(Applications);
 function Applications({ loaderData: page1 }: Route.ComponentProps) {
@@ -22,13 +30,12 @@ function Applications({ loaderData: page1 }: Route.ComponentProps) {
   const status_key = (
     params.has("status") ? params.get("status")! : "02"
   ) as keyof typeof statuses;
-  const status_label = statuses[status_key]?.toLowerCase() ?? "";
 
   const { node, loading } = use_table<IReg>({
     table: ({ items, ...props }) => (
       <Table
         items={items}
-        empty_msg={`No ${status_label} applications found`}
+        empty_msg={empty_msgs[status_key] ?? empty_msgs[""]}
         {...props}
       />
     ),
@@ -52,8 +59,8 @@ function Applications({ loaderData: page1 }: Route.ComponentProps) {
   }
 
   return (
-    <div className="@container grid content-start gap-y-4 px-6 py-4 md:px-10 md:py-8 w-full">
-      <h3 className="font-bold text-2xl">NPO Applications</h3>
+    <div className="@container grid content-start gap-y-4 px-4 py-4 md:px-10 md:py-8 w-full">
+      <h1 className="sr-only">NPO applications</h1>
       <div className="flex flex-wrap gap-3">
         <form
           onSubmit={handle_search}
@@ -72,7 +79,7 @@ function Applications({ loaderData: page1 }: Route.ComponentProps) {
         <Filter isDisabled={loading} classes="w-full @sm:w-auto" />
       </div>
 
-      <div className="grid table-scroll">{node}</div>
+      <div className="grid">{node}</div>
     </div>
   );
 }

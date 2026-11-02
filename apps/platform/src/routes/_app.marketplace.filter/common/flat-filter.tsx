@@ -10,7 +10,9 @@ export function FlatFilter<T>({ classes = "", ...props }: GroupProps<T>) {
 
   return (
     <fieldset className={`grid px-2 py-4 ${classes}`}>
-      <legend className="font-bold text-xs uppercase">{props.label}</legend>
+      <legend className="text-sm font-semibold text-gray-11">
+        {props.label}
+      </legend>
       <div className="flex flex-wrap gap-x-1 gap-y-2">
         {props.options.map((option) => {
           const selected = props.selectedValues.includes(option.value);
@@ -23,7 +25,7 @@ export function FlatFilter<T>({ classes = "", ...props }: GroupProps<T>) {
               className={`${
                 selected
                   ? "border-primary text-gray-12 bg-secondary-active"
-                  : ""
+                  : "border-gray-7 hover:border-gray-8 hover:bg-gray-4"
               } border select-none rounded-full capitalize text-xs pt-1 pb-1 px-4`}
             >
               {option.displayText}

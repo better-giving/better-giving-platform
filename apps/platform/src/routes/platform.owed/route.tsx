@@ -107,8 +107,8 @@ export default function Page({ loaderData }: Route.ComponentProps) {
   const return_focus_fallback = () => dialog && owed_return_target(dialog.at);
 
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8 w-full grid content-start">
-      <h3 className="font-bold text-2xl mb-4">Amounts owed</h3>
+    <div className="px-4 py-4 md:px-10 md:py-8 w-full grid content-start">
+      <h1 className="sr-only">Amounts owed</h1>
       {node}
       <WriteOffDialog
         open={dialog?.at.action === "write_off" && dialog.open && !wo.done}

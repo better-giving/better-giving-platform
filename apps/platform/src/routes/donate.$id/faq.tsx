@@ -80,7 +80,7 @@ const faqs = [
   },
   {
     id: 4,
-    question: "How do I donate by Check?",
+    question: "How do I donate by check?",
     paragraphs: [
       <p key={0} className="leading-normal">
         For gifts by check: Make your check out to{" "}

@@ -11,7 +11,7 @@ import type { Route } from "./+types/route";
 export { loader } from "./api";
 export const clientLoader = createClientLoaderCache<Route.ClientLoaderArgs>();
 export const meta: Route.MetaFunction = () =>
-  metas({ title: "Settle Donations" });
+  metas({ title: "Settle donations" });
 
 export default CacheRoute(Page);
 function Page({ loaderData }: Route.ComponentProps) {
@@ -20,9 +20,9 @@ function Page({ loaderData }: Route.ComponentProps) {
   const prev_cursor = search_params.get("cursor");
 
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8 w-full max-w-5xl grid content-start">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-bold text-2xl">Settle Donations</h3>
+    <div className="px-4 py-4 md:px-10 md:py-8 w-full max-w-5xl grid content-start">
+      <h1 className="sr-only">Settle donations</h1>
+      <div className="flex justify-end mb-4">
         <NavLink
           to="create"
           preventScrollReset

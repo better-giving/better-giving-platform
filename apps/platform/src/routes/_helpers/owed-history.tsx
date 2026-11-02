@@ -37,7 +37,7 @@ export function OwedHistory({ rows, run_noun, received_label }: IOwedHistory) {
       <div className="table-scroll">
         <table className="table" aria-labelledby="owed-history">
           <thead>
-            <tr>
+            <tr className="whitespace-nowrap">
               <th>Gift</th>
               <th>Reason</th>
               <th>{received_label}</th>
@@ -72,9 +72,13 @@ export function OwedHistory({ rows, run_noun, received_label }: IOwedHistory) {
                       {r.source === "refund" ? "Refund" : "Dispute"}{" "}
                       {to_utc_day(r.recorded_at)}
                     </td>
-                    <td>{usd(r.received_usd)}</td>
-                    <td>{usd(r.fee_processing_usd)}</td>
-                    <td>{usd(r.fee_dispute_usd)}</td>
+                    <td className="whitespace-nowrap">{usd(r.received_usd)}</td>
+                    <td className="whitespace-nowrap">
+                      {usd(r.fee_processing_usd)}
+                    </td>
+                    <td className="whitespace-nowrap">
+                      {usd(r.fee_dispute_usd)}
+                    </td>
                     <td>
                       <div>{STATUS[r.state]}</div>
                       {events.length > 0 && (

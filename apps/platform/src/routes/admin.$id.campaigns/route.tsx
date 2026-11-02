@@ -78,17 +78,20 @@ export default function Page({ loaderData }: Route.ComponentProps) {
   const tab = loaderData.view;
   const { endow } = loaderData;
   const new_to = href("/admin/:id/campaigns/new", { id: String(endow.id) });
+  const no_campaigns =
+    loaderData.view === "campaigns" &&
+    loaderData.campaigns.length === 0 &&
+    loaderData.org_funds.length === 0;
 
   return (
-    <div className="grid px-6 py-4 md:px-10 md:py-8 gap-6 max-w-[1400px]">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-bold">Campaigns</h1>
-        {loaderData.view === "campaigns" && (
-          <Link to={new_to} className="btn btn-primary">
-            New campaign
-          </Link>
-        )}
-      </div>
+    <div className="grid px-4 py-4 md:px-10 md:py-8 gap-6 max-w-[1400px]">
+      <h1 className="sr-only">Campaigns</h1>
+      {/* the empty state carries the one create action */}
+      {loaderData.view === "campaigns" && !no_campaigns && (
+        <Link to={new_to} className="btn btn-primary justify-self-end">
+          New campaign
+        </Link>
+      )}
       <Tabs
         className="grid gap-6"
         value={tab}
@@ -105,8 +108,7 @@ export default function Page({ loaderData }: Route.ComponentProps) {
       >
         {loaderData.view === "campaigns" ? (
           <TabPanel value="campaigns" className="grid gap-6">
-            {loaderData.campaigns.length === 0 &&
-            loaderData.org_funds.length === 0 ? (
+            {no_campaigns ? (
               <EmptyState
                 action={
                   <Link to={new_to} className="btn btn-primary">

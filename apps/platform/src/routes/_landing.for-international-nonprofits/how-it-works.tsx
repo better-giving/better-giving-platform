@@ -22,7 +22,7 @@ export function HowItWorks({ classes = "" }) {
           Your donors give to Better Giving, a U.S. 501(c)(3), earmarked for
           your organization. They get a U.S. tax deduction. You get the funds.
         </p>
-        <ol className="bg-panel border border-gray-6 rounded divide-y divide-gray-6">
+        <ol className="bg-card rounded-card border border-hairline divide-y divide-hairline">
           {steps.map((s, i) => (
             <li
               key={s.title}
@@ -36,7 +36,7 @@ export function HowItWorks({ classes = "" }) {
               </span>
               <div className="grid gap-2 min-w-0">
                 <h3 className="text-lg font-bold">{s.title}</h3>
-                <p className="text-sm/relaxed text-gray-11 text-pretty max-w-prose">
+                <p className="text-base/relaxed text-gray-12 text-pretty max-w-prose">
                   {s.body}
                 </p>
               </div>

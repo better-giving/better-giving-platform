@@ -226,7 +226,7 @@ describe("admin views donation forms", () => {
     await expect.element(screen.getByRole("table")).toBeInTheDocument();
 
     await expect
-      .element(screen.getByRole("link", { name: "Create Form" }))
+      .element(screen.getByRole("link", { name: "Create form" }))
       .toBeInTheDocument();
   });
 
@@ -355,7 +355,8 @@ describe("admin filters forms", () => {
 
     const screen = await render_page(npo.id, "inactive");
 
-    expect(screen.getByRole("table").query()).toBeNull();
+    // the empty state is a row of the table card, under the filter header
+    await expect.element(screen.getByRole("table")).toBeInTheDocument();
     await expect
       .element(screen.getByText(/no.*inactive.*forms found/i))
       .toBeVisible();
@@ -372,8 +373,8 @@ describe("admin filters forms", () => {
     await expect.element(screen.getByText("is-active")).toBeVisible();
     await expect.element(screen.getByText("is-inactive")).toBeInTheDocument();
 
-    // open StatusFilter (single combobox on the page) and pick Inactive
-    await screen.getByRole("combobox").click();
+    // the filter is named for its column, not for the value it holds
+    await screen.getByRole("combobox", { name: "Status" }).click();
     await screen.getByRole("option", { name: "Inactive" }).click();
 
     await expect.element(screen.getByText("is-inactive")).toBeVisible();
@@ -385,13 +386,14 @@ describe("admin filters forms", () => {
     const screen = await render_page(npo.id);
 
     await expect.element(screen.getByText("Donation forms")).toBeVisible();
-    expect(screen.getByRole("table").query()).toBeNull();
+    // the empty state is a row of the table card, under the filter header
+    await expect.element(screen.getByRole("table")).toBeInTheDocument();
     await expect.element(screen.getByText(/no.*forms found/i)).toBeVisible();
     await expect
       .element(screen.getByText("Forms you create will show up here."))
       .toBeVisible();
     await expect
-      .element(screen.getByRole("link", { name: "Create Form" }))
+      .element(screen.getByRole("link", { name: "Create form" }))
       .toBeInTheDocument();
   });
 });

@@ -43,84 +43,90 @@ function Page({ loaderData }: Route.ComponentProps) {
   const top_holders = ltd ? top_holders_fn(ltd.balances) : [];
 
   return (
-    <div className="px-6 py-4 md:px-10 md:py-8 w-full max-w-4xl grid content-start">
-      <h3 className="font-bold text-2xl mb-4">Savings</h3>
-
+    <div className="px-4 py-4 md:px-10 md:py-8 w-full max-w-4xl grid content-start gap-6">
+      <h1 className="sr-only">Savings</h1>
       {ltd ? (
         <>
-          <div>
-            <p className="text-gray-11 text-sm mb-2">Total Value</p>
+          <div className="card">
+            <p className="text-gray-11 text-sm mb-2">Total value</p>
             <p className="text-3xl font-bold">${humanize(ltd.total)}</p>
           </div>
 
-          <h4 className="font-bold text-lg mb-4 mt-8 capitalize">
-            Total savings balance
-          </h4>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart
-              data={line_data}
-              margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
-            >
-              <Legend wrapperStyle={{ fontSize: 14, paddingTop: 10 }} />
-              <XAxis dataKey="date" tick={{ fontSize: 12, dy: 4 }} />
-              <YAxis
-                yAxisId="left"
-                orientation="left"
-                stroke="#1e6dab"
-                tick={{ fontSize: 12, dx: -4 }}
-              />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="total"
-                stroke="#1e6dab"
-                name="Savings Balance"
-                dot={{ r: 3 }}
-                isAnimationActive={false}
-              />
+          <section className="card">
+            <h2 className="font-bold text-lg mb-4 capitalize">
+              Total savings balance
+            </h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart
+                data={line_data}
+                margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+              >
+                <Legend wrapperStyle={{ fontSize: 14, paddingTop: 10 }} />
+                <XAxis dataKey="date" tick={{ fontSize: 12, dy: 4 }} />
+                <YAxis
+                  yAxisId="left"
+                  orientation="left"
+                  stroke="#1e6dab"
+                  tick={{ fontSize: 12, dx: -4 }}
+                />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="total"
+                  stroke="#1e6dab"
+                  name="Savings Balance"
+                  dot={{ r: 3 }}
+                  isAnimationActive={false}
+                />
 
-              <RechartsTooltip
-                contentStyle={{ fontSize: 12 }}
-                formatter={(val, name) => [`${humanize(val as number)}`, name]}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+                <RechartsTooltip
+                  contentStyle={{ fontSize: 12 }}
+                  formatter={(val, name) => [
+                    `${humanize(val as number)}`,
+                    name,
+                  ]}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </section>
 
-          <div className="flex items-center justify-between mt-8 mb-4">
-            <h4 className="text-lg">Recent balance snapshots</h4>
-            {logs_bal_next && (
-              <Link to="balance-history" className="text-sm link">
-                See All
-              </Link>
-            )}
-          </div>
-          <BalanceHistoryTable items={logs_bal} />
+          <section className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg">Recent balance snapshots</h2>
+              {logs_bal_next && (
+                <Link to="balance-history" className="text-sm link">
+                  See all
+                </Link>
+              )}
+            </div>
+            <BalanceHistoryTable items={logs_bal} />
+          </section>
         </>
       ) : (
-        <EmptyState>No balance data yet</EmptyState>
+        <div className="card">
+          <EmptyState>No balance data yet</EmptyState>
+        </div>
       )}
 
-      <div className="flex items-center gap-x-2 mt-8 mb-4">
-        <h4 className="font-bold text-lg">Recent interests</h4>
-        <NavLink
-          replace
-          preventScrollReset
-          to="log-interest"
-          className="btn btn-sm btn-primary"
-        >
-          Log Interest
-        </NavLink>
-        {logs_intr_next && (
-          <Link to="interest-history" className="ml-auto text-sm link">
-            See All
-          </Link>
-        )}
-      </div>
-      {logs_intr.length > 0 ? (
+      <section className="card">
+        <div className="flex items-center gap-x-2 mb-4">
+          <h2 className="font-bold text-lg">Recent interests</h2>
+          <NavLink
+            replace
+            preventScrollReset
+            to="log-interest"
+            className="btn btn-sm btn-primary"
+          >
+            Log interest
+          </NavLink>
+          {logs_intr_next && (
+            <Link to="interest-history" className="ml-auto text-sm link">
+              See all
+            </Link>
+          )}
+        </div>
         <InterestHistoryTable items={logs_intr} />
-      ) : (
-        <EmptyState>No interest logs yet</EmptyState>
-      )}
+      </section>
 
       {top_holders.length > 0 && (
         <TopSavers holders={top_holders} total={num_holders} />
@@ -137,10 +143,10 @@ interface ITopSavers {
 
 function TopSavers({ holders, total }: ITopSavers) {
   return (
-    <div className="table-scroll">
-      <h5 className="font-bold text-base mt-8 mb-2">
+    <section className="card">
+      <h2 className="font-bold text-base mb-2">
         Top savers <span className="text-sm text-gray-11">( of {total} )</span>
-      </h5>
+      </h2>
       <div className="table-scroll">
         <table className="table">
           <thead>
@@ -161,6 +167,6 @@ function TopSavers({ holders, total }: ITopSavers) {
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   );
 }

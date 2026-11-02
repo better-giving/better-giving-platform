@@ -77,7 +77,7 @@ export function DonationTab({
           classes={{
             label: "",
           }}
-          label="Tax Receipt message for donors"
+          label="Tax receipt message for donors"
           placeholder="Your nonprofit's message to all donors"
         />
         <p
@@ -100,7 +100,7 @@ export function DonationTab({
 
       <div className="grid gap-2">
         <CheckField {...register("hide_bg_tip")} classes="font-medium">
-          Opt out of Support Contribution Model
+          Opt out of support contribution model
         </CheckField>
         <span className="text-sm text-gray-11">
           In the donation form, there is a section in which users can choose to
@@ -127,7 +127,7 @@ export function DonationTab({
         </span>
       </div>
 
-      <div className="mt-8">
+      <div>
         <SaveAlert data={fetcher.data} />
         <Actions>
           <button

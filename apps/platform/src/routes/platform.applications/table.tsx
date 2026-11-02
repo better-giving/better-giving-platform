@@ -41,7 +41,7 @@ export function Table({
     <div className={`${classes} table-scroll`}>
       <table className="table">
         <thead>
-          <tr>
+          <tr className="whitespace-nowrap">
             <th>
               <HeaderButton
                 onClick={handle_sort("o_name")}
@@ -49,7 +49,7 @@ export function Table({
                 _sortKey={"o_name" as any}
                 _sortDirection={sort_dir}
               >
-                Nonprofit Name
+                Nonprofit name
               </HeaderButton>
             </th>
             <th>
@@ -59,7 +59,7 @@ export function Table({
                 _sortKey={"updated_at" as any}
                 _sortDirection={sort_dir}
               >
-                Date Submitted
+                Date submitted
               </HeaderButton>
             </th>
             <th>
@@ -69,7 +69,7 @@ export function Table({
                 _sortKey={"o_hq_country" as any}
                 _sortDirection={sort_dir}
               >
-                HQ Country
+                HQ country
               </HeaderButton>
             </th>
             <th>
@@ -79,7 +79,7 @@ export function Table({
                 _sortKey={"status" as any}
                 _sortDirection={sort_dir}
               >
-                Registration Status
+                Registration status
               </HeaderButton>
             </th>
             <th>
@@ -94,7 +94,7 @@ export function Table({
             items.map((row) => (
               <tr key={row.id} className="text-sm">
                 <td>{row.o_name}</td>
-                <td>{toPP(row.updated_at)}</td>
+                <td className="whitespace-nowrap">{toPP(row.updated_at)}</td>
                 <td>{row.o_hq_country}</td>
                 <td>
                   <Status status={row.status} reg={row} />
@@ -120,7 +120,7 @@ export function Table({
         </tbody>
         {load_next && (
           <LoadMoreRow
-            col_span={6}
+            col_span={5}
             disabled={disabled}
             loading={loading}
             on_load_next={load_next}
@@ -178,7 +178,7 @@ function Status({ status, reg }: IStatusProps) {
           {progress.steps.map((done, i) => (
             <div
               key={i}
-              className={`h-1 w-3 rounded-full ${done ? "bg-primary" : "bg-gray-3"}`}
+              className={`h-1 w-3 rounded-full ${done ? "bg-primary" : "bg-gray-4"}`}
               title={`${step_labels[i]}: ${done ? "done" : "pending"}`}
             />
           ))}

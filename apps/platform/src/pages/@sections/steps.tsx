@@ -8,15 +8,13 @@ import { app_name } from "#/constants/env";
 import { BOOK_A_DEMO } from "#/constants/urls";
 
 type TListItem = {
-  title1: string;
-  title2: string;
+  title: string;
   description: string;
   image: { src: string; width?: number; height?: number; alt: string };
 };
 const items: TListItem[] = [
   {
-    title1: "Step 1",
-    title2: "Sign up",
+    title: "Sign up",
     description: `Join ${app_name}. No platform fee while the optional donor contribution stays on. Turning that ask off is a 1.5% fee.`,
     image: {
       src: laira1,
@@ -26,8 +24,7 @@ const items: TListItem[] = [
     },
   },
   {
-    title1: "Step 2",
-    title2: "Add the donation form ",
+    title: "Add the donation form",
     description:
       "Fewer clicks + more donation types + express checkout = more completed gifts and monthly donors.",
     image: {
@@ -38,10 +35,9 @@ const items: TListItem[] = [
     },
   },
   {
-    title1: "Step 3",
-    title2: "Grow",
+    title: "Grow",
     description:
-      "Let your hard earned donations work for you with passive high-yield savings & managed investments.",
+      "Let your hard-earned donations work for you with passive high-yield savings & managed investments.",
     image: {
       src: laira3,
       width: 115,
@@ -54,21 +50,23 @@ const items: TListItem[] = [
 export function Steps({ classes = "" }) {
   return (
     <section className={`${classes} grid content-start `}>
-      <motion.h3
-        className="text-center text-3xl section-heading mb-6 px-4"
+      <motion.h2
+        className="text-center section-heading mb-6 px-4"
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-100px" }}
         transition={{ type: "spring" }}
       >
         Easy as 1-2-3
-      </motion.h3>
+      </motion.h2>
 
-      <ul className="mt-20 lg:divide-x divide-gray-6 grid gap-y-20 lg:gap-y-0 lg:grid-cols-3">
+      {/* the order is the list's, not a badge's: laira already holds each
+          step's number, so the ol carries it for assistive tech alone */}
+      <ol className="mt-20 lg:divide-x divide-hairline grid gap-y-20 lg:gap-y-0 lg:grid-cols-3">
         {items.map((item, idx) => (
           <ListItem {...item} key={idx} index={idx} />
         ))}
-      </ul>
+      </ol>
       <motion.p
         className="text-center max-w-3xl justify-self-center mt-12 text-lg px-4"
         initial={{ opacity: 0, y: 20 }}
@@ -100,7 +98,7 @@ export function Steps({ classes = "" }) {
           to={BOOK_A_DEMO}
           className="btn btn-lg btn-secondary inline-flex items-center font-bold"
         >
-          Book a Demo
+          Book a demo
         </Link>
       </motion.div>
     </section>
@@ -110,7 +108,7 @@ export function Steps({ classes = "" }) {
 function ListItem(props: TListItem & { index: number }) {
   return (
     <motion.li
-      className="grid lg:grid-rows-subgrid row-span-4 px-9 justify-items-center"
+      className="grid lg:grid-rows-subgrid row-span-3 px-9 justify-items-center"
       initial={{ opacity: 0, y: 40 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-100px" }}
@@ -123,10 +121,9 @@ function ListItem(props: TListItem & { index: number }) {
         alt={props.image.alt}
         className="mb-4"
       />
-      <h4 className="text-center font-medium text-2xl px-8">{props.title1}</h4>
-      <h5 className="py-4 text-center font-medium text-lg @6xl:text-xl border-b-[3px] border-primary mb-7 px-8">
-        {props.title2}
-      </h5>
+      <h3 className="py-4 text-center font-medium text-xl @6xl:text-2xl border-b-[3px] border-primary mb-7 px-8">
+        {props.title}
+      </h3>
       <p className="text-center text-lg @6xl:text-xl">{props.description}</p>
     </motion.li>
   );

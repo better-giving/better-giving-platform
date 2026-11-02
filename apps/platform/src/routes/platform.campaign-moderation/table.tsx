@@ -5,7 +5,12 @@ import { toPP } from "@/helpers/date";
 import type { IFundListItem } from "$/pg/queries/fund";
 import { DeleteBtn } from "./delete-btn";
 
-interface Props extends IPaginator<IFundListItem> {}
+interface IRow extends IFundListItem {
+  /** first name, else email; null when the creator has no user row */
+  creator_name: string | null;
+}
+
+interface Props extends IPaginator<IRow> {}
 
 export function Table({
   items,
@@ -27,7 +32,9 @@ export function Table({
       <tbody>
         {items.map((row) => (
           <tr key={row.id} className="text-sm">
-            <td>{row.created_at ? toPP(row.created_at) : "--"}</td>
+            <td className="whitespace-nowrap">
+              {row.created_at ? toPP(row.created_at) : "--"}
+            </td>
             <td>
               <NavLink
                 to={href("/campaigns/:fund_id", { fund_id: row.id })}
@@ -36,7 +43,23 @@ export function Table({
                 {row.name}
               </NavLink>
             </td>
-            <td>{row.creator_id}</td>
+            <td>
+              {row.creator_name ? (
+                <span
+                  className="block max-w-48 truncate"
+                  title={row.creator_name}
+                >
+                  {row.creator_name}
+                </span>
+              ) : (
+                <span
+                  className="block max-w-48 truncate font-mono text-xs"
+                  title={row.creator_id}
+                >
+                  {row.creator_id}
+                </span>
+              )}
+            </td>
             <td>
               <DeleteBtn fund_id={row.id} name={row.name} />
             </td>

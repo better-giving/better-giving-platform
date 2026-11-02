@@ -10,12 +10,14 @@ export function Container({ title, children, classes = "" }: Props) {
   const [is_open, set_open] = useState(true);
 
   return (
-    <div className={`w-full border rounded divide-y divide-gray-6 ${classes}`}>
+    <div
+      className={`w-full bg-card rounded-card border border-hairline divide-y divide-hairline ${classes}`}
+    >
       <div className="flex items-center gap-x-3 p-3">
         <button
           type="button"
           onClick={() => set_open((prev) => !prev)}
-          className="flex items-center justify-center p-px size-6 border rounded"
+          className="btn btn-sm btn-icon btn-secondary"
           aria-label="toggle section content's visibility"
         >
           {is_open ? (
@@ -24,7 +26,7 @@ export function Container({ title, children, classes = "" }: Props) {
             <Plus className="icon-lg" />
           )}
         </button>
-        <p className="uppercase text-sm font-bold">{title}</p>
+        <p className="text-sm font-bold first-letter:uppercase">{title}</p>
       </div>
       {is_open && children}
     </div>

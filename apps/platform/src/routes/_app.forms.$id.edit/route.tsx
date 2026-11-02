@@ -55,9 +55,7 @@ export default function Page({ loaderData }: Route.ComponentProps) {
               <h3 className="text-lg flex-1">{d.name}</h3>
               {d.program_id && (
                 <p className="text-sm mt-1">
-                  <span className="text-2xs bg-gray-3 p-1 rounded">
-                    Program
-                  </span>{" "}
+                  <span className="text-xs bg-gray-3 p-1 rounded">Program</span>{" "}
                   <span className="text-sm font-medium text-gray-11">
                     {d.program_name}
                   </span>
