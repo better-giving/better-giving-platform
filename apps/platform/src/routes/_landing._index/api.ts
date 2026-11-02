@@ -47,9 +47,19 @@ export const loader = ({ url }: Route.LoaderArgs) => {
   return null;
 };
 
+/** RFC 8288 discovery links: the API catalog (RFC 9727), the OpenAPI
+ * description, the markdown twin and the MCP server card */
+const DISCOVERY_LINKS = [
+  '</.well-known/api-catalog>; rel="api-catalog"',
+  '</openapi.json>; rel="service-desc"; type="application/json"',
+  '</index.md>; rel="alternate"; type="text/markdown"',
+  '</.well-known/mcp.json>; rel="mcp"; type="application/json"',
+].join(", ");
+
 // homepage is otherwise fully static. pin a cdn-friendly cache-control so the
 // document can be served from edge cache. RR merges parent Set-Cookie
 // automatically; returning a plain object avoids duplicating those headers.
 export const headers: Route.HeadersFunction = () => ({
   "cache-control": CACHE_CONTROL,
+  link: DISCOVERY_LINKS,
 });

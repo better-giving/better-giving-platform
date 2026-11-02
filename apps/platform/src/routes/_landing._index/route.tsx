@@ -61,11 +61,18 @@ const faq_page = {
   })),
 };
 
-export const meta: Route.MetaFunction = () =>
-  metas({
+export const meta: Route.MetaFunction = () => [
+  ...metas({
     description: `Raise more this quarter and grow funds together. ${app_name} offers donation forms, savings, and fund growth tools. No platform fee while the optional donor contribution stays on.`,
     jsonld: [organization, website, faq_page],
-  });
+  }),
+  {
+    tagName: "link",
+    rel: "alternate",
+    type: "text/markdown",
+    href: "/index.md",
+  },
+];
 
 export const links: LinksFunction = () => [
   { rel: "preload", href: donation_form, as: "image", fetchPriority: "high" },

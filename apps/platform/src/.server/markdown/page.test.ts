@@ -2,10 +2,17 @@ import { createElement as h } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import { FAQ, faqs } from "#/pages/@sections/faq";
-import { page_markdown } from "./page";
+import { page_markdown as with_frontmatter } from "./page";
 
 const ORIGIN = "https://www.better.giving";
 const PAGE = `${ORIGIN}/pricing`;
+
+const NOW = new Date("2026-11-03T12:00:00Z");
+
+/** the body under the frontmatter, which has its own tests below */
+const page_markdown = (html: string, url: string) =>
+  with_frontmatter(html, url, NOW)?.replace(/^---\n[\s\S]*?\n---\n\n/, "") ??
+  null;
 
 const doc = (title: string, main: string) =>
   `<!DOCTYPE html><html><head><title>${title}</title><style>.x{}</style></head><body>` +
@@ -177,5 +184,35 @@ describe("page_markdown", () => {
         PAGE
       )
     ).toBeNull();
+  });
+
+  test("opens with frontmatter: title, description, canonical, last-updated", () => {
+    const html =
+      `<!DOCTYPE html><html><head><title>Pricing | "Better" Giving</title>` +
+      `<meta name="description" content="Free  forever.">` +
+      `<link rel="canonical" href="/pricing"></head>` +
+      `<body><main><p>Free.</p></main></body></html>`;
+    expect(with_frontmatter(html, `${PAGE}?utm=1`, NOW)).toBe(
+      [
+        "---",
+        'title: "Pricing | \\"Better\\" Giving"',
+        'description: "Free forever."',
+        `canonical: "${PAGE}"`,
+        "last-updated: 2026-11-03",
+        "---",
+        "",
+        '# Pricing | "Better" Giving',
+        "",
+        "Free.",
+        "",
+      ].join("\n")
+    );
+  });
+
+  test("frontmatter falls back to the page url and the h1", () => {
+    const md = with_frontmatter(doc("", "<h1>Hi</h1>"), PAGE, NOW);
+    expect(md?.startsWith(`---\ntitle: "Hi"\ncanonical: "${PAGE}"\n`)).toBe(
+      true
+    );
   });
 });

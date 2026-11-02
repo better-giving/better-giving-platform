@@ -7,6 +7,18 @@ export const MCP_SERVER_INFO = {
 /** the production MCP endpoint the guide names */
 export const MCP_URL = "https://better.giving/agents/mcp";
 
+export const MCP_TITLE = "Better Giving donations";
+export const MCP_DESCRIPTION =
+  "Find a nonprofit on Better Giving, quote a one-time USD donation, and hand the donor a Stripe-hosted checkout link.";
+
+/** the site logo, `public/logo.png` (2048x2048) */
+export const mcp_icons = (origin: string) => [
+  { src: `${origin}/logo.png`, mimeType: "image/png", sizes: ["2048x2048"] },
+];
+
+export const server_card_url = (origin: string) =>
+  `${origin}/.well-known/mcp/server-card.json`;
+
 export const GUIDE = `# Better Giving agent donations
 
 Connect to the remote MCP server at \`${MCP_URL}\` for
@@ -44,6 +56,12 @@ export const tools = [
     name: "find_nonprofit",
     description:
       "Find a Better Giving nonprofit by name or US EIN. items lists only listed nonprofits whose name matches the query, best first; match is exact when one is the name asked for, close when only similar names match (confirm with the donor), and none when no listed nonprofit matches. Each listed item carries increments: the nonprofit's preset amounts in USD, smallest first, each with a label in the nonprofit's own words. Offer them as the amount options, plus a custom amount; an increment with an empty label is offered as the amount alone. Offer generic amounts plus a custom amount only when increments is empty, and never invent what an amount achieves. IRS-verified 501(c)(3)s that are not on Better Giving come back in not_on_better_giving and cannot take a donation: tell the donor and share onboarding_url, and never pass them to quote_donation. If external_lookup is invalid_query, ask for a name of at least two characters or a 9-digit EIN. If external_lookup is not ok, not_found, or invalid_query, the IRS lookup is temporarily unavailable.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: "object",
       properties: { query: { type: "string" }, ein: { type: "string" } },
@@ -55,6 +73,12 @@ export const tools = [
     name: "quote_donation",
     description:
       "Quote a one-time USD donation, including tip and optional card-fee coverage. increment_label is the nonprofit's own label when amount exactly equals one of its increments and that label is not empty, otherwise null; repeat it as the nonprofit's words, never as a claim of your own. breakdown shows where the money goes: amount + tip + fee_allowance = total_charged, and nonprofit_receives + platform_fee (1.5% of the donation amount, or of each member's share for a fund, for each nonprofit that turned off tips, whether or not the card fee is covered) + fiscal_sponsor_fee (2.9% of the donation amount, or of each member's share for a fund, for a fiscally sponsored nonprofit, whether or not the card fee is covered) + processing_fee (Stripe's card fee, estimated at its card rate) + better_giving_receives (the tip and what the fee allowance leaves after the card fee) = total_charged.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     inputSchema: {
       type: "object",
       properties: {
@@ -79,6 +103,12 @@ export const tools = [
     name: "donate",
     description:
       "Create or recover a Stripe-hosted Checkout Session for an unchanged quote.",
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: "object",
       properties: {
@@ -102,6 +132,12 @@ export const tools = [
     name: "donation_status",
     description:
       "Read the status and amounts of an agent donation without donor details.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     inputSchema: {
       type: "object",
       properties: { donation_id: { type: "string", format: "uuid" } },
