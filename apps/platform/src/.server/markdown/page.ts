@@ -16,12 +16,35 @@ const NOT_CONTENT = [
   '[aria-hidden="true"]',
 ].join(",");
 
+/**
+ * an ark/zag accordion renders each question as a `<button>` and each closed
+ * answer `hidden`, both on the strip list — the question becomes a paragraph
+ * and the answer is shown before stripping
+ */
+function open_accordions(main: HTMLElement) {
+  for (const trigger of main.querySelectorAll(
+    '[data-scope="accordion"][data-part="item-trigger"]'
+  )) {
+    trigger.replaceWith(`<p>${trigger.innerHTML}</p>`);
+  }
+  for (const panel of main.querySelectorAll(
+    '[data-scope="accordion"][data-part="item-content"]'
+  )) {
+    panel.removeAttribute("hidden");
+  }
+}
+
 const BLOCK_DISPLAY = new Set(["block", "flex", "grid"]);
 const STACKS_CHILDREN = new Set(["grid", "flex-col"]);
 const FLEX = new Set(["flex", "inline-flex"]);
 
 const has_class = (el: HTMLElement, names: Set<string>) =>
   el.classList.value.some((c) => names.has(c));
+
+/** the mobile copy of a block a page renders once per breakpoint; `max-*:hidden` marks the desktop copy, kept */
+const MOBILE_ONLY = new Set(
+  ["sm", "md", "lg", "xl", "2xl"].map((bp) => `${bp}:hidden`)
+);
 
 /**
  * the converter reads tags, not css: a span tailwind lays out as a block (its
@@ -67,7 +90,11 @@ export function page_markdown(html: string, page_url: string): string | null {
   const main = root.querySelector("main");
   if (!main) return null;
 
+  open_accordions(main);
   for (const el of main.querySelectorAll(NOT_CONTENT)) el.remove();
+  for (const el of main.querySelectorAll("[class]")) {
+    if (has_class(el, MOBILE_ONLY)) el.remove();
+  }
   lay_out(main);
   for (const [selector, attr] of [
     ["a[href]", "href"],

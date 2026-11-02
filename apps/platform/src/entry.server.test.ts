@@ -10,9 +10,15 @@ import {
   useAsyncValue,
   useLoaderData,
 } from "react-router";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+import { report_error } from "#/errors/report";
 import * as entry from "./entry.server";
 import * as pricing from "./routes/_landing.pricing/route";
+
+vi.mock("#/errors/report", async (original) => ({
+  ...(await original<typeof import("#/errors/report")>()),
+  report_error: vi.fn(),
+}));
 
 const ORIGIN = "https://www.better.giving";
 const BROWSER =
@@ -56,17 +62,47 @@ function Page() {
   );
 }
 
-const page_module = (handle?: object) => ({
+// over react's default progressiveChunkSize (12,800 bytes)
+const BIG_STORY = `Long story ${"word ".repeat(3_000)}end of story`;
+
+const page_module = (handle?: object, story = "Deferred story") => ({
   default: Page,
   handle,
   meta: () => [{ title: "Acme Fund" }],
   headers: () => ({ "cache-control": "public, max-age=60", vary: "Cookie" }),
   loader: () => ({
     name: "Acme",
-    story: new Promise<string>((r) =>
-      setTimeout(() => r("Deferred story"), 20)
-    ),
+    story: new Promise<string>((r) => setTimeout(() => r(story), 20)),
   }),
+});
+
+function ShellThrows(): never {
+  throw new Error("shell render failed");
+}
+
+function BoundaryThrows(): never {
+  throw new Error("boundary render failed");
+}
+
+function RecoverablePage() {
+  return h(
+    "main",
+    null,
+    h("p", null, "Outside the boundary"),
+    h(
+      Suspense,
+      { fallback: h("p", null, "Boundary fallback") },
+      h(BoundaryThrows)
+    )
+  );
+}
+
+const opted_module = (default_: () => unknown, loader?: () => unknown) => ({
+  default: default_,
+  handle: { markdown: true },
+  meta: () => [{ title: "Edge" }],
+  headers: () => ({ vary: "Cookie" }),
+  loader,
 });
 
 const entry_route = (
@@ -103,6 +139,41 @@ const build = {
       path: "plain",
       module: page_module(),
     },
+    big: {
+      id: "big",
+      parentId: "root",
+      path: "big",
+      module: page_module({ markdown: true }, BIG_STORY),
+    },
+    "shell-throws": {
+      id: "shell-throws",
+      parentId: "root",
+      path: "shell-throws",
+      module: opted_module(ShellThrows),
+    },
+    recoverable: {
+      id: "recoverable",
+      parentId: "root",
+      path: "recoverable",
+      module: opted_module(RecoverablePage),
+    },
+    "opted-404": {
+      id: "opted-404",
+      parentId: "root",
+      path: "opted-404",
+      module: opted_module(
+        () => h("main", null, h("p", null, "Never rendered")),
+        () => {
+          throw new Response("no such fund", { status: 404 });
+        }
+      ),
+    },
+    "no-main": {
+      id: "no-main",
+      parentId: "root",
+      path: "no-main",
+      module: opted_module(() => h("div", null, h("p", null, "No landmark"))),
+    },
     pricing: {
       id: "pricing",
       parentId: "root",
@@ -116,6 +187,16 @@ const build = {
       root: entry_route("root", "", undefined, false),
       opted: entry_route("opted", "opted", "root"),
       plain: entry_route("plain", "plain", "root"),
+      big: entry_route("big", "big", "root"),
+      "shell-throws": entry_route(
+        "shell-throws",
+        "shell-throws",
+        "root",
+        false
+      ),
+      recoverable: entry_route("recoverable", "recoverable", "root", false),
+      "opted-404": entry_route("opted-404", "opted-404", "root"),
+      "no-main": entry_route("no-main", "no-main", "root", false),
       pricing: entry_route("pricing", "pricing", "root", false),
     },
     url: "/manifest.js",
@@ -165,6 +246,13 @@ describe("markdown negotiation in the document entry", () => {
     }
   });
 
+  test("a deferred boundary larger than react's chunk size lands inline", async () => {
+    const md = await (await serve("/big", "text/markdown")).text();
+    expect(md).toContain("Long story word");
+    expect(md).toContain("end of story");
+    expect(md).not.toContain("Loading story");
+  });
+
   test.each([[BROWSER], ["*/*"], [undefined], ["text/markdown, text/html"]])(
     "the same page keeps its html for Accept %s, varied",
     async (accept) => {
@@ -211,6 +299,40 @@ describe("markdown negotiation in the document entry", () => {
     expect(md).toMatch(/^# Pricing \| /);
     expect(md).toContain("Free. Forever.");
     expect(md).not.toMatch(/\]\(\//);
+  });
+
+  test("a shell error re-render lists Accept in Vary once", async () => {
+    const res = await serve("/shell-throws", "text/markdown");
+    expect(res.status).toBe(500);
+    expect(res.headers.get("content-type")).toBe("text/html");
+    expect(res.headers.get("vary")?.match(/accept/gi)).toHaveLength(1);
+  });
+
+  test("an error inside a suspense boundary is reported and the page still converts", async () => {
+    vi.mocked(report_error).mockClear();
+    const res = await serve("/recoverable", "text/markdown");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe(
+      "text/markdown; charset=utf-8"
+    );
+    expect(await res.text()).toContain("Outside the boundary");
+    expect(report_error).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "boundary render failed" })
+    );
+  });
+
+  test("an opted-in page whose loader throws a 404 stays html", async () => {
+    const res = await serve("/opted-404", "text/markdown");
+    expect(res.status).toBe(404);
+    expect(res.headers.get("content-type")).toBe("text/html");
+    expect(await res.text()).not.toContain("Never rendered");
+  });
+
+  test("an opted-in page with no main element answers with its html", async () => {
+    const res = await serve("/no-main", "text/markdown");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("text/html");
+    expect(await res.text()).toContain("No landmark");
   });
 
   test("a 404 stays html", async () => {

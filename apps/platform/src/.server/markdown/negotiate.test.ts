@@ -11,6 +11,9 @@ describe("prefers_markdown", () => {
     ["text/html;q=0.5, text/markdown"],
     ["TEXT/Markdown ; charset=utf-8"],
     ["text/markdown, */*;q=0.1"],
+    ["text/markdown, text/*;q=0.5"],
+    ["text/markdown;q=0.5, text/*;q=0.1, */*"],
+    ["text/markdown, text/html;q=abc"],
   ])("markdown preferred: %s", (accept) => {
     expect(prefers_markdown(accept)).toBe(true);
   });
@@ -28,6 +31,9 @@ describe("prefers_markdown", () => {
     ["text/markdown;q=0"],
     ["text/markdown;q=0, */*"],
     ["application/json"],
+    ["text/*;q=0.1, */*"],
+    ["text/markdown;q=0.4, text/*;q=0.5"],
+    ["text/markdown;q=abc, text/html;q=0.1"],
   ])("html, today's response: %s", (accept) => {
     expect(prefers_markdown(accept)).toBe(false);
   });

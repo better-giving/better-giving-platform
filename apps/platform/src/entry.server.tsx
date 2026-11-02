@@ -64,7 +64,8 @@ export default async function handle_request(
   _load_context: RouterContextProvider
 ) {
   const markdown = opts_into_markdown(router_context);
-  if (markdown) response_headers.append("vary", "Accept");
+  // rr re-enters with the same headers after a shell error
+  if (markdown) vary_on_accept(response_headers);
   const as_markdown =
     markdown &&
     response_status_code === 200 &&
@@ -142,6 +143,13 @@ export default async function handle_request(
 
 const MARKDOWN_TYPE = "text/markdown; charset=utf-8";
 
+function vary_on_accept(headers: Headers) {
+  const listed = (headers.get("vary") ?? "")
+    .split(",")
+    .some((v) => v.trim().toLowerCase() === "accept");
+  if (!listed) headers.append("vary", "Accept");
+}
+
 /** a page opts in with `export const handle = { markdown: true }` on its own route module */
 function opts_into_markdown({
   staticHandlerContext: { matches },
@@ -163,27 +171,32 @@ async function render_markdown(
   headers: Headers,
   router_context: EntryContext
 ): Promise<Response> {
+  // a shell error rejects below and reaches rr's handleError; errors inside a
+  // boundary can fire before the shell resolves, so they wait for it
+  const before_shell: unknown[] = [];
   let shell_rendered = false;
-  let failed = false;
   const stream = await renderToReadableStream(
     <ServerRouter context={router_context} url={request.url} />,
     {
       signal: AbortSignal.timeout(streamTimeout + 1000),
+      // React outlines a boundary above this many bytes into a hidden div the converter strips
+      progressiveChunkSize: Number.POSITIVE_INFINITY,
       onError(error: unknown) {
-        failed = true;
         if (shell_rendered) report_error(error);
+        else before_shell.push(error);
       },
     }
   );
   shell_rendered = true;
+  for (const error of before_shell) report_error(error);
   await stream.allReady;
   const html = await new Response(stream).text();
 
-  const md = failed ? null : page_markdown(html, request.url);
+  const md = page_markdown(html, request.url);
   if (md === null) {
-    // a render error or a page with no <main>: the html it rendered, as html
+    // a page with no <main>: the html it rendered, as html
     headers.set("content-type", "text/html");
-    return new Response(html, { status: failed ? 500 : 200, headers });
+    return new Response(html, { status: 200, headers });
   }
   headers.set("content-type", MARKDOWN_TYPE);
   return new Response(md, { status: 200, headers });
