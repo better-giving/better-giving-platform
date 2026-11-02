@@ -93,6 +93,13 @@ const problems = (...statuses: number[]) =>
     statuses.map((s) => [s, { $ref: `#/components/responses/Problem${s}` }])
   );
 
+/** a keyed action's refusals: the key check (401, 429), input validation
+ * (422) and connector_route's 500, plus the action's own `refuses` */
+const keyed_problems = (refuses: number[]) =>
+  problems(
+    ...[...new Set([401, 422, 429, 500, ...refuses])].sort((a, b) => a - b)
+  );
+
 const ok = (description: string, schema: Json = { type: "object" }) => ({
   description,
   content: { "application/json": { schema } },
@@ -432,7 +439,7 @@ const keyed_read = (
   path: string,
   action: keyof typeof QUERY_PARAMS,
   summary: string,
-  id_of?: string
+  extra: { id_of?: string; refuses?: number[] } = {}
 ): IOperation => ({
   route,
   path,
@@ -441,10 +448,13 @@ const keyed_read = (
     operationId: action,
     summary,
     security: KEYED,
-    parameters: [...(id_of ? [id_param(id_of)] : []), ...query_of(action)],
+    parameters: [
+      ...(extra.id_of ? [id_param(extra.id_of)] : []),
+      ...query_of(action),
+    ],
     responses: {
       200: ok(summary),
-      ...problems(401, 404, 422, 429, 500),
+      ...keyed_problems(extra.refuses ?? []),
     },
   },
 });
@@ -463,6 +473,8 @@ const keyed_write = (
     created?: Json;
     /** no body at all reads as `{}` */
     body_optional?: boolean;
+    /** 4xx beyond the key check and validation */
+    refuses?: number[];
   }
 ): IOperation => ({
   route,
@@ -490,15 +502,10 @@ const keyed_write = (
             201: ok("Created.", extra.created),
           }
         : { 200: ok("The resource after the change.") }),
-      ...problems(
+      ...keyed_problems([
         ...(extra.idem === undefined ? [] : [400]),
-        401,
-        404,
-        409,
-        422,
-        429,
-        500
-      ),
+        ...(extra.refuses ?? []),
+      ]),
     },
   },
 });
@@ -527,7 +534,7 @@ const connector_ops = (): IOperation[] => [
             },
           },
         }),
-        ...problems(404, 429),
+        ...problems(429, 500),
       },
     },
   },
@@ -551,7 +558,7 @@ const connector_ops = (): IOperation[] => [
           required: ["key", "name"],
           properties: { key: { type: "string" }, name: { type: "string" } },
         }),
-        ...problems(400, 404, 429, 500),
+        ...problems(400, 429, 500),
       },
     },
   },
@@ -565,7 +572,7 @@ const connector_ops = (): IOperation[] => [
       security: KEYED,
       responses: {
         204: { description: "Revoked." },
-        ...problems(401, 404, 429, 500),
+        ...problems(401, 429, 500),
       },
     },
   },
@@ -581,14 +588,19 @@ const connector_ops = (): IOperation[] => [
     "post",
     "create_campaign",
     "Create a draft campaign",
-    { idem: true, required: ["title"], created: { type: "object" } }
+    {
+      idem: true,
+      required: ["title"],
+      created: { type: "object" },
+      refuses: [409],
+    }
   ),
   keyed_read(
     "connector.v1.campaigns.$id",
     "/connector/v1/campaigns/{id}",
     "get_campaign",
     "Get a campaign",
-    "campaign"
+    { id_of: "campaign", refuses: [404] }
   ),
   keyed_write(
     "connector.v1.campaigns.$id.settings",
@@ -596,7 +608,7 @@ const connector_ops = (): IOperation[] => [
     "patch",
     "update_campaign_settings",
     "Change a campaign's goal or end date",
-    { id_of: "campaign" }
+    { id_of: "campaign", refuses: [404, 409] }
   ),
   keyed_write(
     "connector.v1.campaigns.$id.blocks",
@@ -604,7 +616,7 @@ const connector_ops = (): IOperation[] => [
     "patch",
     "update_campaign_blocks",
     "Change a campaign page's blocks",
-    { id_of: "campaign", required: ["blocks"] }
+    { id_of: "campaign", required: ["blocks"], refuses: [404, 409] }
   ),
   keyed_write(
     "connector.v1.campaigns.$id.publish",
@@ -612,7 +624,7 @@ const connector_ops = (): IOperation[] => [
     "post",
     "publish_campaign",
     "Publish a campaign",
-    { id_of: "campaign", body_optional: true }
+    { id_of: "campaign", body_optional: true, refuses: [404, 409] }
   ),
   keyed_write(
     "connector.v1.campaigns.$id.end",
@@ -620,13 +632,14 @@ const connector_ops = (): IOperation[] => [
     "post",
     "end_campaign",
     "End a campaign",
-    { id_of: "campaign", body_optional: true }
+    { id_of: "campaign", body_optional: true, refuses: [404] }
   ),
   keyed_read(
     "connector.v1.donation-page",
     "/connector/v1/donation-page",
     "get_donation_page",
-    "Get the nonprofit's donation page"
+    "Get the nonprofit's donation page",
+    { refuses: [404] }
   ),
   keyed_read(
     "connector.v1.blocks.catalog",
@@ -646,14 +659,14 @@ const connector_ops = (): IOperation[] => [
     "post",
     "create_form",
     "Create a donation form",
-    { idem: false, created: { type: "object" } }
+    { idem: false, created: { type: "object" }, refuses: [404, 409] }
   ),
   keyed_read(
     "connector.v1.forms.$id",
     "/connector/v1/forms/{id}",
     "get_form",
     "Get a donation form",
-    "form"
+    { id_of: "form", refuses: [404] }
   ),
   keyed_write(
     "connector.v1.forms.$id",
@@ -661,19 +674,21 @@ const connector_ops = (): IOperation[] => [
     "patch",
     "update_form",
     "Change a donation form",
-    { id_of: "form" }
+    { id_of: "form", refuses: [404, 409] }
   ),
   keyed_read(
     "connector.v1.results",
     "/connector/v1/results",
     "get_results",
-    "Get fundraising totals"
+    "Get fundraising totals",
+    { refuses: [404] }
   ),
   keyed_read(
     "connector.v1.donations",
     "/connector/v1/donations",
     "list_donations",
-    "List donations"
+    "List donations",
+    { refuses: [404] }
   ),
   keyed_read(
     "connector.v1.donors",
@@ -686,7 +701,7 @@ const connector_ops = (): IOperation[] => [
     "/connector/v1/donors/{id}",
     "get_donor",
     "Get a donor and their gifts",
-    "donor"
+    { id_of: "donor", refuses: [404] }
   ),
   keyed_read(
     "connector.v1.recurring",
@@ -702,6 +717,7 @@ const connector_ops = (): IOperation[] => [
     "Create a one-time link for uploading a campaign photo",
     {
       required: ["target"],
+      refuses: [404, 409],
       created: {
         type: "object",
         required: ["url", "expires_at"],
@@ -775,8 +791,17 @@ const CONNECTOR_PROBLEM = {
   },
 };
 
-const API_STATUSES = [400, 404, 500];
-const PROBLEM_STATUSES = [400, 401, 404, 409, 422, 429, 500];
+/** the error statuses operations on `prefix` routes document, each of which
+ * gets one components response */
+const error_statuses = (prefix: string) =>
+  [
+    ...new Set(
+      operations()
+        .filter((o) => o.route.startsWith(prefix))
+        .flatMap((o) => Object.keys(o.op.responses as Json).map(Number))
+        .filter((s) => s >= 400)
+    ),
+  ].sort((a, b) => a - b);
 
 /** the OpenAPI 3.1 document for the public read API and connector v1, with
  * `origin` as its server */
@@ -814,7 +839,7 @@ export function openapi_doc(origin: string) {
       schemas: { ApiError: API_ERROR, ConnectorProblem: CONNECTOR_PROBLEM },
       responses: {
         ...Object.fromEntries(
-          API_STATUSES.map((s) => [
+          error_statuses("api.").map((s) => [
             `Api${s}`,
             {
               description: STATUS_TEXT[s],
@@ -823,7 +848,7 @@ export function openapi_doc(origin: string) {
           ])
         ),
         ...Object.fromEntries(
-          PROBLEM_STATUSES.map((s) => [
+          error_statuses("connector.v1.").map((s) => [
             `Problem${s}`,
             {
               description: STATUS_TEXT[s],

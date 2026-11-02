@@ -1,6 +1,21 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { reset_rate_limits } from "#/.server/auth/rate-limit";
-import { action, loader } from "./connector.v1.hello";
+
+const gate = vi.hoisted(() => ({ throws: false }));
+vi.mock("$/connector/gate", async (actual) => {
+  const real = await actual<typeof import("$/connector/gate")>();
+  return {
+    ...real,
+    reserve_ip: (...args: Parameters<typeof real.reserve_ip>) => {
+      if (gate.throws) throw new Error("limiter down");
+      return real.reserve_ip(...args);
+    },
+  };
+});
+const reported = vi.hoisted(() => vi.fn());
+vi.mock("#/errors/report", () => ({ report_error: reported }));
+
+const { action, loader } = await import("./connector.v1.hello");
 
 const hello = (ip?: string) =>
   loader({
@@ -9,7 +24,7 @@ const hello = (ip?: string) =>
     }),
     params: {},
     context: {},
-  } as any) as Response;
+  } as any) as Promise<Response>;
 
 beforeEach(() => {
   reset_rate_limits();
@@ -22,7 +37,7 @@ afterEach(() => {
 
 describe("GET /connector/v1/hello", () => {
   test("returns the contract, no-store, and not a redirect", async () => {
-    const res = hello("203.0.113.4");
+    const res = await hello("203.0.113.4");
 
     expect(res.status).toBe(200);
     expect(res.headers.get("location")).toBeNull();
@@ -63,17 +78,17 @@ describe("GET /connector/v1/hello", () => {
   test("release is the trimmed commit sha", async () => {
     vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "  abcdef  ");
 
-    const res = hello("203.0.113.5");
+    const res = await hello("203.0.113.5");
 
     expect(await res.json()).toMatchObject({ release: "abcdef" });
   });
 
   test("the 121st GET from one address is 429 and another address still passes", async () => {
-    let res = hello("203.0.113.8");
-    for (let i = 1; i < 120; i++) res = hello("203.0.113.8");
+    let res = await hello("203.0.113.8");
+    for (let i = 1; i < 120; i++) res = await hello("203.0.113.8");
     expect(res.status).toBe(200);
 
-    const limited = hello("203.0.113.8");
+    const limited = await hello("203.0.113.8");
     expect(limited.status).toBe(429);
     expect(limited.headers.get("cache-control")).toBe("no-store");
     expect(limited.headers.get("content-type")).toBe(
@@ -88,15 +103,27 @@ describe("GET /connector/v1/hello", () => {
       },
     });
 
-    expect(hello("203.0.113.9").status).toBe(200);
+    expect((await hello("203.0.113.9")).status).toBe(200);
   });
 
-  test("a missing address shares one bucket and does not limit a real address", () => {
-    let res = hello();
-    for (let i = 1; i < 120; i++) res = hello();
+  test("a missing address shares one bucket and does not limit a real address", async () => {
+    let res = await hello();
+    for (let i = 1; i < 120; i++) res = await hello();
     expect(res.status).toBe(200);
-    expect(hello().status).toBe(429);
-    expect(hello("203.0.113.10").status).toBe(200);
+    expect((await hello()).status).toBe(429);
+    expect((await hello("203.0.113.10")).status).toBe(200);
+  });
+
+  test("a throw is a reported internal_error problem, not react-router's 500", async () => {
+    gate.throws = true;
+    const res = await hello("203.0.113.11").finally(() => {
+      gate.throws = false;
+    });
+
+    expect(res.status).toBe(500);
+    expect(res.headers.get("content-type")).toBe("application/problem+json");
+    expect((await res.json()).code).toBe("internal_error");
+    expect(reported).toHaveBeenCalledOnce();
   });
 });
 
