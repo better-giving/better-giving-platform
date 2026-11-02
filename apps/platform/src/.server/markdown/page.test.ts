@@ -211,8 +211,8 @@ describe("page_markdown", () => {
 
   test("frontmatter falls back to the page url and the h1", () => {
     const md = with_frontmatter(doc("", "<h1>Hi</h1>"), PAGE, NOW);
-    expect(
-      md?.startsWith('---\ntitle: "Hi"\ncanonical: "' + PAGE + '"\n')
-    ).toBe(true);
+    expect(md?.startsWith(`---\ntitle: "Hi"\ncanonical: "${PAGE}"\n`)).toBe(
+      true
+    );
   });
 });
