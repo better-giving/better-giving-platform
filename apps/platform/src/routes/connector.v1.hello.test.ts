@@ -27,6 +27,7 @@ const hello = (ip?: string) =>
   } as any) as Promise<Response>;
 
 beforeEach(() => {
+  reported.mockClear();
   reset_rate_limits();
   vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "   ");
 });
