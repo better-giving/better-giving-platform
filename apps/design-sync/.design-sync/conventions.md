@@ -5,7 +5,7 @@ app, not an idealized kit. Every component here is the real component: same prop
 
 ### Setup
 
-Components come from `window.BetterGiving`. Two of them read router context — `Breadcrumbs` and
+Components come from `window.BetterGiving`. Two of them read router context — `Breadcrumb` and
 `Prompt` — and throw outside one, so wrap anything containing them in the exported `DsProvider`:
 
 ```jsx
@@ -47,7 +47,8 @@ attribute would do nothing. `icon` is the icon-only shape and **requires** `aria
 
 The classes are still real and still the fallback when you compose a control by hand: `.btn` plus
 one of `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-outline`, `.btn-destructive`,
-`.btn-success`, `.btn-warning`, `.btn-form-primary`; `.pending` for in-flight; the sizes `.btn-sm`
+`.btn-success`, `.btn-warning`, `.btn-form-primary`, and `.btn-inverse` (the one filled action on a
+`surface-primary` band: white fill, brand label, no hover); `.pending` for in-flight; the sizes `.btn-sm`
 (24px), bare `.btn` (36px), `.btn-lg` (52px), `.btn-field`; and `.btn-icon`, a **modifier** rather
 than a fourth size — it squares the control on whichever tier it accompanies. Never write
 `btn btn-md`: bare `.btn` is that tier, and `btn-md` exists only to step *down* responsively
@@ -65,6 +66,8 @@ The other real class names, for when you compose a control by hand rather than u
 `.selector-btn`, `.selector-opt`, `.table`, and the utilities `.surface-primary`,
 `.eyebrow`, `.section-heading`, `.section-body`, `.hero-heading`, `.article-heading`,
 `.flex-center`, `.absolute-center`, `.link`.
+Inside `.table`, a money or count column puts `num` on its `<th>` and every `<td>`: the column
+right-aligns. Rows are separated by hairlines only; there are no column rules.
 
 ### Empty states — use `EmptyState`
 
@@ -115,15 +118,16 @@ are the semantic tokens:
 
 | family | names |
 | --- | --- |
-| surfaces | `background` (the page), `panel` (a card, dialog, popover or menu — radix files all four under one rung), `surface` (a form control's fill, one step *lighter* than the panel it sits on), `overlay` (a dialog scrim), `sidebar` |
-| brand tint | `band` (a page-level ground), `secondary` (a ui element at rest, and the hover fill of anything resting transparent), `secondary-active` (that element selected) |
+| surfaces | `background` (gray-1: the page, app and marketing alike, painted once by the app), `card` (gray-2: a card, with a `border-hairline` edge), `panel` (a **well** inside a card, gray-3), `popover` (gray-1: dialog, popover, menu, select list, hovercard or toast, with `shadow-floating`), `surface` (a form control's fill, gray-1), `overlay` (a dialog scrim) |
+| edges | `hairline` (gray-6: a card's edge and every line inside one), `input` / `input-hover` (gray-7 / 8: a field's, checkbox's or radio's edge — Radix's interactive-border role; under WCAG 1.4.11's 3:1, an accepted miss by PM decision); a button's edge is the same steps spelled `gray-7`, hovered `gray-8` |
+| brand tint | `band` (a page-level ground), `secondary` (a ui element at rest), `secondary-hover` (it, or a row resting transparent, hovered), `secondary-active` (that element selected) |
 | brand / state | `primary`, `success`, `warning`, `destructive` |
 | tinted band | `destructive-subtle` / `success-subtle` / `warning-subtle` (+ their `-fg`) |
-| ink | the `-fg` partner of the four fills whose ink follows them: `primary-fg`, `success-fg`, `warning-fg`, `destructive-fg`. **no other surface has one.** ink on a light fill is always `text-gray-12`, so `panel`, `surface`, `band`, `secondary` and `sidebar` take the neutral rung |
-| neutral ink + lines | **step names, not token names**: `text-gray-12` body, `text-gray-11` de-emphasised, `border-gray-6` hairline. `text-fg`, `text-panel-fg`, `text-secondary-fg`, `text-muted-fg`, `bg-muted` and `border-border` do **not** compile — they named a rung, and the rung is what you write |
+| ink | the `-fg` partner of the four fills whose ink follows them: `primary-fg`, `success-fg`, `warning-fg`, `destructive-fg`. **no other surface has one.** ink on a light fill is always `text-gray-12`, so `card`, `panel`, `surface`, `band` and `secondary` take the neutral rung |
+| neutral ink + lines | **step names, not token names**: `text-gray-12` body, `text-gray-11` de-emphasised, `border-gray-7` a control's edge (`border-gray-8` hovered). The one line with a token name is `hairline` (`border-hairline`, `divide-hairline`): a line inside a card. `text-fg`, `text-panel-fg`, `text-secondary-fg`, `text-muted-fg`, `bg-muted` and `border-border` do **not** compile — they named a rung, and the rung is what you write |
 | other lines | `ring` |
 
-Use them as `bg-panel`, `text-gray-11`, `border-gray-6`, and so on. **A fill token is not
+Use them as `bg-card`, `text-gray-11`, `border-hairline`, and so on. **A fill token is not
 automatically a text color.** `text-warning` is illegible at Lc 39.9 — use `text-warning-subtle-fg`,
 which is the warning ink on *every* surface. Never pair an alpha tint with its own ink
 (`bg-warning/10 text-warning` measures Lc 34.9, and no tint's figure survives a change of ground); use the authored pair
@@ -170,31 +174,32 @@ display face equals the body face right now. The name exists so the fix is one l
 with real tabular figures is adopted, rather than a 22-site sweep. Any figure a reader compares to
 another — a money column, a total, a count, a date — takes it.
 
-Radius is one value and the ladder is **closed**: `rounded` is the only corner name, everywhere —
-buttons, inputs, cards, dialogs, option lists. Buttons and inputs get it from their own recipe, so
-no `rounded*` class at the call site. `rounded-sm`, `-md`, `-lg`, `-xl`, `-xs` are reset to
-`initial` and **fail to compile** — writing one produces no rule at all, which is deliberate: it is
-how the single radius stays single. `rounded-full` and `rounded-none` still work. Nothing is a pill.
+Radius is two values and the ladder is **closed**: `rounded` (6px) for a control or a well inside a
+card, `rounded-card` (12px) for a container or a floating layer — card, dialog, menu, popover, option
+list, hovercard, toast. Buttons and inputs get theirs from their own recipe, so no `rounded*` class at
+the call site. `rounded-sm`, `-md`, `-lg`, `-xl`, `-xs` are reset to `initial` and **fail to
+compile** — writing one produces no rule at all, which is deliberate: it is how the two corners stay
+two. `rounded-full` and `rounded-none` still work. Nothing is a pill.
 
-**The app is flat, and the shadow namespace is closed.** A card is `bg-panel` + `border` + `rounded` — never a
-shadow. The fill sits one rung below the page, so the panel reads by fill *and* border; a field inside it goes back
-up to `bg-surface`. `shadow-xs`/`-sm`/`-md`/`-lg`/`-xl`/`-2xl`/`-inner` are reset to `initial` and **fail to
+**The app is flat in the flow, and the shadow namespace is closed.** Every neutral sits on its Radix step role. The surface model, outside in: **page** (gray-1,
+`--background`, which the app paints once, never a screen, marketing pages included) → **card** (`card`: gray-2, `rounded-card`, a gray-6 `border-hairline` edge, **no shadow**)
+→ **well** (`bg-panel rounded`, gray-3, inside a card) → **field** (gray-1 `bg-surface` with its gray-7 `border-input` edge). Lines inside a
+card are `border-hairline` / `divide-hairline`. Hovers go to step 4, presses and selections to 5. `shadow-xs`/`-sm`/`-md`/`-lg`/`-xl`/`-2xl`/`-inner` are reset to `initial` and **fail to
 compile**, so depth cannot be re-picked one call site at a time; `shadow-[…]` still compiles and is caught by a
 sweep instead. The whole set a call site may spend:
 
-- `shadow-floating` — the one shadow for things that genuinely hover with no scrim under them: menu, dropdown,
-  combobox and select popup, tooltip, hovercard, toast, and a pinned header once it is stuck.
-- **no shadow at all on the modal level.** A dialog, drawer or route-modal is defined by its `bg-overlay` scrim and
-  its stacking step — a shadow laid over an already dimmed page says nothing, so there is no `shadow-modal` and
-  adding one is not the fix for a dialog that reads flat.
+- **no shadow on an in-flow container.** A card is found by its edge; `shadow-card` is deleted and a sweep fails it.
+- `shadow-floating` — the one shadow for things over the page: menu, dropdown, combobox and select popup, tooltip,
+  hovercard, toast, a pinned header once it is stuck, and — Radix Themes' panel plus shadow — the dialog, whose
+  `modal_box` tier carries it (its `bg-popover` fill is the call site's).
 - `inset-shadow-track` + `shadow-track-fill` — the recessed pair, and the only inward depth: a slider or progress
   track and the fill riding raised inside it. Both halves or neither.
 - `shadow-handle` — a legibility affordance, not a rung: the white crop handle over a donor's own photograph. Never
   reach for it to raise something.
-- `shadow-lift-card` / `shadow-lift-cta` / `shadow-lift-media` — the **marketing lift**, a treatment held apart from
-  the levels on purpose. Marketing cards, hero CTAs and photographs only; an app surface must not reach for one, and
-  there is no rung of the ladder that leads to it. The tint lives inside each token — never a `shadow-<color>/<alpha>`
-  written beside a name.
+- `shadow-lift-media` — the **marketing lift**, a treatment held apart from the levels on purpose. Photographs only (or
+  the skeleton standing in for one): a marketing card takes `card` and a solid control, a hero CTA included, carries no
+  shadow. An app surface must not reach for it, and there is no rung of the ladder that leads to it. The tint lives
+  inside the token — never a `shadow-<color>/<alpha>` written beside a name.
 
 Stacking is six named steps, low to high: `z-subbar` (a bar pinned beneath a pinned header), `z-sticky` (pinned page
 chrome), `z-scrim`, `z-modal`, `z-floating` (above an open modal, so a combobox in a dialog needs no hand-picked
@@ -254,7 +259,7 @@ Two scrollers, both classes:
 
 **A screen that is one card is `solo-card`**, not a narrowed `page`. Login, signup, check-email and
 the five password-reset panels each sit alone on an otherwise empty page in exactly one shape: a
-`max-w-md` bordered card with its own `bg-panel` fill and its own padding. `page` is a width and a
+`max-w-md` edged card with its own padding. `page` is a width and a
 gutter for a full layout; this is the single card that *is* the layout. It sets no `gap` and no
 `justify-items` on purpose — space its children with per-child `mt-*`, and say the alignment
 yourself, because these screens split evenly on whether their content is centered.

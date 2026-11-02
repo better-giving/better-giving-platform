@@ -49,7 +49,7 @@ export const Linked = () => (
 
 // donor avatar: small, round, beside the message it belongs to.
 export const Avatar = () => (
-  <div className="flex bg-panel items-start gap-4 border p-4 rounded w-80">
+  <div className="flex bg-card items-start gap-4 p-4 rounded-card w-80">
     <Image
       src={logo}
       alt="Marisol Vega"

@@ -24,7 +24,7 @@ function Emit({ toasts }: { toasts: Toast[] }) {
 // the page underneath a toast — kept realistic so the overlay reads in context.
 function MembersPanel() {
   return (
-    <div className="w-96 overflow-hidden rounded border bg-panel">
+    <div className="w-96 overflow-hidden rounded-card bg-card">
       <div className="border-b bg-gray-3 px-4 py-3 text-sm font-medium text-gray-12">
         Members — Rainforest Trust
       </div>

@@ -24,7 +24,8 @@ export function PublicLayout({
       <Body
         style={{
           fontFamily: "sans-serif",
-          backgroundColor: flat_colors.background,
+          // the app's page ground: --background is this same gray-1 step.
+          backgroundColor: flat_colors.gray_1,
           // explicit ink: clients that force dark mode invert inherited text
           // while still honouring an explicit background — white on white.
           color: flat_colors.gray_12,

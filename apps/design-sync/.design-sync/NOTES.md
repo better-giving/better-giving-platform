@@ -43,7 +43,7 @@ The "design system" is split across two packages:
 
 Two reasons this file exists beside `packages/ui`'s barrel (`src/index.ts`):
 
-- **`DsProvider`.** Components that call `useNavigate`/`NavLink` (`Prompt`, `Breadcrumbs`) throw
+- **`DsProvider`.** Components that call `useNavigate`/`Link` (`Prompt`, `Breadcrumb`) throw
   outside a router, so previews mount through a `MemoryRouter` the package has no business
   shipping.
 - **The `Arrow`/`Content` collision.** `tooltip.tsx` and `hover-card.tsx` both export those two
@@ -313,7 +313,7 @@ fallback.
   packages.** `Group.tsx` renders `Field` and `Select` inside its panel; `Input.tsx` imports
   `lucide-react` directly. What a preview must NOT import is `react-router`: that bundles a
   second copy which doesn't share context with `DsProvider`'s `MemoryRouter`. Components that
-  use router links internally (`Breadcrumbs`) are fine; only preview-authored imports are unsafe.
+  use router links internally (`Breadcrumb`) are fine; only preview-authored imports are unsafe.
 
 - **Overlays need to be opened synthetically.** `Modal` takes a real `open` prop, but neither
   `Tooltip` nor `HoverCard` does: `Tooltip` holds `useState(false)` and passes it to Ark as a
@@ -369,8 +369,8 @@ Collected across the fan-out; each was hit at least once while authoring.
   `onError`, unless the caller supplies its own `onError`, which suppresses the fallback.
   `ImagePlaceholder` has no intrinsic size and its glyph is `w-1/2 h-1/2`, so always give it both
   dimensions.
-- `Breadcrumbs`' active-crumb style is only reachable by pointing a crumb at `/`, since
-  `DsProvider`'s `MemoryRouter` sits there.
+- `Breadcrumb` has no active-crumb state to reach: the last item is always the current page
+  (an `h1`), whatever its `to`.
 - `CurrencySelector` derives disabled from the query state: a literal `QueryState`
   (`{data, is_loading, is_fetching, is_error}`; `is_query()` needs both boolean keys present)
   renders all three of its visibly distinct states.
@@ -802,3 +802,48 @@ Fifteen previews wrote a deleted name and moved with the rest: `bg-card` → `bg
 in the panel-shaped ones, `bg-input` → `bg-surface` in `Increments`, `text-popover-fg` →
 `text-gray-12` in `Tooltip` and `HoverCard`. `Group.tsx` needed nothing and already
 covers the page → panel → field stack the rename is about.
+
+## 2026-10-31: the surface model (ground → card → well → field)
+
+Cards, dialogs and floating layers went white, borderless and `rounded-card` (12px);
+`--panel` became a well inside a card; `--sidebar` and `card-on-band` were deleted;
+`--card` and `--hairline` arrived. What this directory had to change:
+
+- **`styles-entry.css`**: `card` and `hairline` joined the semantic inline list,
+  `sidebar` left it, and `divide-hairline` / `rounded-card` are listed explicitly.
+- **`check-conventions.mjs`**: `card` in `PLAIN`, `sidebar` out; the hairline pair in
+  `lines`; `rounded-card` in `radius`; `bg-sidebar` and `card-on-band` documented absent.
+- **previews**: every panel-shaped wrapper (`bg-panel border rounded`) moved to
+  `bg-card rounded-card`, and `Modal`'s fills to `bg-card`.
+
+The **ground is not in this bundle**: the app page's flat gray `--ground` is painted once
+by platform's `src/index.css` (on `body`), not by `packages/ui`'s stylesheet, so a
+preview card renders white on the preview's own white. That is the model with its
+ground missing, not a broken card; don't add a border to make it show.
+
+## 2026-11-01: Radix step roles (page 1 → card 2 + edge 6 → well 3 → field 1 + edge 7)
+
+The PM aligned every neutral to Radix's step roles: the page is gray-1, a card is gray-2
+with a gray-6 `border-hairline` edge and no shadow (`shadow-card` deleted), a well is
+gray-3, a field is gray-1 with the `--input` edge (gray-7, hovered gray-8: Radix's
+interactive-border role, under WCAG 1.4.11's 3:1, an accepted miss by PM decision),
+and floating layers and dialogs are the new `--popover` (gray-1) with `shadow-floating`.
+`--secondary-hover` (blue-4) is new; `--ground` is gone. Done in this directory:
+`styles-entry.css` lists `popover`, `input`, `input-hover`, `secondary-hover`;
+`check-conventions.mjs` knows them; `conventions.md` and `docs/Group.md` describe the
+new card. **Not done, next sync:** the previews' panel-shaped wrappers still spell
+`bg-card rounded-card` without the edge, `Tooltip.tsx`'s hand shell and `Modal`'s
+fills still spell `bg-card` (should be `bg-popover`), and nothing was published. The
+preview page is white, so a gray-2 card now shows by fill even before its edge lands.
+
+## 2026-11-02: GoalBar preview; HeaderButton's unsorted glyph is hover-only
+
+- **`previews/GoalBar.tsx`** is new: `GoalBar` was mapped in `config.json` and exported
+  from `entry.tsx` with no preview, so it published with no card. It stretches to its
+  container (`w-full`), so each story gives it a width and it joins the `column` set.
+  `FirstGift` shows the 4px minimum fill any amount raised gets.
+- **`HeaderButton`'s unsorted columns show no glyph in a static card.** The muted double
+  chevron appears on hover or keyboard focus of that head (a named `group/sort`, so an
+  ancestor `.group` does not trigger it) and always on a coarse pointer. A preview is
+  neither, so only the sorted column's caret paints: that is the component at rest, not
+  a missing icon. Hover a head in the preview to see it.

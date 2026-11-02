@@ -16,7 +16,7 @@
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 
-// components that call useNavigate/NavLink (Prompt, Breadcrumbs) throw outside
+// components that call useNavigate/Link (Prompt, Breadcrumb) throw outside
 // a router. previews mount through this via cfg.provider.
 export function DsProvider({ children }: { children: ReactNode }) {
   return <MemoryRouter>{children}</MemoryRouter>;
@@ -26,7 +26,7 @@ export function DsProvider({ children }: { children: ReactNode }) {
 export { Accordion } from "../../../packages/ui/src/components/accordion";
 export { Amount } from "../../../packages/ui/src/components/amount";
 export { Badge } from "../../../packages/ui/src/components/badge";
-export { Breadcrumbs } from "../../../packages/ui/src/components/breadcrumbs";
+export { Breadcrumb } from "../../../packages/ui/src/components/breadcrumb";
 // the button, and every button-shaped link. first in the file because it is
 // the one name a design reaches for before any other.
 export { Button } from "../../../packages/ui/src/components/button";
@@ -58,6 +58,7 @@ export { MaskedInput } from "../../../packages/ui/src/components/form/masked-inp
 export * as masks from "../../../packages/ui/src/components/form/masks";
 export { PasswordInput } from "../../../packages/ui/src/components/form/password-input";
 export { UrlInput } from "../../../packages/ui/src/components/form/url-input";
+export { GoalBar } from "../../../packages/ui/src/components/goal-bar";
 export { Group } from "../../../packages/ui/src/components/group";
 // the sortable column head: label, then the caret that says which key the
 // table is ordered by and in which direction.

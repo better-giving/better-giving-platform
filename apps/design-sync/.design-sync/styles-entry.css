@@ -82,9 +82,13 @@
    never true and is now deliberately false: only the four fills whose ink
    follows them keep one. every other surface takes gray-12, so `text-panel-fg`
    and `text-secondary-fg` are gone rather than aliased.
-   the line row is `ring` alone — `border` and `input` both moved, `border` to
-   the neutral scale below and `input` to `surface`, which is a fill. */
-@source inline("{bg,text,border,ring}-{background,panel,surface,overlay,primary,primary-fg,secondary,secondary-active,band,destructive,destructive-fg,destructive-subtle,destructive-subtle-fg,success,success-fg,success-subtle,success-subtle-fg,warning,warning-fg,warning-subtle,warning-subtle-fg,sidebar,ring}");
+   the line row is `ring`, `hairline` and `input` (the field edge, gray-7, and
+   its hover rung). */
+@source inline("{bg,text,border,ring}-{background,card,panel,popover,surface,hairline,input,input-hover,overlay,primary,primary-fg,secondary,secondary-hover,secondary-active,band,destructive,destructive-fg,destructive-subtle,destructive-subtle-fg,success,success-fg,success-subtle,success-subtle-fg,warning,warning-fg,warning-subtle,warning-subtle-fg,ring}");
+/* the surface model's line and corner: a card's edge and the divider inside
+   it, and the container's 12px corner. */
+@source inline("divide-hairline");
+@source inline("rounded-card");
 
 /* the neutral scale, whose steps replaced the names dropped from the row
    above — fg, muted, muted-fg and border, plus every surface's -fg twin. those

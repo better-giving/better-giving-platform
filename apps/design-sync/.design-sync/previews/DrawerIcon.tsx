@@ -4,14 +4,14 @@ import { DrawerIcon } from "@better-giving/ui";
 // every select trigger, combobox and expandable panel in the app.
 
 export const Closed = () => (
-  <div className="flex items-center justify-between w-72 border rounded px-3 py-2 bg-panel">
+  <div className="flex items-center justify-between w-72 rounded-card px-3 py-2 bg-card">
     <span className="text-sm">How does employer matching work?</span>
     <DrawerIcon is_open={false} size={24} className="text-gray-11" />
   </div>
 );
 
 export const Open = () => (
-  <div className="w-72 border rounded bg-panel overflow-clip">
+  <div className="w-72 rounded-card bg-card overflow-clip">
     <div className="flex items-center justify-between px-3 py-2">
       <span className="text-sm">How does employer matching work?</span>
       <DrawerIcon is_open={true} size={24} className="text-gray-11" />
@@ -27,14 +27,14 @@ export const OnSelectTrigger = () => (
   <div className="flex flex-col gap-3">
     <button
       type="button"
-      className="flex items-center justify-between w-72 border rounded px-3 py-2 bg-panel text-sm"
+      className="flex items-center justify-between w-72 rounded-card px-3 py-2 bg-card text-sm"
     >
       <span>Rainforest Trust</span>
       <DrawerIcon is_open={false} size={20} className="text-gray-11" />
     </button>
     <button
       type="button"
-      className="flex items-center justify-between w-72 border rounded px-3 py-2 bg-panel text-sm"
+      className="flex items-center justify-between w-72 rounded-card px-3 py-2 bg-card text-sm"
     >
       <span>Ocean Conservancy</span>
       <DrawerIcon is_open={true} size={20} className="text-gray-11" />
