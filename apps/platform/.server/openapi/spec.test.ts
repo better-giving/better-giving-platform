@@ -63,9 +63,8 @@ const api_route_ids = () =>
     .filter((e) => !/\.test\.tsx?$/.test(e.name))
     .map((e) => (e.isDirectory() ? e.name : e.name.replace(/\.tsx?$/, "")));
 
-/** operations whose route answers every request it serves, so only a throw
- * (the 500) is an error; the public-source test below confirms they send no
- * 4xx `api_error` */
+/** operations whose route never refuses a request, so their only error is a
+ * throw's 500; the api_error-codes test below confirms they send no 4xx */
 const REFUSES_NOTHING = [
   "list_currencies",
   "search_tickers",

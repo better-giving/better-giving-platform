@@ -82,8 +82,9 @@ function absolute(url: string, base: string): string {
 }
 
 /**
- * markdown of a rendered document's `<main>`, headed by its `<title>`; links
- * resolve against `page_url`. null when the document has no `<main>`.
+ * markdown of a rendered document's `<main>`, headed by its `<title>` unless
+ * that repeats the `<h1>`; links and image sources resolve against `page_url`.
+ * null when the document has no `<main>`.
  */
 export function page_markdown(html: string, page_url: string): string | null {
   const root = parse(html);

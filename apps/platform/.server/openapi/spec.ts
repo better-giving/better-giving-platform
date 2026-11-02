@@ -93,8 +93,9 @@ const problems = (...statuses: number[]) =>
     statuses.map((s) => [s, { $ref: `#/components/responses/Problem${s}` }])
   );
 
-/** a keyed action's refusals: the key check (401, 429), input validation
- * (422) and connector_route's 500, plus the action's own `refuses` */
+/** a keyed action's error responses: the key check (401, 429), input
+ * validation (422) and connector_route's 500, plus the action's own
+ * `refuses` */
 const keyed_problems = (refuses: number[]) =>
   problems(
     ...[...new Set([401, 422, 429, 500, ...refuses])].sort((a, b) => a - b)
@@ -791,7 +792,7 @@ const CONNECTOR_PROBLEM = {
   },
 };
 
-/** the error statuses operations on `prefix` routes document, each of which
+/** every error status documented by an operation on a `prefix` route; each
  * gets one components response */
 const error_statuses = (prefix: string) =>
   [
