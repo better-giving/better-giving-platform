@@ -24,6 +24,12 @@ import { draw_page4 } from "./page4";
 import type { Fonts, Images } from "./types";
 import { PAGE_H, PAGE_W } from "./types";
 
+// the faces ship as woff2. pdf-lib writes the bytes it is given straight into
+// the document unless it subsets, and a pdf font stream has to be an sfnt, so
+// an unsubset woff2 renders as a fallback face or not at all in a viewer even
+// though measuring text with it works. subsetting re-encodes to truetype.
+const SUBSET = { subset: true } as const;
+
 const decode = (b64: string): Uint8Array => Buffer.from(b64, "base64");
 
 export async function build_pdf(view: View): Promise<Uint8Array> {
@@ -32,11 +38,11 @@ export async function build_pdf(view: View): Promise<Uint8Array> {
   doc.setTitle("better-giving-report");
 
   const fonts: Fonts = {
-    light: await doc.embedFont(decode(text_light_b64)),
-    regular: await doc.embedFont(decode(text_regular_b64)),
-    medium: await doc.embedFont(decode(text_medium_b64)),
-    semibold: await doc.embedFont(decode(text_semibold_b64)),
-    bold: await doc.embedFont(decode(text_bold_b64)),
+    light: await doc.embedFont(decode(text_light_b64), SUBSET),
+    regular: await doc.embedFont(decode(text_regular_b64), SUBSET),
+    medium: await doc.embedFont(decode(text_medium_b64), SUBSET),
+    semibold: await doc.embedFont(decode(text_semibold_b64), SUBSET),
+    bold: await doc.embedFont(decode(text_bold_b64), SUBSET),
   };
 
   const images: Images = {

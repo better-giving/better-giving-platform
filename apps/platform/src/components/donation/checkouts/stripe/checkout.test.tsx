@@ -1,4 +1,5 @@
 import { AskHost } from "@better-giving/ui";
+import { Elements } from "@stripe/react-stripe-js";
 import type { Stripe, StripeError } from "@stripe/stripe-js";
 import { HttpResponse, http } from "msw";
 import { type ReactNode, useEffect, useRef } from "react";
@@ -259,6 +260,28 @@ describe("stripe checkout", () => {
     await expect
       .element(screen.getByRole("button", { name: /donate now/i }))
       .toBeVisible();
+  });
+
+  test("the payment fields are handed the face the page speaks, by absolute url", async () => {
+    const screen = await render(<Checkout {...fv} tip_format="20" />);
+    await expect
+      .element(screen.getByTestId("stripe-checkout-form"))
+      .toBeVisible();
+
+    // stripe draws the fields in its own iframe, so a family that is named
+    // in `appearance` but not loaded here falls back to sans-serif silently
+    const { options } = vi.mocked(Elements).mock.calls.at(-1)![0];
+    const fonts = options!.fonts as {
+      family: string;
+      src: string;
+      weight: string;
+    }[];
+    const family = options!.appearance!.variables!.fontFamily!;
+    expect(fonts.map((f) => f.weight)).toEqual(["400", "500", "600", "700"]);
+    for (const f of fonts) {
+      expect(family.startsWith(`"${f.family}"`)).toBe(true);
+      expect(f.src).toMatch(/^url\(https?:\/\/[^)]+\.woff2\)$/);
+    }
   });
 
   test("card error", async () => {

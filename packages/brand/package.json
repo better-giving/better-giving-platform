@@ -1,11 +1,8 @@
 {
   "name": "@better-giving/brand",
   "private": true,
-  "description": "Shared Better Giving brand constants (legal identity, social profile urls, design-token color palette)",
+  "description": "Shared Better Giving brand constants (legal identity, social profile urls) and the flat-hex mirror of the design palette",
   "type": "module",
-  "sideEffects": [
-    "**/*.css"
-  ],
   "engines": {
     "node": "24.x"
   },

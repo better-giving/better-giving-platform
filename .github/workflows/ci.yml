@@ -26,7 +26,7 @@ on:
 permissions:
   contents: read
 
-# turborepo remote cache (vercel-hosted). workflow-level so both jobs share it.
+# turborepo remote cache (vercel-hosted). workflow-level so `checks` and `test` share it.
 # TURBO_TOKEN is a vercel access token scoped to the better-giving team; TURBO_TEAM
 # is that team's slug. neither is required for the run to succeed — with the token
 # absent or unreadable turbo silently falls back to its local cache, which is what
@@ -125,9 +125,8 @@ jobs:
   # not blacksmith. deliberately NOT in `gate`'s needs: a registry outage or a
   # new registry release must not hold production migrations. pinned to a
   # commit of the registry's init-registry branch, the only place
-  # design-check.yml exists until that branch merges; move it to the release
-  # tag afterwards. the default `registry` input (design.better.giving) must be
-  # serving for this to pass.
+  # design-check.yml exists until that branch merges. the default `registry`
+  # input (design.better.giving) must be serving for this to pass.
   design:
     name: design
     uses: better-giving/design-system/.github/workflows/design-check.yml@a5cd4dbe68226ce0941d71e56b0cedc1fe49ae4e
