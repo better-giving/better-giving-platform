@@ -92,3 +92,25 @@ describe("app footer", () => {
     expect(screen.getByRole("link").elements()).toHaveLength(4);
   });
 });
+
+describe("footer landscape", () => {
+  test("full variant draws it as decoration only", async () => {
+    const Stub = stb("full");
+    const screen = await render(<Stub />);
+
+    const art = screen.container.querySelector("footer > svg");
+    expect(art).not.toBeNull();
+    expect(art?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  test.each(["minimal", "app"] as const)(
+    "%s variant has none",
+    async (variant) => {
+      const Stub = stb(variant);
+      const screen = await render(<Stub />);
+
+      await expect.element(screen.getByRole("contentinfo")).toBeVisible();
+      expect(screen.container.querySelector("footer svg")).toBeNull();
+    }
+  );
+});
