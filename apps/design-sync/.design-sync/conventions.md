@@ -149,10 +149,9 @@ Dimmer text is `text-gray-11`, never `text-gray-12` at reduced opacity.
 
 ### Type, shape, elevation
 
-**One face: Quicksand Variable.** `--font-display` (headings `h1`–`h6` and numeric figures) and
-`--font-body` (body copy, buttons, forms, tables, labels) are two roles that both resolve to it
-today; the split is kept as the seam a second face would arrive through, not as a difference you
-can see. Neither is named at a call site — `packages/ui` binds them to the elements, so an element
+**Red Hat Round, in three cuts.** `--font-display` (Red Hat Round Display: headings `h1`–`h6` and
+numeric figures), `--font-body` (Red Hat Round Text: body copy, buttons, forms, tables, labels) and
+`--font-mono` (Red Hat Round Mono: ids, hashes, addresses). Neither display nor body is named at a call site — `packages/ui` binds them to the elements, so an element
 gets its face from what it is. Gochi Hand is the handwritten aside — six call sites in the whole
 product, never decoratively. App body and controls sit at `text-sm`; micro-meta at `text-xs` and
 `text-2xs`.
@@ -160,18 +159,17 @@ product, never decoratively. App body and controls sit at `text-sm`; micro-meta 
 **The type ladders are closed**, the same way radius and color are. Sizes are `text-2xs`, `xs`,
 `sm`, `base`, `lg`, `xl`, `2xl`, `3xl`, `4xl`, `4.5xl`, `5xl`, `6xl` — `text-7xl` and above are
 reset to `initial` and **fail to compile**. Weights are `font-normal`/`medium`/`semibold`/`bold`
-only; `font-extrabold` and `font-black` fail to compile, because Quicksand's weight axis stops at
-700 and they never rendered anyway. Leading is `none`/`tight`/`snug`/`normal`/`relaxed` (plus the
+only; `font-extrabold` and `font-black` fail to compile, because only the display cut ships 800 and
+900, so on body text they would fall back to bold. Leading is `none`/`tight`/`snug`/`normal`/`relaxed` (plus the
 numeric `leading-<n>`); tracking is `tight`/`wide`/`wider`/`widest` plus the authored
 `tracking-label` (0.12em, standalone uppercase labels) and `tracking-badge` (0.08em, uppercase text
 in a padded chip). Arbitrary values are the gap the compiler does not close: `text-[11px]` still
 compiles, so don't write one.
 
 Aligned numbers are the `figures` utility. It sets the display family and `tabular-nums`, and
-**both halves are inert under Quicksand** — the face ships no `tnum` feature and its digits are
-proportional, so a money column does not line up and cannot be made to under this face; and the
-display face equals the body face right now. The name exists so the fix is one line the day a face
-with real tabular figures is adopted, rather than a 22-site sweep. Any figure a reader compares to
+**both halves fire** — the display and text cuts ship a `tnum` feature, so a money column lines up,
+and the display face is a different cut from the body face. One name keeps a change to how figures
+render a one-line edit rather than a 22-site sweep. Any figure a reader compares to
 another — a money column, a total, a count, a date — takes it.
 
 Radius is two values and the ladder is **closed**: `rounded` (6px) for a control or a well inside a

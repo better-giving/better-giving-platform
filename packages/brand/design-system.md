@@ -1,13 +1,14 @@
 # Design tokens: what each one is for
 
-Ledger for the palette in `src/colors.css`. Values live in the CSS; this file says
+Ledger for the palette in `packages/ui/src/styles/colors.css` (copied in from the
+design registry; see "The design registry" below). Values live in the CSS; this file says
 what to reach for and what has already been measured, so nobody rediscovers it.
 
 Type and elevation are here too, and their values are **not** in this package:
 the face tokens, the size/weight/leading/tracking ladders, and the shadow and
 stacking sets all sit in `packages/ui/src/styles/theme.css`. They are recorded
 here because this is the one file that says what a token is *for*, and a second
-ledger would only be a second place to go stale. See "One face, two roles, and
+ledger would only be a second place to go stale. See "Two roles, three faces, and
 four closed ladders" and "Elevation: five levels, and one treatment that is not
 a rung".
 
@@ -206,7 +207,7 @@ Lc 60 are the step-11 inks on the `blue-5` pressed rung.
 
 | | app | email |
 | --- | --- | --- |
-| file | `src/colors.css` | `src/colors.ts` |
+| file | `packages/ui/src/styles/colors.css` | `packages/brand/src/colors.ts` |
 | form | `:root`, real `oklch()` | flat hex |
 | `var()` / `color-mix()` | fine | **impossible** |
 
@@ -800,7 +801,7 @@ Its values are **not** in
 this package: the shadow tokens and the stacking steps live in
 `packages/ui/src/styles/theme.css`, because a box-shadow is not a color and
 `colors.css` is parsed token-by-token by `colors.test.ts` and
-`scripts/generate-colors.ts`: both of which *throw* on a `:root` declaration
+`src/scripts/generate-colors.ts`: both of which *throw* on a `:root` declaration
 that is neither an `oklch()`, a `var()` alias, a `color-mix()` nor a plain
 length. A shadow there would take the email mirror down with it. Only the scrim
 color, `--overlay`, is a color and stays in the palette.
@@ -1944,7 +1945,7 @@ the rule is that a color belongs to exactly one of them and is named in it.
 
 | layer | file | what belongs | email twin |
 | --- | --- | --- | --- |
-| **semantic palette** | `packages/brand/src/colors.css` | every color that carries meaning or ink: surfaces, states, brand, chrome | yes, by the guard |
+| **semantic palette** | `packages/ui/src/styles/colors.css` | every color that carries meaning or ink: surfaces, states, brand, chrome | yes, by the guard |
 | **decorative marketing washes** | `apps/platform/src/index.css` `@theme` | flat pastel grounds behind marketing copy, carrying `gray-12` and nothing else | no, and deliberately |
 
 The semantic set is closed and greppable precisely because it is small. Pouring
@@ -2108,7 +2109,7 @@ segment (**Lc 35.7**); on the grant track it is Lc 66.1. The `bg-panel` +
 role on purpose: steps 7/8 are a resting control's edge on the neutral ramp and
 do not clear Lc 30 on `--warning`.
 
-## One face, two roles, and four closed ladders
+## Two roles, three faces, and four closed ladders
 
 The face is settled, and the *ladders* (size, weight, leading, tracking) are
 closed sets in
@@ -2117,22 +2118,23 @@ at all rather than drifting in one call site at a time.
 
 ### The face
 
-The product runs on **Quicksand Variable**, one family, with **Gochi Hand** as
-the handwritten aside.
+The product runs on **Red Hat Round**, three cuts of one family, with **Gochi
+Hand** as the handwritten aside. Red Hat Round is the face everywhere: the site,
+the Stripe payment fields and the donation-calculator PDF. The faces, their `@font-face` rules and their
+tokens come from the design registry, not from this repo's own edits.
 
 | token | resolves to | what takes it |
 | --- | --- | --- |
-| `--font-display` | Quicksand Variable | every heading `h1`-`h6`, marketing and dashboard alike, and every numeric figure (the `figures` utility) |
-| `--font-body` | Quicksand Variable | everything else: body copy, buttons, forms, tables, labels |
+| `--font-display` | Red Hat Round Display | every heading `h1`-`h6`, marketing and dashboard alike, and every numeric figure (the `figures` utility) |
+| `--font-body` | Red Hat Round Text | everything else: body copy, buttons, forms, tables, labels |
+| `--font-mono` | Red Hat Round Mono, then the system mono stack | ids, hashes and wallet addresses |
 | `--font-gochi` | Gochi Hand | the handwritten aside. Six call sites, never decoratively |
 
-**Both semantic tokens resolve to the same face, and the split is kept anyway.**
-That is not an oversight waiting to be tidied: it is the seam. `h1`-`h6` and
-`body` are bound to these tokens in `packages/ui/src/styles/base.css`, so **no
-call site anywhere names a face**; an element gets one from what it *is*. The
-consequence is that adopting a display/body pair is a one-line edit in
-`theme.css` and nothing else moves. Collapsing the two names into one would buy
-nothing and would convert that one-line edit back into a forty-file sweep.
+**Display and body are two faces of one family, named by role.** `h1`-`h6` and
+`body` are bound to `--font-display` and `--font-body` in
+`packages/ui/src/styles/base.css`, so **no call site anywhere names a face**; an
+element gets one from what it *is*. Swapping either face is a one-line edit in
+`theme.css` and nothing else moves.
 
 The two are named by **role**, and that is the decorative-color rule read
 backwards. "The decorative layer" above names its tokens by hue and *never* by
@@ -2141,28 +2143,25 @@ them. Display-vs-body is a role, so the semantic faces take role names.
 `--font-gochi` keeps its face name for the matching reason: it is the decorative
 one-off, and a role name would file it into the semantic set.
 
-`--font-mono` is declared explicitly in the same block, and only because the
-`--font-*` namespace is the one type namespace that stays open: closing it
-would take the three faces down with it and leave nothing to name. Left undeclared, `font-mono`
-resolves to Tailwind's built-in default stack: a value nobody in this repo
-chose, reached by call sites that do exist. It is pinned to a system-mono stack and
-downloads nothing: mono here carries ids, hashes and wallet addresses, never
-reading copy.
+`--font-mono` is declared explicitly in the same block because the `--font-*`
+namespace is the one type namespace that stays open: closing it would take the
+faces down with it and leave nothing to name. It leads with Red Hat Round Mono so
+ids and addresses match the product's rounded type, and falls back to the system
+mono stack for any codepoint the file does not cover.
 
-### Two pairs were evaluated and rejected
+### Pairs evaluated and not adopted
 
-Both were tried end-to-end (deps, imports, PDF fonts, Stripe, embed config)
-and both were reverted. Recorded so the same ground is not walked again from
-scratch, not as a verdict on the faces themselves:
+Recorded so the same ground is not walked again from scratch, not as a verdict
+on the faces themselves:
 
 - **Outfit + DM Sans.** Rejected on identity: both have **flat terminals**, and
   the Better Giving wordmark is a rounded-terminal mark, so every heading
   disagreed with the logo above it.
 - **Nunito + Nunito Sans.** Rejected after evaluation; the change was reverted
   in full.
-
-The product stays on Quicksand. Anyone re-opening this should re-open it as a
-decision with a reason, not as a cleanup.
+- **Quicksand** (one family for both roles) was the previous face. Red
+  Hat Round replaced it, and its Display and Text cuts carry the `tnum`
+  feature Quicksand never had.
 
 ### The size ladder: closed
 
@@ -2223,13 +2222,12 @@ Four weights, and the ones that are gone are the point of it:
 | `font-semibold` | 600 | 151 |
 | `font-bold` | 700 | 347 |
 
-`font-extrabold` and `font-black` now fail to compile. Quicksand's `wght` axis
-stops at 700, so 800 and 900 have only ever rendered *as* bold: a latent no-op
-that would have gone live, unreviewed, the day a heavier face was adopted.
-`font-thin`,
-`font-extralight` and `font-light` go for the reverse reason: nothing under 400
-is legible at this face's low stroke contrast, and none has ever been reached
-for.
+`font-extrabold` and `font-black` fail to compile. Only the display cut ships
+800 and 900; text and mono stop at 700, so on body copy those classes would
+synthesize or fall back to bold. No call site asks for them, and opening them is
+a design decision. `font-thin`, `font-extralight` and `font-light` go because
+none of them carries a call site: the 300 files are declared in `fonts.css` but
+no class reaches them, so none is downloaded.
 
 ### The leading and tracking ladders: closed
 
@@ -2293,7 +2291,7 @@ stays the caller's to say.
 These are the sanctioned way to pick a heading size. Reaching past them means
 naming a new role here, not spelling a step at the call site.
 
-### `figures` is an inert seam, and that is recorded on purpose
+### `figures` aligns numbers
 
 ```css
 @utility figures {
@@ -2302,35 +2300,22 @@ naming a new role here, not spelling a step at the call site.
 }
 ```
 
-**Both halves do nothing today.** `--font-display` equals `--font-body`, so the
-family declaration changes no glyph. And `tabular-nums` emits
-`font-variant-numeric: tabular-nums` against a face that ships **no `tnum`
-feature**: measured against the binary with fontTools, not read off a specimen.
-Quicksand's digits are proportional (advance widths 588 / 363 / 549 / 519 / 506 /
-535 / 533 / 501 / 537 / 555 per 1000 upm, so a `1` is ~62% the width of a `0`),
-so a money column in it does not line up and **cannot be made to under this
-face**.
+**Both halves fire.** `--font-display` is Red Hat Round Display, a different
+cut from `--font-body`, so the family declaration moves figures off the body face.
+`tabular-nums` emits `font-variant-numeric: tabular-nums`, and the Display and
+Text cuts both ship a `tnum` feature (checked against the binaries with
+fontTools), so digits take a 600-unit advance and a money column lines up. The
+vendor's tabular nine is off-grid in some weights (display 612 and 636, text bold
+651), a drift of a few hundredths of an em per 9 that nothing here can correct.
 
-The utility earns its line as a seam rather than as a rule that fires: it
-collapses every such call site into one name, so the day a face with real
-tabular figures is adopted, this is a one-line change instead of a repo sweep. Both
-halves are written out for that reason: a seam missing half its intent is a seam
-the next person re-derives wrong.
+One name rather than two classes at every call site: any figure a reader compares
+to another (a money column, a total, a count, a date) takes `figures`, and a
+change to how figures render is a one-line edit in `utilities.css`. Tables do
+**not** get it automatically.
 
-Any figure a reader compares to another (a money column, a total, a count, a
-date) takes it. Tables do **not** get it automatically.
-
-`slashed-zero` looks like the same category and is **not**. It sits at 4 call
-sites (`pages/@sections/trust-bar.tsx`, `_landing.for-international-nonprofits/`
-×3) and it works: Quicksand draws a dotted-zero alternate behind the `zero`
-feature, and the self-hosted subsets keep that feature (see "The faces" below).
-
-The asymmetry between the two is the thing worth carrying: a dead
-`font-variant-*` rule can have either of two causes, and they differ in whether
-anything can be done. `slashed-zero` was a **delivery** problem: the face had
-the feature and the build was discarding it, so it was fixable without touching
-the design. `tabular-nums` is a **typeface** problem, and no build can add a
-feature Quicksand does not draw.
+`slashed-zero` works too: all three cuts carry the `zero` feature, verified
+against the binaries. The files are the vendor's own, copied in whole rather than
+subset, which is how the feature survives.
 
 ### The limitation: closing a scale stops names, not brackets
 
@@ -2353,9 +2338,9 @@ should be migrated onto a step.
 
 ### The faces
 
-`packages/ui/src/styles/theme.css` declares `--font-display`, `--font-body` and
-`--font-gochi`. `packages/ui/src/styles/fonts.css` **loads** them, from binaries
-committed beside it in `packages/ui/src/styles/fonts/`.
+`packages/ui/src/styles/theme.css` declares `--font-display`, `--font-body`,
+`--font-mono` and `--font-gochi`. `packages/ui/src/styles/fonts.css` **loads**
+them, from binaries committed beside it in `packages/ui/src/styles/fonts/`.
 
 Declaration and load sit together on purpose. Split apart (the tokens here, the
 `@import` of a font package in each consumer's own entry) a consumer can import
@@ -2366,54 +2351,43 @@ making an off-system name compile to no rule, and there is no way to make a
 *missing* import fail. Keeping the two in one package is the only thing that
 does, and it costs each consumer nothing but the import it already has.
 
-**Why we subset the fonts ourselves rather than depend on fontsource.** Quicksand
-draws an alternate zero with a dot in its bowl and exposes it as the OpenType
-`zero` feature, which is exactly what `font-variant-numeric: slashed-zero`
-(Tailwind's `slashed-zero`) asks a font for, whatever the designer drew for it.
-fontsource cuts its subsets with pyftsubset's default layout-feature retain list.
-`zero` is not in that list, so the feature and its glyph were dropped before any
-browser saw them, and four call sites on the fee-comparison pages had been asking
-for a distinguishable zero since they were written and silently getting a plain
-one. Measured on the binaries, not assumed:
+**The files are the design registry's.** The `fonts` item (Red Hat Round Display,
+Text and Mono as the vendor's static woff2 files, Gochi Hand as a subset, and the
+SIL OFL text) and the `tokens` item are copied into `packages/ui/src` by the
+`bg-design` CLI and recorded in `packages/ui/bg-design.json`. Nothing in this
+repo regenerates them; a face change is a registry release followed by
+`bg-design update`. The Red Hat Round files are taken whole, with no
+`unicode-range`, so a codepoint outside a file (vietnamese stacked diacritics
+among them) falls through to the next family in the stack.
 
-| binary | codepoints | features | `zero` |
-| --- | --- | --- | --- |
-| `@fontsource-variable/quicksand@5.2.10`, latin | 228 | 9 | no |
-| ours, latin | 237 | 10 | **yes** |
-| upstream `google/fonts` Quicksand[wght].ttf | 694 | 17 | yes |
+Two seams the stylesheet does **not** reach, both fed from the same files:
 
-Each subset is cut to the **union** of fontsource's declared `unicode-range` and
-the coverage the committed binary beside the script already has, so coverage
-cannot regress against what the site served before. That floor is read
-from the shipped bytes rather than from fontsource, because fontsource is no
-longer a dependency: a floor derived from `node_modules` would return nothing on
-a clean install and quietly cut a smaller font than the one it replaced. The
-script also verifies the ratchet after each cut and exits non-zero naming any
-codepoint lost. `packages/ui/src/styles/fonts/generate.sh` regenerates all four
-files from the upstream `google/fonts` sources and prints the codepoint counts
-and feature tags per file. Its output is **committed
-source**, the same convention as `packages/crypto`'s and `packages/stocks`'
-`src/generated/**`: nothing in the task graph runs it, and a font bump is a
-deliberate act.
-
-Gochi Hand needs no feature Quicksand needed. It is subset the same way purely so
-both faces have one pipeline and one place to look. `apps/docs` now emits it as a
-build asset without using it: a browser only fetches a face some element
-actually asks for, so that costs disk and not a request.
-
-Two seams this does **not** close, both deliberate:
-
-- **The PDF export embeds its own five static TTFs** from
-  `apps/platform/src/routes/donation-calculator-export/fonts/`, full upstream
-  files rather than these subsets, because pdf-lib embeds a binary and does not
-  read `@font-face`. A node test pins the five BaseFont names, so a face change
-  that misses that directory fails there rather than shipping a report in the
-  old type.
-- **The Stripe payment box loads Quicksand from the Google Fonts CDN**, in
+- **The PDF export** embeds the five Red Hat Round Text weights from
+  `@better-giving/ui/fonts/*` (an export of `packages/ui`), because pdf-lib embeds
+  a binary and does not read `@font-face`. A node test pins the five BaseFont
+  names, so a face change that misses `build-pdf.ts` fails there rather than
+  shipping a report in the old type.
+- **The Stripe payment box** gets the Text weights from the same files, as
+  absolute urls on this site's origin, in
   `components/donation/checkouts/stripe/checkout.tsx`. Stripe Elements renders in
-  a cross-origin iframe and can only be handed a stylesheet URL and a literal
-  family name, so it cannot reach these files. That copy is not feature-checked
-  and does not need to be: it renders card fields, not figures.
+  a cross-origin iframe that cannot see this page's `@font-face`, so it is
+  handed the files by url.
+
+## The design registry
+
+`packages/ui/bg-design.json` records which registry items this repo copied, at
+which version, and a hash of each file. Items today: `tokens`, `fonts`, `button`,
+`input`, `dialog`, `tooltip`. The copied files, the color palette among them
+(`packages/ui/src/styles/colors.css`), are not edited here: CI runs
+`bg-design diff --check`, which fails on a file that no longer matches what was
+copied and on an item that is behind the registry. A change belongs in the
+registry repo, then `bg-design update`.
+
+`packages/brand` keeps `colors.ts`, the flat-hex mirror the email templates and
+the PDF need, and reads `colors.css` through `@better-giving/ui/colors.css`.
+`generate-colors` and the drift tests still run against it. After a registry
+update that moves a palette token, run `pnpm --filter @better-giving/brand
+generate-colors` and commit `colors.ts` with it.
 
 ## Adoption
 

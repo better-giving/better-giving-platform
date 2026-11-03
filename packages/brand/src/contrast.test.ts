@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { APCAcontrast, alphaBlend, sRGBtoY } from "apca-w3";
 import { describe, expect, it } from "vitest";
 import { colors } from "./colors.ts";
@@ -753,7 +754,10 @@ describe("the pairings the ledger records under their threshold still are", () =
 // covered above. the recipe is read out of the css the way colors.test.ts reads
 // :root — a hardcoded percentage here would keep passing against a stale one —
 // while the ingredients still come from the guarded mirror.
-const css = readFileSync(new URL("./colors.css", import.meta.url), "utf8");
+const css = readFileSync(
+  createRequire(import.meta.url).resolve("@better-giving/ui/colors.css"),
+  "utf8"
+);
 
 type Recipe = { first: string; pct: number; second: string };
 

@@ -1,4 +1,8 @@
 import { ErrorStatus } from "@better-giving/ui";
+import text_bold from "@better-giving/ui/fonts/RedHatRoundText-Bold.woff2?url";
+import text_medium from "@better-giving/ui/fonts/RedHatRoundText-Medium.woff2?url";
+import text_regular from "@better-giving/ui/fonts/RedHatRoundText-Regular.woff2?url";
+import text_semibold from "@better-giving/ui/fonts/RedHatRoundText-SemiBold.woff2?url";
 import { Elements } from "@stripe/react-stripe-js";
 import { href } from "react-router";
 import use_swr from "swr/immutable";
@@ -22,6 +26,23 @@ const fetcher = async (intent: IDonationIntent) =>
     method: "POST",
     body: JSON.stringify(intent),
   }).then((res) => json_ok<IStripeIntentReturn>(res));
+
+// stripe renders the payment fields in its own iframe, which cannot see this
+// page's @font-face rules, so the faces are handed over as absolute urls. they
+// are the same files ui's fonts.css declares, so the fields match the page.
+// called only once the intent has loaded, i.e. in the browser.
+const stripe_fonts = () =>
+  [
+    [text_regular, "400"],
+    [text_medium, "500"],
+    [text_semibold, "600"],
+    [text_bold, "700"],
+  ].map(([path, weight]) => ({
+    family: "Red Hat Round Text",
+    src: `url(${new URL(path, window.location.origin).href})`,
+    weight,
+    display: "swap",
+  }));
 
 interface IStripeCheckoutProps extends StripeDonationDetails {
   bank_only?: boolean;
@@ -108,18 +129,13 @@ export function StripeCheckout(props: IStripeCheckoutProps) {
         ) : (
           <Elements
             options={{
-              fonts: [
-                {
-                  family: "Quicksand",
-                  cssSrc: "https://fonts.googleapis.com/css2?family=Quicksand",
-                },
-              ],
+              fonts: stripe_fonts(),
               clientSecret: data.client_secret,
               appearance: {
                 theme: "flat",
                 variables: {
                   colorPrimary: don.config?.accent_primary,
-                  fontFamily: "Quicksand, sans-serif",
+                  fontFamily: '"Red Hat Round Text", sans-serif',
                   borderRadius: "4px",
                   gridRowSpacing: "20px",
                 },

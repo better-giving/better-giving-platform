@@ -26,7 +26,7 @@ on:
 permissions:
   contents: read
 
-# turborepo remote cache (vercel-hosted). workflow-level so both jobs share it.
+# turborepo remote cache (vercel-hosted). workflow-level so `checks` and `test` share it.
 # TURBO_TOKEN is a vercel access token scoped to the better-giving team; TURBO_TEAM
 # is that team's slug. neither is required for the run to succeed — with the token
 # absent or unreadable turbo silently falls back to its local cache, which is what
@@ -118,6 +118,43 @@ jobs:
       # reads. the env guard also stands down under vitest (see
       # apps/platform/vite.config.ts), so nothing here needs real credentials.
       - run: pnpm test
+
+  # fails a pr when a design-registry item copied into packages/ui is behind the
+  # registry, edited locally, or missing a file (packages/ui/bg-design.json).
+  # runs the registry's own cli, fetched from the registry it checks against,
+  # so the check and the published items can't drift apart. deliberately NOT
+  # in `gate`'s needs: a registry outage or a new registry release must not
+  # hold production migrations.
+  design:
+    name: design
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      REGISTRY: https://design.better.giving/registry
+      # blank the workflow-level turbo credentials: the downloaded cli runs
+      # here and must not see the token.
+      TURBO_TOKEN: ""
+      TURBO_TEAM: ""
+      # sha-256 of the cli the registry serves. bumping the cli means
+      # updating this hash.
+      BG_DESIGN_CLI_SHA256: fc690bf4b1cce6bfd0048c437e2025361d5eebd2944e3564595c412aed036374
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: bg-design diff --check
+        working-directory: packages/ui
+        run: |
+          set -euo pipefail
+          cli="$RUNNER_TEMP/bg-design.mjs"
+          curl --fail --silent --show-error --location \
+            --retry 3 --retry-all-errors --retry-delay 5 --connect-timeout 20 \
+            "$REGISTRY/cli.mjs" --output "$cli"
+          echo "$BG_DESIGN_CLI_SHA256  $cli" | sha256sum --check --strict
+          node "$cli" diff --check --registry "$REGISTRY" --lock bg-design.json
 
   # the one check smoke.yml's production migrate waits on, so the job set lives
   # here alone: a job newly required in vercel goes into `needs` too, or

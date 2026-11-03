@@ -316,9 +316,19 @@ describe("Letter", () => {
       .poll(() => donates(main).some((d) => d.checkVisibility() && in_view(d)))
       .toBe(true);
     expect(header_donate(root)).toBeUndefined();
-    scroll_past_hero_donate(root);
-    await expect.poll(() => header_donate(root)).toBeDefined();
-    await expect.poll(() => header_donate_in_view(root)).toBe(true);
+    // the fixture page is barely taller than the viewport, so how far it can
+    // scroll rides on the face's line breaks. room to scroll past the hero is
+    // the test's to provide, not the typeface's.
+    const room = document.createElement("div");
+    room.style.height = "2000px";
+    document.body.append(room);
+    try {
+      scroll_past_hero_donate(root);
+      await expect.poll(() => header_donate(root)).toBeDefined();
+      await expect.poll(() => header_donate_in_view(root)).toBe(true);
+    } finally {
+      room.remove();
+    }
   });
 
   test.each([

@@ -1,17 +1,13 @@
 {
   "name": "@better-giving/brand",
   "private": true,
-  "description": "Shared Better Giving brand constants (legal identity, social profile urls, design-token color palette)",
+  "description": "Shared Better Giving brand constants (legal identity, social profile urls) and the flat-hex mirror of the design palette",
   "type": "module",
-  "sideEffects": [
-    "**/*.css"
-  ],
   "engines": {
     "node": "24.x"
   },
   "exports": {
     ".": "./src/index.ts",
-    "./colors.css": "./src/colors.css",
     "./flat": "./src/flat.ts"
   },
   "scripts": {
@@ -22,6 +18,7 @@
     "generate-colors": "node ./src/scripts/generate-colors.ts"
   },
   "devDependencies": {
+    "@better-giving/ui": "workspace:*",
     "apca-w3": "0.1.9",
     "typescript": "catalog:",
     "vitest": "5.0.0"

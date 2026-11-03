@@ -1,7 +1,7 @@
 {
   "name": "@better-giving/ui",
   "private": true,
-  "description": "Better Giving design system — shared React components, style layer, and pure helpers",
+  "description": "Better Giving design system \u2014 shared React components, style layer, and pure helpers",
   "type": "module",
   "sideEffects": [
     "**/*.css"
@@ -15,7 +15,9 @@
     "./masks": "./src/components/form/masks/index.ts",
     "./tooltip": "./src/components/tooltip.tsx",
     "./hover-card": "./src/components/hover-card.tsx",
-    "./styles.css": "./src/styles/index.css"
+    "./styles.css": "./src/styles/index.css",
+    "./fonts/*": "./src/styles/fonts/*",
+    "./colors.css": "./src/styles/colors.css"
   },
   "scripts": {
     "build": "tailwindcss -i ./src/styles/build-entry.css -o ./dist/styles.css && mkdir -p ./dist/fonts && cp ./src/styles/fonts/*.woff2 ./dist/fonts/",
@@ -32,7 +34,6 @@
     "valibot": "^1.5.0"
   },
   "dependencies": {
-    "@better-giving/brand": "workspace:*",
     "date-fns": "4.1.0",
     "lucide-react": "0.562.0"
   },
