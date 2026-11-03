@@ -98,7 +98,7 @@ describe("footer landscape", () => {
     const Stub = stb("full");
     const screen = await render(<Stub />);
 
-    const art = screen.container.querySelector("footer > svg");
+    const art = screen.container.querySelector("footer > img[aria-hidden]");
     expect(art).not.toBeNull();
     expect(art?.getAttribute("aria-hidden")).toBe("true");
   });
@@ -110,7 +110,9 @@ describe("footer landscape", () => {
       const screen = await render(<Stub />);
 
       await expect.element(screen.getByRole("contentinfo")).toBeVisible();
-      expect(screen.container.querySelector("footer svg")).toBeNull();
+      expect(
+        screen.container.querySelector("footer img[aria-hidden]")
+      ).toBeNull();
     }
   );
 });
