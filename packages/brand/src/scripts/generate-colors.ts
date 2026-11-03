@@ -1,10 +1,15 @@
 // regenerates colors.ts from colors.css's :root tokens.
 // run: pnpm --filter @better-giving/brand generate-colors
 import { readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 
 import { oklch_to_hex } from "../oklch.ts";
 
-const css_path = new URL("../colors.css", import.meta.url);
+// colors.css is the registry's, copied into packages/ui; edit it there only via a
+// registry release.
+const css_path = createRequire(import.meta.url).resolve(
+  "@better-giving/ui/colors.css"
+);
 const out_path = new URL("../colors.ts", import.meta.url);
 
 const css = readFileSync(css_path, "utf8");

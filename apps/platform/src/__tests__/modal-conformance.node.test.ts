@@ -53,6 +53,10 @@ describe("modal size set", () => {
     expect(files_with('size="none"')).toEqual([
       // an edge-anchored drawer, not a centered content box
       "apps/platform/src/layout/dashboard/sidebar/sidebar-opener/toggleable-sidebar.tsx",
+      // prose only: the registry's palette comment on --overlay names the
+      // drawer. the file is copied in (packages/ui/bg-design.json), so the
+      // mention is not ours to reword.
+      "packages/ui/src/styles/colors.css",
     ]);
   });
 

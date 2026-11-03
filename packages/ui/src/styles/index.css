@@ -5,7 +5,7 @@
    "tailwindcss" from this file — platform's compile needs to own that. */
 
 @import "./fonts.css";
-@import "@better-giving/brand/colors.css";
+@import "./colors.css";
 @import "./base.css";
 @import "./components.css";
 @import "./utilities.css";

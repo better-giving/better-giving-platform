@@ -119,6 +119,21 @@ jobs:
       # apps/platform/vite.config.ts), so nothing here needs real credentials.
       - run: pnpm test
 
+  # fails a pr when a design-registry item copied into packages/ui is behind the
+  # registry, edited locally, or missing a file (packages/ui/bg-design.json).
+  # runs the registry's reusable workflow, so it is on github-hosted runners,
+  # not blacksmith. deliberately NOT in `gate`'s needs: a registry outage or a
+  # new registry release must not hold production migrations. pinned to a
+  # commit of the registry's init-registry branch, the only place
+  # design-check.yml exists until that branch merges; move it to the release
+  # tag afterwards. the default `registry` input (design.better.giving) must be
+  # serving for this to pass.
+  design:
+    name: design
+    uses: better-giving/design-system/.github/workflows/design-check.yml@a5cd4dbe68226ce0941d71e56b0cedc1fe49ae4e
+    with:
+      working-directory: packages/ui
+
   # the one check smoke.yml's production migrate waits on, so the job set lives
   # here alone: a job newly required in vercel goes into `needs` too, or
   # production migrates before it passes. always() + the explicit result test

@@ -1,13 +1,18 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { colors } from "./colors.ts";
 import { oklch_to_hex } from "./oklch.ts";
 
-// drift guard: colors.ts must always agree with colors.css.
+// drift guard: colors.ts must always agree with colors.css, which the design
+// registry owns (copied into packages/ui; see packages/ui/bg-design.json).
 // parses :root the same way a human eye would — a literal oklch() token, or a
 // var() alias followed to the literal it points at. color-mix() and --radius
 // fall out on their own: neither has one literal behind it.
-const css = readFileSync(new URL("./colors.css", import.meta.url), "utf8");
+const css = readFileSync(
+  createRequire(import.meta.url).resolve("@better-giving/ui/colors.css"),
+  "utf8"
+);
 
 function sole_block(selector: string): string {
   const matches = [

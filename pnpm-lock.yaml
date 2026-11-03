@@ -618,6 +618,9 @@ importers:
 
   packages/brand:
     devDependencies:
+      '@better-giving/ui':
+        specifier: workspace:*
+        version: link:../ui
       apca-w3:
         specifier: 0.1.9
         version: 0.1.9
@@ -709,9 +712,6 @@ importers:
 
   packages/ui:
     dependencies:
-      '@better-giving/brand':
-        specifier: workspace:*
-        version: link:../brand
       date-fns:
         specifier: 4.1.0
         version: 4.1.0

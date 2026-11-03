@@ -1,11 +1,11 @@
+import text_bold_b64 from "@better-giving/ui/fonts/RedHatRoundText-Bold.woff2?bin";
+import text_light_b64 from "@better-giving/ui/fonts/RedHatRoundText-Light.woff2?bin";
+import text_medium_b64 from "@better-giving/ui/fonts/RedHatRoundText-Medium.woff2?bin";
+import text_regular_b64 from "@better-giving/ui/fonts/RedHatRoundText-Regular.woff2?bin";
+import text_semibold_b64 from "@better-giving/ui/fonts/RedHatRoundText-SemiBold.woff2?bin";
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument } from "pdf-lib";
 import type { View } from "#/routes/_app.donation-calculator/types";
-import quicksand_bold_b64 from "../fonts/quicksand-bold.ttf?bin";
-import quicksand_light_b64 from "../fonts/quicksand-light.ttf?bin";
-import quicksand_medium_b64 from "../fonts/quicksand-medium.ttf?bin";
-import quicksand_regular_b64 from "../fonts/quicksand-regular.ttf?bin";
-import quicksand_semibold_b64 from "../fonts/quicksand-semibold.ttf?bin";
 import fb_b64 from "../icons/facebook.png?bin";
 import ig_b64 from "../icons/instagram.png?bin";
 import li_b64 from "../icons/linkedin.png?bin";
@@ -32,11 +32,11 @@ export async function build_pdf(view: View): Promise<Uint8Array> {
   doc.setTitle("better-giving-report");
 
   const fonts: Fonts = {
-    light: await doc.embedFont(decode(quicksand_light_b64)),
-    regular: await doc.embedFont(decode(quicksand_regular_b64)),
-    medium: await doc.embedFont(decode(quicksand_medium_b64)),
-    semibold: await doc.embedFont(decode(quicksand_semibold_b64)),
-    bold: await doc.embedFont(decode(quicksand_bold_b64)),
+    light: await doc.embedFont(decode(text_light_b64)),
+    regular: await doc.embedFont(decode(text_regular_b64)),
+    medium: await doc.embedFont(decode(text_medium_b64)),
+    semibold: await doc.embedFont(decode(text_semibold_b64)),
+    bold: await doc.embedFont(decode(text_bold_b64)),
   };
 
   const images: Images = {

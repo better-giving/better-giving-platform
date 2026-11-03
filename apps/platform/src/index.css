@@ -1,7 +1,9 @@
 @import "tailwindcss";
 /* the faces ship with the design system — packages/ui/src/styles/fonts.css
    declares them beside the --font-* tokens that name them. an app does not
-   load a face of its own. */
+   load a face of its own. the style layer is copied in from the design
+   registry (packages/ui/bg-design.json): change it by a registry release, not
+   here. */
 @import "@better-giving/ui/styles.css";
 
 @plugin "@tailwindcss/typography";
@@ -27,7 +29,7 @@
      75 body text needs). named by hue, not by role, so nobody reads one as a
      system surface. never in product UI — a
      dashboard, form, table or badge takes the semantic set from
-     packages/brand/src/colors.css. a wash that needs a second ink has stopped
+     packages/ui/src/styles/colors.css. a wash that needs a second ink has stopped
      being decorative and is a mint request against that palette instead. */
   --color-peach: #fde3d8;
   --color-lilac: #eae2fc;

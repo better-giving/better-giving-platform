@@ -29,11 +29,11 @@ describe("build_pdf", () => {
     // export to the same family the site renders — a face swap that misses
     // ./fonts fails here rather than shipping a report in the old type.
     expect([...base_fonts].sort()).toEqual([
-      "Quicksand-Bold",
-      "Quicksand-Light",
-      "Quicksand-Medium",
-      "Quicksand-Regular",
-      "Quicksand-SemiBold",
+      "RedHatRoundText-Bold",
+      "RedHatRoundText-Light",
+      "RedHatRoundText-Medium",
+      "RedHatRoundText-Regular",
+      "RedHatRoundText-SemiBold",
     ]);
   });
 });

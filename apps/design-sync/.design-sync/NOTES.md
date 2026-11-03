@@ -29,7 +29,7 @@ dependencies of the package, and `workspaceRoot` still derives to the repo root 
 
 The "design system" is split across two packages:
 
-- **`packages/brand`**: the token palette (`src/colors.css`, real `oklch()`, `:root` only,
+- **`packages/brand`**: the token palette (`packages/ui/src/styles/colors.css` since the registry move, real `oklch()`, `:root` only,
   the palette is light-only, the `.dark` set was deleted 2026-08-19)
   and `design-system.md`, the token ledger. Read that ledger before touching color; it records
   measured contrast, the fill-vs-ink distinction, and several deliberate decisions that look
@@ -136,10 +136,9 @@ exist in the emitted `.d.ts`. **Re-run it whenever a component's props change.**
 `cfg.extraFonts` points at **`../../packages/ui/src/styles/fonts.css`**: the design system's
 own `@font-face` layer, one entry for both families.
 
-`packages/ui` self-hosts both faces beside the tokens that
-name them (committed `.woff2` in `packages/ui/src/styles/fonts/`, cut by that dir's
-`generate.sh` so Quicksand keeps its `zero` feature; see `packages/brand/design-system.md`,
-"The faces").
+`packages/ui` self-hosts the faces beside the tokens that
+name them (committed `.woff2` in `packages/ui/src/styles/fonts/`, copied in from the design
+registry's `fonts` item; see `packages/brand/design-system.md`, "The faces").
 
 Two things about that path still matter. `extraFonts` is bounded to the **git workspace root**
 rather than `PKG_DIR`, which is what makes the `../../` form legal. And the converter needs
@@ -149,9 +148,8 @@ compiled app CSS is no use for this: it references `/assets/*.woff2` (absolute,
 root-relative) which resolve to nothing on disk, so the converter drops those as dead
 `@font-face` blocks.
 
-Quicksand Variable and Gochi Hand are the only two families the system uses: `--font-display`
-and `--font-body` are two roles resolving to the one Quicksand face, so this is two families in
-one file, not three. Keep it in step with `--font-*` in `packages/ui/src/styles/theme.css`: a
+Red Hat Round (Display, Text and Mono) and Gochi Hand are the families the system uses, all in
+the one file. Keep it in step with `--font-*` in `packages/ui/src/styles/theme.css`: a
 face swap that misses `fonts.css` makes every preview render in a family the system no longer
 has.
 
