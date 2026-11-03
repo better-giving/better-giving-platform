@@ -128,6 +128,7 @@ export const top_level_route_segments = [
   "profile",
   "referral-program",
   "register",
+  "registry",
   "resources",
   "robots.txt",
   "security-policy",

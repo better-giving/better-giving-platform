@@ -10,6 +10,6 @@
     // diversity glyph as a url) — without it tsc can't resolve the asset.
     "types": ["vite/client"]
   },
-  "include": ["src", "vite.config.ts"],
+  "include": ["src", "scripts", "vite.config.ts"],
   "exclude": ["node_modules", "dist"]
 }

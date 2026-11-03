@@ -3,6 +3,7 @@ packages:
   - packages/brand
   - packages/chariot
   - packages/crypto
+  - packages/design-cli
   - packages/emails
   - packages/paypal
   - packages/stocks

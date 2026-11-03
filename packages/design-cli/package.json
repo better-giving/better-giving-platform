@@ -1,0 +1,28 @@
+{
+  "name": "@better-giving/design-cli",
+  "private": true,
+  "description": "bg-design: copies Better Giving design-system registry items into another app's source",
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "bin": {
+    "bg-design": "./src/cli.mjs"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest --run",
+    "lint": "biome check .",
+    "format": "biome check --write ."
+  },
+  "devDependencies": {
+    "@better-giving/ui": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "19.2.18",
+    "lucide-react": "0.562.0",
+    "react": "19.2.9",
+    "react-router": "7.18.5",
+    "typescript": "catalog:",
+    "vitest": "5.0.0"
+  }
+}

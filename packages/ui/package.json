@@ -15,10 +15,12 @@
     "./masks": "./src/components/form/masks/index.ts",
     "./tooltip": "./src/components/tooltip.tsx",
     "./hover-card": "./src/components/hover-card.tsx",
-    "./styles.css": "./src/styles/index.css"
+    "./styles.css": "./src/styles/index.css",
+    "./registry/*": "./registry/*"
   },
   "scripts": {
     "build": "tailwindcss -i ./src/styles/build-entry.css -o ./dist/styles.css && mkdir -p ./dist/fonts && cp ./src/styles/fonts/*.woff2 ./dist/fonts/",
+    "registry:build": "node ./scripts/registry-build.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest --run --bail 1",
     "lint": "biome check .",

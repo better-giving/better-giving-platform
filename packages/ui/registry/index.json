@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "name": "fonts",
+      "description": "Quicksand and Gochi Hand subsets with their @font-face rules",
+      "dependencies": {},
+      "registryDependencies": [],
+      "files": [
+        "styles/fonts.css",
+        "styles/fonts/gochi-hand-latin-400-normal.woff2",
+        "styles/fonts/quicksand-latin-ext-wght-normal.woff2",
+        "styles/fonts/quicksand-latin-wght-normal.woff2",
+        "styles/fonts/quicksand-vietnamese-wght-normal.woff2"
+      ]
+    },
+    {
+      "name": "tokens",
+      "description": "Color palette (Radix step roles), theme mapping, spacing, base styles, component classes and utilities. Import styles/index.css after tailwindcss",
+      "dependencies": {
+        "tailwindcss": "4.3.1"
+      },
+      "registryDependencies": [
+        "fonts"
+      ],
+      "files": [
+        "styles/colors.css",
+        "styles/index.css",
+        "styles/base.css",
+        "styles/components.css",
+        "styles/utilities.css",
+        "styles/theme.css"
+      ]
+    },
+    {
+      "name": "button",
+      "description": "Button and link-button with variants, sizes and loading state",
+      "dependencies": {
+        "lucide-react": "0.562.0",
+        "react": "19.2.9",
+        "react-router": "7.18.5"
+      },
+      "registryDependencies": [
+        "tokens"
+      ],
+      "files": [
+        "components/button.tsx",
+        "components/load-text.tsx"
+      ]
+    },
+    {
+      "name": "input",
+      "description": "Text input, label and form field with error and hint slots",
+      "dependencies": {
+        "lucide-react": "0.562.0",
+        "react": "19.2.9"
+      },
+      "registryDependencies": [
+        "tokens"
+      ],
+      "files": [
+        "components/form/input.tsx",
+        "components/form/field.tsx",
+        "components/form/label.tsx",
+        "components/form/types.ts",
+        "helpers/unpack.ts"
+      ]
+    },
+    {
+      "name": "dialog",
+      "description": "Modal dialog on Ark UI with size scale and focus handling",
+      "dependencies": {
+        "@ark-ui/react": "5.37.2",
+        "react": "19.2.9"
+      },
+      "registryDependencies": [
+        "tokens"
+      ],
+      "files": [
+        "components/modal.tsx",
+        "components/stripe-challenge.ts",
+        "helpers/dialog-name.ts",
+        "helpers/ejected-focus.ts",
+        "helpers/modal-box.ts"
+      ]
+    },
+    {
+      "name": "tooltip",
+      "description": "Tooltip on Ark UI sharing the popup motion shell",
+      "dependencies": {
+        "@ark-ui/react": "5.37.2",
+        "react": "19.2.9"
+      },
+      "registryDependencies": [
+        "tokens"
+      ],
+      "files": [
+        "components/tooltip.tsx",
+        "components/popup.ts"
+      ]
+    }
+  ]
+}
