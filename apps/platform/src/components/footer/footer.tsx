@@ -9,6 +9,7 @@ import {
   socials,
   TERMS_OF_USE_NPO,
 } from "#/constants/urls";
+import { Landscape } from "./landscape";
 import { NewsletterForm } from "./newsletter-form";
 
 type Props = {
@@ -155,7 +156,7 @@ export function Footer({ classes = "", variant = "full", width }: Props) {
 
   return (
     <footer
-      className={`${classes} surface-primary border-t border-primary-fg/10 pt-16 pb-10`}
+      className={`${classes} surface-primary border-t border-primary-fg/10 pt-16`}
     >
       <div
         className={`${page} grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.3fr]`}
@@ -273,6 +274,9 @@ export function Footer({ classes = "", variant = "full", width }: Props) {
           </span>
         </div>
       </div>
+
+      {/* full-bleed and flush with the bottom edge, which is why the footer has no pb-* */}
+      <Landscape className="mt-4" />
     </footer>
   );
 }
