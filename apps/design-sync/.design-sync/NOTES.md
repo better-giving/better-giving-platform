@@ -29,9 +29,9 @@ dependencies of the package, and `workspaceRoot` still derives to the repo root 
 
 The "design system" is split across two packages:
 
-- **`packages/brand`**: the token palette (`packages/ui/src/styles/colors.css` since the registry move, real `oklch()`, `:root` only,
-  the palette is light-only, the `.dark` set was deleted 2026-08-19)
-  and `design-system.md`, the token ledger. Read that ledger before touching color; it records
+- **`packages/brand`**: `design-system.md`, the token ledger for the palette. The palette itself
+  is `packages/ui/src/styles/colors.css` (copied in from the design registry; real `oklch()`,
+  `:root` only, light-only, the `.dark` set was deleted 2026-08-19). Read that ledger before touching color; it records
   measured contrast, the fill-vs-ink distinction, and several deliberate decisions that look
   like bugs.
 - **`packages/ui`** (`@better-giving/ui`): the components, under `src/components/`, plus the

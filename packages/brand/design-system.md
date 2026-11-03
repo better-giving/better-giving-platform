@@ -2119,9 +2119,8 @@ at all rather than drifting in one call site at a time.
 ### The face
 
 The product runs on **Red Hat Round**, three cuts of one family, with **Gochi
-Hand** as the handwritten aside. Red Hat Round replaced Quicksand everywhere on
-2026-11-03 (the PM's standing decision): the site, the Stripe payment fields and
-the donation-calculator PDF. The faces, their `@font-face` rules and their
+Hand** as the handwritten aside. Red Hat Round is the face everywhere: the site,
+the Stripe payment fields and the donation-calculator PDF. The faces, their `@font-face` rules and their
 tokens come from the design registry, not from this repo's own edits.
 
 | token | resolves to | what takes it |
@@ -2160,8 +2159,8 @@ on the faces themselves:
   disagreed with the logo above it.
 - **Nunito + Nunito Sans.** Rejected after evaluation; the change was reverted
   in full.
-- **Quicksand** (one family for both roles) was the face until 2026-11-03. It
-  was replaced by Red Hat Round, whose Display and Text cuts carry the `tnum`
+- **Quicksand** (one family for both roles) was the previous face. Red
+  Hat Round replaced it, and its Display and Text cuts carry the `tnum`
   feature Quicksand never had.
 
 ### The size ladder: closed
