@@ -121,17 +121,30 @@ jobs:
 
   # fails a pr when a design-registry item copied into packages/ui is behind the
   # registry, edited locally, or missing a file (packages/ui/bg-design.json).
-  # runs the registry's reusable workflow, so it is on github-hosted runners,
-  # not blacksmith. deliberately NOT in `gate`'s needs: a registry outage or a
-  # new registry release must not hold production migrations. pinned to a
-  # commit of the registry's init-registry branch, the only place
-  # design-check.yml exists until that branch merges. the default `registry`
-  # input (design.better.giving) must be serving for this to pass.
+  # runs the registry's own cli, fetched from the registry it checks against,
+  # so the check and the published items can't drift apart. deliberately NOT
+  # in `gate`'s needs: a registry outage or a new registry release must not
+  # hold production migrations.
   design:
     name: design
-    uses: better-giving/design-system/.github/workflows/design-check.yml@a5cd4dbe68226ce0941d71e56b0cedc1fe49ae4e
-    with:
-      working-directory: packages/ui
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      REGISTRY: https://design.better.giving/registry
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: bg-design diff --check
+        working-directory: packages/ui
+        run: |
+          set -euo pipefail
+          cli="$RUNNER_TEMP/bg-design.mjs"
+          curl --fail --silent --show-error --location "$REGISTRY/cli.mjs" --output "$cli"
+          node "$cli" diff --check --registry "$REGISTRY" --lock bg-design.json
 
   # the one check smoke.yml's production migrate waits on, so the job set lives
   # here alone: a job newly required in vercel goes into `needs` too, or
