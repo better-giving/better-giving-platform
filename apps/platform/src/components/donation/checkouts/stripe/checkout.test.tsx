@@ -17,6 +17,7 @@ import {
 import { render } from "vitest-browser-react";
 import { don_intents_error_handler } from "#/services/api/mock";
 import { mswWorker } from "#/setup-tests-browser";
+import fonts_css from "../../../../../../../packages/ui/src/styles/fonts.css?raw";
 import type { Config } from "../../types";
 import { type StripeDonationDetails, tip_fv_init } from "../../types";
 import { StripeCheckout as Checkout } from "./checkout";
@@ -126,6 +127,17 @@ const fv: StripeDonationDetails = {
   ...tip_fv_init,
   cover_processing_fee: false,
 };
+
+// the faces ui's fonts.css declares, keyed by file name. read from the css so
+// renaming a face or re-weighting a file there fails the stripe test too.
+// ui exports no path to fonts.css, hence the relative reach.
+const declared_faces: Record<string, { family: string; weight: string }> = {};
+for (const [, body] of fonts_css.matchAll(/@font-face\s*{([^}]*)}/g)) {
+  const family = body!.match(/font-family:\s*"([^"]+)"/)?.[1];
+  const weight = body!.match(/font-weight:\s*(\d+)/)?.[1];
+  const file = body!.match(/url\(\.\/fonts\/([^)]+)\)/)?.[1];
+  if (family && weight && file) declared_faces[file] = { family, weight };
+}
 
 describe("stripe checkout", () => {
   const og_error = console.error;
@@ -278,9 +290,23 @@ describe("stripe checkout", () => {
     }[];
     const family = options!.appearance!.variables!.fontFamily!;
     expect(fonts.map((f) => f.weight)).toEqual(["400", "500", "600", "700"]);
+    const file_of_weight: Record<string, string> = {
+      "400": "RedHatRoundText-Regular.woff2",
+      "500": "RedHatRoundText-Medium.woff2",
+      "600": "RedHatRoundText-SemiBold.woff2",
+      "700": "RedHatRoundText-Bold.woff2",
+    };
     for (const f of fonts) {
       expect(family.startsWith(`"${f.family}"`)).toBe(true);
       expect(f.src).toMatch(/^url\(https?:\/\/[^)]+\.woff2\)$/);
+      // the file handed over is the one fonts.css declares at that weight,
+      // under the same family name the page speaks
+      const file = file_of_weight[f.weight]!;
+      expect(f.src).toContain(`/${file}`);
+      expect(declared_faces[file]).toEqual({
+        family: f.family,
+        weight: f.weight,
+      });
     }
   });
 

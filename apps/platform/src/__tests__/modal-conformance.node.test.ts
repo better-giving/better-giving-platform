@@ -15,7 +15,14 @@ import { sources_of } from "./conformance/walk";
  * so it is gated with the other controls in `controls-conformance`.
  */
 
-const corpus = sources_of(import.meta.url);
+// colors.css is copied in from the design registry (packages/ui/bg-design.json),
+// so its prose is not ours to reword — its --overlay comment names the drawer
+// and `size="none"`. it holds no modal call, so leaving it out of the corpus
+// keeps a real `size="none"` call written in any other css file caught.
+const REGISTRY_COPIES = ["packages/ui/src/styles/colors.css"];
+const corpus = sources_of(import.meta.url).filter(
+  (x) => !REGISTRY_COPIES.includes(x.file)
+);
 
 /** every scanned file whose text contains `needle`, repo-relative, sorted. */
 function files_with(needle: string): string[] {
@@ -53,10 +60,6 @@ describe("modal size set", () => {
     expect(files_with('size="none"')).toEqual([
       // an edge-anchored drawer, not a centered content box
       "apps/platform/src/layout/dashboard/sidebar/sidebar-opener/toggleable-sidebar.tsx",
-      // prose only: the registry's palette comment on --overlay names the
-      // drawer. the file is copied in (packages/ui/bg-design.json), so the
-      // mention is not ours to reword.
-      "packages/ui/src/styles/colors.css",
     ]);
   });
 

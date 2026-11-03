@@ -59,5 +59,8 @@ describe("build_pdf", () => {
     }
     expect(heads).toHaveLength(5);
     expect(heads).not.toContain("wOF2");
+    // an sfnt opens with 0x00010000 (truetype outlines), 'true' or 'OTTO'
+    const sfnt = new Set(["\x00\x01\x00\x00", "true", "OTTO"]);
+    expect(heads.filter((h) => !sfnt.has(h))).toEqual([]);
   });
 });
