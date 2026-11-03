@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
@@ -108,6 +109,16 @@ describe("cli", () => {
     const second = run();
     expect(second.status).toBe(1);
     expect(second.stderr).toContain("would overwrite");
+  });
+
+  test("bin runs when launched through a symlink, as a package bin shim does", () => {
+    const link = join(mk(), "bg-design");
+    symlinkSync(cli, link);
+    const r = spawnSync("node", [link, "list", "--registry", registry], {
+      encoding: "utf8",
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("button");
   });
 });
 

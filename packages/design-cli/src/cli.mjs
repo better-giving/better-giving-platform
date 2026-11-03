@@ -9,7 +9,13 @@
 // the registry is a url (https://…/registry) or a local directory holding
 // index.json and items/<name>.json. format: packages/ui/REGISTRY.md.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 
@@ -191,7 +197,9 @@ async function main(argv) {
   return rows.some((r) => r.status !== "same") ? 1 : 0;
 }
 
-if (import.meta.filename === process.argv[1]) {
+// argv[1] keeps the symlink a package manager's bin shim runs through;
+// import.meta.filename is the real file, so compare real paths.
+if (process.argv[1] && import.meta.filename === realpathSync(process.argv[1])) {
   main(process.argv.slice(2)).then(
     (code) => process.exit(code),
     (e) => {
