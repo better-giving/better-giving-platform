@@ -92,10 +92,9 @@ vi.mock("#/components/bank-details", () => ({
 // --- imports (after mocks hoisted) ---
 
 import { get_session } from "#/.server/auth";
-import { update_action } from "#/pages/registration/update-action";
 import { reg_put } from "$/pg/queries/registration";
 import { create_test_db } from "$/pg/test-utils/pglite";
-import Banking, { loader } from "./route";
+import Banking, { action, loader } from "./route";
 
 const mock_get_session = vi.mocked(get_session);
 const TEST_EMAIL = "test@example.com";
@@ -201,7 +200,7 @@ function render_step_4(id: string, search = "") {
           path: "4",
           Component: Banking,
           loader: loader as any,
-          action: update_action("5") as any,
+          action: action as any,
         },
         { path: "5", Component: () => <p>summary</p> },
         { path: "2", Component: () => <p>org details</p> },
@@ -242,7 +241,11 @@ describe("registration step 4: banking", () => {
 
     await screen.getByRole("button", { name: /submit bank details/i }).click();
 
-    await expect.element(screen.getByText(/summary/i)).toBeInTheDocument();
+    await expect
+      .element(
+        screen.getByRole("region", { name: "Your bank payout", exact: true })
+      )
+      .toBeInTheDocument();
     await expect
       .element(screen.getByText(/unexpected error occurred/i))
       .not.toBeInTheDocument();
@@ -275,9 +278,46 @@ describe("registration step 4: banking", () => {
       screen.getByRole("region", { name: "Stripe account" }).query()
     ).toBeNull();
 
-    // bank details alone complete the step
+    // a saved bank comes back to this step, where stripe is now offered
     await screen.getByRole("button", { name: /submit bank details/i }).click();
+    await expect
+      .element(
+        screen.getByRole("region", { name: "Your bank payout", exact: true })
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        screen
+          .getByRole("region", { name: "Stripe account" })
+          .getByRole("link", { name: "Connect with Stripe" })
+      )
+      .toBeVisible();
+
+    // bank details alone complete the step
+    await screen.getByRole("link", { name: "Continue" }).click();
     await expect.element(screen.getByText(/summary/i)).toBeVisible();
+  }, 30_000);
+
+  it("comes back to the saved bank after a change, not to the summary", async () => {
+    const id = await seed_step_4();
+    await save_bank(id);
+    bank_statement.url = "https://example.com/new.pdf";
+    const screen = await render_step_4(id);
+
+    await screen.getByRole("button", { name: "Change bank details" }).click();
+    await screen.getByRole("button", { name: /submit bank details/i }).click();
+
+    const bank = screen.getByRole("region", {
+      name: "Your bank payout",
+      exact: true,
+    });
+    await expect
+      .element(bank.getByRole("link", { name: "View bank statement" }))
+      .toHaveAttribute("href", "https://example.com/new.pdf");
+    await expect
+      .element(screen.getByRole("region", { name: "Stripe account" }))
+      .toBeVisible();
+    expect(screen.getByText(/summary/i).query()).toBeNull();
   }, 30_000);
 
   it("keeps a linked account's card beside the bank form", async () => {
@@ -303,7 +343,10 @@ describe("registration step 4: banking", () => {
     await save_bank(id);
     const screen = await render_step_4(id);
 
-    const bank = screen.getByRole("region", { name: "Your bank payout" });
+    const bank = screen.getByRole("region", {
+      name: "Your bank payout",
+      exact: true,
+    });
     await expect
       .element(bank.getByText("Saved", { exact: true }))
       .toBeVisible();
@@ -346,7 +389,9 @@ describe("registration step 4: banking", () => {
       .toBeVisible();
     await screen.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect
-      .element(screen.getByRole("region", { name: "Your bank payout" }))
+      .element(
+        screen.getByRole("region", { name: "Your bank payout", exact: true })
+      )
       .toBeVisible();
   }, 30_000);
 
@@ -553,6 +598,15 @@ describe("registration step 4: banking", () => {
       await screen
         .getByRole("button", { name: /submit bank details/i })
         .click();
+      await expect
+        .element(
+          screen.getByRole("region", { name: "Your bank payout", exact: true })
+        )
+        .toBeVisible();
+      expect(
+        screen.getByRole("region", { name: "Stripe account" }).query()
+      ).toBeNull();
+      await screen.getByRole("link", { name: "Continue" }).click();
       await expect.element(screen.getByText(/summary/i)).toBeVisible();
     }, 30_000);
 

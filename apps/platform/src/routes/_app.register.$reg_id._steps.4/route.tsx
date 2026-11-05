@@ -8,7 +8,7 @@ import { StripeConnectCard } from "#/components/stripe-connect/connect-card";
 import { submit_error_prompt } from "#/helpers/error-prompt";
 import { use_strip_connect_params } from "#/hooks/use-strip-connect-params";
 import { step_loader } from "#/pages/registration/data/step-loader";
-import { before_banking, next_step, steps } from "#/pages/registration/routes";
+import { before_banking, steps } from "#/pages/registration/routes";
 import { update_action } from "#/pages/registration/update-action";
 import type { TRegUpdate } from "@/reg";
 import {
@@ -53,11 +53,22 @@ export const loader = async (args: Route.LoaderArgs) => {
   };
   return { ...reg, stripe, connect_routing };
 };
-export const action = update_action(next_step[4]);
+// a saved bank comes back here, not on to the summary: the saved state is
+// where stripe is offered, and Continue moves on
+export const action = update_action(steps.banking, { next_always: true });
 
 export default function Page({ loaderData: reg }: Route.ComponentProps) {
   const [is_changing, set_is_changing] = useState(false);
   const fetcher = useFetcher();
+  // a change that landed redirects back to this same route, which stays
+  // mounted — so the form is closed here, as the save settles without a failure
+  const [fetcher_state, set_fetcher_state] = useState(fetcher.state);
+  if (fetcher_state !== fetcher.state) {
+    set_fetcher_state(fetcher.state);
+    if (fetcher.state === "idle" && !fetcher.data?.message) {
+      set_is_changing(false);
+    }
+  }
   const ask_prompt = use_ask_prompt();
   const heading_id = useId();
   const back = before_banking(reg.o_type);

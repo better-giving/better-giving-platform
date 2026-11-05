@@ -28,6 +28,10 @@ export interface IUpdateActionOpts {
   /** the contact step: reachable by a draft-grant holder, whose address is not
    * proven yet. finishing it is what asks for the proof. */
   registrant?: boolean;
+  /** redirect to `next` even when the application is already complete, where
+   * a save otherwise goes straight to the summary. banking: its saved state is
+   * where the stripe card shows. */
+  next_always?: boolean;
 }
 
 /** `next` is a function where the step it hands off to depends on the
@@ -110,6 +114,7 @@ export const update_action =
       return redirect(check_email_url({ email: user.email, redirect_to: to }));
     }
 
-    if (prog.step === 5) return redirect(`../${steps.summary}`);
+    if (prog.step === 5 && !opts?.next_always)
+      return redirect(`../${steps.summary}`);
     return redirect(`../${typeof next === "string" ? next : next(reg)}`);
   };
