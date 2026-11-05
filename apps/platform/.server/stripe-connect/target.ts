@@ -1,4 +1,4 @@
-import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
+import { and, eq, isNull, ne, notInArray, or, sql } from "drizzle-orm";
 import { steps } from "#/pages/registration/routes";
 import { EDITABLE } from "@/reg/schema";
 import {
@@ -99,7 +99,9 @@ export async function target_access(
 
 /** whether `acct` already belongs to an npo or a registration other than `t`.
  * approved registrations are skipped: their account lives on the npo now, or
- * was replaced there. a pending one would collide with this one at approval. */
+ * was replaced there. rejected ones are skipped too: they keep the account to
+ * resubmit with, but the organization may connect it from a new registration.
+ * a pending one would collide with this one at approval. */
 export async function held_elsewhere(
   acct: string,
   t: TConnectTarget,
@@ -123,7 +125,10 @@ export async function held_elsewhere(
     .where(
       and(
         eq(registrations.o_stripe_account_id, acct),
-        or(isNull(registrations.status), ne(registrations.status, "03")),
+        or(
+          isNull(registrations.status),
+          notInArray(registrations.status, ["03", "04"])
+        ),
         t.kind === "reg" ? ne(registrations.id, t.reg_id) : undefined
       )
     )
