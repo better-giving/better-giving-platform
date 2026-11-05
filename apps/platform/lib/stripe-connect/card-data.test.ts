@@ -8,6 +8,13 @@ describe("reg_ineligibility", () => {
     ).toEqual({ reason: "fiscal_sponsored" });
   });
 
+  // sponsorship is judged before the empty-country skip
+  test("a fiscally sponsored registration with no hq country is still ineligible as sponsored", () => {
+    expect(reg_ineligibility({ o_type: "other", o_hq_country: "" })).toEqual({
+      reason: "fiscal_sponsored",
+    });
+  });
+
   // the org step hasn't run, so there is no country to judge yet
   test("a registration with no hq country yet has nothing ruling it out", () => {
     expect(reg_ineligibility({ o_type: "501c3", o_hq_country: "" })).toBeNull();

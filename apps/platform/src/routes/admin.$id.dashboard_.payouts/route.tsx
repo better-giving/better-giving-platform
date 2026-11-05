@@ -10,7 +10,7 @@ import { npo_payouts } from "$/pg/queries/payout";
 import { npo_sent_transfers } from "$/stripe-connect/sent";
 import type { Route } from "./+types/route";
 import { PayoutsTable } from "./common/payouts-table";
-import { SentToStripe, WhereMoneyShows } from "./sent";
+import { SentToStripe, stripe_link, WhereMoneyShows } from "./sent";
 
 export const loader = async (x: Route.LoaderArgs) => {
   const { next } = search(x.url);
@@ -46,9 +46,10 @@ function Page({ loaderData: page1, params }: Route.ComponentProps) {
   });
   const { sent } = page1;
   const payouts_heading_id = useId();
-  // the bank table's empty row is this page's only content off Connect. beside
-  // the stripe list it would still say nothing was paid after a transfer
-  const show_bank = sent === null || page1.items.length > 0;
+  // the bank table's empty row is this page's only content off Connect, and
+  // where card gifts land once they stop routing. beside a live stripe list it
+  // would still say nothing was paid after a transfer
+  const show_bank = !sent?.on_stripe || page1.items.length > 0;
 
   return (
     <div className="grid gap-6 content-start px-4 py-4 md:px-10 md:py-8">
@@ -61,7 +62,7 @@ function Page({ loaderData: page1, params }: Route.ComponentProps) {
           { label: "Grant items" },
         ]}
       />
-      {sent && <WhereMoneyShows />}
+      {sent && show_bank && <WhereMoneyShows link={stripe_link(sent)} />}
       {sent && <SentToStripe sent={sent} />}
       {show_bank && sent && (
         <section aria-labelledby={payouts_heading_id} className="grid gap-3">

@@ -351,8 +351,7 @@ describe("registration step 4: banking", () => {
   }, 30_000);
 
   describe("a registration stripe can never route to", () => {
-    // outside the transfer countries; fiscal sponsorship reads the same way
-    // through `reg_ineligibility`, but its step 3 would need seeding too
+    // outside the transfer countries
     const ineligible = async () => {
       const id = await seed_step_4();
       await test_db
@@ -393,6 +392,60 @@ describe("registration step 4: banking", () => {
       expect(
         screen.getByRole("region", { name: "How you get paid" }).query()
       ).toBeNull();
+      expect(account_status_live).not.toHaveBeenCalled();
+    }, 30_000);
+  });
+
+  describe("a fiscally sponsored registration", () => {
+    // the country is one stripe could route to (the seed's United States):
+    // sponsorship alone rules it out. the other types' fsa steps must be seeded
+    // for the loader to let the applicant reach step 4.
+    const sponsored = async () => {
+      const id = await seed_step_4();
+      await test_db
+        .current!.db.update(registrations)
+        .set({
+          o_type: "other",
+          r_proof_of_identity: "https://example.com/id.pdf",
+          o_proof_of_reg: "https://example.com/reg.pdf",
+          o_registration_number: "REG-1",
+          o_project_description: "A project",
+          o_legal_entity_type: "association",
+          o_fsa_signing_url: "https://example.com/sign",
+          o_fsa_signed_doc_url: "https://example.com/signed.pdf",
+        })
+        .where(eq(registrations.id, id));
+      return id;
+    };
+
+    it("is not offered stripe beside the bank form", async () => {
+      const id = await sponsored();
+      const screen = await render_step_4(id);
+
+      await expect
+        .element(
+          screen.getByRole("region", { name: "Set up your bank payout" })
+        )
+        .toBeVisible();
+      expect(screen.getByText(STRIPE_LATER).query()).toBeNull();
+      expect(
+        screen.getByRole("region", { name: "How you get paid" }).query()
+      ).toBeNull();
+      expect(
+        screen.getByRole("region", { name: "Stripe account" }).query()
+      ).toBeNull();
+    }, 30_000);
+
+    it("is told why once the bank is saved", async () => {
+      const id = await sponsored();
+      await save_bank(id, { o_stripe_account_id: "acct_123" });
+      const screen = await render_step_4(id);
+
+      const card = screen.getByRole("region", { name: "Stripe account" });
+      await expect
+        .element(card.getByText(/fiscally sponsored nonprofits/i))
+        .toBeVisible();
+      expect(card.getByRole("link").query()).toBeNull();
       expect(account_status_live).not.toHaveBeenCalled();
     }, 30_000);
   });

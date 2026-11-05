@@ -71,7 +71,8 @@ export const reg_ineligibility = (reg: {
   o_hq_country: string;
 }): TConnectIneligibility | null => {
   const fiscal_sponsored = reg.o_type === "other";
-  // empty until the org step: no country to judge yet
+  // `reg_new` requires the country at creation (a 501c3's is always the US),
+  // so an empty one is a row stored without it: nothing to judge
   if (!fiscal_sponsored && reg.o_hq_country === "") return null;
   return connect_ineligibility({
     fiscal_sponsored,

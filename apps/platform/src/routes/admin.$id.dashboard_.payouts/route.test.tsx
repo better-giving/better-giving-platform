@@ -30,7 +30,20 @@ vi.mock("$/pg/db", () => ({
     }
   ),
 }));
+const routing = vi.hoisted(() => ({ on: true }));
 vi.mock("$/kit/stripe", () => ({ stripe }));
+vi.mock("$/env", async (importOriginal) => {
+  const real = await importOriginal<typeof import("$/env")>();
+  return {
+    ...real,
+    stripe: {
+      ...real.stripe,
+      get connect_routing() {
+        return routing.on;
+      },
+    },
+  };
+});
 vi.mock("#/.server/auth", async () =>
   (await import("$/auth/test-utils")).make_auth_mock()
 );
@@ -72,6 +85,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   records.clear();
+  routing.on = true;
   vi.clearAllMocks();
   stripe.transfers.retrieve.mockImplementation(async (id: string) => {
     const t = records.get(id);
@@ -93,10 +107,18 @@ const listed = (amounts: number[]): IRecord["reversals"] => ({
   has_more: false,
 });
 
-async function npo(acct: string | null = null) {
+async function npo(
+  acct: string | null = null,
+  extra: Partial<typeof npos.$inferInsert> = {}
+) {
   const row = await seed_npo(db(), {
     registration_number: "EIN-SENT",
+    // ready, so a linked account routes
+    stripe_charges_enabled: true,
+    stripe_payouts_enabled: true,
+    stripe_details_submitted: true,
     ...(acct && { stripe_account_id: acct }),
+    ...extra,
   });
   npo_id = row!.id;
 }
@@ -180,6 +202,8 @@ async function render_page() {
 
 const sent_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
   screen.getByRole("region", { name: "Sent to your Stripe account" });
+const earlier_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
+  screen.getByRole("region", { name: "Sent to Stripe earlier" });
 const where_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
   screen.getByRole("region", { name: "Where your money shows" });
 const BANK_SUBHEAD =
@@ -251,7 +275,7 @@ describe("the payouts page", () => {
     expect(screen.getByText("$90.00").query()).toBeNull();
   });
 
-  test("renders each routed transfer's amount, date and standing", async () => {
+  test("renders each routed transfer's amount, date and standing, explaining no list it leaves out", async () => {
     await npo("acct_sent");
     await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
     await transfer("tr_part", 40, "2026-07-02T00:00:00.000Z", listed([2_500]));
@@ -294,6 +318,7 @@ describe("the payouts page", () => {
         .getByRole("heading", { level: 2, name: "Payouts", exact: true })
         .query()
     ).toBeNull();
+    expect(where_region(screen).query()).toBeNull();
   });
 
   test("a bank payout still shows when nothing has been sent to Stripe", async () => {
@@ -379,6 +404,98 @@ describe("the payouts page", () => {
     await expect.element(screen.getByText("$12.50")).toBeVisible();
     await expect.element(screen.getByText("Pending")).toBeVisible();
   });
+
+  test.each([
+    [
+      "routing is off",
+      async () => {
+        routing.on = false;
+        await npo("acct_sent");
+      },
+    ],
+    [
+      "the nonprofit is fiscally sponsored",
+      () => npo("acct_sent", { fiscal_sponsored: true }),
+    ],
+  ])(
+    "when %s, past transfers read as history and the bank list stays",
+    async (_, seed) => {
+      await seed();
+      await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+
+      const screen = await render_page();
+
+      expect(sent_region(screen).query()).toBeNull();
+      const earlier = earlier_region(screen);
+      await expect.element(earlier.getByText("$90.00")).toBeVisible();
+      await expect
+        .element(
+          earlier.getByText(
+            "Stripe donations sent to your Stripe account before. New Stripe donations pay out to your bank. What Stripe has paid on to your bank is in your Stripe dashboard."
+          )
+        )
+        .toBeVisible();
+      const where = where_region(screen);
+      await expect
+        .element(
+          where.getByText(
+            "Everything sent to your bank through Wise, new Stripe donations included."
+          )
+        )
+        .toBeVisible();
+      expect(where.getByText(/its own transfer/).query()).toBeNull();
+      expect(where.getByText(/before you connected/).query()).toBeNull();
+      await expect
+        .element(
+          screen.getByRole("heading", {
+            level: 2,
+            name: "Payouts",
+            exact: true,
+          })
+        )
+        .toBeVisible();
+      await expect
+        .element(screen.getByText("No payouts yet", { exact: true }))
+        .toBeVisible();
+    }
+  );
+
+  test("a disconnected nonprofit is told new Stripe donations pay out to its bank", async () => {
+    await npo("acct_sent", {
+      stripe_deauthorized_at: "2026-08-01T00:00:00.000Z",
+    });
+    await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+    await payout(12.5);
+
+    const screen = await render_page();
+
+    const earlier = earlier_region(screen);
+    await expect.element(earlier.getByText("$90.00")).toBeVisible();
+    await expect
+      .element(
+        earlier.getByText(
+          "Your Stripe account is disconnected, so new Stripe donations pay out to your bank. These were sent to it while it was connected."
+        )
+      )
+      .toBeVisible();
+    const where = where_region(screen);
+    await expect
+      .element(
+        where.getByText(
+          "Stripe donations sent to your Stripe account while it was connected."
+        )
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        where.getByText(
+          "Everything sent to your bank through Wise. Your Stripe account is disconnected, so new Stripe donations are here too."
+        )
+      )
+      .toBeVisible();
+    expect(where.getByText(/before you connected/).query()).toBeNull();
+    await expect.element(screen.getByText("$12.50")).toBeVisible();
+  });
 });
 
 describe("SentToStripe", () => {
@@ -387,6 +504,8 @@ describe("SentToStripe", () => {
       <SentToStripe
         sent={{
           truncated: true,
+          on_stripe: true,
+          connected: true,
           items: [
             {
               id: "tr_x",

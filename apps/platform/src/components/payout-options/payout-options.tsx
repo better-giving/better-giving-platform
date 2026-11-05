@@ -3,7 +3,8 @@ import { useId } from "react";
 import { TRANSFER_COUNTRIES_COPY } from "@/stripe-connect/eligibility";
 
 export interface IPayoutOptions {
-  /** `open` where nothing is set up yet; `collapsed` everywhere else */
+  /** `open` on banking while Stripe isn't connected, saved bank methods or
+   * not; `collapsed` once it is, and always on registration step 4 */
   variant: "open" | "collapsed";
   /** the collapsed trigger's second line */
   subtitle?: string;

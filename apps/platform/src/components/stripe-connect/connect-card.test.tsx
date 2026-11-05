@@ -192,6 +192,69 @@ describe("StripeConnectCard", () => {
     );
   });
 
+  // each row carries a phrase unique to that status's body, plus where Stripe
+  // donations go meanwhile
+  test.each<[IStripeConnectCard["status"], string[]]>([
+    [
+      "not_connected",
+      [
+        "donations paid through Stripe go straight to it, after fees",
+        "If you skip Stripe, Stripe donations go to your bank too.",
+      ],
+    ],
+    [
+      "disconnected",
+      [
+        "donations paid through Stripe go straight to it, after fees",
+        "If you skip Stripe, Stripe donations go to your bank too.",
+      ],
+    ],
+    [
+      "incomplete",
+      [
+        "Stripe needs a few more details before it can receive donations.",
+        "Until Stripe says your account is ready, Stripe donations go to your bank payout.",
+      ],
+    ],
+    [
+      "pending",
+      [
+        "Stripe is reviewing your account. Until it's ready, Stripe donations go to your bank payout.",
+      ],
+    ],
+    [
+      "ready",
+      [
+        "now go straight to your Stripe account, after fees.",
+        "Stripe donations go back to your bank.",
+      ],
+    ],
+  ])(
+    "%s: the card body says what happens to Stripe donations",
+    async (status, phrases) => {
+      const screen = await render_card({ status });
+      const card = screen.getByRole("region", { name: "Stripe account" });
+
+      for (const phrase of phrases) {
+        await expect.element(card.getByText(phrase)).toBeVisible();
+      }
+      // an optional card, whichever state it is in
+      await expect
+        .element(card.getByText("Optional", { exact: true }))
+        .toBeVisible();
+      // a status's body never carries another status's promise
+      const others = [
+        "If you skip Stripe",
+        "Until Stripe says your account is ready",
+        "Stripe is reviewing your account",
+        "now go straight to your Stripe account",
+      ].filter((p) => !phrases.some((own) => own.includes(p)));
+      for (const other of others) {
+        expect(card.getByText(other).query()).toBeNull();
+      }
+    }
+  );
+
   test("no notice, no band and no focus taken", async () => {
     const screen = await render_card({ status: "ready" });
     await expect

@@ -937,6 +937,45 @@ describe("stripe connect card", () => {
       .toBeVisible();
   });
 
+  // only a nonprofit that never linked an account gets the comparison open;
+  // one that has been through Stripe, however far, starts collapsed
+  it.each([
+    {
+      status: "disconnected",
+      seed: { ...READY, stripe_deauthorized_at: "2026-10-01T00:00:00.000Z" },
+      line: "Disconnected. Stripe donations go to your bank payout.",
+    },
+    {
+      status: "incomplete",
+      seed: { ...READY, stripe_details_submitted: false },
+      line: "Finish setup on Stripe",
+    },
+    {
+      status: "pending",
+      seed: { ...READY, stripe_charges_enabled: false },
+      line: "Pending review",
+    },
+  ])(
+    "a $status account starts with the comparison collapsed",
+    async ({ seed, line }) => {
+      const npo = await seed_npo(seed);
+      const screen = await render_list(npo.id);
+
+      // the card renders this status, so the open/collapsed read is live
+      const card = screen.getByRole("region", { name: "Stripe account" });
+      await expect.element(card.getByText(line)).toBeVisible();
+      await expect
+        .element(screen.getByRole("region", { name: "How you get paid" }))
+        .toBeVisible();
+      expect(
+        screen
+          .getByRole("heading", { level: 2, name: "How you get paid" })
+          .query()
+      ).toBeNull();
+      expect(sync_npo_account).not.toHaveBeenCalled();
+    }
+  );
+
   it.each([
     {
       why: "fiscally sponsored",

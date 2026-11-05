@@ -3,10 +3,37 @@ import { format } from "date-fns";
 import { SquareArrowOutUpRight } from "lucide-react";
 import { useId } from "react";
 import { humanize } from "@/helpers/decimal";
-import type { ISentTransfers, TSentStanding } from "@/stripe-connect/sent";
+import type { INpoSent, TSentStanding } from "@/stripe-connect/sent";
+
+/** where a card gift made now goes: the connected account (`on`), or the bank
+ * while the account stays linked (`off`) or after a disconnect */
+export type TStripeLink = "on" | "off" | "disconnected";
+
+export const stripe_link = (sent: INpoSent): TStripeLink =>
+  sent.on_stripe ? "on" : sent.connected ? "off" : "disconnected";
+
+interface ICopy {
+  heading: string;
+  lead: string;
+}
+
+const list_copy: Record<TStripeLink, ICopy> = {
+  on: {
+    heading: "Sent to your Stripe account",
+    lead: "Each donation paid through Stripe is sent here as its own transfer, after fees.",
+  },
+  off: {
+    heading: "Sent to Stripe earlier",
+    lead: "Stripe donations sent to your Stripe account before. New Stripe donations pay out to your bank.",
+  },
+  disconnected: {
+    heading: "Sent to Stripe earlier",
+    lead: "Your Stripe account is disconnected, so new Stripe donations pay out to your bank. These were sent to it while it was connected.",
+  },
+};
 
 export interface ISentToStripe {
-  sent: ISentTransfers;
+  sent: INpoSent;
   /** outer placement only — margin */
   classes?: string;
 }
@@ -66,16 +93,16 @@ function Standing({ standing }: IStanding) {
  * and what reached the bank stay on stripe */
 export function SentToStripe({ sent, classes = "" }: ISentToStripe) {
   const heading_id = useId();
+  const copy = list_copy[stripe_link(sent)];
   return (
     <section aria-labelledby={heading_id} className={`${classes} grid gap-3`}>
       <div className="grid gap-1">
         <h2 id={heading_id} className="font-bold text-lg">
-          Sent to your Stripe account
+          {copy.heading}
         </h2>
         <p className="text-sm text-gray-11 max-w-3xl">
           {sent.truncated && "Showing the most recent. "}
-          Each donation paid through Stripe is sent here as its own transfer,
-          after fees. What Stripe has paid on to your bank is in your{" "}
+          {copy.lead} What Stripe has paid on to your bank is in your{" "}
           <ExtLink
             href="https://dashboard.stripe.com/"
             className="inline-flex items-center gap-1 link"
@@ -131,21 +158,53 @@ interface IWell {
   detail: string;
 }
 
-const wells: IWell[] = [
-  {
-    title: "Sent to your Stripe account",
-    detail:
-      "Donations paid through Stripe (cards, digital wallets and bank debits), each sent as its own transfer, after fees.",
-  },
-  {
-    title: "Payouts",
-    detail:
-      "Everything else: stocks, DAF grants, crypto, PayPal, cheques and savings, sent to your bank through Wise. Stripe donations from before you connected Stripe are here too.",
-  },
-];
+/** the stripe list's well, then the bank list's */
+const wells: Record<TStripeLink, [IWell, IWell]> = {
+  on: [
+    {
+      title: list_copy.on.heading,
+      detail:
+        "Donations paid through Stripe (cards, digital wallets and bank debits), each sent as its own transfer, after fees.",
+    },
+    {
+      title: "Payouts",
+      detail:
+        "Everything else: stocks, DAF grants, crypto, PayPal, cheques and savings, sent to your bank through Wise. Stripe donations from before you connected Stripe are here too.",
+    },
+  ],
+  off: [
+    {
+      title: list_copy.off.heading,
+      detail:
+        "Stripe donations sent to your Stripe account before. New ones are not sent there.",
+    },
+    {
+      title: "Payouts",
+      detail:
+        "Everything sent to your bank through Wise, new Stripe donations included.",
+    },
+  ],
+  disconnected: [
+    {
+      title: list_copy.disconnected.heading,
+      detail:
+        "Stripe donations sent to your Stripe account while it was connected.",
+    },
+    {
+      title: "Payouts",
+      detail:
+        "Everything sent to your bank through Wise. Your Stripe account is disconnected, so new Stripe donations are here too.",
+    },
+  ],
+};
 
-/** which of the page's two lists a donation lands in */
-export function WhereMoneyShows() {
+export interface IWhereMoneyShows {
+  link: TStripeLink;
+}
+
+/** which of the page's two lists a donation lands in. mount it only beside
+ * both */
+export function WhereMoneyShows({ link }: IWhereMoneyShows) {
   const heading_id = useId();
   return (
     <section aria-labelledby={heading_id} className="card grid gap-3 text-sm">
@@ -155,7 +214,7 @@ export function WhereMoneyShows() {
       {/* columns follow the box, as in `PayoutOptions` */}
       <div className="@container">
         <div className="grid gap-4 @3xl:grid-cols-2">
-          {wells.map((w) => (
+          {wells[link].map((w) => (
             <div
               key={w.title}
               className="bg-panel rounded p-4 grid gap-1 content-start"

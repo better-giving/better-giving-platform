@@ -87,6 +87,8 @@ export interface Props<T> extends Omit<FieldProps, "classes">, Opt<T> {
    * all the way through instead of distributing to `boolean`.
    */
   allow_custom?: [T] extends [string] ? boolean : never;
+  /** help text under the label, named as the input's description */
+  sub?: string;
   on_reset?: () => void;
   ref?: Ref<HTMLInputElement>;
 }
@@ -113,6 +115,13 @@ export function Combo<T>({ ref, ...p }: Props<T>) {
   // `query` state has settled — the ref is what the open reads
   const query_ref = useRef("");
   const err_id = useId();
+  const sub_id = useId();
+  // the hint is read before the error: the error alone loses the guidance
+  // that would fix it
+  const described =
+    [p.sub ? sub_id : undefined, p.error ? err_id : undefined]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
   const limit = p.limit ?? RESULT_LIMIT;
   const match = p.filter ?? contains;
@@ -168,6 +177,8 @@ export function Combo<T>({ ref, ...p }: Props<T>) {
       required={p.required}
       error={p.error}
       error_id={err_id}
+      sub={p.sub}
+      sub_id={sub_id}
       disabled={disabled}
       classes={{ container: p.classes?.container, label: p.classes?.label }}
     >
@@ -209,7 +220,7 @@ export function Combo<T>({ ref, ...p }: Props<T>) {
             ref={ref}
             placeholder={p.placeholder}
             aria-required={p.required || undefined}
-            aria-describedby={p.error ? err_id : undefined}
+            aria-describedby={described}
             spellCheck={false}
             className={input_cls}
           />

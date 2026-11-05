@@ -673,3 +673,40 @@ describe("Combo: error announcement", () => {
       .toHaveAccessibleDescription("");
   });
 });
+
+describe("Combo: hint", () => {
+  test("names the hint as the input's description", async () => {
+    const screen = await render(
+      <Combo
+        label="Country"
+        value={undefined}
+        on_change={() => {}}
+        options={countries}
+        sub="Where the bank account is held"
+      />
+    );
+
+    await expect
+      .element(screen.getByRole("combobox"))
+      .toHaveAccessibleDescription("Where the bank account is held");
+  });
+
+  test("reads the hint before the error when both are present", async () => {
+    const screen = await render(
+      <Combo
+        label="Country"
+        value={undefined}
+        on_change={() => {}}
+        options={countries}
+        sub="Where the bank account is held"
+        error="Pick a country"
+      />
+    );
+
+    await expect
+      .element(screen.getByRole("combobox"))
+      .toHaveAccessibleDescription(
+        "Where the bank account is held Pick a country"
+      );
+  });
+});

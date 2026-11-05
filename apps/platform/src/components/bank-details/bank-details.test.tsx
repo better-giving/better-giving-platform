@@ -78,13 +78,9 @@ describe("BankDetails: currency list", () => {
     });
 
     await expect.element(field).toBeEnabled();
-    await expect
-      .element(
-        screen.getByText(
-          "The details Wise asks for next depend on this currency."
-        )
-      )
-      .toBeVisible();
+    const hint = "The details Wise asks for next depend on this currency.";
+    await expect.element(screen.getByText(hint)).toBeVisible();
+    await expect.element(field).toHaveAccessibleDescription(hint);
     await field.click();
     await expect
       .element(screen.getByRole("option", { name: /GBP - British Pound/ }))
