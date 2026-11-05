@@ -193,6 +193,7 @@ describe("StripeConnectCard", () => {
       "not_connected",
       [
         "donations paid through Stripe go straight to it, after fees",
+        "Everything else still pays out to your bank: PayPal, DAF grants (through Chariot), crypto (through NOWPayments), stocks and cheques.",
         "If you skip Stripe, Stripe donations go to your bank too.",
       ],
     ],

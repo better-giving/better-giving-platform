@@ -72,7 +72,7 @@ const with_replace = (href: string) =>
 const bodies: Record<TConnectStatus, string[]> = {
   not_connected: [
     "Connect your own Stripe account and donations paid through Stripe go straight to it, after fees: cards, digital wallets and bank debits. Stripe then pays your bank on Stripe's schedule.",
-    "Everything else still pays out to your bank: stocks, DAF grants, crypto, PayPal and cheques. If you skip Stripe, Stripe donations go to your bank too.",
+    "Everything else still pays out to your bank: PayPal, DAF grants (through Chariot), crypto (through NOWPayments), stocks and cheques. If you skip Stripe, Stripe donations go to your bank too.",
   ],
   disconnected: [
     "Stripe donations go to your bank payout.",

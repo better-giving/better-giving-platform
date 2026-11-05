@@ -3,12 +3,10 @@ import { useId } from "react";
 import { TRANSFER_COUNTRIES_COPY } from "@/stripe-connect/eligibility";
 
 export interface IPayoutOptions {
-  /** `open` on banking only while no Stripe account was ever linked
-   * (`not_connected`); `collapsed` once one was, however far it got or if it
-   * was disconnected since, and always on registration step 4 */
+  /** `open` while no Stripe account was ever linked (`not_connected`) on
+   * banking and registration step 4; `collapsed` once one was, however far it
+   * got or if it was disconnected since */
   variant: "open" | "collapsed";
-  /** the collapsed trigger's second line */
-  subtitle?: string;
   /** outer placement only — margin, grid placement */
   classes?: string;
 }
@@ -36,11 +34,16 @@ const options: IOption[] = [
       {
         term: "What it covers",
         detail:
-          "Stocks, DAF grants, crypto, PayPal and cheques. Also card, wallet and bank-debit donations, until you connect Stripe.",
+          "PayPal, DAF grants (through Chariot), crypto (through NOWPayments), stocks and cheques. Also Stripe donations, until you connect Stripe.",
       },
       {
         term: "When you get it",
         detail: "Every 3 days, once your balance reaches your payout minimum.",
+      },
+      {
+        term: "How it's split",
+        detail:
+          "Your Grant share pays out to your bank. If you send a share to Savings or Investments, it stays in those accounts.",
       },
       {
         term: "Where you see it",
@@ -66,6 +69,11 @@ const options: IOption[] = [
           "Each donation is sent to your Stripe account as its own transfer, after fees. Stripe then pays your bank on Stripe's schedule.",
       },
       {
+        term: "How it's split",
+        detail:
+          "Stripe donations skip your Savings and Investments split: the whole donation goes to your Stripe account, after fees.",
+      },
+      {
         term: "Where you see it",
         detail:
           "Sent to your Stripe account on your Payouts page, and in your Stripe dashboard.",
@@ -79,11 +87,7 @@ const options: IOption[] = [
 ];
 
 /** "How you get paid" — the bank payout beside the optional Stripe account. */
-export function PayoutOptions({
-  variant,
-  subtitle = "Your bank payout is required. Stripe is optional.",
-  classes = "",
-}: IPayoutOptions) {
+export function PayoutOptions({ variant, classes = "" }: IPayoutOptions) {
   const heading_id = useId();
 
   if (variant === "collapsed") {
@@ -98,7 +102,9 @@ export function PayoutOptions({
               trigger: (
                 <span className="grid">
                   <span className="font-semibold">How you get paid</span>
-                  <span className="text-gray-11">{subtitle}</span>
+                  <span className="text-gray-11">
+                    Your bank payout is required. Stripe is optional.
+                  </span>
                 </span>
               ),
               content: <Comparison />,

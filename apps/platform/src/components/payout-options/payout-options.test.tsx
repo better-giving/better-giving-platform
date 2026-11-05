@@ -5,6 +5,12 @@ import { TRANSFER_COUNTRIES_COPY } from "@/stripe-connect/eligibility";
 import { PayoutOptions } from "./payout-options";
 
 const WHO_STRIPE = `Not available to fiscally sponsored nonprofits, or to nonprofits headquartered outside ${TRANSFER_COUNTRIES_COPY}.`;
+const BANK_COVERS =
+  "PayPal, DAF grants (through Chariot), crypto (through NOWPayments), stocks and cheques. Also Stripe donations, until you connect Stripe.";
+const BANK_SPLIT =
+  "Your Grant share pays out to your bank. If you send a share to Savings or Investments, it stays in those accounts.";
+const STRIPE_SPLIT =
+  "Stripe donations skip your Savings and Investments split: the whole donation goes to your Stripe account, after fees.";
 
 /** the one heading the box adds to the page: an h2, open or closed. the
  * options are not headings — banking's own sections carry those names */
@@ -53,6 +59,38 @@ describe("PayoutOptions", () => {
     expect(region.element().textContent).not.toMatch(/stripe payments/i);
   });
 
+  test("open: each option says what it covers and how its money is split", async () => {
+    const screen = await render(<PayoutOptions variant="open" />);
+    const region = screen.getByRole("region", { name: "How you get paid" });
+    const [bank, stripe] = region.getByRole("listitem").all();
+
+    /** the detail under `term` in `option`'s list of facts */
+    const detail_of = (option: Locator, term: string) => {
+      const dt = option
+        .getByText(term, { exact: true })
+        .element() as HTMLElement;
+      expect(dt.tagName).toBe("DT");
+      return dt.nextElementSibling?.textContent;
+    };
+
+    await expect
+      .element(bank.getByText(BANK_COVERS, { exact: true }))
+      .toBeVisible();
+    expect(detail_of(bank, "What it covers")).toBe(BANK_COVERS);
+    expect(detail_of(bank, "How it's split")).toBe(BANK_SPLIT);
+    expect(detail_of(stripe, "How it's split")).toBe(STRIPE_SPLIT);
+
+    // each split line belongs to its own option and appears once in the box
+    expect(bank.getByText(STRIPE_SPLIT).query()).toBeNull();
+    expect(stripe.getByText(BANK_SPLIT).query()).toBeNull();
+    expect(
+      region.getByText(STRIPE_SPLIT, { exact: true }).elements()
+    ).toHaveLength(1);
+    expect(
+      region.getByText(BANK_SPLIT, { exact: true }).elements()
+    ).toHaveLength(1);
+  });
+
   test("collapsed: closed until its trigger is pressed", async () => {
     const screen = await render(<PayoutOptions variant="collapsed" />);
     const region = screen.getByRole("region", { name: "How you get paid" });
@@ -79,23 +117,5 @@ describe("PayoutOptions", () => {
       .toBeVisible();
     // opening it adds nothing below the h2, so the outline matches the open box
     await expect_one_h2(region);
-  });
-
-  test("collapsed: the subtitle prop replaces the default line", async () => {
-    const screen = await render(
-      <PayoutOptions
-        variant="collapsed"
-        subtitle="Compare your bank payout with Stripe."
-      />
-    );
-    const trigger = screen.getByRole("button", { name: /how you get paid/i });
-    await expect
-      .element(trigger.getByText("Compare your bank payout with Stripe."))
-      .toBeVisible();
-    expect(
-      trigger
-        .getByText("Your bank payout is required. Stripe is optional.")
-        .query()
-    ).toBeNull();
   });
 });
