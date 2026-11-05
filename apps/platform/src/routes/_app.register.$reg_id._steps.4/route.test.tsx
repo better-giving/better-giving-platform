@@ -628,17 +628,19 @@ describe("registration step 4: choose how you get paid", () => {
       routing.on = false;
     });
 
-    it("requires the bank without a stripe reason, and hides a return notice", async () => {
+    it("asks for the bank without a word of stripe, and hides a return notice", async () => {
       const id = await seed_step_4();
       const screen = await render_step_4(id, "?stripe_connect=connected");
 
       const required = screen.getByRole("region", {
         name: "Set up your bank payout",
       });
-      await expect
-        .element(required.getByText("Required", { exact: true }))
-        .toBeVisible();
-      expect(screen.getByText(/Stripe isn't available/).query()).toBeNull();
+      await expect.element(required).toBeVisible();
+      // the badge is for a nonprofit Stripe can't serve; here it isn't offered
+      expect(
+        required.getByText("Required", { exact: true }).query()
+      ).toBeNull();
+      expect(required.element().textContent).not.toMatch(/stripe/i);
       expect(radio(screen, "Stripe").query()).toBeNull();
       expect(stripe_card(screen).query()).toBeNull();
       expect(

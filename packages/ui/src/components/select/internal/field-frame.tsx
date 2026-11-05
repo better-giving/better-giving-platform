@@ -13,11 +13,6 @@ interface IFieldFrame {
    * screen reader announces an invalid control with no reason. the caller
    * mints the id because the caller is what owns the control element. */
   error_id?: string;
-  /** help text between the label and the control. drawn here, named by the
-   * control: like `error_id`, nothing in ark or zag links it, so the caller
-   * mints `sub_id` and points the control's `aria-describedby` at it. */
-  sub?: string;
-  sub_id?: string;
   disabled?: boolean;
   classes?: { container?: string; label?: string };
   children: ReactNode;
@@ -46,16 +41,9 @@ export function FieldFrame({ label, ...p }: IFieldFrame) {
     </p>
   );
 
-  const sub = p.sub && (
-    <p id={p.sub_id} className="text-gray-11 text-sm mb-2">
-      {p.sub}
-    </p>
-  );
-
   if (label == null) {
     return (
       <div className={container}>
-        {sub}
         {p.children}
         {err}
       </div>
@@ -66,11 +54,10 @@ export function FieldFrame({ label, ...p }: IFieldFrame) {
     <Field.Root invalid={!!p.error} disabled={p.disabled} className={container}>
       <Field.Label
         data-required={p.required}
-        className={`label empty:hidden w-fit ${sub ? "" : "mb-2"} ${p.classes?.label ?? ""}`}
+        className={`label empty:hidden w-fit mb-2 ${p.classes?.label ?? ""}`}
       >
         {label}
       </Field.Label>
-      {sub}
       {p.children}
       {err}
     </Field.Root>

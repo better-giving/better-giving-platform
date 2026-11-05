@@ -7,8 +7,9 @@ import {
 } from "@/stripe-connect/eligibility";
 
 export interface IBankRequired {
-  /** why Stripe is out. absent when Stripe isn't offered at all (routing
-   *  off): the note then says nothing about Stripe */
+  /** why Stripe is out: the bank is then badged Required. absent when
+   *  Stripe isn't offered at all (routing off): no badge, and the note says
+   *  nothing about Stripe */
   ineligible?: TConnectIneligibility;
   /** the bank form, with its own Back and Submit */
   children: ReactNode;
@@ -21,8 +22,8 @@ const reasons = (i: TConnectIneligibility) =>
     ? "Stripe isn't available to fiscally sponsored nonprofits."
     : `Stripe isn't available for nonprofits headquartered in ${i.hq_country}. We can send Stripe donations to nonprofits headquartered in ${TRANSFER_COUNTRIES_COPY}.`;
 
-/** registration step 4 for a nonprofit that can't use Stripe: the bank
- *  payout is its only way to get paid, so it is required */
+/** registration step 4 when the bank payout is the only way to get paid:
+ *  for a nonprofit that can't use Stripe, or while Stripe isn't offered */
 export function BankRequired({
   ineligible,
   children,
@@ -36,15 +37,25 @@ export function BankRequired({
           <h2 id={heading_id} className="text-xl">
             Set up your bank payout
           </h2>
-          <Badge tone="primary">Required</Badge>
+          {ineligible && <Badge tone="primary">Required</Badge>}
         </div>
         <div className="grid gap-1 rounded bg-panel px-4 py-3 text-sm">
-          {ineligible && <p className="font-medium">{reasons(ineligible)}</p>}
-          <p className="text-gray-11">
-            Your bank payout is how you get paid, so it's required. Every
-            donation, Stripe donations included, pays out to your bank, every 3
-            days once your balance reaches your payout minimum.
-          </p>
+          {ineligible ? (
+            <>
+              <p className="font-medium">{reasons(ineligible)}</p>
+              <p className="text-gray-11">
+                Your bank payout is how you get paid, so it's required. Every
+                donation, Stripe donations included, pays out to your bank,
+                every 3 days once your balance reaches your payout minimum.
+              </p>
+            </>
+          ) : (
+            <p className="text-gray-11">
+              Your bank payout is how you get paid. Every donation pays out to
+              your bank, every 3 days once your balance reaches your payout
+              minimum.
+            </p>
+          )}
         </div>
       </section>
       {children}

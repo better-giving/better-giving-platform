@@ -329,16 +329,27 @@ describe("BankRequired: can't use Stripe", () => {
     expect(screen.container.textContent).not.toMatch(/wise|money-transfer/i);
   });
 
-  test("Stripe not offered: no reason line about Stripe", async () => {
+  test("Stripe not offered: the bank explained plainly, with no badge and no word of Stripe", async () => {
     const screen = await render(
       <BankRequired>
         <p>bank form</p>
       </BankRequired>
     );
     await expect
-      .element(screen.getByText("Required", { exact: true }))
+      .element(screen.getByRole("heading", { name: "Set up your bank payout" }))
       .toBeVisible();
-    expect(screen.getByText("Stripe isn't available").query()).toBeNull();
+    await expect
+      .element(
+        screen.getByText(
+          "Your bank payout is how you get paid. Every donation pays out to your bank, every 3 days once your balance reaches your payout minimum.",
+          { exact: true }
+        )
+      )
+      .toBeVisible();
+    await expect.element(screen.getByText("bank form")).toBeVisible();
+    expect(screen.getByText("Required", { exact: true }).query()).toBeNull();
+    expect(screen.container.textContent).not.toMatch(/stripe/i);
+    expect(screen.container.textContent).not.toMatch(/wise|money-transfer/i);
   });
 });
 
