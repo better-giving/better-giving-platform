@@ -28,7 +28,7 @@ type Props = {
   onSubmit: OnSubmit;
   is_loading: boolean;
   verified?: boolean;
-  /** the currency field, the form's first — for a caller that opens the form
+  /** the currency field, the form's first, for a caller that opens the form
    *  in place of the control that held focus */
   first_field_ref?: Ref<HTMLInputElement>;
 };

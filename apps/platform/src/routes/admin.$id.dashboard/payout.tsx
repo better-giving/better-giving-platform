@@ -90,7 +90,7 @@ function Held({ to }: IHeld) {
       </p>
     );
   }
-  // a stripe gift that lands before ready stays held after ready too — the
+  // a stripe gift that lands before ready stays held after ready too, per the
   // held cards' STRIPE_HELD_LEAD (components/payout-options/held-money.tsx)
   if (!to.ready) {
     return (

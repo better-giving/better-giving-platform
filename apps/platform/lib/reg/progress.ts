@@ -131,7 +131,7 @@ export class Progress {
     return $3 && reg_ineligibility($3) === null;
   }
 
-  /** step 4 — a saved bank, or a stripe account connected in any status from
+  /** step 4: a saved bank, or a stripe account connected in any status from
    * an org stripe can serve, whatever the `STRIPE_CONNECT_ROUTING` switch */
   get banking() {
     const $3 = this.fsa_signed || this.docs_ein;

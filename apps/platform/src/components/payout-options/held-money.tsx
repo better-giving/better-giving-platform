@@ -14,8 +14,8 @@ export const rail_labels: Record<HeldRail, string> = {
   withdrawal: "Savings and Investments withdrawals",
 };
 
-/** `stripe`: a Stripe account is linked — ready or not yet — and no bank is
- *  on file. `none`: neither — Stripe disconnected and no bank */
+/** `stripe`: a Stripe account is linked (ready or not yet) and no bank is
+ *  on file. `none`: neither, Stripe disconnected and no bank */
 export type THeldRails = "stripe" | "none";
 
 export interface IHeldMoneyCard {
