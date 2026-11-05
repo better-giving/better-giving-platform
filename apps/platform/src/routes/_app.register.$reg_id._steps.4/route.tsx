@@ -1,9 +1,14 @@
-import { Actions, Badge, ExtLink, use_ask_prompt } from "@better-giving/ui";
-import { SquareArrowOutUpRight } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { NavLink, useFetcher } from "react-router";
+import { Actions, Button, use_ask_prompt } from "@better-giving/ui";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFetcher } from "react-router";
 import { BankDetails, type OnSubmit } from "#/components/bank-details";
-import { PayoutOptions } from "#/components/payout-options";
+import {
+  BankRequired,
+  is_linked,
+  PayoutChoice,
+  SavedBank,
+  type TPayoutOption,
+} from "#/components/payout-options";
 import { StripeConnectCard } from "#/components/stripe-connect/connect-card";
 import { submit_error_prompt } from "#/helpers/error-prompt";
 import { use_strip_connect_params } from "#/hooks/use-strip-connect-params";
@@ -15,7 +20,6 @@ import {
   connect_notice,
   connect_start_href,
   type IConnectCardData,
-  payout_options_variant,
   reg_ineligibility,
 } from "@/stripe-connect/card-data";
 import { stripe as stripe_env } from "$/env";
@@ -40,7 +44,7 @@ export const loader = async (args: Route.LoaderArgs) => {
       })) ||
     undefined;
   const stripe: IConnectCardData = {
-    // the not-available card shows no status, so stripe isn't asked for one
+    // an org stripe can never pay is not offered stripe, so stripe isn't asked
     status:
       connect_routing && acct && !ineligible
         ? await account_status_live(acct)
@@ -60,6 +64,8 @@ export const action = update_action(steps.banking, { next_always: true });
 
 export default function Page({ loaderData: reg }: Route.ComponentProps) {
   const [is_changing, set_is_changing] = useState(false);
+  // a press on an option; until one, the option shown is what is saved
+  const [picked, set_picked] = useState<TPayoutOption | null>(null);
   const fetcher = useFetcher();
   // a change that landed redirects back to this same route, which stays
   // mounted — so the form is closed here, as the save settles without a failure
@@ -72,18 +78,11 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
     }
   }
   const ask_prompt = use_ask_prompt();
-  const heading_id = useId();
   const back = before_banking(reg.o_type);
   // stable identity — BankDetails renders it as a component
   const FormButtons = useMemo(() => form_buttons(back), [back]);
   use_strip_connect_params(reg.connect_routing && !!reg.stripe.notice);
   const offers_stripe = reg.connect_routing && !reg.stripe.ineligible;
-  const payout_options = offers_stripe && (
-    <PayoutOptions variant={payout_options_variant(reg.stripe.status)} />
-  );
-  const stripe_card = reg.connect_routing ? (
-    <StripeConnectCard {...reg.stripe} />
-  ) : null;
 
   const submit: OnSubmit = async (recipient, bank_statement) => {
     const update: TRegUpdate = {
@@ -113,8 +112,9 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
     );
   }, [fetcher.state, fetcher.data, ask_prompt]);
 
-  const shows_saved = !!reg.o_bank_id && !is_changing;
-  // the form that held focus is gone once the saved panel replaces it; a
+  const bank_saved = !!reg.o_bank_id;
+  const shows_saved = bank_saved && !is_changing;
+  // the form that held focus is gone once the saved card replaces it; a
   // saved bank there on arrival is not a change, so focus stays put
   const saved_heading = useRef<HTMLHeadingElement>(null);
   const showed_saved = useRef(shows_saved);
@@ -123,103 +123,24 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
     showed_saved.current = shows_saved;
   }, [shows_saved]);
 
-  if (shows_saved) {
-    return (
-      <div className="grid gap-6 content-start">
-        <section aria-labelledby={heading_id} className="grid gap-3">
-          <div className="flex items-center gap-2">
-            <h2
-              id={heading_id}
-              ref={saved_heading}
-              tabIndex={-1}
-              className="text-xl"
-            >
-              Your bank payout
-            </h2>
-            <Badge tone="success">Saved</Badge>
-          </div>
-          <p className="text-sm text-gray-11">
-            Grants are sent to this account through Wise, a money-transfer
-            service, every 3 days once your balance reaches your payout minimum.
-          </p>
-          <dl className="grid gap-0.5 mt-2 text-sm">
-            <dt className="font-semibold">Bank account reference</dt>
-            <dd className="text-gray-11">{reg.o_bank_id}</dd>
-            <dd className="text-xs text-gray-11">
-              Wise's reference for the account you entered.
-            </dd>
-          </dl>
-          <ExtLink
-            href={reg.o_bank_statement}
-            className="flex items-center gap-2 link justify-self-start text-sm"
-          >
-            <SquareArrowOutUpRight className="icon-md" />
-            <span>View bank statement</span>
-          </ExtLink>
-          <button
-            className="btn btn-secondary btn-sm justify-self-start"
-            type="button"
-            onClick={() => set_is_changing(true)}
-          >
-            Change bank details
-          </button>
-        </section>
-
-        {payout_options}
-        {stripe_card}
-
-        <Actions>
-          <NavLink to={`../${back}`} className="min-w-32 btn btn-secondary">
-            Back
-          </NavLink>
-          <NavLink
-            to={`../${steps.summary}`}
-            className="min-w-32 btn btn-primary"
-          >
-            Continue
-          </NavLink>
-        </Actions>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-6 content-start">
-      <section aria-labelledby={heading_id} className="grid gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <h2 id={heading_id} className="text-xl">
-              {is_changing ? "Update" : "Set up"} your bank payout
-            </h2>
-            <Badge tone="primary">Required</Badge>
-          </div>
-          {is_changing && (
-            <button
-              className="btn btn-secondary btn-sm"
-              type="button"
-              onClick={() => set_is_changing(false)}
-            >
-              Cancel
-            </button>
-          )}
-        </div>
-        <p className="text-sm text-gray-11">
-          Grants are sent to this account through Wise, a money-transfer
-          service, in the currency you choose. Every kind of donation can pay
-          out here, every 3 days once your balance reaches your payout minimum.
-        </p>
-        {offers_stripe && !reg.o_stripe_account_id && (
-          <p className="text-sm text-gray-11">
-            Stripe is optional. You can connect it right after your bank details
-            are saved.
-          </p>
-        )}
-      </section>
-
-      {payout_options}
-      {/* stripe follows a saved bank, unless an account is already linked */}
-      {offers_stripe && reg.o_stripe_account_id && stripe_card}
-
+  const bank = shows_saved ? (
+    <SavedBank
+      account_id={reg.o_bank_id ?? ""}
+      statement_href={reg.o_bank_statement ?? ""}
+      onChange={() => set_is_changing(true)}
+      heading_ref={saved_heading}
+    />
+  ) : (
+    <div className="grid gap-3">
+      {is_changing && (
+        <button
+          className="btn btn-secondary btn-sm justify-self-end"
+          type="button"
+          onClick={() => set_is_changing(false)}
+        >
+          Cancel
+        </button>
+      )}
       <BankDetails
         verified
         FormButtons={FormButtons}
@@ -227,5 +148,56 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
         is_loading={fetcher.state !== "idle"}
       />
     </div>
+  );
+
+  const back_to = `../${back}`;
+  const continue_to = `../${steps.summary}`;
+
+  if (!offers_stripe) {
+    return (
+      <BankRequired ineligible={reg.stripe.ineligible}>
+        {bank}
+        {shows_saved && (
+          <Actions>
+            <Button variant="secondary" to={back_to} classes="min-w-32">
+              Back
+            </Button>
+            <Button variant="primary" to={continue_to} classes="min-w-32">
+              Continue
+            </Button>
+          </Actions>
+        )}
+      </BankRequired>
+    );
+  }
+
+  // back from stripe, the attempt is what the applicant came to see
+  const saved_choice: TPayoutOption | null = reg.stripe.notice
+    ? "stripe"
+    : bank_saved
+      ? "bank"
+      : is_linked(reg.stripe.status)
+        ? "stripe"
+        : null;
+
+  return (
+    <PayoutChoice
+      selected={picked ?? saved_choice}
+      onSelect={set_picked}
+      // a bank being changed holds the step on its form, as before a save
+      bank_saved={shows_saved}
+      stripe_status={reg.stripe.status}
+      bank={bank}
+      stripe={
+        <StripeConnectCard
+          {...reg.stripe}
+          brief
+          heading_level={3}
+          has_bank={bank_saved}
+        />
+      }
+      back_to={back_to}
+      continue_to={continue_to}
+    />
   );
 }

@@ -121,7 +121,7 @@ export default function Loaded(
             </Row>
           </dl>
           <p className="p-3 text-sm text-gray-11">
-            Bank account details couldn't be loaded from Wise.
+            Bank account details couldn't be loaded from the payout provider.
           </p>
         </Container>
       )}

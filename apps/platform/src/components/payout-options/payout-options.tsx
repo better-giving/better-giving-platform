@@ -13,8 +13,6 @@ export interface IPayoutOptions {
   /** what is set up now, named on the closed row. absent, the row reads as
    *  it does open */
   current?: IPayoutRails;
-  /** @deprecated ignored: the row is always closed until pressed */
-  variant?: "open" | "collapsed";
   /** outer placement only — margin, grid placement */
   classes?: string;
 }

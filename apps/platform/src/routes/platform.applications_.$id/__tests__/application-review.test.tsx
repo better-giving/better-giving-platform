@@ -508,7 +508,7 @@ describe("wise outage", () => {
     await expect.element(screen.getByText("Test Org")).toBeInTheDocument();
     await expect.element(screen.getByText("123456789")).toBeInTheDocument();
     await expect
-      .element(screen.getByText(/couldn't be loaded from wise/i))
+      .element(screen.getByText(/couldn't be loaded from the payout provider/i))
       .toBeInTheDocument();
     await expect
       .element(screen.getByText(/could not load the application/i))

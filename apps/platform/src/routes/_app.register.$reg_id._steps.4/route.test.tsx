@@ -174,13 +174,6 @@ async function save_bank(
     .where(eq(registrations.id, id));
 }
 
-const EMPTY_INTRO =
-  "Grants are sent to this account through Wise, a money-transfer service, in the currency you choose. Every kind of donation can pay out here, every 3 days once your balance reaches your payout minimum.";
-const SAVED_INTRO =
-  "Grants are sent to this account through Wise, a money-transfer service, every 3 days once your balance reaches your payout minimum.";
-const STRIPE_LATER =
-  "Stripe is optional. You can connect it right after your bank details are saved.";
-
 function render_step_4(id: string, search = "") {
   const Stub = createRoutesStub([
     {
@@ -211,443 +204,210 @@ function render_step_4(id: string, search = "") {
 }
 
 type TScreen = Awaited<ReturnType<typeof render_step_4>>;
-const explainer = (screen: TScreen) =>
-  screen.getByRole("region", { name: "How you get paid" });
 
-/** the comparison on show, with no trigger to open it */
-async function expect_explainer_open(screen: TScreen) {
-  const e = explainer(screen);
-  await expect
-    .element(e.getByRole("heading", { level: 2, name: "How you get paid" }))
-    .toBeVisible();
-  await expect.element(e.getByText("Bank only:")).toBeVisible();
-  expect(e.getByRole("button").query()).toBeNull();
-}
+const radio = (screen: TScreen, name: "Bank" | "Stripe") =>
+  screen.getByRole("radio", { name, exact: true });
+const continue_link = (screen: TScreen) =>
+  screen.getByRole("link", { name: "Continue", exact: true });
+const saved_bank = (screen: TScreen) =>
+  screen.getByRole("region", { name: "Bank payout", exact: true });
+const stripe_card = (screen: TScreen) =>
+  screen.getByRole("region", { name: "Stripe account" });
+const submit_bank = (screen: TScreen) =>
+  screen.getByRole("button", { name: /submit bank details/i });
 
-async function expect_explainer_collapsed(screen: TScreen) {
-  await expect
-    .element(
-      explainer(screen).getByRole("button", { name: /how you get paid/i })
-    )
-    .toHaveAttribute("aria-expanded", "false");
-}
+const link_stripe = (id: string) =>
+  test_db
+    .current!.db.update(registrations)
+    .set({ o_stripe_account_id: "acct_123" })
+    .where(eq(registrations.id, id));
+
+/** the payout provider is never named to the nonprofit */
+const expect_no_wise = (screen: TScreen) =>
+  expect(screen.container.textContent).not.toMatch(/\bwise\b|money-transfer/i);
 
 // --- tests ---
 
-describe("registration step 4: banking", () => {
-  it("surfaces the failure when the update is rejected", async () => {
-    // a bank statement url the action's schema rejects
-    bank_statement.url = "not-a-url";
+describe("registration step 4: choose how you get paid", () => {
+  it("starts with nothing chosen, and a saved bank lets the applicant continue", async () => {
     const id = await seed_step_4();
     const screen = await render_step_4(id);
-
-    await screen.getByRole("button", { name: /submit bank details/i }).click();
-
-    // a 4xx is the user's to act on, so the action's own message is shown
-    await expect.element(screen.getByText(/invalid url/i)).toBeInTheDocument();
-
-    // nothing was written
-    const [row] = await test_db
-      .current!.db.select()
-      .from(registrations)
-      .where(eq(registrations.id, id));
-    expect(row.o_bank_id).toBeNull();
-  }, 30_000);
-
-  it("keeps the change form open when changing a saved bank fails", async () => {
-    const id = await seed_step_4();
-    await save_bank(id);
-    bank_statement.url = "not-a-url";
-    const screen = await render_step_4(id);
-
-    await screen.getByRole("button", { name: "Change bank details" }).click();
-    await screen.getByRole("button", { name: /submit bank details/i }).click();
-
-    await expect.element(screen.getByText(/invalid url/i)).toBeInTheDocument();
-    // the prompt is modal, so the page behind it has no roles until it closes
-    await screen.getByRole("button", { name: "Ok", exact: true }).click();
-    await expect
-      .element(screen.getByRole("region", { name: "Update your bank payout" }))
-      .toBeInTheDocument();
-    expect(
-      screen
-        .getByRole("region", { name: "Your bank payout", exact: true })
-        .query()
-    ).toBeNull();
-
-    const [row] = await test_db
-      .current!.db.select()
-      .from(registrations)
-      .where(eq(registrations.id, id));
-    expect(row.o_bank_statement).toBe("https://example.com/bank.pdf");
-  }, 30_000);
-
-  it("closes the change form once a retry after a failure lands", async () => {
-    const id = await seed_step_4();
-    await save_bank(id);
-    bank_statement.url = "not-a-url";
-    const screen = await render_step_4(id);
-
-    await screen.getByRole("button", { name: "Change bank details" }).click();
-    await screen.getByRole("button", { name: /submit bank details/i }).click();
-    const failure = screen.getByText(/invalid url/i);
-    await expect.element(failure).toBeInTheDocument();
-    await screen.getByRole("button", { name: "Ok", exact: true }).click();
-    await expect.element(failure).not.toBeInTheDocument();
-
-    bank_statement.url = "https://example.com/new.pdf";
-    await screen.getByRole("button", { name: /submit bank details/i }).click();
 
     await expect
-      .element(
-        screen
-          .getByRole("region", { name: "Your bank payout", exact: true })
-          .getByRole("link", { name: "View bank statement" })
-      )
-      .toHaveAttribute("href", "https://example.com/new.pdf");
-    expect(screen.getByText(/invalid url/i).query()).toBeNull();
-  }, 30_000);
-
-  describe("focus after the bank form closes", () => {
-    const saved_heading = (screen: Awaited<ReturnType<typeof render_step_4>>) =>
-      screen.getByRole("heading", { name: "Your bank payout", exact: true });
-
-    it("moves to the saved heading once a first save lands", async () => {
-      const id = await seed_step_4();
-      const screen = await render_step_4(id);
-
-      await screen
-        .getByRole("button", { name: /submit bank details/i })
-        .click();
-
-      await expect.element(saved_heading(screen)).toHaveFocus();
-    }, 30_000);
-
-    it("moves to the saved heading once a change lands", async () => {
-      const id = await seed_step_4();
-      await save_bank(id);
-      const screen = await render_step_4(id);
-
-      await screen.getByRole("button", { name: "Change bank details" }).click();
-      await screen
-        .getByRole("button", { name: /submit bank details/i })
-        .click();
-
-      await expect.element(saved_heading(screen)).toHaveFocus();
-    }, 30_000);
-
-    it("is not taken by a saved bank that is there on arrival", async () => {
-      const id = await seed_step_4();
-      await save_bank(id);
-      const screen = await render_step_4(id);
-
-      await expect.element(saved_heading(screen)).toBeVisible();
-      await expect.element(saved_heading(screen)).not.toHaveFocus();
-    }, 30_000);
-  });
-
-  it("asks for the bank first, and leaves stripe for after it is saved", async () => {
-    const id = await seed_step_4();
-    const screen = await render_step_4(id);
-
-    const bank = screen.getByRole("region", {
-      name: "Set up your bank payout",
-    });
-    await expect
-      .element(bank.getByText("Required", { exact: true }))
+      .element(screen.getByRole("heading", { name: "Choose how you get paid" }))
       .toBeVisible();
-    await expect.element(bank.getByText(EMPTY_INTRO)).toBeVisible();
-    await expect.element(bank.getByText(STRIPE_LATER)).toBeVisible();
-    await expect_explainer_open(screen);
-    // nothing to connect to until there is a bank to fall back on
-    expect(
-      screen.getByRole("region", { name: "Stripe account" }).query()
-    ).toBeNull();
-
-    // a saved bank comes back to this step, where stripe is now offered
-    await screen.getByRole("button", { name: /submit bank details/i }).click();
+    await expect.element(radio(screen, "Bank")).not.toBeChecked();
+    await expect.element(radio(screen, "Stripe")).not.toBeChecked();
     await expect
-      .element(
-        screen.getByRole("region", { name: "Your bank payout", exact: true })
-      )
+      .element(continue_link(screen))
+      .toHaveAttribute("aria-disabled", "true");
+    await expect
+      .element(screen.getByText("Choose an option to continue."))
+      .toBeVisible();
+    expect(submit_bank(screen).query()).toBeNull();
+    expect_no_wise(screen);
+
+    await screen.getByText("Bank", { exact: true }).click();
+    await submit_bank(screen).click();
+
+    // a saved bank comes back to this step, not on to the summary
+    await expect
+      .element(saved_bank(screen).getByText("Saved", { exact: true }))
       .toBeVisible();
     await expect
       .element(
-        screen
-          .getByRole("region", { name: "Stripe account" })
-          .getByRole("link", { name: "Connect with Stripe" })
+        screen.getByRole("heading", { name: "Bank payout", exact: true })
       )
-      .toBeVisible();
-    // still nothing linked, so the comparison stays open
-    await expect_explainer_open(screen);
-
-    // bank details alone complete the step
-    await screen.getByRole("link", { name: "Continue" }).click();
+      .toHaveFocus();
+    await expect.element(radio(screen, "Bank")).toBeChecked();
+    expect_no_wise(screen);
+    await continue_link(screen).click();
     await expect.element(screen.getByText(/summary/i)).toBeVisible();
   }, 30_000);
 
-  it("comes back to the saved bank after a change, not to the summary", async () => {
-    const id = await seed_step_4();
-    await save_bank(id);
-    bank_statement.url = "https://example.com/new.pdf";
-    const screen = await render_step_4(id);
-
-    await screen.getByRole("button", { name: "Change bank details" }).click();
-    await screen.getByRole("button", { name: /submit bank details/i }).click();
-
-    const bank = screen.getByRole("region", {
-      name: "Your bank payout",
-      exact: true,
-    });
-    await expect
-      .element(bank.getByRole("link", { name: "View bank statement" }))
-      .toHaveAttribute("href", "https://example.com/new.pdf");
-    await expect
-      .element(screen.getByRole("region", { name: "Stripe account" }))
-      .toBeVisible();
-    expect(screen.getByText(/summary/i).query()).toBeNull();
-  }, 30_000);
-
-  it("keeps a linked account's card beside the bank form", async () => {
-    account_status_live.mockResolvedValue("pending");
-    const id = await seed_step_4();
-    await test_db
-      .current!.db.update(registrations)
-      .set({ o_stripe_account_id: "acct_123" })
-      .where(eq(registrations.id, id));
-    const screen = await render_step_4(id);
-
-    const card = screen.getByRole("region", { name: "Stripe account" });
-    await expect
-      .element(card.getByText("Pending review", { exact: true }))
-      .toBeVisible();
-    await expect
-      .element(screen.getByRole("button", { name: /submit bank details/i }))
-      .toBeVisible();
-    await expect_explainer_collapsed(screen);
-  }, 30_000);
-
-  it("does not promise stripe for later while changing a bank with a linked account", async () => {
-    account_status_live.mockResolvedValue("pending");
-    const id = await seed_step_4();
-    await save_bank(id, { o_stripe_account_id: "acct_123" });
-    const screen = await render_step_4(id);
-
-    await screen.getByRole("button", { name: "Change bank details" }).click();
-
-    const bank = screen.getByRole("region", {
-      name: "Update your bank payout",
-    });
-    await expect.element(bank.getByText(EMPTY_INTRO)).toBeVisible();
-    expect(screen.getByText(STRIPE_LATER).query()).toBeNull();
-    await expect
-      .element(
-        screen
-          .getByRole("region", { name: "Stripe account" })
-          .getByText("Pending review", { exact: true })
-      )
-      .toBeVisible();
-  }, 30_000);
-
-  it("shows the saved bank, then stripe, and lets the bank be changed", async () => {
+  it("shows a bank saved on arrival as chosen, and offers stripe beside it", async () => {
     const id = await seed_step_4();
     await save_bank(id);
     const screen = await render_step_4(id);
 
-    const bank = screen.getByRole("region", {
-      name: "Your bank payout",
-      exact: true,
-    });
-    await expect
-      .element(bank.getByText("Saved", { exact: true }))
-      .toBeVisible();
-    await expect.element(bank.getByText(SAVED_INTRO)).toBeVisible();
-    await expect
-      .element(bank.getByText("Bank account reference", { exact: true }))
-      .toBeVisible();
+    await expect.element(radio(screen, "Bank")).toBeChecked();
+    const bank = saved_bank(screen);
     await expect.element(bank.getByText("999", { exact: true })).toBeVisible();
     await expect
-      .element(bank.getByText("Wise's reference for the account you entered."))
-      .toBeVisible();
-    await expect
-      .element(bank.getByRole("link", { name: "View bank statement" }))
+      .element(bank.getByRole("link", { name: "Bank statement" }))
       .toHaveAttribute("href", "https://example.com/bank.pdf");
-    expect(screen.getByText(STRIPE_LATER).query()).toBeNull();
-
-    await expect_explainer_open(screen);
-    const card = screen.getByRole("region", { name: "Stripe account" });
     await expect
-      .element(card.getByRole("link", { name: "Connect with Stripe" }))
+      .element(
+        screen.getByRole("heading", { name: "Bank payout", exact: true })
+      )
+      .not.toHaveFocus();
+    await expect
+      .element(continue_link(screen))
+      .not.toHaveAttribute("aria-disabled", "true");
+    expect_no_wise(screen);
+
+    await screen.getByText("Stripe", { exact: true }).click();
+    await expect
+      .element(
+        stripe_card(screen).getByRole("link", { name: "Connect Stripe" })
+      )
       .toHaveAttribute(
         "href",
         `/api/stripe-connect/start?kind=reg&reg_id=${id}`
       );
+    // the bank still finishes the step
     await expect
-      .element(screen.getByRole("link", { name: "Continue" }))
-      .toBeVisible();
+      .element(continue_link(screen))
+      .not.toHaveAttribute("aria-disabled", "true");
+    expect(account_status_live).not.toHaveBeenCalled();
+  }, 30_000);
 
-    await bank.getByRole("button", { name: "Change bank details" }).click();
-    await expect
-      .element(screen.getByRole("region", { name: "Update your bank payout" }))
-      .toBeVisible();
-    await expect
-      .element(screen.getByRole("button", { name: /submit bank details/i }))
-      .toBeVisible();
-    await screen.getByRole("button", { name: "Cancel", exact: true }).click();
+  it("shows a connected but unfinished stripe account as chosen", async () => {
+    account_status_live.mockResolvedValue("incomplete");
+    const id = await seed_step_4();
+    await link_stripe(id);
+    const screen = await render_step_4(id);
+
+    await expect.element(radio(screen, "Stripe")).toBeChecked();
     await expect
       .element(
-        screen.getByRole("region", { name: "Your bank payout", exact: true })
+        screen.getByText(
+          "Your Stripe account is connected. You can continue now, and add a bank account any time from Banking."
+        )
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        stripe_card(screen).getByText("Finish setup on Stripe", { exact: true })
+      )
+      .toBeVisible();
+    await expect
+      .element(stripe_card(screen).getByText(/Stripe donations are held too/))
+      .toBeVisible();
+    expect(account_status_live).toHaveBeenCalledWith("acct_123");
+    expect_no_wise(screen);
+    await continue_link(screen).click();
+    await expect.element(screen.getByText(/summary/i)).toBeVisible();
+  }, 30_000);
+
+  it("shows a ready stripe account as chosen", async () => {
+    account_status_live.mockResolvedValue("ready");
+    const id = await seed_step_4();
+    await link_stripe(id);
+    const screen = await render_step_4(id);
+
+    await expect.element(radio(screen, "Stripe")).toBeChecked();
+    await expect
+      .element(
+        stripe_card(screen).getByText("Ready to receive Stripe donations")
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        stripe_card(screen).getByText("Your Stripe account is connected.")
+      )
+      .toBeVisible();
+    await expect
+      .element(continue_link(screen))
+      .not.toHaveAttribute("aria-disabled", "true");
+    expect_no_wise(screen);
+  }, 30_000);
+
+  it("shows the bank as chosen when both are saved, with stripe a press away", async () => {
+    account_status_live.mockResolvedValue("ready");
+    const id = await seed_step_4();
+    await save_bank(id, { o_stripe_account_id: "acct_123" });
+    const screen = await render_step_4(id);
+
+    await expect.element(radio(screen, "Bank")).toBeChecked();
+    await expect.element(saved_bank(screen)).toBeVisible();
+    await screen.getByText("Stripe", { exact: true }).click();
+    await expect
+      .element(
+        stripe_card(screen).getByText("Ready to receive Stripe donations")
       )
       .toBeVisible();
   }, 30_000);
 
-  describe("a registration stripe can never route to", () => {
-    // outside the transfer countries
-    const ineligible = async () => {
-      const id = await seed_step_4();
-      await test_db
-        .current!.db.update(registrations)
-        .set({ o_hq_country: "Brazil" })
-        .where(eq(registrations.id, id));
-      return id;
-    };
-
-    it("is not offered stripe beside the bank form", async () => {
-      const id = await ineligible();
-      const screen = await render_step_4(id);
-
-      await expect
-        .element(
-          screen.getByRole("region", { name: "Set up your bank payout" })
-        )
-        .toBeVisible();
-      expect(screen.getByText(STRIPE_LATER).query()).toBeNull();
-      expect(
-        screen.getByRole("region", { name: "How you get paid" }).query()
-      ).toBeNull();
-      expect(
-        screen.getByRole("region", { name: "Stripe account" }).query()
-      ).toBeNull();
-    }, 30_000);
-
-    it("is told stripe is not available once the bank is saved", async () => {
-      const id = await ineligible();
-      await save_bank(id, { o_stripe_account_id: "acct_123" });
-      const screen = await render_step_4(id);
-
-      const card = screen.getByRole("region", { name: "Stripe account" });
-      await expect
-        .element(card.getByText("Not available", { exact: true }))
-        .toBeVisible();
-      expect(card.getByRole("link").query()).toBeNull();
-      expect(
-        screen.getByRole("region", { name: "How you get paid" }).query()
-      ).toBeNull();
-      expect(account_status_live).not.toHaveBeenCalled();
-    }, 30_000);
-  });
-
-  describe("an ineligible registration that never linked an account", () => {
-    const unlinked = async () => {
-      const id = await seed_step_4();
-      await test_db
-        .current!.db.update(registrations)
-        .set({ o_hq_country: "Brazil" })
-        .where(eq(registrations.id, id));
-      await save_bank(id);
-      return id;
-    };
-
-    it("is told stripe is not available once the bank is saved", async () => {
-      const id = await unlinked();
-      const screen = await render_step_4(id);
-
-      const card = screen.getByRole("region", { name: "Stripe account" });
-      await expect
-        .element(card.getByText("Not available", { exact: true }))
-        .toBeVisible();
-      expect(card.getByRole("link").query()).toBeNull();
-      expect(account_status_live).not.toHaveBeenCalled();
-    }, 30_000);
-
-    it("shows no return notice when sent back from stripe", async () => {
-      const id = await unlinked();
-      const screen = await render_step_4(id, "?stripe_connect=connected");
-
-      await expect
-        .element(
-          screen
-            .getByRole("region", { name: "Stripe account" })
-            .getByText("Not available", { exact: true })
-        )
-        .toBeVisible();
-      expect(
-        screen.getByText("Your Stripe account is connected.").query()
-      ).toBeNull();
-    }, 30_000);
-  });
-
-  describe("a fiscally sponsored registration", () => {
-    // the country is one stripe could route to (the seed's United States):
-    // sponsorship alone rules it out. the other types' fsa steps must be seeded
-    // for the loader to let the applicant reach step 4.
-    const sponsored = async () => {
-      const id = await seed_step_4();
-      await test_db
-        .current!.db.update(registrations)
-        .set({
-          o_type: "other",
-          r_proof_of_identity: "https://example.com/id.pdf",
-          o_proof_of_reg: "https://example.com/reg.pdf",
-          o_registration_number: "REG-1",
-          o_project_description: "A project",
-          o_legal_entity_type: "association",
-          o_fsa_signing_url: "https://example.com/sign",
-          o_fsa_signed_doc_url: "https://example.com/signed.pdf",
-        })
-        .where(eq(registrations.id, id));
-      return id;
-    };
-
-    it("is not offered stripe beside the bank form", async () => {
-      const id = await sponsored();
-      const screen = await render_step_4(id);
-
-      await expect
-        .element(
-          screen.getByRole("region", { name: "Set up your bank payout" })
-        )
-        .toBeVisible();
-      expect(screen.getByText(STRIPE_LATER).query()).toBeNull();
-      expect(
-        screen.getByRole("region", { name: "How you get paid" }).query()
-      ).toBeNull();
-      expect(
-        screen.getByRole("region", { name: "Stripe account" }).query()
-      ).toBeNull();
-    }, 30_000);
-
-    it("is told why once the bank is saved", async () => {
-      const id = await sponsored();
-      await save_bank(id, { o_stripe_account_id: "acct_123" });
-      const screen = await render_step_4(id);
-
-      const card = screen.getByRole("region", { name: "Stripe account" });
-      await expect
-        .element(card.getByText(/fiscally sponsored nonprofits/i))
-        .toBeVisible();
-      expect(card.getByRole("link").query()).toBeNull();
-      expect(account_status_live).not.toHaveBeenCalled();
-    }, 30_000);
-  });
-
-  it("shows how the connect attempt ended on the way back from stripe", async () => {
+  it("asks for stripe before Continue opens when stripe is chosen and nothing is set up", async () => {
     const id = await seed_step_4();
-    await save_bank(id);
+    const screen = await render_step_4(id);
+
+    await screen.getByText("Stripe", { exact: true }).click();
+    await expect
+      .element(
+        stripe_card(screen).getByRole("link", { name: "Connect Stripe" })
+      )
+      .toBeVisible();
+    await expect
+      .element(continue_link(screen))
+      .toHaveAttribute("aria-disabled", "true");
+  }, 30_000);
+
+  it("lands back on the stripe option after connecting, a saved bank or not", async () => {
+    account_status_live.mockResolvedValue("ready");
+    const id = await seed_step_4();
+    await save_bank(id, { o_stripe_account_id: "acct_123" });
     const screen = await render_step_4(id, "?stripe_connect=connected");
 
+    await expect.element(radio(screen, "Stripe")).toBeChecked();
     await expect
-      .element(screen.getByText("Your Stripe account is connected."))
+      .element(
+        stripe_card(screen).getByText("Your Stripe account is connected.")
+      )
+      .toBeVisible();
+  }, 30_000);
+
+  it("shows how a failed connect attempt ended, on the stripe option", async () => {
+    const id = await seed_step_4();
+    const screen = await render_step_4(
+      id,
+      "?stripe_connect=error&stripe_connect_reason=expired"
+    );
+
+    await expect.element(radio(screen, "Stripe")).toBeChecked();
+    await expect
+      .element(screen.getByText("The link to Stripe timed out."))
       .toBeVisible();
   }, 30_000);
 
@@ -659,7 +419,9 @@ describe("registration step 4: banking", () => {
       "?stripe_connect=error&stripe_connect_reason=made_up"
     );
 
-    const card = screen.getByRole("region", { name: "Stripe account" });
+    await expect.element(radio(screen, "Bank")).toBeChecked();
+    await screen.getByText("Stripe", { exact: true }).click();
+    const card = stripe_card(screen);
     await expect
       .element(card.getByText("Not connected", { exact: true }))
       .toBeVisible();
@@ -696,89 +458,209 @@ describe("registration step 4: banking", () => {
     }, 30_000);
   });
 
-  it("reads a linked account's status from stripe, beside saved bank details", async () => {
-    account_status_live.mockResolvedValue("pending");
+  describe("changing a saved bank", () => {
+    it("opens the form, and Cancel puts the saved bank back", async () => {
+      const id = await seed_step_4();
+      await save_bank(id);
+      const screen = await render_step_4(id);
+
+      await saved_bank(screen).getByRole("button", { name: "Change" }).click();
+      await expect.element(submit_bank(screen)).toBeVisible();
+      await screen.getByRole("button", { name: "Cancel", exact: true }).click();
+      await expect.element(saved_bank(screen)).toBeVisible();
+    }, 30_000);
+
+    it("comes back to the saved bank with focus on it once a change lands", async () => {
+      const id = await seed_step_4();
+      await save_bank(id);
+      bank_statement.url = "https://example.com/new.pdf";
+      const screen = await render_step_4(id);
+
+      await saved_bank(screen).getByRole("button", { name: "Change" }).click();
+      await submit_bank(screen).click();
+
+      await expect
+        .element(
+          saved_bank(screen).getByRole("link", { name: "Bank statement" })
+        )
+        .toHaveAttribute("href", "https://example.com/new.pdf");
+      await expect
+        .element(
+          screen.getByRole("heading", { name: "Bank payout", exact: true })
+        )
+        .toHaveFocus();
+      expect(screen.getByText(/summary/i).query()).toBeNull();
+    }, 30_000);
+
+    it("keeps the form open when the change fails, and closes it once a retry lands", async () => {
+      const id = await seed_step_4();
+      await save_bank(id);
+      bank_statement.url = "not-a-url";
+      const screen = await render_step_4(id);
+
+      await saved_bank(screen).getByRole("button", { name: "Change" }).click();
+      await submit_bank(screen).click();
+      const failure = screen.getByText(/invalid url/i);
+      await expect.element(failure).toBeInTheDocument();
+      // the prompt is modal, so the page behind it has no roles until it closes
+      await screen.getByRole("button", { name: "Ok", exact: true }).click();
+      await expect.element(failure).not.toBeInTheDocument();
+      await expect.element(submit_bank(screen)).toBeVisible();
+      expect(saved_bank(screen).query()).toBeNull();
+
+      const [row] = await test_db
+        .current!.db.select()
+        .from(registrations)
+        .where(eq(registrations.id, id));
+      expect(row.o_bank_statement).toBe("https://example.com/bank.pdf");
+
+      bank_statement.url = "https://example.com/new.pdf";
+      await submit_bank(screen).click();
+      await expect
+        .element(
+          saved_bank(screen).getByRole("link", { name: "Bank statement" })
+        )
+        .toHaveAttribute("href", "https://example.com/new.pdf");
+    }, 30_000);
+  });
+
+  it("surfaces the failure when a first save is rejected", async () => {
+    // a bank statement url the action's schema rejects
+    bank_statement.url = "not-a-url";
     const id = await seed_step_4();
-    await save_bank(id, { o_stripe_account_id: "acct_123" });
     const screen = await render_step_4(id);
 
-    const card = screen.getByRole("region", { name: "Stripe account" });
-    await expect
-      .element(card.getByText("Pending review", { exact: true }))
-      .toBeVisible();
-    expect(account_status_live).toHaveBeenCalledWith("acct_123");
-    await expect
-      .element(screen.getByRole("link", { name: "Continue" }))
-      .toBeVisible();
-    await expect_explainer_collapsed(screen);
+    await screen.getByText("Bank", { exact: true }).click();
+    await submit_bank(screen).click();
+
+    // a 4xx is the user's to act on, so the action's own message is shown
+    await expect.element(screen.getByText(/invalid url/i)).toBeInTheDocument();
+    const [row] = await test_db
+      .current!.db.select()
+      .from(registrations)
+      .where(eq(registrations.id, id));
+    expect(row.o_bank_id).toBeNull();
   }, 30_000);
+
+  describe("a registration stripe can never route to", () => {
+    // outside the transfer countries
+    const abroad = async () => {
+      const id = await seed_step_4();
+      await test_db
+        .current!.db.update(registrations)
+        .set({ o_hq_country: "Brazil" })
+        .where(eq(registrations.id, id));
+      return id;
+    };
+
+    // the country is one stripe could route to (the seed's United States):
+    // sponsorship alone rules it out. the other types' fsa steps must be seeded
+    // for the loader to let the applicant reach step 4.
+    const sponsored = async () => {
+      const id = await seed_step_4();
+      await test_db
+        .current!.db.update(registrations)
+        .set({
+          o_type: "other",
+          r_proof_of_identity: "https://example.com/id.pdf",
+          o_proof_of_reg: "https://example.com/reg.pdf",
+          o_registration_number: "REG-1",
+          o_project_description: "A project",
+          o_legal_entity_type: "association",
+          o_fsa_signing_url: "https://example.com/sign",
+          o_fsa_signed_doc_url: "https://example.com/signed.pdf",
+        })
+        .where(eq(registrations.id, id));
+      return id;
+    };
+
+    it("requires the bank, says why, and continues once it is saved", async () => {
+      const id = await sponsored();
+      const screen = await render_step_4(id);
+
+      const required = screen.getByRole("region", {
+        name: "Set up your bank payout",
+      });
+      await expect
+        .element(required.getByText("Required", { exact: true }))
+        .toBeVisible();
+      await expect
+        .element(
+          required.getByText(
+            "Stripe isn't available to fiscally sponsored nonprofits."
+          )
+        )
+        .toBeVisible();
+      expect(radio(screen, "Stripe").query()).toBeNull();
+      expect(stripe_card(screen).query()).toBeNull();
+      expect(continue_link(screen).query()).toBeNull();
+      expect_no_wise(screen);
+
+      await submit_bank(screen).click();
+      await expect.element(saved_bank(screen)).toBeVisible();
+      await continue_link(screen).click();
+      await expect.element(screen.getByText(/summary/i)).toBeVisible();
+    }, 30_000);
+
+    it("names the country, and never asks stripe about a linked account", async () => {
+      const id = await abroad();
+      await save_bank(id, { o_stripe_account_id: "acct_123" });
+      const screen = await render_step_4(id, "?stripe_connect=connected");
+
+      await expect
+        .element(
+          screen.getByText(
+            /Stripe isn't available for nonprofits headquartered in Brazil/
+          )
+        )
+        .toBeVisible();
+      await expect.element(saved_bank(screen)).toBeVisible();
+      expect(stripe_card(screen).query()).toBeNull();
+      expect(
+        screen.getByText("Your Stripe account is connected.").query()
+      ).toBeNull();
+      expect(account_status_live).not.toHaveBeenCalled();
+    }, 30_000);
+  });
 
   describe("while routing is off", () => {
     beforeEach(() => {
       routing.on = false;
     });
 
-    it("hides stripe beside the bank form, including a return notice", async () => {
+    it("requires the bank without a stripe reason, and hides a return notice", async () => {
       const id = await seed_step_4();
       const screen = await render_step_4(id, "?stripe_connect=connected");
 
+      const required = screen.getByRole("region", {
+        name: "Set up your bank payout",
+      });
       await expect
-        .element(screen.getByRole("button", { name: /submit bank details/i }))
+        .element(required.getByText("Required", { exact: true }))
         .toBeVisible();
-      expect(
-        screen.getByRole("region", { name: "Stripe account" }).query()
-      ).toBeNull();
-      expect(
-        screen.getByText("Not connected", { exact: true }).query()
-      ).toBeNull();
-      expect(
-        screen.getByRole("link", { name: "Connect with Stripe" }).query()
-      ).toBeNull();
-      expect(
-        screen.getByRole("link", { name: "Stripe dashboard" }).query()
-      ).toBeNull();
+      expect(screen.getByText(/Stripe isn't available/).query()).toBeNull();
+      expect(radio(screen, "Stripe").query()).toBeNull();
+      expect(stripe_card(screen).query()).toBeNull();
       expect(
         screen.getByText("Your Stripe account is connected.").query()
       ).toBeNull();
-      expect(explainer(screen).query()).toBeNull();
-      expect(screen.container.textContent).not.toMatch(/stripe/i);
+      expect_no_wise(screen);
 
-      await screen
-        .getByRole("button", { name: /submit bank details/i })
-        .click();
-      await expect
-        .element(
-          screen.getByRole("region", { name: "Your bank payout", exact: true })
-        )
-        .toBeVisible();
-      expect(
-        screen.getByRole("region", { name: "Stripe account" }).query()
-      ).toBeNull();
-      expect(explainer(screen).query()).toBeNull();
-      await screen.getByRole("link", { name: "Continue" }).click();
+      await submit_bank(screen).click();
+      await expect.element(saved_bank(screen)).toBeVisible();
+      await continue_link(screen).click();
       await expect.element(screen.getByText(/summary/i)).toBeVisible();
     }, 30_000);
 
-    it("hides stripe beside saved bank details and does not ask stripe", async () => {
-      account_status_live.mockResolvedValue("pending");
+    it("holds a stripe-only registration on the bank form, and does not ask stripe", async () => {
+      account_status_live.mockResolvedValue("ready");
       const id = await seed_step_4();
-      await save_bank(id, { o_stripe_account_id: "acct_123" });
-      const screen = await render_step_4(id, "?stripe_connect=connected");
+      await link_stripe(id);
+      const screen = await render_step_4(id);
 
-      await expect
-        .element(screen.getByRole("link", { name: "Continue" }))
-        .toBeVisible();
-      expect(
-        screen.getByRole("region", { name: "Stripe account" }).query()
-      ).toBeNull();
-      expect(
-        screen.getByText("Pending review", { exact: true }).query()
-      ).toBeNull();
-      expect(explainer(screen).query()).toBeNull();
-      expect(
-        screen.getByText("Your Stripe account is connected.").query()
-      ).toBeNull();
-      expect(screen.container.textContent).not.toMatch(/stripe/i);
+      await expect.element(submit_bank(screen)).toBeVisible();
+      expect(continue_link(screen).query()).toBeNull();
+      expect(stripe_card(screen).query()).toBeNull();
       expect(account_status_live).not.toHaveBeenCalled();
     }, 30_000);
   });

@@ -15,6 +15,7 @@ import { doc_args } from "#/__tests__/fixtures/route-args";
 import { get_qstash_events } from "#/setup-tests-browser";
 import { banking_apps } from "$/pg/schema/banking";
 import { npos } from "$/pg/schema/npo";
+import { payouts } from "$/pg/schema/payout";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 // --- mocks (hoisted) ---
@@ -182,6 +183,20 @@ async function get_bapp(id: string) {
   return row;
 }
 
+/** a Savings withdrawal waiting for a bank payout */
+async function seed_held(npo_id: number, amount: number) {
+  counter++;
+  await test_db.current!.db.insert(payouts).values({
+    id: `payout-${counter}`,
+    source_id: `liq-${counter}`,
+    npo_id,
+    source: "liq",
+    date: "2026-10-27T00:00:00.000Z",
+    amount,
+    type: "pending",
+  });
+}
+
 function get_outbox_events() {
   return get_qstash_events();
 }
@@ -259,6 +274,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  await test_db.current!.db.delete(payouts);
   await test_db.current!.db.delete(banking_apps);
   await test_db.current!.db.delete(npos);
   counter = 0;
@@ -362,18 +378,18 @@ describe("payout methods list", () => {
 
     const bank = screen.getByRole("region", { name: "Bank payout" });
     await expect
-      .element(bank.getByText(/no payout methods yet/i))
-      .toBeVisible();
-    await expect
-      .element(bank.getByText("Required", { exact: true }))
+      .element(bank.getByText("No bank account yet", { exact: true }))
       .toBeVisible();
     await expect
       .element(
         bank.getByText(
-          "Grants are sent to your bank through Wise, a money-transfer service, in the currency you choose. Every kind of donation can pay out here, every 3 days once your balance reaches your payout minimum."
+          "Bank payout: we send it to your bank account every 3 days once your balance reaches your payout minimum."
         )
       )
       .toBeVisible();
+    expect(screen.container.textContent).not.toMatch(
+      /\bwise\b|money-transfer/i
+    );
     await expect
       .element(bank.getByRole("link", { name: "Add bank account" }))
       .toHaveAttribute("href", `/admin/${npo.id}/banking/new`);
@@ -582,7 +598,7 @@ describe("payout method detail", () => {
     );
 
     await expect
-      .element(screen.getByText(/couldn't be loaded from wise/i))
+      .element(screen.getByText(/couldn't be loaded right now/i))
       .toBeInTheDocument();
     // the uploaded statement is ours and outlives the outage
     await expect
@@ -695,9 +711,7 @@ describe("delete", () => {
     (proceed_btn.element() as HTMLElement).click();
 
     // redirected to list — bapp gone
-    await expect
-      .element(screen.getByText(/no payout methods yet/i))
-      .toBeVisible();
+    await expect.element(screen.getByText("No bank account yet")).toBeVisible();
   });
 
   async function open_prompt(npo_id: number, bank_id: string) {
@@ -874,48 +888,26 @@ describe("stripe connect card", () => {
     stripe_synced_at: new Date().toISOString(),
   };
 
-  it("follows the bank payout, reading the status off the mirror", async () => {
-    const npo = await seed_npo(READY);
+  const compare_row = (screen: Awaited<ReturnType<typeof render_list>>) =>
+    screen
+      .getByRole("region", { name: "Compare your options" })
+      .getByRole("button", { name: /compare your options/i });
+  const add_bank_links = (screen: Awaited<ReturnType<typeof render_list>>) =>
+    screen.getByRole("link", { name: "Add bank account" }).elements();
+  const no_wise = (screen: Awaited<ReturnType<typeof render_list>>) =>
+    expect(screen.container.textContent).not.toMatch(
+      /\bwise\b|money-transfer/i
+    );
+
+  it("bank only: offers stripe beside the bank, and holds nothing", async () => {
+    const npo = await seed_npo();
     await seed_bapp(npo.id, {
-      status: "approved",
+      status: "default",
       bank_summary: "USD account ending in 1234",
     });
+    // a pending payout beside a bank is on its way, not held
+    await seed_held(npo.id, 500);
 
-    const screen = await render_list(npo.id);
-
-    const card = screen.getByRole("region", { name: "Stripe account" });
-    await expect
-      .element(card.getByText("Ready to receive Stripe donations"))
-      .toBeVisible();
-    await expect
-      .element(
-        card.getByRole("link", {
-          name: /what's been sent on your payouts page/i,
-        })
-      )
-      .toHaveAttribute("href", `/admin/${npo.id}/dashboard/payouts`);
-    const bank = screen.getByRole("region", { name: "Bank payout" });
-    await expect
-      .element(bank.getByText("USD account ending in 1234"))
-      .toBeVisible();
-    // a connected npo has read the comparison already: it starts collapsed
-    const explainer = screen.getByRole("region", { name: "How you get paid" });
-    await expect
-      .element(explainer.getByRole("button", { name: /how you get paid/i }))
-      .toHaveAttribute("aria-expanded", "false");
-    const [e, b, c] = [explainer, bank, card].map((l) => l.element());
-    expect(
-      e.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
-    expect(
-      b.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
-    // a synced mirror is read as it stands
-    expect(sync_npo_account).not.toHaveBeenCalled();
-  });
-
-  it("offers the connect link for this nonprofit when none is linked", async () => {
-    const npo = await seed_npo();
     const screen = await render_list(npo.id);
 
     const card = screen.getByRole("region", { name: "Stripe account" });
@@ -923,31 +915,201 @@ describe("stripe connect card", () => {
       .element(card.getByText("Not connected", { exact: true }))
       .toBeVisible();
     await expect
-      .element(card.getByRole("link", { name: "Connect with Stripe" }))
+      .element(card.getByText(/Everything else keeps paying out to your bank/))
+      .toBeVisible();
+    await expect
+      .element(card.getByRole("link", { name: "Connect Stripe" }))
       .toHaveAttribute(
         "href",
         `/api/stripe-connect/start?kind=npo&npo_id=${npo.id}`
       );
-    // nothing is set up on stripe yet, so the comparison starts open
-    const explainer = screen.getByRole("region", { name: "How you get paid" });
     await expect
-      .element(
-        explainer.getByRole("heading", { level: 2, name: "How you get paid" })
-      )
+      .element(compare_row(screen))
+      .toMatchTextContent(/Right now: Bank\. See how Bank and Stripe differ\./);
+    await expect
+      .element(compare_row(screen))
+      .toHaveAttribute("aria-expanded", "false");
+    const bank = screen.getByRole("region", { name: "Bank payout" });
+    await expect
+      .element(bank.getByText("USD account ending in 1234"))
       .toBeVisible();
+    await expect
+      .element(bank.getByRole("link", { name: "Add bank account" }))
+      .toHaveAttribute("href", `/admin/${npo.id}/banking/new`);
+    expect(screen.getByText("Held right now").query()).toBeNull();
+    // the compare row, then the bank, then stripe
+    const [e, b, c] = [
+      screen.getByRole("region", { name: "Compare your options" }),
+      bank,
+      card,
+    ].map((l) => l.element());
     expect(
-      explainer.getByRole("button", { name: /how you get paid/i }).query()
-    ).toBeNull();
+      e.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      b.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    no_wise(screen);
   });
 
-  // only a nonprofit that never linked an account gets the comparison open;
-  // one that has been through Stripe, however far, starts collapsed
+  it("stripe only: shows what waits for a bank, with one way to add it", async () => {
+    const npo = await seed_npo(READY);
+    await seed_held(npo.id, 500);
+
+    const screen = await render_list(npo.id);
+
+    const held = screen.getByRole("region", {
+      name: "Waiting for a bank account",
+    });
+    await expect
+      .element(held.getByText("$500.00", { exact: true }).first())
+      .toBeVisible();
+    await expect
+      .element(held.getByText("Savings and Investments withdrawals"))
+      .toBeVisible();
+    await expect
+      .element(held.getByRole("link", { name: "Add bank account" }))
+      .toHaveAttribute("href", `/admin/${npo.id}/banking/new`);
+    // the held card carries the page's one Add bank account
+    expect(add_bank_links(screen)).toHaveLength(1);
+    const bank = screen.getByRole("region", { name: "Bank payout" });
+    await expect
+      .element(
+        bank.getByText(
+          "Add one to release held money and have everything else pay out to your bank."
+        )
+      )
+      .toBeVisible();
+    await expect
+      .element(compare_row(screen))
+      .toMatchTextContent(
+        /Right now: Stripe\. See how Bank and Stripe differ\./
+      );
+    const card = screen.getByRole("region", { name: "Stripe account" });
+    await expect
+      .element(card.getByText("Ready to receive Stripe donations"))
+      .toBeVisible();
+    await expect
+      .element(card.getByText(/What Stripe pays on to your own bank/))
+      .toBeVisible();
+    // a synced mirror is read as it stands
+    expect(sync_npo_account).not.toHaveBeenCalled();
+    no_wise(screen);
+  });
+
+  it("stripe only with nothing waiting: no held card, and the bank section offers the add", async () => {
+    const npo = await seed_npo(READY);
+
+    const screen = await render_list(npo.id);
+
+    await expect
+      .element(screen.getByRole("region", { name: "Stripe account" }))
+      .toBeVisible();
+    expect(screen.getByText("Held right now").query()).toBeNull();
+    const bank = screen.getByRole("region", { name: "Bank payout" });
+    await expect
+      .element(bank.getByRole("link", { name: "Add bank account" }))
+      .toBeVisible();
+    expect(add_bank_links(screen)).toHaveLength(1);
+  });
+
+  it("never linked stripe and no bank: no held card, the bank section offers the add", async () => {
+    const npo = await seed_npo();
+    await seed_held(npo.id, 500);
+
+    const screen = await render_list(npo.id);
+
+    await expect
+      .element(
+        screen
+          .getByRole("region", { name: "Stripe account" })
+          .getByText("Not connected", { exact: true })
+      )
+      .toBeVisible();
+    expect(screen.getByText("Held right now").query()).toBeNull();
+    expect(add_bank_links(screen)).toHaveLength(1);
+  });
+
+  it("bank and stripe: says what goes where, and links the payouts page", async () => {
+    const npo = await seed_npo(READY);
+    await seed_bapp(npo.id, {
+      status: "default",
+      bank_summary: "USD account ending in 1234",
+    });
+
+    const screen = await render_list(npo.id);
+
+    const card = screen.getByRole("region", { name: "Stripe account" });
+    await expect
+      .element(
+        card.getByRole("link", {
+          name: /what's been sent on your payouts page/i,
+        })
+      )
+      .toHaveAttribute("href", `/admin/${npo.id}/dashboard/payouts`);
+    await expect
+      .element(card.getByText(/Everything else pays out to your bank/))
+      .toBeVisible();
+    const bank = screen.getByRole("region", { name: "Bank payout" });
+    await expect
+      .element(
+        bank.getByText(/Everything except Stripe donations pays out here\./)
+      )
+      .toBeVisible();
+    await expect
+      .element(compare_row(screen))
+      .toMatchTextContent(/Right now: Bank and Stripe\. See how they differ\./);
+    expect(screen.getByText("Held right now").query()).toBeNull();
+    no_wise(screen);
+  });
+
+  it("disconnected with no bank: everything is held, with both ways back", async () => {
+    const npo = await seed_npo({
+      ...READY,
+      stripe_deauthorized_at: "2026-10-01T00:00:00.000Z",
+    });
+    await seed_held(npo.id, 500);
+
+    const screen = await render_list(npo.id);
+
+    const held = screen.getByRole("region", {
+      name: "No way to get paid right now",
+    });
+    await expect
+      .element(held.getByText("$500.00", { exact: true }).first())
+      .toBeVisible();
+    await expect
+      .element(held.getByRole("link", { name: "Connect Stripe" }))
+      .toHaveAttribute(
+        "href",
+        `/api/stripe-connect/start?kind=npo&npo_id=${npo.id}`
+      );
+    expect(add_bank_links(screen)).toHaveLength(1);
+    await expect
+      .element(
+        screen
+          .getByRole("region", { name: "Bank payout" })
+          .getByText(
+            "Add one to release held money and get everything paid out to your bank."
+          )
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        screen
+          .getByRole("region", { name: "Stripe account" })
+          .getByText("Disconnected", { exact: true })
+      )
+      .toBeVisible();
+    await expect
+      .element(compare_row(screen))
+      .toMatchTextContent(
+        /Right now: nothing set up\. See how Bank and Stripe differ\./
+      );
+    no_wise(screen);
+  });
+
   it.each([
-    {
-      status: "disconnected",
-      seed: { ...READY, stripe_deauthorized_at: "2026-10-01T00:00:00.000Z" },
-      line: "Disconnected",
-    },
     {
       status: "incomplete",
       seed: { ...READY, stripe_details_submitted: false },
@@ -958,25 +1120,17 @@ describe("stripe connect card", () => {
       seed: { ...READY, stripe_charges_enabled: false },
       line: "Pending review",
     },
-  ])(
-    "a $status account starts with the comparison collapsed",
-    async ({ seed, line }) => {
-      const npo = await seed_npo(seed);
-      const screen = await render_list(npo.id);
+  ])("a $status account counts as stripe set up", async ({ seed, line }) => {
+    const npo = await seed_npo(seed);
+    const screen = await render_list(npo.id);
 
-      // the card renders this status, so the open/collapsed read is live
-      const card = screen.getByRole("region", { name: "Stripe account" });
-      await expect.element(card.getByText(line, { exact: true })).toBeVisible();
-      await expect
-        .element(
-          screen
-            .getByRole("region", { name: "How you get paid" })
-            .getByRole("button", { name: /how you get paid/i })
-        )
-        .toHaveAttribute("aria-expanded", "false");
-      expect(sync_npo_account).not.toHaveBeenCalled();
-    }
-  );
+    const card = screen.getByRole("region", { name: "Stripe account" });
+    await expect.element(card.getByText(line, { exact: true })).toBeVisible();
+    await expect
+      .element(compare_row(screen))
+      .toMatchTextContent(/Right now: Stripe\./);
+    expect(sync_npo_account).not.toHaveBeenCalled();
+  });
 
   it.each([
     {
@@ -1006,7 +1160,7 @@ describe("stripe connect card", () => {
         .element(screen.getByText("USD account ending in 1234"))
         .toBeVisible();
       expect(
-        screen.getByRole("region", { name: "How you get paid" }).query()
+        screen.getByRole("region", { name: "Compare your options" }).query()
       ).toBeNull();
       expect(screen.getByRole("link", { name: /stripe/i }).query()).toBeNull();
       expect(
@@ -1038,7 +1192,7 @@ describe("stripe connect card", () => {
         .element(card.getByText("Not available", { exact: true }))
         .toBeVisible();
       expect(
-        screen.getByRole("link", { name: "Connect with Stripe" }).query()
+        screen.getByRole("link", { name: "Connect Stripe" }).query()
       ).toBeNull();
       expect(
         screen.getByText("Your Stripe account is connected.").query()
@@ -1162,13 +1316,13 @@ describe("stripe connect card", () => {
       screen.getByText("Not connected", { exact: true }).query()
     ).toBeNull();
     expect(
-      screen.getByRole("link", { name: "Connect with Stripe" }).query()
+      screen.getByRole("link", { name: "Connect Stripe" }).query()
     ).toBeNull();
     expect(
       screen.getByText(/already linked to another nonprofit/i).query()
     ).toBeNull();
     expect(
-      screen.getByRole("region", { name: "How you get paid" }).query()
+      screen.getByRole("region", { name: "Compare your options" }).query()
     ).toBeNull();
     const bank = screen.getByRole("region", { name: "Bank payout" });
     await expect.element(bank).toBeVisible();

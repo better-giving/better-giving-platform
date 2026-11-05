@@ -169,7 +169,7 @@ const wells: Record<TStripeLink, [IWell, IWell]> = {
     {
       title: "Payouts",
       detail:
-        "PayPal, DAF grants, crypto, stocks, cheques, and any Stripe donations from before you connected Stripe: the Grant share of each, sent to your bank through Wise.",
+        "PayPal, DAF grants, crypto, stocks, cheques, and any Stripe donations from before you connected Stripe: the Grant share of each, sent to your bank.",
     },
   ],
   off: [
@@ -180,8 +180,7 @@ const wells: Record<TStripeLink, [IWell, IWell]> = {
     },
     {
       title: "Payouts",
-      detail:
-        "Everything sent to your bank through Wise, new Stripe donations included.",
+      detail: "Everything sent to your bank, new Stripe donations included.",
     },
   ],
   disconnected: [
@@ -193,7 +192,7 @@ const wells: Record<TStripeLink, [IWell, IWell]> = {
     {
       title: "Payouts",
       detail:
-        "Everything sent to your bank through Wise. Your Stripe account is disconnected, so new Stripe donations are here too.",
+        "Everything sent to your bank. Your Stripe account is disconnected, so new Stripe donations are here too.",
     },
   ],
 };

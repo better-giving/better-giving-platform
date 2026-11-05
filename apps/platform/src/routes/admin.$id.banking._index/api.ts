@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { admin_ctx } from "#/.server/auth";
 import { report_degraded } from "#/errors/report";
 import type { IBapp } from "@/banking";
+import type { IHeldMoney } from "@/payouts";
 import {
   connect_notice,
   connect_start_href,
@@ -14,7 +15,9 @@ import {
   type TConnectStatus,
 } from "@/stripe-connect/readiness";
 import { stripe as stripe_env } from "$/env";
-import { npo_bapps } from "$/pg/queries/banking";
+import { db } from "$/pg/db";
+import { npo_bapps, npo_default_bapp } from "$/pg/queries/banking";
+import { held_money } from "$/pg/queries/held-money";
 import { type INpo, npo_get } from "$/pg/queries/npo";
 import { sync_npo_account } from "$/stripe-connect/sync";
 import type { Route } from "./+types/route";
@@ -23,22 +26,38 @@ export interface LoaderData {
   methods: IBapp[];
   stripe: IConnectCardData;
   connect_routing: boolean;
+  /** a default bank is on file: everything not routed to stripe pays out */
+  has_bank: boolean;
+  /** what waits for a bank, once stripe stands in for one. null beside a
+   * bank, and wherever stripe was never linked or routing is off: the held
+   * card speaks of stripe */
+  held: IHeldMoney | null;
 }
 
 export const loader = async (x: Route.LoaderArgs) => {
   const id = x.context.get(admin_ctx);
   const connect_routing = stripe_env.connect_routing;
 
-  const [page, stripe_part] = await Promise.all([
+  const [page, stripe_part, bank] = await Promise.all([
     npo_bapps(id),
     connect_routing ? stripe_of(id, x.url) : Promise.resolve(null),
+    npo_default_bapp(id),
   ]);
   const stripe: IConnectCardData = {
     status: "not_connected",
     start_href: connect_start_href({ kind: "npo", npo_id: id }),
     ...stripe_part,
   };
-  return { methods: page.items, stripe, connect_routing } satisfies LoaderData;
+  return {
+    methods: page.items,
+    stripe,
+    connect_routing,
+    has_bank: !!bank,
+    held:
+      bank || stripe.status === "not_connected"
+        ? null
+        : await held_money(db, id),
+  } satisfies LoaderData;
 };
 
 type TStripePart = Pick<IConnectCardData, "status" | "notice" | "ineligible">;

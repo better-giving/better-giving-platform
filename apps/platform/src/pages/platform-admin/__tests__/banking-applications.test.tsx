@@ -227,7 +227,7 @@ describe("wise outage", () => {
     const screen = await render_detail_live(bapp_id);
 
     await expect
-      .element(screen.getByText(/couldn't be loaded from wise/i))
+      .element(screen.getByText(/couldn't be loaded from the payout provider/i))
       .toBeInTheDocument();
     // the application row is ours and survives
     await expect

@@ -54,6 +54,7 @@ vi.mock("remix-client-cache", () => ({
 
 import { seed_npo } from "#/__tests__/fixtures/funds";
 import { admin_ctx } from "$/auth/test-utils";
+import { banking_apps } from "$/pg/schema/banking";
 import { dists } from "$/pg/schema/dist";
 import { donations } from "$/pg/schema/donation";
 import { npos } from "$/pg/schema/npo";
@@ -93,6 +94,7 @@ beforeEach(async () => {
     return { id, ...t };
   });
   await db().delete(payouts);
+  await db().delete(banking_apps);
   await db().delete(dists);
   await db().delete(donations);
   await db().delete(npos);
@@ -178,6 +180,33 @@ async function payout(amount: number) {
   });
 }
 
+/** a Savings withdrawal waiting for a bank payout. a gift payout needs its
+ * dist for a rail, and `payout` seeds none */
+async function withdrawal(amount: number) {
+  await db().insert(payouts).values({
+    id: "p-liq",
+    source_id: "liq-1",
+    npo_id,
+    source: "liq",
+    date: "2026-07-04T00:00:00.000Z",
+    amount,
+    type: "pending",
+  });
+}
+
+/** a default bank payout on file */
+async function bank() {
+  await db().insert(banking_apps).values({
+    id: "bapp-1",
+    npo_id,
+    status: "default",
+    bank_summary: "USD account ending in 4821",
+    bank_statement_url: "https://example.com/stmt.pdf",
+    rejection_reason: "",
+    date_created: "2026-06-01T00:00:00.000Z",
+  });
+}
+
 async function render_page() {
   const Stub = createRoutesStub([
     {
@@ -207,7 +236,11 @@ const earlier_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
 const where_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
   screen.getByRole("region", { name: "Where your money shows" });
 const BANK_SUBHEAD =
-  "Sent to your bank through Wise, every 3 days once your balance reaches your payout minimum.";
+  "Sent to your bank every 3 days once your balance reaches your payout minimum.";
+const held_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
+  screen.getByRole("region", { name: "On hold until you add a bank account" });
+const no_wise = (screen: Awaited<ReturnType<typeof render_page>>) =>
+  expect(screen.container.textContent).not.toMatch(/\bwise\b|money-transfer/i);
 
 describe("the payouts page", () => {
   test("a nonprofit not on Connect still has the empty payouts table", async () => {
@@ -323,6 +356,7 @@ describe("the payouts page", () => {
 
   test("a bank payout still shows when nothing has been sent to Stripe", async () => {
     await npo("acct_sent");
+    await bank();
     await payout(12.5);
 
     const screen = await render_page();
@@ -374,6 +408,7 @@ describe("the payouts page", () => {
 
   test("bank payouts stay beside the stripe list, each explained", async () => {
     await npo("acct_sent");
+    await bank();
     await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
     await payout(12.5);
 
@@ -390,7 +425,7 @@ describe("the payouts page", () => {
     await expect
       .element(
         where.getByText(
-          "PayPal, DAF grants, crypto, stocks, cheques, and any Stripe donations from before you connected Stripe: the Grant share of each, sent to your bank through Wise."
+          "PayPal, DAF grants, crypto, stocks, cheques, and any Stripe donations from before you connected Stripe: the Grant share of each, sent to your bank."
         )
       )
       .toBeVisible();
@@ -403,6 +438,74 @@ describe("the payouts page", () => {
     await expect.element(screen.getByText(BANK_SUBHEAD)).toBeVisible();
     await expect.element(screen.getByText("$12.50")).toBeVisible();
     await expect.element(screen.getByText("Pending")).toBeVisible();
+    expect(held_region(screen).query()).toBeNull();
+    no_wise(screen);
+  });
+
+  test("a stripe-only nonprofit sees what waits for a bank, above the stripe list", async () => {
+    await npo("acct_sent");
+    await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+    await withdrawal(12.5);
+
+    const screen = await render_page();
+
+    const held = held_region(screen);
+    await expect
+      .element(held.getByText("$12.50", { exact: true }).first())
+      .toBeVisible();
+    await expect
+      .element(held.getByText(format("2026-07-04T00:00:00.000Z", "PP")))
+      .toBeVisible();
+    await expect
+      .element(held.getByRole("link", { name: "Add bank account" }))
+      .toHaveAttribute("href", `/admin/${npo_id}/banking/new`);
+    await expect.element(sent_region(screen).getByText("$90.00")).toBeVisible();
+    const [h, s] = [held, sent_region(screen)].map((l) => l.element());
+    expect(
+      h.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    // the held card lists the pending payouts, with no bank to send them to
+    expect(
+      screen
+        .getByRole("heading", { level: 2, name: "Payouts", exact: true })
+        .query()
+    ).toBeNull();
+    expect(where_region(screen).query()).toBeNull();
+    no_wise(screen);
+  });
+
+  test("a stripe-only nonprofit with nothing waiting has no held card", async () => {
+    await npo("acct_sent");
+    await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+
+    const screen = await render_page();
+
+    await expect.element(sent_region(screen).getByText("$90.00")).toBeVisible();
+    expect(held_region(screen).query()).toBeNull();
+    expect(screen.getByText("Held right now").query()).toBeNull();
+  });
+
+  test("a disconnected nonprofit with no bank is told everything is held", async () => {
+    await npo("acct_sent", {
+      stripe_deauthorized_at: "2026-08-01T00:00:00.000Z",
+    });
+    await withdrawal(12.5);
+
+    const screen = await render_page();
+
+    const held = screen.getByRole("region", {
+      name: "No way to get paid right now",
+    });
+    await expect
+      .element(held.getByText("$12.50", { exact: true }).first())
+      .toBeVisible();
+    await expect
+      .element(held.getByRole("link", { name: "Connect Stripe" }))
+      .toHaveAttribute(
+        "href",
+        `/api/stripe-connect/start?kind=npo&npo_id=${npo_id}`
+      );
+    no_wise(screen);
   });
 
   test.each([
@@ -446,7 +549,7 @@ describe("the payouts page", () => {
       await expect
         .element(
           where.getByText(
-            "Everything sent to your bank through Wise, new Stripe donations included."
+            "Everything sent to your bank, new Stripe donations included."
           )
         )
         .toBeVisible();
@@ -471,6 +574,7 @@ describe("the payouts page", () => {
     await npo("acct_sent", {
       stripe_deauthorized_at: "2026-08-01T00:00:00.000Z",
     });
+    await bank();
     await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
     await payout(12.5);
 
@@ -496,7 +600,7 @@ describe("the payouts page", () => {
     await expect
       .element(
         where.getByText(
-          "Everything sent to your bank through Wise. Your Stripe account is disconnected, so new Stripe donations are here too."
+          "Everything sent to your bank. Your Stripe account is disconnected, so new Stripe donations are here too."
         )
       )
       .toBeVisible();
