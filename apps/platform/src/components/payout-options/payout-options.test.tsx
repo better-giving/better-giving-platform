@@ -37,7 +37,7 @@ describe("PayoutOptions", () => {
         )
       )
       .toBeVisible();
-    // the PM's wording: nothing on the card says "Stripe payments"
+    // the card says "Stripe donations", never "Stripe payments"
     expect(region.element().textContent).not.toMatch(/stripe payments/i);
   });
 
