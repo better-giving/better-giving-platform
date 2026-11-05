@@ -1,4 +1,5 @@
 import { and, desc, eq, sql } from "drizzle-orm";
+import { snap } from "@/helpers/decimal";
 import type { HeldRail, IHeldMoney } from "@/payouts";
 import { payout_cents } from "../../payouts/amount";
 import { dists } from "../schema/dist";
@@ -53,29 +54,61 @@ export async function held_money(
     .where(and(eq(payouts.npo_id, npo_id), eq(payouts.type, "pending")))
     .orderBy(desc(payouts.date), desc(payouts.id));
 
-  const items: IHeldMoney["items"] = [];
-  const amounts = new Map<HeldRail, number[]>();
-  for (const r of rows) {
-    if (!r.rail) continue;
-    items.push({
-      rail: r.rail,
-      date: r.date,
-      amount: payout_cents([r.amount]) / 100,
-    });
-    const rail_amounts = amounts.get(r.rail) ?? [];
-    rail_amounts.push(r.amount);
-    amounts.set(r.rail, rail_amounts);
-  }
+  const held = rows.flatMap((r) => (r.rail ? [{ ...r, rail: r.rail }] : []));
+  const total_cents = payout_cents(held.map((r) => r.amount));
 
-  const by_rail = RAILS.flatMap((rail) => {
-    const cents = payout_cents(amounts.get(rail) ?? []);
-    return cents > 0 ? [{ rail, cents }] : [];
+  const rails = RAILS.flatMap((rail) => {
+    const of_rail = held.filter((r) => r.rail === rail);
+    return of_rail.length ? [{ rail, items: of_rail }] : [];
   });
-  const total_cents = by_rail.reduce((s, r) => s + r.cents, 0);
+  const rail_cents = apportion_cents(
+    rails.map((r) => r.items.map((i) => i.amount).reduce((a, b) => a + b, 0)),
+    total_cents
+  );
+
+  const item_cents = new Map<(typeof held)[number], number>();
+  rails.forEach(({ items }, i) => {
+    const cents = apportion_cents(
+      items.map((x) => x.amount),
+      rail_cents[i]
+    );
+    items.forEach((x, j) => {
+      item_cents.set(x, cents[j]);
+    });
+  });
 
   return {
     total: total_cents / 100,
-    by_rail: by_rail.map(({ rail, cents }) => ({ rail, amount: cents / 100 })),
-    items,
+    by_rail: rails.map(({ rail }, i) => ({
+      rail,
+      amount: rail_cents[i] / 100,
+    })),
+    items: held.map((x) => ({
+      rail: x.rail,
+      date: x.date,
+      amount: (item_cents.get(x) ?? 0) / 100,
+    })),
   };
+}
+
+/**
+ * splits `total_cents` over `amounts` (usd) by largest remainder: each takes
+ * its whole cents, and the cents left over go one each to the largest
+ * fractions, the earlier on a tie. `total_cents` is at least the floors' sum
+ * and at most one cent more per fractional amount, as `payout_cents` of their
+ * sum always is.
+ */
+function apportion_cents(amounts: number[], total_cents: number): number[] {
+  const scaled = amounts.map((a) => snap(a * 100));
+  const cents = scaled.map(Math.floor);
+  let left = total_cents - cents.reduce((a, b) => a + b, 0);
+  const by_fraction = scaled
+    .map((s, i) => ({ i, fraction: snap(s - cents[i]) }))
+    .sort((a, b) => b.fraction - a.fraction || a.i - b.i);
+  for (const { i } of by_fraction) {
+    if (left <= 0) break;
+    cents[i]++;
+    left--;
+  }
+  return cents;
 }

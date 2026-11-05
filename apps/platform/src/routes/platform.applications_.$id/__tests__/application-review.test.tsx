@@ -76,6 +76,20 @@ vi.mock("$/kit/wise", () => ({
   },
 }));
 
+const routing = vi.hoisted(() => ({ on: true }));
+vi.mock("$/env", async (importOriginal) => {
+  const env = await importOriginal<typeof import("$/env")>();
+  return {
+    ...env,
+    stripe: {
+      ...env.stripe,
+      get connect_routing() {
+        return routing.on;
+      },
+    },
+  };
+});
+
 vi.mock("remix-client-cache", () => ({
   CacheRoute: (Component: any) => Component,
   createClientLoaderCache: () => undefined,
@@ -104,6 +118,7 @@ import { wise } from "$/kit/wise";
 import { reg_get, reg_put } from "$/pg/queries/registration";
 import { create_test_db } from "$/pg/test-utils/pglite";
 import { loader as review_loader } from "../api";
+import { is_approvable } from "../approvable";
 import Page from "../route";
 
 const mock_get_session = vi.mocked(get_session);
@@ -143,6 +158,7 @@ beforeEach(async () => {
   await test_db.current!.db.delete(npos);
   await test_db.current!.db.delete(user);
   mock_get_session.mockReset();
+  routing.on = true;
 });
 
 // --- helpers ---
@@ -232,7 +248,12 @@ const MOCK_WACC: V2RecipientAccount = {
 const test_loader: LoaderFunction = async ({ params }) => {
   const reg = await reg_get(params.id!);
   if (!reg) throw new Response("Not found", { status: 404 });
-  return { reg, wacc: MOCK_WACC, wacc_unavailable: false };
+  return {
+    reg,
+    wacc: MOCK_WACC,
+    wacc_unavailable: false,
+    approvable: is_approvable(reg, MOCK_WACC, routing.on),
+  };
 };
 
 async function render_review(id: string, sub = "") {
@@ -606,5 +627,25 @@ describe("stripe-only application", () => {
       .element(screen.getByRole("link", { name: /approve/i }))
       .not.toHaveAttribute("aria-disabled", "true");
     expect(wise.v2_account).not.toHaveBeenCalled();
+  });
+
+  it("disables Approve while routing is off, and still allows Reject", async () => {
+    routing.on = false;
+    const id = await seed_reg({
+      ...ALL_FIELDS,
+      o_bank_id: null,
+      o_bank_statement: null,
+      o_stripe_account_id: "acct_only123",
+    });
+
+    const screen = await render_review_live(id);
+
+    await expect.element(screen.getByText(/stripe only/i)).toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("link", { name: /approve/i }))
+      .toHaveAttribute("aria-disabled", "true");
+    await expect
+      .element(screen.getByRole("link", { name: /reject/i }))
+      .not.toHaveAttribute("aria-disabled", "true");
   });
 });

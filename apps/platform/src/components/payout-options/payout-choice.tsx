@@ -24,8 +24,8 @@ export interface IPayoutChoice {
   /** the registration's Stripe account; `not_connected` when it has none */
   stripe_status: TConnectStatus;
   /** under the options while Bank is chosen: `SavedBank`, or the bank form.
-   *  until a bank is saved the form carries its own Back and Submit, and this
-   *  component draws neither Back nor Continue */
+   *  until a bank is saved the form carries its own Back and Submit, so this
+   *  component draws no Back then, and Continue only once Stripe is linked */
   bank: ReactNode;
   /** under the options while Stripe is chosen: `StripeConnectCard` with
    *  `brief`, `heading_level={3}` and `has_bank` */
@@ -57,7 +57,8 @@ export function PayoutChoice({
   const is_done =
     (selected === "bank" && bank_saved) ||
     (selected === "stripe" && stripe_linked);
-  const form_owns_actions = selected === "bank" && !bank_saved;
+  // the bank form draws its own Back and Submit
+  const form_shown = selected === "bank" && !bank_saved;
 
   const hint = can_continue
     ? null
@@ -81,7 +82,7 @@ export function PayoutChoice({
         onValueChange={(e) => e.value && onSelect(e.value as TPayoutOption)}
         className="grid gap-3"
       >
-        <Ark.Label className="text-sm font-semibold mb-3">
+        <Ark.Label className="text-sm font-semibold">
           How do you want to get paid?
         </Ark.Label>
         {options.map((o) => (
@@ -109,7 +110,14 @@ export function PayoutChoice({
         </p>
       )}
 
-      {!form_owns_actions && (
+      {form_shown && can_continue && (
+        <Actions>
+          <Button variant="primary" to={continue_to} classes="min-w-32">
+            Continue without a bank account
+          </Button>
+        </Actions>
+      )}
+      {!form_shown && (
         <div className="grid gap-2">
           <Actions>
             <Button variant="secondary" to={back_to} classes="min-w-32">
@@ -141,12 +149,18 @@ function intro(
   bank_saved: boolean,
   stripe_status: TConnectStatus
 ) {
+  const linked = is_linked(stripe_status);
   if (selected === "bank" && bank_saved)
     return "Your bank payout is saved. You can continue now, and add Stripe any time from Banking.";
-  if (selected === "stripe" && is_linked(stripe_status))
+  if (selected === "stripe" && linked)
     return stripe_status === "ready"
       ? "Your Stripe account is ready. You can continue now, and add a bank account any time from Banking."
       : "Your Stripe account is connected. You can continue now, and add a bank account any time from Banking.";
+  // the other option is the one set up
+  if (linked)
+    return "Your Stripe account is connected, so you can continue now. Add a bank account here too, or any time from Banking.";
+  if (bank_saved)
+    return "Your bank payout is saved, so you can continue now. Connect Stripe here too, or any time from Banking.";
   return "We need one to finish onboarding. You can add the other later from Banking.";
 }
 
@@ -168,7 +182,7 @@ function OptionCard({ option, expanded, stripe_ready }: IOptionCard) {
     // the label (Ark's Item) holds the radio, the option's name and its
     // summary; the rows sit beside it, since a label holds phrasing content
     // only. the name is the radio's, so it is no heading
-    <div className="grid gap-3 rounded-card border border-gray-7 bg-surface p-4 hover:border-gray-8 has-data-[state=checked]:border-primary has-data-[state=checked]:outline-1 has-data-[state=checked]:-outline-offset-2 has-data-[state=checked]:outline-primary">
+    <div className="grid gap-3 rounded-card border border-gray-7 bg-surface p-4 has-[label:hover]:not-has-data-[state=checked]:border-gray-8 has-data-[state=checked]:border-primary has-data-[state=checked]:outline-1 has-data-[state=checked]:-outline-offset-2 has-data-[state=checked]:outline-primary">
       <Ark.Item
         value={option}
         className="group flex items-start gap-3 cursor-pointer"

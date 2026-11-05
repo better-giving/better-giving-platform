@@ -11,7 +11,12 @@ const START = "/api/stripe-connect/start?npo=42";
 const render_card = (props: Partial<IStripeConnectCard> = {}) =>
   render(
     <>
-      <StripeConnectCard status="not_connected" start_href={START} {...props} />
+      <StripeConnectCard
+        status="not_connected"
+        start_href={START}
+        has_bank
+        {...props}
+      />
       <AskHost />
     </>
   );
@@ -337,6 +342,7 @@ describe("StripeConnectCard", () => {
           <StripeConnectCard
             status="ready"
             start_href={START}
+            has_bank
             payouts_href="/admin/42/payouts"
           />
         ),
@@ -399,6 +405,7 @@ describe("StripeConnectCard", () => {
           <StripeConnectCard
             status={status}
             start_href={START}
+            has_bank
             payouts_href="/admin/42/payouts"
           />
         ),

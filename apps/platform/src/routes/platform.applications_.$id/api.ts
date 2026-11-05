@@ -4,15 +4,19 @@ import { resp } from "@/helpers/https";
 import type { IReg } from "@/reg";
 import { reg_id } from "@/reg/schema";
 import type { V2RecipientAccount } from "@/wise";
+import { stripe as stripe_env } from "$/env";
 import { wise } from "$/kit/wise";
 import { reg_get } from "$/pg/queries/registration";
 import type { Route } from "./+types/route";
+import { is_approvable } from "./approvable";
 
 export interface LoaderData {
   reg: IReg;
   wacc: V2RecipientAccount | null;
   /** wise was unreachable — distinct from an application carrying no account */
   wacc_unavailable: boolean;
+  /** what the approve prompt's loader and action will take */
+  approvable: boolean;
 }
 
 export const loader = ({ params }: Route.LoaderArgs) => review_get(params.id);
@@ -39,5 +43,6 @@ export const review_get = async (raw_id: string): Promise<LoaderData> => {
     reg,
     wacc,
     wacc_unavailable: !!reg.o_bank_id && !wacc,
+    approvable: is_approvable(reg, wacc, stripe_env.connect_routing),
   };
 };

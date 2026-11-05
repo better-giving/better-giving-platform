@@ -40,7 +40,7 @@ export interface IStripeConnectCard {
   /** a bank payout is on file: what isn't Stripe's pays out there. without
    *  one it waits in the balance, and so do Stripe donations until Stripe
    *  says the account is ready */
-  has_bank?: boolean;
+  has_bank: boolean;
   /** status, band and control only, where an option card above already
    *  says what Stripe does: registration step 4 */
   brief?: boolean;
@@ -154,7 +154,7 @@ export function StripeConnectCard({
   notice,
   ineligible,
   payouts_href,
-  has_bank = true,
+  has_bank,
   brief = false,
   heading_level = 2,
   classes = "",

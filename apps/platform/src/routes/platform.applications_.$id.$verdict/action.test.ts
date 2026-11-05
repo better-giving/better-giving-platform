@@ -307,6 +307,29 @@ describe("approve", () => {
       expect((await reg_get(RID))?.status).toBe("02");
       expect(await test_db.current!.db.select().from(npos)).toEqual([]);
     });
+
+    test("is rejected while routing is off", async () => {
+      routing.on = false;
+      await stripe_only();
+
+      const res = await verdict("rejected", "docs incomplete");
+
+      expect(res.status).toBe(302);
+      expect((await reg_get(RID))?.status).toBe("04");
+      expect(reg_updates()).toHaveLength(1);
+    });
+
+    test("approved, is announced again after routing goes off", async () => {
+      await stripe_only();
+      await verdict("approved");
+      enqueued.length = 0;
+      routing.on = false;
+
+      const res = await verdict("approved");
+
+      expect(res.status).toBe(302);
+      expect(reg_updates()).toHaveLength(1);
+    });
   });
 
   // a stale prompt pressed long after: the same keys would mail again

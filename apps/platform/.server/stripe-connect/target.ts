@@ -100,8 +100,8 @@ export async function target_access(
 /** whether `acct` already belongs to an npo or a registration other than `t`.
  * approved registrations are skipped: their account lives on the npo now, or
  * was replaced there. rejected ones are skipped too: they keep the account to
- * resubmit with, but the organization may connect it from a new registration.
- * a pending one would collide with this one at approval. */
+ * resubmit with until another target claims it, which `release_rejected`
+ * takes it from them. a pending one would collide with this one at approval. */
 export async function held_elsewhere(
   acct: string,
   t: TConnectTarget,
@@ -134,6 +134,27 @@ export async function held_elsewhere(
     )
     .limit(1);
   return !!reg;
+}
+
+/** `t` has claimed `acct`, so a rejected registration holding it drops it.
+ * kept, the rejected one could be resubmitted onto the account `t` now holds,
+ * since a resubmit never re-checks the claim. call inside the claim's
+ * `lock_acct` transaction, once `t`'s write has won */
+export async function release_rejected(
+  acct: string,
+  t: TConnectTarget,
+  tx: DbOrTx
+) {
+  await tx
+    .update(registrations)
+    .set({ o_stripe_account_id: null, o_stripe_connected_at: null })
+    .where(
+      and(
+        eq(registrations.o_stripe_account_id, acct),
+        eq(registrations.status, "04"),
+        t.kind === "reg" ? ne(registrations.id, t.reg_id) : undefined
+      )
+    );
 }
 
 /** one claim of `acct` at a time, until `tx` ends. registrations carry no

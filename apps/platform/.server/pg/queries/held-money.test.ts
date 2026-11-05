@@ -190,6 +190,62 @@ describe("held_money", () => {
     expect(held.items.map((i) => i.rail)).toEqual(["stripe", "stripe"]);
   });
 
+  test("the total is the payout run's figure: every amount summed, rounded once", async () => {
+    await seed_gift_payout("paypal", 0.333, "2026-10-01T00:00:00.000Z");
+    await seed_gift_payout("crypto:btc", 0.333, "2026-10-02T00:00:00.000Z");
+    await seed_gift_payout("cheque", 0.333, "2026-10-03T00:00:00.000Z");
+
+    const held = await held_money(pg(), npo_id);
+    // 0.999 → 1.00 (half down); rounding each rail first would give 0.99
+    expect(held.total).toBe(1);
+    // the leftover cent goes to the first rail on a tie
+    expect(held.by_rail).toEqual([
+      { rail: "paypal", amount: 0.34 },
+      { rail: "crypto", amount: 0.33 },
+      { rail: "stock_cheque", amount: 0.33 },
+    ]);
+  });
+
+  test("a rail's items add up to the rail", async () => {
+    await seed_gift_payout("paypal", 0.005, "2026-10-01T00:00:00.000Z");
+    await seed_gift_payout("paypal", 0.005, "2026-10-02T00:00:00.000Z");
+
+    const held = await held_money(pg(), npo_id);
+    expect(held.by_rail).toEqual([{ rail: "paypal", amount: 0.01 }]);
+    // each alone rounds to 0; the rail's cent goes to the newest
+    expect(held.items.map((i) => i.amount)).toEqual([0.01, 0]);
+  });
+
+  test("a rail under half a cent stays listed with its items, at zero", async () => {
+    await seed_gift_payout("paypal", 1, "2026-10-01T00:00:00.000Z");
+    await seed_gift_payout("crypto:btc", 0.004, "2026-10-02T00:00:00.000Z");
+
+    const held = await held_money(pg(), npo_id);
+    expect(held.total).toBe(1);
+    expect(held.by_rail).toEqual([
+      { rail: "paypal", amount: 1 },
+      { rail: "crypto", amount: 0 },
+    ]);
+    expect(held.items.map((i) => [i.rail, i.amount])).toEqual([
+      ["crypto", 0],
+      ["paypal", 1],
+    ]);
+  });
+
+  test("daf gifts count under daf; cash, check, match and unknown under stocks & cheques", async () => {
+    await seed_gift_payout("daf", 1, "2026-10-01T00:00:00.000Z");
+    await seed_gift_payout("cash", 2, "2026-10-02T00:00:00.000Z");
+    await seed_gift_payout("check", 4, "2026-10-03T00:00:00.000Z");
+    await seed_gift_payout("match", 8, "2026-10-04T00:00:00.000Z");
+    await seed_gift_payout("unknown", 16, "2026-10-05T00:00:00.000Z");
+
+    const held = await held_money(pg(), npo_id);
+    expect(held.by_rail).toEqual([
+      { rail: "daf", amount: 1 },
+      { rail: "stock_cheque", amount: 30 },
+    ]);
+  });
+
   test("nothing pending holds nothing", async () => {
     expect(await held_money(pg(), npo_id)).toEqual({
       total: 0,

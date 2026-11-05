@@ -161,6 +161,52 @@ describe("HeldMoneyCard: Banking", () => {
   });
 });
 
+// Stripe linked but not yet ready (incomplete, pending) holds Stripe gifts too,
+// and a gift held then still waits once Stripe is ready: the lead follows the
+// table, whatever the status
+const STRIPE_LEAD =
+  "Stripe donations that arrive before your Stripe account is ready wait here, along with the donations Stripe can't receive. They stay in your Better Giving balance until you add a bank account. Nothing is lost.";
+
+const WITH_STRIPE: IHeldMoney = {
+  total: 2310,
+  by_rail: [{ rail: "stripe", amount: 525.5 }, ...HELD.by_rail],
+  items: [
+    { rail: "stripe", date: "2026-10-31T15:00:00Z", amount: 525.5 },
+    ...HELD.items,
+  ],
+};
+
+describe("Stripe linked, Stripe donations held", () => {
+  test("Banking: the lead says Stripe donations wait too, and the table lists them", async () => {
+    const screen = await in_router(
+      <HeldMoneyCard {...base} held={WITH_STRIPE} />
+    );
+    const card = screen.getByRole("region", {
+      name: "Waiting for a bank account",
+    });
+    await expect.element(card.getByText(STRIPE_LEAD)).toBeVisible();
+    expect(card.getByText(/These can't go to Stripe/).query()).toBeNull();
+    expect(body_rows(card)[0]).toEqual(["Stripe donations", "$525.50"]);
+    await expect.element(card.getByText("$2,310.00")).toBeVisible();
+  });
+
+  test("Payouts: the lead says Stripe donations wait too, and the table lists them", async () => {
+    const screen = await in_router(
+      <PayoutsHeldCard {...base} held={WITH_STRIPE} />
+    );
+    const card = screen.getByRole("region", {
+      name: "On hold until you add a bank account",
+    });
+    await expect.element(card.getByText(STRIPE_LEAD)).toBeVisible();
+    expect(card.getByText(/everything else waits/).query()).toBeNull();
+    expect(body_rows(card)[0]).toEqual([
+      "Stripe donations",
+      "Oct 31, 2026",
+      "$525.50",
+    ]);
+  });
+});
+
 describe("PayoutsHeldCard: Payouts", () => {
   test("Stripe only: one row per waiting payout, labelled by its rail", async () => {
     const screen = await in_router(<PayoutsHeldCard {...base} />);
@@ -188,6 +234,27 @@ describe("PayoutsHeldCard: Payouts", () => {
       .toBeVisible();
     no_wise(card);
   });
+});
+
+test("both held tables right-align Amount, header and cells alike", async () => {
+  const screen = await in_router(
+    <>
+      <HeldMoneyCard {...base} />
+      <PayoutsHeldCard {...base} />
+    </>
+  );
+  await expect
+    .element(screen.getByText("On hold until you add a bank account"))
+    .toBeVisible();
+  const regions = screen.getByRole("region").all();
+  expect(regions).toHaveLength(2);
+  for (const region of regions) {
+    const amounts = [
+      ...region.element().querySelectorAll("tr > :last-child"),
+    ].map((c) => getComputedStyle(c).textAlign);
+    expect(amounts.length).toBeGreaterThan(1);
+    expect(new Set(amounts)).toEqual(new Set(["right"]));
+  }
 });
 
 describe("BankPayoutSection: Banking", () => {

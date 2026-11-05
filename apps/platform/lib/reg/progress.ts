@@ -3,9 +3,14 @@ import type { IReg } from "./schema";
 
 export class Progress {
   r: IReg;
+  routing_on: boolean;
 
-  constructor(reg: IReg) {
+  /** @param routing_on - the `STRIPE_CONNECT_ROUTING` switch, which only the
+   * server reads; `step` and `steps` honour it. a caller that omits it is
+   * judged as routing on */
+  constructor(reg: IReg, routing_on = true) {
     this.r = reg;
+    this.routing_on = routing_on;
   }
 
   get init() {
@@ -127,8 +132,7 @@ export class Progress {
   }
 
   /** step 4 — a saved bank, or a stripe account connected in any status from
-   * an org stripe can serve. the `STRIPE_CONNECT_ROUTING` switch is
-   * server-only: submit and approval read `banking_with` */
+   * an org stripe can serve, whatever the `STRIPE_CONNECT_ROUTING` switch */
   get banking() {
     const $3 = this.fsa_signed || this.docs_ein;
     if (!$3) return undefined;
@@ -153,7 +157,7 @@ export class Progress {
    * `o_type: "other"` ever sits at 3; the seeded identity satisfies `docs_ein`,
    * so a 501(c)(3) crosses 2 → 4 */
   get step() {
-    if (this.banking) return 5;
+    if (this.banking_with(this.routing_on)) return 5;
     if (this.docs_ein || this.fsa_signed) return 4;
     if (this.org) return 3;
     if (this.contact) return 2;
@@ -166,7 +170,7 @@ export class Progress {
       this.contact,
       this.org,
       this.docs_ein || this.fsa_signed,
-      this.banking,
+      this.banking_with(this.routing_on),
     ].map((x) => !!x);
   }
 }

@@ -339,7 +339,7 @@ describe("account.application.deauthorized → npo disconnected", () => {
               title: "Disconnected Nonprofit Has No Way To Get Paid",
               body: [
                 `npo ${npo.id} disconnected stripe account acct_deauth-nobank-${status} (event ${ev.id}).`,
-                "it has no default bank details and no stripe account left: every donation is held in its better giving balance until it adds bank details or reconnects stripe.",
+                "it has no default bank details and no stripe account left: every donation is held in its better giving balance until it adds bank details. reconnecting stripe only routes its new stripe donations.",
               ].join("\n"),
             }),
           }),

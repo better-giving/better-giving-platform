@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { createRoutesStub } from "react-router";
 import { describe, expect, test, vi } from "vitest";
-import type { Locator } from "vitest/browser";
+import { type Locator, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
 import { BankRequired } from "./bank-required";
@@ -295,6 +295,73 @@ describe("PayoutChoice: registration step 4", () => {
     await expect.element(screen.getByText("bank section")).toBeVisible();
     expect(screen.getByRole("link", { name: "Back" }).query()).toBeNull();
     expect(continue_link(screen).query()).toBeNull();
+  });
+
+  test.each<TConnectStatus>(["incomplete", "pending", "ready"])(
+    "Stripe %s, then Bank pressed: the form keeps its actions, and the step can still be finished",
+    async (stripe_status) => {
+      const { view } = render_choice({ selected: "bank", stripe_status });
+      const screen = await view;
+      await expect.element(screen.getByText("bank section")).toBeVisible();
+      await expect
+        .element(
+          screen.getByText(
+            "Your Stripe account is connected, so you can continue now. Add a bank account here too, or any time from Banking."
+          )
+        )
+        .toBeVisible();
+      expect(screen.getByText(/We need one/).query()).toBeNull();
+      await expect
+        .element(
+          screen.getByRole("link", { name: "Continue without a bank account" })
+        )
+        .toHaveAttribute("href", "/summary");
+      expect(screen.getByRole("link", { name: "Back" }).query()).toBeNull();
+    }
+  );
+
+  test("Stripe pressed with a bank saved: the intro says the bank is set, and Continue goes on", async () => {
+    const { view } = render_choice({ selected: "stripe", bank_saved: true });
+    const screen = await view;
+    await expect
+      .element(
+        screen.getByText(
+          "Your bank payout is saved, so you can continue now. Connect Stripe here too, or any time from Banking."
+        )
+      )
+      .toBeVisible();
+    expect(screen.getByText(/We need one/).query()).toBeNull();
+    await expect
+      .element(continue_link(screen))
+      .not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  test("an option card firms its edge only over the part that selects", async () => {
+    const { view } = render_choice();
+    const screen = await view;
+    await expect
+      .element(screen.getByRole("radio", { name: "Bank", exact: true }))
+      .toBeInTheDocument();
+    const card = card_of(screen, "Bank");
+    const edge = () => getComputedStyle(card).borderTopColor;
+    const rest = edge();
+    await userEvent.hover(card.querySelector("dl") as HTMLElement);
+    expect(edge()).toBe(rest);
+    await userEvent.hover(card.querySelector("label") as HTMLElement);
+    await expect.poll(edge).not.toBe(rest);
+  });
+
+  test("the chosen card keeps its primary edge under the pointer", async () => {
+    const { view } = render_choice({ selected: "bank", bank_saved: true });
+    const screen = await view;
+    await expect
+      .element(screen.getByRole("radio", { name: "Bank", exact: true }))
+      .toBeChecked();
+    const card = card_of(screen, "Bank");
+    const edge = () => getComputedStyle(card).borderTopColor;
+    const chosen = edge();
+    await userEvent.hover(card.querySelector("label") as HTMLElement);
+    expect(edge()).toBe(chosen);
   });
 });
 

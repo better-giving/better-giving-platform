@@ -4,7 +4,7 @@ import type { PropsWithChildren } from "react";
 import { href, NavLink, Outlet } from "react-router";
 import type { V2RecipientAccount } from "#/types/bank-details";
 import type { IReg } from "@/reg";
-import { is_approvable, is_stripe_only } from "./approvable";
+import { is_stripe_only } from "./approvable";
 import { Container } from "./container";
 
 export default function Loaded(
@@ -12,6 +12,8 @@ export default function Loaded(
     bank: V2RecipientAccount | null;
     /** wise was unreachable; the account may still exist */
     bank_unavailable: boolean;
+    /** `is_approvable`, judged on the server where the routing switch is */
+    approvable: boolean;
   }
 ) {
   const prev_verdict =
@@ -142,8 +144,9 @@ export default function Loaded(
         </NavLink>
         <NavLink
           // approval reads a bank account on file, so wise unreachable
-          // disables it; so does having neither a bank nor stripe
-          aria-disabled={!is_approvable(props, props.bank)}
+          // disables it; so does having neither a bank nor stripe, or
+          // stripe alone while routing is off
+          aria-disabled={!props.approvable}
           to="approved"
           className="min-w-24 btn btn-success"
           preventScrollReset

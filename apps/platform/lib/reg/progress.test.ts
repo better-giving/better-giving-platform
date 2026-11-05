@@ -124,6 +124,25 @@ describe("Progress.banking", () => {
     });
   });
 
+  it("holds a stripe-only applicant on banking while routing is off", () => {
+    const r = new Progress(reg(us_identity, contact, org, stripe), false);
+    expect(r.step).toBe(4);
+    expect(r.steps).toEqual([true, true, true, false]);
+  });
+
+  it("banking_with(false) refuses a stripe-only answer and keeps a bank", () => {
+    const stripe_only = new Progress(reg(us_identity, contact, org, stripe));
+    expect(stripe_only.banking_with(false)).toBeUndefined();
+    expect(stripe_only.banking_with(true)).toMatchObject({
+      o_stripe_account_id: "acct_123",
+    });
+
+    const banked = new Progress(
+      reg(us_identity, contact, org, banking, stripe)
+    );
+    expect(banked.banking_with(false)).toMatchObject({ o_bank_id: "999" });
+  });
+
   it("stays on banking with neither a bank nor stripe", () => {
     const r = new Progress(reg(us_identity, contact, org));
     expect(r.step).toBe(4);

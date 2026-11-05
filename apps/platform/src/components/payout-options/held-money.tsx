@@ -14,8 +14,8 @@ export const rail_labels: Record<HeldRail, string> = {
   withdrawal: "Savings and Investments withdrawals",
 };
 
-/** `stripe`: a Stripe account is linked and no bank is on file. `none`:
- *  neither — Stripe disconnected and no bank */
+/** `stripe`: a Stripe account is linked — ready or not yet — and no bank is
+ *  on file. `none`: neither — Stripe disconnected and no bank */
 export type THeldRails = "stripe" | "none";
 
 export interface IHeldMoneyCard {
@@ -34,6 +34,11 @@ const usd = (n: number) => `$${humanize(n)}`;
 const RELEASE_LINE =
   "Once you add a bank account, this money pays out with your bank payout.";
 
+/** the lead while Stripe donations are among what waits: true at every
+ *  linked status, ready included, since a gift held before ready stays held */
+const STRIPE_HELD_LEAD =
+  "Stripe donations that arrive before your Stripe account is ready wait here, along with the donations Stripe can't receive. They stay in your Better Giving balance until you add a bank account. Nothing is lost.";
+
 const NONE_COPY = {
   heading: "No way to get paid right now",
   lead: "Stripe is disconnected and you have no bank account, so every donation is held in your Better Giving balance. Nothing is lost. Add a bank account or connect Stripe again to get paid.",
@@ -49,7 +54,9 @@ export function HeldMoneyCard(props: IHeldMoneyCard) {
       ? NONE_COPY
       : {
           heading: "Waiting for a bank account",
-          lead: "Stripe can only receive Stripe donations. These can't go to Stripe, so they stay in your Better Giving balance until you add a bank account. Nothing is lost.",
+          lead: held.by_rail.some((r) => r.rail === "stripe")
+            ? STRIPE_HELD_LEAD
+            : "Stripe can only receive Stripe donations. These can't go to Stripe, so they stay in your Better Giving balance until you add a bank account. Nothing is lost.",
         };
   return (
     <HeldShell {...props} {...copy}>
@@ -83,7 +90,9 @@ export function PayoutsHeldCard(props: IHeldMoneyCard) {
       ? NONE_COPY
       : {
           heading: "On hold until you add a bank account",
-          lead: "Stripe can only receive Stripe donations, so everything else waits in your Better Giving balance. Nothing is lost.",
+          lead: held.items.some((it) => it.rail === "stripe")
+            ? STRIPE_HELD_LEAD
+            : "Stripe can only receive Stripe donations, so everything else waits in your Better Giving balance. Nothing is lost.",
         };
   return (
     <HeldShell {...props} {...copy}>
@@ -92,7 +101,7 @@ export function PayoutsHeldCard(props: IHeldMoneyCard) {
           <tr>
             <th>From</th>
             <th>Date</th>
-            <th>Amount</th>
+            <th className="text-right">Amount</th>
           </tr>
         </thead>
         <tbody>
@@ -101,7 +110,7 @@ export function PayoutsHeldCard(props: IHeldMoneyCard) {
             <tr key={i}>
               <td>{rail_labels[it.rail]}</td>
               <td>{format(it.date, "PP")}</td>
-              <td>{usd(it.amount)}</td>
+              <td className="text-right">{usd(it.amount)}</td>
             </tr>
           ))}
         </tbody>
