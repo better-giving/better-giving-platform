@@ -110,3 +110,29 @@ describe("Progress.steps", () => {
     expect(r.steps).toEqual([true, true, false, false]);
   });
 });
+
+describe("Progress.banking", () => {
+  const stripe = { o_stripe_account_id: "acct_123" } as const;
+
+  it("is done with a connected stripe account and no bank", () => {
+    const r = new Progress(reg(us_identity, contact, org, stripe));
+    expect(r.step).toBe(5);
+    expect(r.steps).toEqual([true, true, true, true]);
+    expect(r.banking).toMatchObject({
+      o_bank_id: null,
+      o_stripe_account_id: "acct_123",
+    });
+  });
+
+  it("stays on banking with neither a bank nor stripe", () => {
+    const r = new Progress(reg(us_identity, contact, org));
+    expect(r.step).toBe(4);
+    expect(r.banking).toBeUndefined();
+  });
+
+  it("needs the bank from a fiscally sponsored org, stripe or not", () => {
+    const r = new Progress(reg(intl_identity, contact, org, fsa_docs, stripe));
+    expect(r.step).toBe(4);
+    expect(r.banking).toBeUndefined();
+  });
+});

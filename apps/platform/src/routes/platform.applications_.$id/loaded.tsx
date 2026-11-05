@@ -4,7 +4,7 @@ import type { PropsWithChildren } from "react";
 import { href, NavLink, Outlet } from "react-router";
 import type { V2RecipientAccount } from "#/types/bank-details";
 import type { IReg } from "@/reg";
-import { is_approvable } from "./approvable";
+import { is_approvable, is_stripe_only } from "./approvable";
 import { Container } from "./container";
 
 export default function Loaded(
@@ -104,6 +104,14 @@ export default function Loaded(
           </dl>
         </Container>
       )}
+      {is_stripe_only(props) && (
+        <Container title="Payout">
+          <dl className="grid sm:grid-cols-[auto_auto_1fr]">
+            <Row label="Payout method">Stripe only, no bank account</Row>
+            <Row label="Stripe account ID">{props.o_stripe_account_id}</Row>
+          </dl>
+        </Container>
+      )}
       {props.bank_unavailable && (
         <Container title="Banking details">
           <dl className="grid sm:grid-cols-[auto_auto_1fr]">
@@ -133,7 +141,8 @@ export default function Loaded(
           Reject
         </NavLink>
         <NavLink
-          // approval reads the account: none on file, or wise unreachable
+          // approval reads a bank account on file, so wise unreachable
+          // disables it; so does having neither a bank nor stripe
           aria-disabled={!is_approvable(props, props.bank)}
           to="approved"
           className="min-w-24 btn btn-success"

@@ -7,6 +7,7 @@ import { msg } from "@/queue";
 import { Progress } from "@/reg/progress";
 import { reg_id } from "@/reg/schema";
 import { $ } from "@/schemas";
+import { stripe as stripe_env } from "$/env";
 import { enqueue, in_dedupe_window } from "$/kit/queue";
 import { db } from "$/pg/db";
 import { reg_get, reg_update_from } from "$/pg/queries/registration";
@@ -52,7 +53,8 @@ export const action: ActionFunction = async ({ request, params }) => {
   const reg = await reg_get(id);
   if (!reg) throw new Response("Registration not found", { status: 404 });
 
-  const r = new Progress(reg).banking; // no need to look at fsa
+  // no need to look at fsa
+  const r = new Progress(reg).banking_with(stripe_env.connect_routing);
   if (!r) throw resp.status(400, "registration has incomplete steps");
 
   // a row already at this verdict's status is a repeat of it: a retry after

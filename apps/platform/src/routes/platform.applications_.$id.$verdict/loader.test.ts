@@ -71,6 +71,15 @@ describe("the approve prompt opened by URL", () => {
     expect(await redirected_to("approved")).toBe(DETAIL);
   });
 
+  it("renders for a stripe-only application without reading wise", async () => {
+    reg_get.mockResolvedValue(
+      reg({ o_bank_id: null, o_stripe_account_id: "acct_1" })
+    );
+
+    expect(await redirected_to("approved")).toBeNull();
+    expect(wise.v2_account).not.toHaveBeenCalled();
+  });
+
   it("sends an application whose account wise can't return back to its detail page", async () => {
     reg_get.mockResolvedValue(reg({}));
     wise.v2_account.mockRejectedValue(new Error("wise is down"));

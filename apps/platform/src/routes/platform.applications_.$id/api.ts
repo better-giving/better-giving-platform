@@ -29,7 +29,8 @@ export const review_get = async (raw_id: string): Promise<LoaderData> => {
   // a wise outage must not take the page down with it: the page's other rows
   // come off our own row and are what a reviewer needs. approval does read the
   // account — `$verdict/npo-new.ts` feeds `longAccountSummary` into the banking
-  // app — so Approve is gated on the account in `loaded.tsx`; reject is not.
+  // app — so where a bank is on file, Approve is gated on the account in
+  // `loaded.tsx`; reject is not.
   const wacc = reg.o_bank_id
     ? await wise.v2_account(+reg.o_bank_id).catch(report_degraded_null)
     : null;

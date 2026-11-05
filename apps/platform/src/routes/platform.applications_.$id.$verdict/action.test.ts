@@ -59,6 +59,20 @@ vi.mock("$/kit/wise", () => ({
   },
 }));
 
+const routing = vi.hoisted(() => ({ on: true }));
+vi.mock("$/env", async (importOriginal) => {
+  const env = await importOriginal<typeof import("$/env")>();
+  return {
+    ...env,
+    stripe: {
+      ...env.stripe,
+      get connect_routing() {
+        return routing.on;
+      },
+    },
+  };
+});
+
 // the delivery half: the handler the approval's payload lands in, with its
 // outbound calls stubbed so only its branching is exercised.
 vi.mock("$/email", () => ({
@@ -78,6 +92,8 @@ vi.mock("#/.server/auth/auth", () => ({ auth: {} }));
 const report_error = vi.hoisted(() => vi.fn());
 vi.mock("#/errors/report", () => ({ report_error }));
 
+import type { ReactNode } from "react";
+import { render } from "react-email";
 import { handle_reg_updated } from "#/routes/api.q-handler.$event/handle-reg";
 import { DEDUPE_WINDOW_MS, enqueue } from "$/kit/queue";
 import { wise } from "$/kit/wise";
@@ -117,6 +133,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   test_db.before_update = () => {};
+  routing.on = true;
   const db = test_db.current!.db;
   await db.delete(user_npo_memberships);
   await db.delete(banking_apps);
@@ -255,6 +272,41 @@ describe("approve", () => {
 
     const [npo] = await test_db.current!.db.select().from(npos);
     expect(npo?.stripe_account_id).toBeNull();
+  });
+
+  describe("a stripe-only registration", () => {
+    const stripe_only = () =>
+      test_db.current!.db.update(registrations).set({
+        o_bank_id: null,
+        o_bank_statement: null,
+        o_stripe_account_id: "acct_only",
+      });
+
+    test("approves into an npo with no bank, without asking wise", async () => {
+      await stripe_only();
+
+      const res = await verdict("approved");
+
+      expect(res.status).toBe(302);
+      const db = test_db.current!.db;
+      const [npo] = await db.select().from(npos);
+      expect(npo?.stripe_account_id).toBe("acct_only");
+      expect(await db.select().from(banking_apps)).toEqual([]);
+      expect(wise.v2_account).not.toHaveBeenCalled();
+      expect(enqueued.map((m) => m.id)).toEqual(["reg-updated"]);
+      expect((await reg_get(RID))?.status_approved_npo_id).toBe(npo?.id);
+    });
+
+    test("is refused while routing is off", async () => {
+      routing.on = false;
+      await stripe_only();
+
+      const res = await verdict("approved");
+
+      expect(res.status).toBe(400);
+      expect((await reg_get(RID))?.status).toBe("02");
+      expect(await test_db.current!.db.select().from(npos)).toEqual([]);
+    });
   });
 
   // a stale prompt pressed long after: the same keys would mail again
@@ -414,6 +466,35 @@ describe("approve", () => {
 });
 
 describe("reject", () => {
+  const STRIPE_LINE =
+    "Your Stripe account is still connected, so you can resubmit. If you're not reapplying, you can disconnect Better Giving from your Stripe dashboard.";
+  /** the rejection mail as the applicant reads it */
+  const mailed_text = async () => {
+    await handle_reg_updated(reg_updates()[0].payload as any);
+    const { node } = send_email.mock.calls[0][0] as unknown as {
+      node: ReactNode;
+    };
+    return (await render(node, { plainText: true })).replace(/\s+/g, " ");
+  };
+
+  test("tells an applicant whose stripe account stays connected how to disconnect it", async () => {
+    await test_db
+      .current!.db.update(registrations)
+      .set({ o_stripe_account_id: "acct_kept" });
+
+    await verdict("rejected", "docs incomplete");
+
+    const text = await mailed_text();
+    expect(text).toContain("docs incomplete");
+    expect(text).toContain(STRIPE_LINE);
+  });
+
+  test("says nothing of stripe to an applicant who never connected it", async () => {
+    await verdict("rejected", "docs incomplete");
+
+    expect(await mailed_text()).not.toMatch(/stripe/i);
+  });
+
   test("a retry after the enqueue threw succeeds and enqueues", async () => {
     vi.mocked(enqueue).mockRejectedValueOnce(new Error("qstash down"));
     await expect(verdict("rejected")).rejects.toThrow("qstash down");

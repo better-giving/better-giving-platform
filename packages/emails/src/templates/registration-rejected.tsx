@@ -7,9 +7,15 @@ import { EMAILS } from "../constants";
 export interface IData {
   registrant_first_name: string;
   rejection_reason: string;
+  /** the application still holds a connected stripe account */
+  stripe_connected?: boolean;
 }
 
-function Jsx({ registrant_first_name, rejection_reason }: IData) {
+function Jsx({
+  registrant_first_name,
+  rejection_reason,
+  stripe_connected,
+}: IData) {
   return (
     <PublicLayout type="registration">
       <Text>Hi {registrant_first_name},</Text>
@@ -19,6 +25,13 @@ function Jsx({ registrant_first_name, rejection_reason }: IData) {
         the acceptance process for the following reason(s):
       </Text>
       <ErrorBand>{rejection_reason}</ErrorBand>
+      {stripe_connected && (
+        <Text>
+          Your Stripe account is still connected, so you can resubmit. If you're
+          not reapplying, you can disconnect Better Giving from your Stripe
+          dashboard.
+        </Text>
+      )}
       <Text>
         You will need to make a new application that rectifies these issues, but
         if you have any questions at all, just get in touch at{" "}

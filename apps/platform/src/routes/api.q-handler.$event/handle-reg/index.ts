@@ -164,6 +164,7 @@ export async function handle_reg_updated(reg: IReg) {
     const { node, subject } = registration_rejected.template({
       registrant_first_name: reg.r_first_name || "there",
       rejection_reason: reg.status_rejected_reason || "not specified",
+      stripe_connected: !!reg.o_stripe_account_id,
     });
     const res = await send_email({ node, subject, to: [reg.r_id] });
     console.info(res.data?.id);
@@ -189,11 +190,13 @@ export async function handle_reg_updated(reg: IReg) {
 
   // below the status mails and caught, on an at-most-once kind: a wise error
   // costs the crm its bank fields, not the applicant their mail.
-  const bnk = prog.banking;
+  // a stripe-only registration has no bank to copy
+  const { o_bank_id: bid, o_bank_statement: bos } = prog.banking ?? {};
+  const bnk = bid && bos ? { bid, bos } : undefined;
   const wacc =
     bnk &&
     cmp &&
-    (await wise.v2_account(+bnk.o_bank_id).catch((err) => {
+    (await wise.v2_account(+bnk.bid).catch((err) => {
       report_error(err, { reg_id: reg.id, during: "hubspot bank fields" });
     }));
   if (bnk && cmp && wacc) {
@@ -208,7 +211,7 @@ export async function handle_reg_updated(reg: IReg) {
       details.bankCode ||
       details.swiftCode ||
       "not specified";
-    cmp.bank_statament = bnk.o_bank_statement;
+    cmp.bank_statament = bnk.bos;
   }
 
   if (ctp) {

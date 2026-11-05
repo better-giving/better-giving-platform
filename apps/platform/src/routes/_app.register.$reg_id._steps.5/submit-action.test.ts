@@ -37,6 +37,20 @@ vi.mock("$/kit/queue", async (orig) => ({
   enqueue: vi.fn(async () => {}),
 }));
 
+const routing = vi.hoisted(() => ({ on: true }));
+vi.mock("$/env", async (importOriginal) => {
+  const env = await importOriginal<typeof import("$/env")>();
+  return {
+    ...env,
+    stripe: {
+      ...env.stripe,
+      get connect_routing() {
+        return routing.on;
+      },
+    },
+  };
+});
+
 vi.mock("#/.server/auth", async () =>
   (await import("$/auth/test-utils")).make_auth_mock({ session: true })
 );
@@ -66,6 +80,9 @@ const COMPLETE = {
   o_bank_statement: "https://example.com/bank.pdf",
 } as const;
 
+const { o_bank_id: _, o_bank_statement: __, ...NO_BANK } = COMPLETE;
+const STRIPE_ONLY = { ...NO_BANK, o_stripe_account_id: "acct_1" };
+
 beforeAll(async () => {
   test_db.current = await create_test_db();
 }, 30_000);
@@ -76,6 +93,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   test_db.before_update = () => {};
+  routing.on = true;
   await test_db.current!.db.delete(registrations);
   vi.mocked(enqueue).mockClear();
   vi.mocked(get_session).mockResolvedValue({
@@ -87,7 +105,10 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const seed = (status: TStatus, fields: Partial<typeof COMPLETE> = COMPLETE) =>
+const seed = (
+  status: TStatus,
+  fields: Partial<typeof STRIPE_ONLY & typeof COMPLETE> = COMPLETE
+) =>
   test_db.current!.db.insert(registrations).values({
     id: RID,
     r_id: EMAIL,
@@ -240,6 +261,57 @@ describe("submit_action", () => {
     const res = await submit();
 
     expect(res.status).toBe(400);
+    expect((await reg_get(RID))?.status).toBe("01");
+  });
+
+  test("sends a stripe-only application to review", async () => {
+    await seed("01", STRIPE_ONLY);
+
+    const res = await submit();
+
+    expect(res).not.toBeInstanceOf(Response);
+    expect((await reg_get(RID))?.status).toBe("02");
+  });
+
+  test("refuses an application with neither a bank nor stripe", async () => {
+    await seed("01", NO_BANK);
+
+    const res = await submit();
+
+    expect(res.status).toBe(400);
+    expect((await reg_get(RID))?.status).toBe("01");
+  });
+
+  // fiscally sponsored: stripe can never pay it, so the bank is how it is paid
+  test("refuses a stripe-only application stripe can't serve, asking for a bank", async () => {
+    await seed("01", {
+      ...STRIPE_ONLY,
+      o_type: "other" as any,
+      o_ein: undefined,
+      o_registration_number: "abc123",
+      r_proof_of_identity: "https://example.com/id.pdf",
+      o_proof_of_reg: "https://example.com/reg.pdf",
+      o_project_description: "aid work",
+      o_legal_entity_type: "Nonprofit Corporation",
+      o_fsa_signing_url: "https://anvil.test/sign",
+      o_fsa_signed_doc_url: "https://example.com/signed.pdf",
+    } as any);
+
+    const res = await submit();
+
+    expect(res.status).toBe(400);
+    expect(await res.text()).toMatch(/bank account/i);
+    expect((await reg_get(RID))?.status).toBe("01");
+  });
+
+  test("refuses a stripe-only application while routing is off, asking for a bank", async () => {
+    routing.on = false;
+    await seed("01", STRIPE_ONLY);
+
+    const res = await submit();
+
+    expect(res.status).toBe(400);
+    expect(await res.text()).toMatch(/bank account/i);
     expect((await reg_get(RID))?.status).toBe("01");
   });
 });

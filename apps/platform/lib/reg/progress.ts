@@ -1,3 +1,4 @@
+import { reg_ineligibility } from "../stripe-connect/card-data";
 import type { IReg } from "./schema";
 
 export class Progress {
@@ -118,20 +119,34 @@ export class Progress {
     return n ? { o_ein: n, o_type, ...rest3 } : undefined;
   }
 
-  /** step 4 */
+  /** whether stripe can ever pay this org, fiscal sponsorship and hq country
+   * judged; undefined until the identity step is done */
+  get stripe_eligible() {
+    const $3 = this.fsa_signed || this.docs_ein;
+    return $3 && reg_ineligibility($3) === null;
+  }
+
+  /** step 4 — a saved bank, or a stripe account connected in any status from
+   * an org stripe can serve. the `STRIPE_CONNECT_ROUTING` switch is
+   * server-only: submit and approval read `banking_with` */
   get banking() {
-    const $ein = this.docs_ein;
-    const $fsa = this.fsa_signed;
-    const $3 = $fsa || $ein;
+    const $3 = this.fsa_signed || this.docs_ein;
+    if (!$3) return undefined;
     const { o_bank_id: bid, o_bank_statement: bos } = this.r;
-    return $3 && bid && bos
-      ? {
-          o_bank_id: bid,
-          o_bank_statement: bos,
-          o_stripe_account_id: this.r.o_stripe_account_id ?? null,
-          ...$3,
-        }
-      : undefined;
+    const acct = this.r.o_stripe_account_id ?? null;
+    const bank =
+      bid && bos
+        ? { o_bank_id: bid, o_bank_statement: bos }
+        : { o_bank_id: null, o_bank_statement: null };
+    if (!bank.o_bank_id && !(acct && this.stripe_eligible)) return undefined;
+    return { ...bank, o_stripe_account_id: acct, ...$3 };
+  }
+
+  /** `banking`, less a stripe-only answer while routing is off
+   * @param routing_on - the `STRIPE_CONNECT_ROUTING` switch */
+  banking_with(routing_on: boolean) {
+    const b = this.banking;
+    return b && (b.o_bank_id || routing_on) ? b : undefined;
   }
 
   /** 1 contact · 2 org · 3 fsa agreement · 4 banking · 5 review & submit — only

@@ -581,3 +581,30 @@ describe("wise outage", () => {
       .not.toHaveAttribute("aria-disabled", "true");
   });
 });
+
+describe("stripe-only application", () => {
+  it("says it is stripe-only, shows the stripe account, and allows Approve", async () => {
+    const id = await seed_reg({
+      ...ALL_FIELDS,
+      o_bank_id: null,
+      o_bank_statement: null,
+      o_stripe_account_id: "acct_only123",
+    });
+    vi.mocked(wise.v2_account).mockClear();
+
+    const screen = await render_review_live(id);
+
+    await expect.element(screen.getByText("Test Org")).toBeInTheDocument();
+    await expect.element(screen.getByText(/stripe only/i)).toBeInTheDocument();
+    await expect
+      .element(screen.getByText("acct_only123", { exact: true }))
+      .toBeInTheDocument();
+    await expect
+      .element(screen.getByText(/banking details/i))
+      .not.toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("link", { name: /approve/i }))
+      .not.toHaveAttribute("aria-disabled", "true");
+    expect(wise.v2_account).not.toHaveBeenCalled();
+  });
+});
