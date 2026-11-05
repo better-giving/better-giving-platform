@@ -91,9 +91,12 @@ vi.mock("#/routes/api.q-handler.$event/handle-reg/hubspot", () => ({
 vi.mock("#/.server/auth/auth", () => ({ auth: {} }));
 const report_error = vi.hoisted(() => vi.fn());
 vi.mock("#/errors/report", () => ({ report_error }));
+const accounts = vi.hoisted(() => ({ retrieve: vi.fn() }));
+vi.mock("$/kit/stripe", () => ({ stripe: { accounts } }));
 
 import type { ReactNode } from "react";
 import { render } from "react-email";
+import Stripe from "stripe";
 import { handle_reg_updated } from "#/routes/api.q-handler.$event/handle-reg";
 import { DEDUPE_WINDOW_MS, enqueue } from "$/kit/queue";
 import { wise } from "$/kit/wise";
@@ -123,6 +126,14 @@ const IN_REVIEW = {
   o_bank_statement: "https://example.com/bank.pdf",
 } as const;
 
+/** an account stripe has heard nothing from yet */
+const NOT_READY = {
+  charges_enabled: false,
+  payouts_enabled: false,
+  details_submitted: false,
+  requirements: { currently_due: [] },
+};
+
 beforeAll(async () => {
   test_db.current = await create_test_db();
 }, 30_000);
@@ -144,6 +155,7 @@ beforeEach(async () => {
   send_email.mockClear();
   report_error.mockClear();
   vi.mocked(wise.v2_account).mockClear();
+  accounts.retrieve.mockReset().mockResolvedValue(NOT_READY);
 
   await db.insert(user).values({
     id: "u-1",
@@ -263,7 +275,6 @@ describe("approve", () => {
       stripe_payouts_enabled: false,
       stripe_details_submitted: false,
       stripe_requirements_due: [],
-      stripe_synced_at: null,
     });
   });
 
@@ -272,6 +283,7 @@ describe("approve", () => {
 
     const [npo] = await test_db.current!.db.select().from(npos);
     expect(npo?.stripe_account_id).toBeNull();
+    expect(accounts.retrieve).not.toHaveBeenCalled();
   });
 
   describe("a stripe-only registration", () => {
@@ -295,6 +307,42 @@ describe("approve", () => {
       expect(wise.v2_account).not.toHaveBeenCalled();
       expect(enqueued.map((m) => m.id)).toEqual(["reg-updated"]);
       expect((await reg_get(RID))?.status_approved_npo_id).toBe(npo?.id);
+    });
+
+    test("reads the account's readiness from stripe onto the new npo", async () => {
+      await stripe_only();
+      accounts.retrieve.mockResolvedValue({
+        charges_enabled: true,
+        payouts_enabled: true,
+        details_submitted: true,
+        requirements: { currently_due: [] },
+      });
+
+      await verdict("approved");
+
+      expect(accounts.retrieve).toHaveBeenCalledWith("acct_only");
+      const [npo] = await test_db.current!.db.select().from(npos);
+      expect(npo).toMatchObject({
+        stripe_charges_enabled: true,
+        stripe_payouts_enabled: true,
+        stripe_details_submitted: true,
+        stripe_synced_at: expect.any(String),
+      });
+    });
+
+    test("approves when stripe can't be read, leaving the mirror for later", async () => {
+      await stripe_only();
+      const down = new Stripe.errors.StripeAPIError({ message: "stripe down" });
+      accounts.retrieve.mockRejectedValue(down);
+
+      const res = await verdict("approved");
+
+      expect(res.status).toBe(302);
+      expect((await reg_get(RID))?.status).toBe("03");
+      expect(reg_updates()).toHaveLength(1);
+      const [npo] = await test_db.current!.db.select().from(npos);
+      expect(npo?.stripe_synced_at).toBeNull();
+      expect(report_error).toHaveBeenCalledWith(down);
     });
 
     test("is refused while routing is off", async () => {

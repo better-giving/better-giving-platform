@@ -1,5 +1,7 @@
 import { addYears } from "date-fns";
 import { eq } from "drizzle-orm";
+import Stripe from "stripe";
+import { report_error } from "#/errors/report";
 import { referral_id } from "#/helpers/referral";
 import type { IBapp } from "@/banking";
 import { resp } from "@/helpers/https";
@@ -14,6 +16,7 @@ import { reg_update, reg_update_from } from "$/pg/queries/registration";
 import { userxnpo_put } from "$/pg/queries/user";
 import { user } from "$/pg/schema/auth";
 import { npos } from "$/pg/schema/npo";
+import { sync_npo_account } from "$/stripe-connect/sync";
 import { held_elsewhere, lock_acct } from "$/stripe-connect/target";
 
 type NpoInsert = typeof npos.$inferInsert;
@@ -182,5 +185,17 @@ export const npo_new = async (r: NonNullable<Progress["banking"]>) => {
     return reg_update(tx, r.id, { status_approved_npo_id: id });
   });
 
-  return announce_approval(approved);
+  const npo_id = await announce_approval(approved);
+  // the account's events while the registration held it matched no npo and
+  // were acked, so stripe won't resend them: the mirror is read here or never
+  if (acct) {
+    try {
+      await sync_npo_account(npo_id);
+    } catch (err) {
+      // approved regardless: account.updated or the banking page fills it
+      if (!(err instanceof Stripe.errors.StripeError)) throw err;
+      report_error(err);
+    }
+  }
+  return npo_id;
 };
