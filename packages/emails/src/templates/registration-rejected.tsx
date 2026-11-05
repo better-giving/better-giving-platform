@@ -33,7 +33,9 @@ function Jsx({
         </Text>
       )}
       <Text>
-        You will need to make a new application that rectifies these issues, but
+        {stripe_connected
+          ? "You will need to rectify these issues and resubmit, but"
+          : "You will need to make a new application that rectifies these issues, but"}{" "}
         if you have any questions at all, just get in touch at{" "}
         <MailTo email={EMAILS.hi} />
       </Text>

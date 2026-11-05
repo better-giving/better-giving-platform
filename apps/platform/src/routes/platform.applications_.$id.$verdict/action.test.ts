@@ -487,12 +487,16 @@ describe("reject", () => {
     const text = await mailed_text();
     expect(text).toContain("docs incomplete");
     expect(text).toContain(STRIPE_LINE);
+    expect(text).toContain("rectify these issues and resubmit");
+    expect(text).not.toContain("make a new application");
   });
 
   test("says nothing of stripe to an applicant who never connected it", async () => {
     await verdict("rejected", "docs incomplete");
 
-    expect(await mailed_text()).not.toMatch(/stripe/i);
+    const text = await mailed_text();
+    expect(text).not.toMatch(/stripe/i);
+    expect(text).toContain("make a new application");
   });
 
   test("a retry after the enqueue threw succeeds and enqueues", async () => {
