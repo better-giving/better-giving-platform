@@ -33,7 +33,8 @@ export interface IStripeConnectCard {
   /** outcome of the attempt that just came back from Stripe. one-shot: pass it
    *  on the render that follows the return, and not again */
   notice?: IConnectNotice;
-  /** set when the npo can never route: the card says so and offers nothing */
+  /** set when the npo can never route: the card says so and offers nothing
+   *  of Stripe's */
   ineligible?: TConnectIneligibility;
   /** the Payouts page, linked from the ready state beside a bank */
   payouts_href?: string;
@@ -41,6 +42,12 @@ export interface IStripeConnectCard {
    *  one it waits in the balance, and so do Stripe donations until Stripe
    *  says the account is ready */
   has_bank: boolean;
+  /** a bank account is filed and under review. read only while `has_bank`
+   *  is false */
+  bank_pending?: boolean;
+  /** the add-bank page, through the router: linked from the not-available
+   *  state while no bank is on file or under review */
+  add_bank_href?: string;
   /** status, band and control only, where an option card above already
    *  says what Stripe does: registration step 4 */
   brief?: boolean;
@@ -147,6 +154,14 @@ const ineligible_reasons = (i: TConnectIneligibility) =>
     ? "Stripe isn't available to fiscally sponsored nonprofits, so there's nothing to connect."
     : `Stripe isn't available for nonprofits headquartered in ${i.hq_country}. We can send Stripe donations to nonprofits headquartered in ${TRANSFER_COUNTRIES_COPY}.`;
 
+/** the not-available state: the bank is the only way to get paid */
+const bank_only_line = (has_bank: boolean, bank_pending: boolean) =>
+  has_bank
+    ? "All your donations, Stripe donations included, pay out to your bank. You don't need to do anything."
+    : bank_pending
+      ? "Your bank account is under review. Until it's approved, all your donations, Stripe donations included, are held in your Better Giving balance. Nothing is lost."
+      : "Until you add a bank account, all your donations, Stripe donations included, are held in your Better Giving balance. Nothing is lost.";
+
 /** Stripe beside bank details — registration step 4 and the banking page. */
 export function StripeConnectCard({
   status,
@@ -155,6 +170,8 @@ export function StripeConnectCard({
   ineligible,
   payouts_href,
   has_bank,
+  bank_pending = false,
+  add_bank_href,
   brief = false,
   heading_level = 2,
   classes = "",
@@ -172,10 +189,14 @@ export function StripeConnectCard({
       >
         <Body>
           <p>{ineligible_reasons(ineligible)}</p>
-          <p>
-            All your donations, Stripe donations included, pay out to your bank.
-            You don't need to do anything.
-          </p>
+          <p>{bank_only_line(has_bank, bank_pending)}</p>
+          {!has_bank && !bank_pending && add_bank_href && (
+            <p>
+              <Link to={add_bank_href} className="link">
+                Add a bank account
+              </Link>
+            </p>
+          )}
         </Body>
       </CardShell>
     );

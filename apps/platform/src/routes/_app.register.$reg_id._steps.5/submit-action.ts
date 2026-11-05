@@ -33,15 +33,15 @@ export const submit_action = async ({
   const reg = await reg_get(id);
 
   if (!reg) throw resp.status(404, `reg:${id} not found`);
+  // before readiness: why it can't submit names the nonprofit's stripe standing
+  if (user.email !== reg.r_id && user.role !== "admin") {
+    throw resp.status(403);
+  }
 
   const routing_on = stripe_env.connect_routing;
   const prog = new Progress(reg, routing_on);
   const r = prog.banking_with(routing_on);
   if (!r) throw resp.status(400, not_ready(prog, routing_on));
-
-  if (user.email !== r.r_id && user.role !== "admin") {
-    throw resp.status(403);
-  }
 
   //reset previous review
   const to_review = { status: "02", status_rejected_reason: null } as const;

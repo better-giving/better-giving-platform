@@ -234,6 +234,19 @@ describe("submit_action", () => {
     expect(enqueue).not.toHaveBeenCalled();
   });
 
+  test("refuses another user's submit of an unready application with a bare 403", async () => {
+    routing.on = false;
+    await seed("01", STRIPE_ONLY);
+    vi.mocked(get_session).mockResolvedValue({
+      user: { id: "u-2", email: "mallory@test.com", role: null } as any,
+    });
+
+    const res = await submit();
+
+    expect(res.status).toBe(403);
+    expect(await res.text()).not.toMatch(/stripe/i);
+  });
+
   // the status move commits before the enqueue; a publish that throws leaves an
   // application in review that admins were never told about.
   test("a retry after the enqueue threw succeeds and enqueues", async () => {

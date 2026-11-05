@@ -194,12 +194,12 @@ async function withdrawal(amount: number) {
   });
 }
 
-/** a default bank payout on file */
-async function bank() {
+/** a default bank payout on file, or one still `under-review` */
+async function bank(status: "default" | "under-review" = "default") {
   await db().insert(banking_apps).values({
     id: "bapp-1",
     npo_id,
-    status: "default",
+    status,
     bank_summary: "USD account ending in 4821",
     bank_statement_url: "https://example.com/stmt.pdf",
     rejection_reason: "",
@@ -552,11 +552,15 @@ describe("the payouts page", () => {
       async () => {
         routing.on = false;
         await npo("acct_sent");
+        await bank();
       },
     ],
     [
       "the nonprofit is fiscally sponsored",
-      () => npo("acct_sent", { fiscal_sponsored: true }),
+      async () => {
+        await npo("acct_sent", { fiscal_sponsored: true });
+        await bank();
+      },
     ],
   ])(
     "when %s, past transfers read as history and the bank list stays",
@@ -607,6 +611,67 @@ describe("the payouts page", () => {
         .toBeVisible();
     }
   );
+
+  test("a stripe-only nonprofit whose bank is under review is told it pays out once approved", async () => {
+    await npo("acct_sent");
+    await bank("under-review");
+    await withdrawal(12.5);
+
+    const screen = await render_page();
+
+    const held = screen.getByRole("region", {
+      name: "On hold until your bank account is approved",
+    });
+    await expect
+      .element(held.getByText("$12.50", { exact: true }).first())
+      .toBeVisible();
+    expect(held_region(screen).query()).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Add bank account" }).query()
+    ).toBeNull();
+  });
+
+  // Banking and the dashboard hold stripe to the same eligibility
+  test("a fiscally sponsored nonprofit with no bank gets no stripe held card, and is told new donations wait", async () => {
+    await npo("acct_sent", { fiscal_sponsored: true });
+    await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+    await withdrawal(12.5);
+
+    const screen = await render_page();
+
+    expect(screen.getByText("Held right now").query()).toBeNull();
+    await expect
+      .element(
+        earlier_region(screen).getByText(
+          /New Stripe donations wait in your Better Giving balance until you add a bank account\./
+        )
+      )
+      .toBeVisible();
+  });
+
+  test("a stripe nonprofit whose bank is under review is told new donations wait for its approval", async () => {
+    await npo("acct_sent", { fiscal_sponsored: true });
+    await bank("under-review");
+    await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+
+    const screen = await render_page();
+
+    await expect
+      .element(
+        earlier_region(screen).getByText(
+          /New Stripe donations wait in your Better Giving balance until your bank account is approved\./
+        )
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        where_region(screen).getByText(
+          /New donations, Stripe donations included, wait in your Better Giving balance until your bank account is approved\./
+        )
+      )
+      .toBeVisible();
+    expect(screen.container.textContent).not.toMatch(/add a bank account/);
+  });
 
   test("a disconnected nonprofit is told new Stripe donations pay out to its bank", async () => {
     await npo("acct_sent", {

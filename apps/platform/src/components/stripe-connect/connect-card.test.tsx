@@ -452,4 +452,55 @@ describe("StripeConnectCard", () => {
       expect(card.getByRole("button").query()).toBeNull();
     }
   );
+
+  test("not eligible, no bank: says every donation is held, and links adding one", async () => {
+    const Stub = createRoutesStub([
+      {
+        path: "/",
+        Component: () => (
+          <StripeConnectCard
+            status="not_connected"
+            start_href={START}
+            ineligible={{ reason: "fiscal_sponsored" }}
+            has_bank={false}
+            add_bank_href="/admin/42/banking/new"
+          />
+        ),
+      },
+    ]);
+    const screen = await render(<Stub />);
+    const card = screen.getByRole("region", { name: "Stripe account" });
+
+    await expect
+      .element(
+        card.getByText(
+          "Until you add a bank account, all your donations, Stripe donations included, are held in your Better Giving balance. Nothing is lost."
+        )
+      )
+      .toBeVisible();
+    expect(card.getByText(/don't need to do anything/).query()).toBeNull();
+    await expect
+      .element(card.getByRole("link", { name: "Add a bank account" }))
+      .toHaveAttribute("href", "/admin/42/banking/new");
+    expect(card.getByRole("button").query()).toBeNull();
+  });
+
+  test("not eligible, bank under review: says the money waits for the review, and asks for no bank", async () => {
+    const screen = await render_card({
+      ineligible: { reason: "country", hq_country: "Brazil" },
+      has_bank: false,
+      bank_pending: true,
+      add_bank_href: "/admin/42/banking/new",
+    });
+    const card = screen.getByRole("region", { name: "Stripe account" });
+
+    await expect
+      .element(
+        card.getByText(
+          "Your bank account is under review. Until it's approved, all your donations, Stripe donations included, are held in your Better Giving balance. Nothing is lost."
+        )
+      )
+      .toBeVisible();
+    expect(card.getByRole("link").query()).toBeNull();
+  });
 });

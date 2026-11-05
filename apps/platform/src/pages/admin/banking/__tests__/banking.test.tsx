@@ -1030,6 +1030,64 @@ describe("stripe connect card", () => {
     expect(add_bank_links(screen)).toHaveLength(1);
   });
 
+  it("stripe only with a bank under review: says it pays out once approved, and asks for no other", async () => {
+    const npo = await seed_npo(READY);
+    await seed_bapp(npo.id, { status: "under-review" });
+    await seed_held(npo.id, 500);
+
+    const screen = await render_list(npo.id);
+
+    const held = screen.getByRole("region", {
+      name: "Waiting for your bank account to be approved",
+    });
+    await expect
+      .element(held.getByText("$500.00", { exact: true }).first())
+      .toBeVisible();
+    await expect
+      .element(
+        screen
+          .getByRole("region", { name: "Bank payout" })
+          .getByText(/Your bank account is under review\./)
+      )
+      .toBeVisible();
+    expect(add_bank_links(screen)).toHaveLength(0);
+  });
+
+  // fiscally sponsored: stripe can't pay it, so it holds what Banking says
+  // Payouts and the dashboard hold too
+  it("ineligible with no bank: no stripe held card, and the stripe card says donations are held", async () => {
+    const npo = await seed_npo({ ...READY, fiscal_sponsored: true });
+    await seed_held(npo.id, 500);
+
+    const screen = await render_list(npo.id);
+
+    const card = screen.getByRole("region", { name: "Stripe account" });
+    await expect
+      .element(
+        card.getByText(/Until you add a bank account, all your donations/)
+      )
+      .toBeVisible();
+    await expect
+      .element(card.getByRole("link", { name: "Add a bank account" }))
+      .toHaveAttribute("href", `/admin/${npo.id}/banking/new`);
+    expect(screen.getByText("Held right now").query()).toBeNull();
+  });
+
+  it("ineligible with a bank under review: the stripe card says it waits for approval", async () => {
+    const npo = await seed_npo({ fiscal_sponsored: true });
+    await seed_bapp(npo.id, { status: "under-review" });
+
+    const screen = await render_list(npo.id);
+
+    const card = screen.getByRole("region", { name: "Stripe account" });
+    await expect
+      .element(card.getByText(/Your bank account is under review\./))
+      .toBeVisible();
+    expect(
+      card.getByRole("link", { name: "Add a bank account" }).query()
+    ).toBeNull();
+  });
+
   it("bank and stripe: says what goes where, and links the payouts page", async () => {
     const npo = await seed_npo(READY);
     await seed_bapp(npo.id, {

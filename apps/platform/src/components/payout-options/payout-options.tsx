@@ -10,8 +10,8 @@ export interface IPayoutRails {
 }
 
 export interface IPayoutOptions {
-  /** what is set up now, named on the closed row. absent, the row reads as
-   *  it does open */
+  /** what is set up now, named on the row. absent, the row says what the
+   *  comparison is for */
   current?: IPayoutRails;
   /** outer placement only — margin, grid placement */
   classes?: string;
@@ -30,7 +30,9 @@ const current_line = ({ bank, stripe }: IPayoutRails) =>
 
 /** Banking's "Compare your options": one row that opens Bank beside Stripe */
 export function PayoutOptions({ current, classes = "" }: IPayoutOptions) {
-  const closed_line = current ? current_line(current) : OPEN_LINE;
+  // the trigger's text is its accessible name and the heading's, so it stays
+  // the same open or closed; `aria-expanded` carries the state
+  const row_line = current ? current_line(current) : OPEN_LINE;
   return (
     <section aria-label="Compare your options" className={`${classes} card`}>
       <Accordion
@@ -40,21 +42,16 @@ export function PayoutOptions({ current, classes = "" }: IPayoutOptions) {
           {
             value: "compare",
             trigger: (
-              <span className="grid">
-                <span className="text-sm font-semibold">
+              <span className="grid gap-1">
+                <span className="text-lg font-semibold">
                   Compare your options
                 </span>
-                {/* the item is the `group`: open, the row says what the
-                    comparison is for instead of what is set up */}
-                <span className="text-sm font-normal text-gray-11 group-data-[state=open]:hidden">
-                  {closed_line}
-                </span>
-                <span className="hidden text-sm font-normal text-gray-11 group-data-[state=open]:inline">
-                  {OPEN_LINE}
+                <span className="text-sm font-normal text-gray-11">
+                  {row_line}
                 </span>
               </span>
             ),
-            content: <Comparison />,
+            content: <Comparison lead={current ? OPEN_LINE : undefined} />,
           },
         ]}
       />
@@ -62,9 +59,15 @@ export function PayoutOptions({ current, classes = "" }: IPayoutOptions) {
   );
 }
 
-function Comparison() {
+interface IComparison {
+  /** what the comparison is for, when the row doesn't already say it */
+  lead?: string;
+}
+
+function Comparison({ lead }: IComparison) {
   return (
     <div className="grid gap-4 border-t border-hairline pt-4 text-sm">
+      {lead && <p className="text-gray-11">{lead}</p>}
       {/* the columns follow the box: Banking's views column is narrower than
           the window beside the sidebar */}
       <div className="@container">
@@ -96,7 +99,7 @@ function Column({ option }: IColumn) {
       aria-labelledby={heading_id}
       className="grid gap-3 content-start py-4 first:pt-0 last:pb-0 not-first:border-t not-first:border-hairline @2xl:py-0 @2xl:first:pr-6 @2xl:not-first:border-t-0 @2xl:not-first:border-l @2xl:not-first:pl-6"
     >
-      <h3 id={heading_id} className="text-lg font-semibold">
+      <h3 id={heading_id} className="text-base font-semibold">
         {option_names[option]}
       </h3>
       <dl className="grid gap-3">

@@ -1,6 +1,7 @@
 import { type ActionFunction, href, redirect } from "react-router";
 import { literal, object, safeParse, variant } from "valibot";
 import { review_get } from "#/routes/platform.applications_.$id/api";
+import { lost_payout } from "#/routes/platform.applications_.$id/approvable";
 import { resp } from "@/helpers/https";
 import { msg } from "@/queue";
 import { Progress } from "@/reg/progress";
@@ -85,6 +86,12 @@ export const action: ActionFunction = async ({ request, params }) => {
 
   // only a new approval files banking; no need to look at fsa
   const routing_on = stripe_env.connect_routing;
+  if (lost_payout(reg)) {
+    throw resp.status(
+      400,
+      "The applicant's Stripe account was disconnected and no bank is on file. Reject the application so they can add one."
+    );
+  }
   const r = new Progress(reg, routing_on).banking_with(routing_on);
   if (!r) throw resp.status(400, "registration has incomplete steps");
   const npo = await npo_new(r);

@@ -1,10 +1,10 @@
 import { createRoutesStub } from "react-router";
 import { describe, expect, test } from "vitest";
 import { render } from "vitest-browser-react";
+import type { TPayoutTo } from "@/payouts/payout-to";
 import { Payout } from "./payout";
-import type { TPayoutTo } from "./payout-to";
 
-const render_payout = (to: TPayoutTo) => {
+const render_payout = (to: TPayoutTo, bank_pending = false) => {
   const Stub = createRoutesStub([
     {
       path: "/",
@@ -14,6 +14,7 @@ const render_payout = (to: TPayoutTo) => {
           threshold={50}
           next_payout="2026-11-08T00:00:00.000Z"
           to={to}
+          bank_pending={bank_pending}
         />
       ),
     },
@@ -63,4 +64,22 @@ describe("dashboard Payout", () => {
       /before your stripe account is ready wait in your better giving balance.*until you add a bank account/i
     );
   });
+
+  test.each<TPayoutTo>([
+    { kind: "none" },
+    { kind: "stripe", ready: false },
+    { kind: "stripe", ready: true },
+  ])(
+    "bank under review ($kind): says it pays out once approved, and asks for no bank",
+    async (to) => {
+      const screen = await render_payout(to, true);
+      await expect
+        .element(screen.getByText(/until your bank account is approved/i))
+        .toBeVisible();
+      expect(screen.getByText(/no way to get paid/i).query()).toBeNull();
+      expect(
+        screen.getByRole("link", { name: "add a bank account" }).query()
+      ).toBeNull();
+    }
+  );
 });

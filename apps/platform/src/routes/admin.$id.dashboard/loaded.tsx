@@ -159,6 +159,7 @@ export function Loaded({ classes = "", ...props }: Props) {
               bal_cash={props.bal_cash}
               threshold={payout_min}
               to={props.payout_to}
+              bank_pending={props.bank_pending}
               classes=""
             />
           )}

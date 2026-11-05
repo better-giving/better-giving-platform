@@ -629,6 +629,65 @@ describe("stripe-only application", () => {
     expect(wise.v2_account).not.toHaveBeenCalled();
   });
 
+  it("says why Approve is off once its stripe account was disconnected in review", async () => {
+    const id = await seed_reg({
+      ...ALL_FIELDS,
+      o_bank_id: null,
+      o_bank_statement: null,
+      o_stripe_account_id: null,
+    });
+
+    const screen = await render_review_live(id);
+
+    await expect
+      .element(screen.getByText("None on file (Stripe disconnected)"))
+      .toBeInTheDocument();
+    await expect
+      .element(screen.getByText(/Reject it so the applicant can add/))
+      .toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("link", { name: /approve/i }))
+      .toHaveAttribute("aria-disabled", "true");
+    await expect
+      .element(screen.getByRole("link", { name: /reject/i }))
+      .not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("keeps Approve off for a bank plus a stripe account while wise is down", async () => {
+    const id = await seed_reg({
+      ...ALL_FIELDS,
+      o_stripe_account_id: "acct_both123",
+    });
+    vi.mocked(wise.v2_account).mockRejectedValueOnce("wise is down");
+
+    const screen = await render_review_live(id);
+
+    await expect.element(screen.getByText("Test Org")).toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("link", { name: /approve/i }))
+      .toHaveAttribute("aria-disabled", "true");
+  });
+
+  it.each(["03", "04"] as const)(
+    "keeps Approve off for a stripe-only application already decided (%s) while routing is on",
+    async (status) => {
+      const id = await seed_reg({
+        ...ALL_FIELDS,
+        status,
+        o_bank_id: null,
+        o_bank_statement: null,
+        o_stripe_account_id: "acct_only123",
+      });
+
+      const screen = await render_review_live(id);
+
+      await expect.element(screen.getByText("Test Org")).toBeInTheDocument();
+      await expect
+        .element(screen.getByRole("link", { name: /approve/i }))
+        .toHaveAttribute("aria-disabled", "true");
+    }
+  );
+
   it("disables Approve while routing is off, and still allows Reject", async () => {
     routing.on = false;
     const id = await seed_reg({

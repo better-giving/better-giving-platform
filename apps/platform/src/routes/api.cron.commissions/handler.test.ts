@@ -110,6 +110,7 @@ const { index } = await import("./handler");
 const { report_error } = await import("#/errors/report");
 const { create_test_db } = await import("$/pg/test-utils/pglite");
 const { npos } = await import("$/pg/schema/npo");
+const { banking_apps } = await import("$/pg/schema/banking");
 const { referrer_commissions, referrer_payouts } = await import(
   "$/pg/schema/referrer"
 );
@@ -955,6 +956,23 @@ describe("commissions cron", () => {
       expect(wise.transfer).not.toHaveBeenCalled();
       expect(await statuses()).toEqual({ "d-1": "pending" });
       expect(await db().select().from(referrer_payouts)).toEqual([]);
+    });
+
+    test("switched off, the same npo referrer is paid to its default bank once it has one", async () => {
+      referrer.real = true;
+      await db().insert(banking_apps).values({
+        id: "777",
+        npo_id,
+        status: "default",
+        bank_summary: "USD account ending in 0777",
+      });
+      await seed("d-1", 120);
+
+      await index();
+
+      expect(wise.transfer).toHaveBeenCalledOnce();
+      expect(wise.transfer.mock.calls[0]![0].targetAccount).toBe("777");
+      expect(await statuses()).toEqual({ "d-1": "paid" });
     });
 
     test("switched on, an npo referrer with no default bank whose owed covers its commissions is paid them as recovered", async () => {

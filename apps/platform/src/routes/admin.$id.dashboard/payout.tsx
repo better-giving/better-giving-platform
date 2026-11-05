@@ -2,13 +2,15 @@ import { to_usd } from "@better-giving/ui/helpers";
 import { format, formatDistance } from "date-fns";
 import { PencilIcon } from "lucide-react";
 import { Link } from "react-router";
-import type { TPayoutTo } from "./payout-to";
+import type { TPayoutTo } from "@/payouts/payout-to";
 
 interface Props {
   bal_cash: number;
   threshold: number;
   next_payout: string;
   to: TPayoutTo;
+  /** no default bank, and one filed waits for review */
+  bank_pending?: boolean;
   classes?: string;
 }
 
@@ -17,7 +19,7 @@ export function Payout({ classes = "", ...p }: Props) {
   if (p.to.kind !== "bank") {
     return (
       <div className={classes}>
-        <Held to={p.to} />
+        <Held to={p.to} bank_pending={!!p.bank_pending} />
       </div>
     );
   }
@@ -74,19 +76,28 @@ export function Payout({ classes = "", ...p }: Props) {
 
 interface IHeld {
   to: Exclude<TPayoutTo, { kind: "bank" }>;
+  bank_pending: boolean;
 }
 
-function Held({ to }: IHeld) {
-  const add_bank = (
-    <Link to="../banking" className="link font-medium">
-      add a bank account
-    </Link>
+function Held({ to, bank_pending }: IHeld) {
+  const add_bank = bank_pending ? (
+    "your bank account is approved"
+  ) : (
+    <>
+      you{" "}
+      <Link to="../banking" className="link font-medium">
+        add a bank account
+      </Link>
+    </>
   );
   if (to.kind === "none") {
     return (
       <p className="text-sm">
-        You have no way to get paid right now. Donations wait in your Better
-        Giving balance until you {add_bank}. Nothing is lost.
+        {bank_pending
+          ? "Your bank account is under review."
+          : "You have no way to get paid right now."}{" "}
+        Donations wait in your Better Giving balance until {add_bank}. Nothing
+        is lost.
       </p>
     );
   }
@@ -96,15 +107,15 @@ function Held({ to }: IHeld) {
     return (
       <p className="text-sm">
         Stripe donations that arrive before your Stripe account is ready wait in
-        your Better Giving balance, along with everything else, until you{" "}
-        {add_bank}. Nothing is lost.
+        your Better Giving balance, along with everything else, until {add_bank}
+        . Nothing is lost.
       </p>
     );
   }
   return (
     <p className="text-sm">
       Stripe donations go straight to your Stripe account. Everything else waits
-      in your Better Giving balance until you {add_bank}.
+      in your Better Giving balance until {add_bank}.
     </p>
   );
 }

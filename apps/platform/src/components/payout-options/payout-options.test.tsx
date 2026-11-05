@@ -73,18 +73,19 @@ describe("PayoutOptions: compare your options", () => {
       exact: true,
     });
     const trigger = region.getByRole("button");
+    const name =
+      /^Compare your options ?Right now: Stripe\. See how Bank and Stripe differ\.$/;
+    await expect.element(trigger).toHaveAccessibleName(name);
     await trigger.click();
     await expect.element(trigger).toHaveAttribute("aria-expanded", "true");
 
-    // open, the row says what the comparison is for
-    await expect
-      .element(
-        trigger.getByText("You need one to get paid. Having both is possible.")
-      )
-      .toBeVisible();
-    await expect
-      .element(trigger.getByText("Right now: Stripe."))
-      .not.toBeVisible();
+    // the name holds open; what the comparison is for leads the panel
+    await expect.element(trigger).toHaveAccessibleName(name);
+    const lead = region.getByText(
+      "You need one to get paid. Having both is possible."
+    );
+    await expect.element(lead).toBeVisible();
+    expect(trigger.element().contains(lead.element())).toBe(false);
 
     const bank = region.getByRole("region", { name: "Bank", exact: true });
     const stripe = region.getByRole("region", { name: "Stripe", exact: true });
@@ -324,6 +325,8 @@ describe("PayoutChoice: registration step 4", () => {
           screen.getByRole("link", { name: "Continue without a bank account" })
         )
         .toHaveAttribute("href", "/summary");
+      // the bank form's Submit is the one primary on screen
+      expect(screen.container.querySelector(".btn-primary")).toBeNull();
       expect(screen.getByRole("link", { name: "Back" }).query()).toBeNull();
     }
   );

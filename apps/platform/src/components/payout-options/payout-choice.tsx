@@ -1,6 +1,7 @@
 import { RadioGroup as Ark } from "@ark-ui/react/radio-group";
 import { Actions, Button } from "@better-giving/ui";
 import { type ReactNode, useId } from "react";
+import { Link } from "react-router";
 import { TRANSFER_COUNTRIES_COPY } from "@/stripe-connect/eligibility";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
 import { Cell } from "./payout-options";
@@ -117,13 +118,14 @@ export function PayoutChoice({
         </p>
       )}
 
-      {/* over a saved bank the form's Cancel is the way back to Continue */}
+      {/* over a saved bank the form's Cancel is the way back to Continue. a
+          link, not a button: the form's Submit stays the one primary */}
       {form_shown && !bank_saved && stripe_linked && (
-        <Actions>
-          <Button variant="primary" to={continue_to} classes="min-w-32">
+        <p className="text-sm">
+          <Link to={continue_to} className="link">
             Continue without a bank account
-          </Button>
-        </Actions>
+          </Link>
+        </p>
       )}
       {!form_shown && (
         <div className="grid gap-2">

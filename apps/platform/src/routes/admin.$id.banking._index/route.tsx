@@ -24,7 +24,8 @@ export const meta: Route.MetaFunction = ({ matches }) =>
 
 export default CacheRoute(Page);
 function Page({ loaderData, params }: Route.ComponentProps) {
-  const { methods, stripe, connect_routing, has_bank, held } = loaderData;
+  const { methods, stripe, connect_routing, has_bank, bank_pending, held } =
+    loaderData;
   use_strip_connect_params(connect_routing && !!stripe.notice);
   const offers_stripe = connect_routing && !stripe.ineligible;
   const stripe_linked = is_linked(stripe.status);
@@ -37,6 +38,7 @@ function Page({ loaderData, params }: Route.ComponentProps) {
         <HeldMoneyCard
           held={held}
           rails={stripe_linked ? "stripe" : "none"}
+          bank_pending={bank_pending}
           add_bank_href="new"
           {...(offers_stripe && { connect_href: stripe.start_href })}
         />
@@ -55,6 +57,7 @@ function Page({ loaderData, params }: Route.ComponentProps) {
         }
         stripe_status={stripe.status}
         holds_money={holds_money}
+        bank_pending={bank_pending}
         add_href="new"
       />
 
@@ -62,6 +65,8 @@ function Page({ loaderData, params }: Route.ComponentProps) {
         <StripeConnectCard
           {...stripe}
           has_bank={has_bank}
+          bank_pending={bank_pending}
+          add_bank_href="new"
           payouts_href={href("/admin/:id/dashboard/payouts", { id: params.id })}
         />
       )}

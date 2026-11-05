@@ -17,23 +17,48 @@ interface ICopy {
   lead: string;
 }
 
-const list_copy: Record<TStripeLink, ICopy> = {
-  on: {
-    heading: "Sent to your Stripe account",
-    lead: "Each donation paid through Stripe is sent here as its own transfer, after fees.",
-  },
-  off: {
-    heading: "Sent to Stripe earlier",
-    lead: "Stripe donations sent to your Stripe account before. New Stripe donations pay out to your bank.",
-  },
-  disconnected: {
-    heading: "Sent to Stripe earlier",
-    lead: "Your Stripe account is disconnected, so new Stripe donations pay out to your bank. These were sent to it while it was connected.",
-  },
+/** where the account's bank stands, as far as the copy cares */
+interface IBank {
+  has_bank: boolean;
+  bank_pending: boolean;
+}
+
+/** what new donations do without a bank: wait for one to be added, or for the
+ * one filed to be approved */
+const held_for_bank = (bank_pending: boolean) =>
+  `wait in your Better Giving balance ${bank_pending ? "until your bank account is approved" : "until you add a bank account"}`;
+
+/** where new Stripe donations go hangs on a bank: without one they wait */
+const list_copy = (
+  link: TStripeLink,
+  { has_bank, bank_pending }: IBank
+): ICopy => {
+  switch (link) {
+    case "on":
+      return {
+        heading: "Sent to your Stripe account",
+        lead: "Each donation paid through Stripe is sent here as its own transfer, after fees.",
+      };
+    case "off":
+      return {
+        heading: "Sent to Stripe earlier",
+        lead: `Stripe donations sent to your Stripe account before. New Stripe donations ${has_bank ? "pay out to your bank" : held_for_bank(bank_pending)}.`,
+      };
+    case "disconnected":
+      return {
+        heading: "Sent to Stripe earlier",
+        lead: `Your Stripe account is disconnected, so new Stripe donations ${has_bank ? "pay out to your bank" : held_for_bank(bank_pending)}. These were sent to it while it was connected.`,
+      };
+  }
 };
 
 export interface ISentToStripe {
   sent: INpoSent;
+  /** a bank payout is on file. without one, what Stripe doesn't take is held */
+  has_bank?: boolean;
+  /** no bank on file, and one filed waits for review: what is held waits for
+   * its approval rather than for a bank to be added */
+  bank_pending?: boolean;
   /** outer placement only — margin */
   classes?: string;
 }
@@ -91,9 +116,14 @@ function Standing({ standing }: IStanding) {
 
 /** routed transfers paid to the nonprofit's connected account. balances, fees
  * and what reached the bank stay on stripe */
-export function SentToStripe({ sent, classes = "" }: ISentToStripe) {
+export function SentToStripe({
+  sent,
+  has_bank = true,
+  bank_pending = false,
+  classes = "",
+}: ISentToStripe) {
   const heading_id = useId();
-  const copy = list_copy[stripe_link(sent)];
+  const copy = list_copy(stripe_link(sent), { has_bank, bank_pending });
   return (
     <section aria-labelledby={heading_id} className={`${classes} grid gap-3`}>
       <div className="grid gap-1">
@@ -159,51 +189,69 @@ interface IWell {
 }
 
 /** the stripe list's well, then the bank list's */
-const wells: Record<TStripeLink, [IWell, IWell]> = {
-  on: [
-    {
-      title: list_copy.on.heading,
-      detail:
-        "Donations paid through Stripe (cards, digital wallets and bank debits), each sent as its own transfer, after fees.",
-    },
-    {
-      title: "Payouts",
-      detail:
-        "PayPal, DAF grants, crypto, stocks, cheques, and any Stripe donations from before you connected Stripe: the Grant share of each, sent to your bank.",
-    },
-  ],
-  off: [
-    {
-      title: list_copy.off.heading,
-      detail:
-        "Stripe donations sent to your Stripe account before. New ones are not sent there.",
-    },
-    {
-      title: "Payouts",
-      detail: "Everything sent to your bank, new Stripe donations included.",
-    },
-  ],
-  disconnected: [
-    {
-      title: list_copy.disconnected.heading,
-      detail:
-        "Stripe donations sent to your Stripe account while it was connected.",
-    },
-    {
-      title: "Payouts",
-      detail:
-        "Everything sent to your bank. Your Stripe account is disconnected, so new Stripe donations are here too.",
-    },
-  ],
+const wells = (link: TStripeLink, bank: IBank): [IWell, IWell] => {
+  const title = list_copy(link, bank).heading;
+  const { has_bank, bank_pending } = bank;
+  switch (link) {
+    case "on":
+      return [
+        {
+          title,
+          detail:
+            "Donations paid through Stripe (cards, digital wallets and bank debits), each sent as its own transfer, after fees.",
+        },
+        {
+          title: "Payouts",
+          detail:
+            "PayPal, DAF grants, crypto, stocks, cheques, and any Stripe donations from before you connected Stripe: the Grant share of each, sent to your bank.",
+        },
+      ];
+    case "off":
+      return [
+        {
+          title,
+          detail:
+            "Stripe donations sent to your Stripe account before. New ones are not sent there.",
+        },
+        {
+          title: "Payouts",
+          detail: has_bank
+            ? "Everything sent to your bank, new Stripe donations included."
+            : `Everything sent to your bank before. New donations, Stripe donations included, ${held_for_bank(bank_pending)}.`,
+        },
+      ];
+    case "disconnected":
+      return [
+        {
+          title,
+          detail:
+            "Stripe donations sent to your Stripe account while it was connected.",
+        },
+        {
+          title: "Payouts",
+          detail: has_bank
+            ? "Everything sent to your bank. Your Stripe account is disconnected, so new Stripe donations are here too."
+            : `Everything sent to your bank before. Your Stripe account is disconnected, so new donations, Stripe donations included, ${held_for_bank(bank_pending)}.`,
+        },
+      ];
+  }
 };
 
 export interface IWhereMoneyShows {
   link: TStripeLink;
+  /** as on `SentToStripe` */
+  has_bank?: boolean;
+  /** as on `SentToStripe` */
+  bank_pending?: boolean;
 }
 
 /** which of the page's two lists a donation lands in. mount it only beside
  * both */
-export function WhereMoneyShows({ link }: IWhereMoneyShows) {
+export function WhereMoneyShows({
+  link,
+  has_bank = true,
+  bank_pending = false,
+}: IWhereMoneyShows) {
   const heading_id = useId();
   return (
     <section aria-labelledby={heading_id} className="card grid gap-3 text-sm">
@@ -213,7 +261,7 @@ export function WhereMoneyShows({ link }: IWhereMoneyShows) {
       {/* columns follow the box, as in `PayoutOptions` */}
       <div className="@container">
         <div className="grid gap-4 @3xl:grid-cols-2">
-          {wells[link].map((w) => (
+          {wells(link, { has_bank, bank_pending }).map((w) => (
             <div
               key={w.title}
               className="bg-panel rounded p-4 grid gap-1 content-start"

@@ -382,6 +382,31 @@ describe("payouts loader — routed transfer standing", () => {
     expect(report_degraded).not.toHaveBeenCalled();
   });
 
+  test("load-more pages past held payouts as the first page does", async () => {
+    await npo({ acct: "acct_sent" });
+    const row = (id: string, type: "pending" | "settled", date: string) => ({
+      id,
+      source_id: `liq-${id}`,
+      npo_id,
+      source: "liq" as const,
+      date,
+      amount: 5,
+      type,
+    });
+    await db()
+      .insert(payouts)
+      .values([
+        row("held", "pending", "2026-07-02T00:00:00.000Z"),
+        row("paid", "settled", "2026-07-01T00:00:00.000Z"),
+      ]);
+    const next = encode_date_cursor("2026-08-01T00:00:00.000Z");
+
+    const data = await load(`?next=${next}`);
+
+    expect(data.items.map((p) => p.id)).toEqual(["paid"]);
+    expect(data.held).toBeNull();
+  });
+
   test("load-more does not read stripe again", async () => {
     await npo({ acct: "acct_sent" });
     await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", {

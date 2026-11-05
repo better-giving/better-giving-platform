@@ -4,7 +4,7 @@ import type { PropsWithChildren } from "react";
 import { href, NavLink, Outlet } from "react-router";
 import type { V2RecipientAccount } from "#/types/bank-details";
 import type { IReg } from "@/reg";
-import { is_stripe_only } from "./approvable";
+import { is_stripe_only, lost_payout } from "./approvable";
 import { Container } from "./container";
 
 export default function Loaded(
@@ -112,6 +112,18 @@ export default function Loaded(
             <Row label="Payout method">Stripe only, no bank account</Row>
             <Row label="Stripe account ID">{props.o_stripe_account_id}</Row>
           </dl>
+        </Container>
+      )}
+      {lost_payout(props) && (
+        <Container title="Payout">
+          <dl className="grid sm:grid-cols-[auto_auto_1fr]">
+            <Row label="Payout method">None on file (Stripe disconnected)</Row>
+          </dl>
+          <p className="p-3 text-sm text-gray-11">
+            The applicant disconnected their Stripe account after submitting, so
+            this application can't be approved. Reject it so the applicant can
+            add a bank account or connect Stripe again, then resubmit.
+          </p>
         </Container>
       )}
       {props.bank_unavailable && (

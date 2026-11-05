@@ -8,11 +8,12 @@ import { use_table } from "#/hooks/use-table";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
 import { search } from "@/helpers/https";
 import type { IHeldMoney } from "@/payouts";
+import { stripe_standing } from "@/payouts/payout-to";
 import { connect_start_href } from "@/stripe-connect/card-data";
 import { stripe as stripe_env } from "$/env";
 import { db } from "$/pg/db";
-import { npo_default_bapp } from "$/pg/queries/banking";
-import { held_money } from "$/pg/queries/held-money";
+import { npo_bapp_in_review, npo_default_bapp } from "$/pg/queries/banking";
+import { has_held_money, held_money } from "$/pg/queries/held-money";
 import { npo_get } from "$/pg/queries/npo";
 import { npo_payouts } from "$/pg/queries/payout";
 import { npo_sent_transfers } from "$/stripe-connect/sent";
@@ -24,45 +25,73 @@ export const loader = async (x: Route.LoaderArgs) => {
   const { next } = search(x.url);
   const id = x.context.get(admin_ctx);
 
-  const [held, sent] = await Promise.all([
-    held_of(id),
+  const [standing, sent] = await Promise.all([
+    standing_of(id),
     next ? null : npo_sent_transfers(id),
   ]);
+  const held = next ? null : await held_of(id, standing);
+  // a load-more needs only whether anything is held, not what
+  const holds = next
+    ? !!standing.held_rails && (await has_held_money(db, id))
+    : holds_money(held);
   // pending payouts the held card lists have no bank to go to, so the bank
   // table pages past them: on every page, or a first page of them hides the
   // paid history behind it
   const page = await npo_payouts(id, {
     next,
     limit: 5,
-    not_status: holds_money(held) ? "pending" : undefined,
+    not_status: holds ? "pending" : undefined,
   });
+  const { has_bank, bank_pending } = standing;
   // one shape either way: a load-more reads only the next payout page, and a
   // missing `sent` on that branch is what collapsed the list's type
-  if (next) return { ...page, sent: null, held: null };
-  return { ...page, sent, held };
+  if (next) return { ...page, sent: null, held: null, has_bank, bank_pending };
+  return { ...page, sent, held, has_bank, bank_pending };
 };
 
 const holds_money = (held: IHeld | null) => !!held && held.money.total > 0;
 
+interface IStanding {
+  /** a default bank is on file */
+  has_bank: boolean;
+  /** no default bank, and one filed waits for review */
+  bank_pending: boolean;
+  /** the held card speaks of stripe, so it is for a nonprofit with no bank
+   * that linked stripe instead (`stripe_standing`). null for any other */
+  held_rails: THeldRails | null;
+}
+
+async function standing_of(npo_id: number): Promise<IStanding> {
+  const [npo, bank, in_review] = await Promise.all([
+    npo_get(npo_id),
+    npo_default_bapp(npo_id),
+    npo_bapp_in_review(npo_id),
+  ]);
+  const stripe = stripe_standing(npo, stripe_env.connect_routing);
+  return {
+    has_bank: !!bank,
+    bank_pending: !bank && in_review,
+    held_rails:
+      bank || !stripe ? null : stripe === "linked" ? "stripe" : "none",
+  };
+}
+
 interface IHeld {
   money: IHeldMoney;
   rails: THeldRails;
+  bank_pending: boolean;
   connect_href: string;
 }
 
-/** what waits for a bank, for a nonprofit that linked stripe instead of one.
- * the card speaks of stripe, so a nonprofit that never linked an account, or
- * one routing is off for, gets none */
-async function held_of(npo_id: number): Promise<IHeld | null> {
-  if (!stripe_env.connect_routing) return null;
-  const [npo, bank] = await Promise.all([
-    npo_get(npo_id),
-    npo_default_bapp(npo_id),
-  ]);
-  if (bank || !npo?.stripe_account_id) return null;
+async function held_of(
+  npo_id: number,
+  { held_rails, bank_pending }: IStanding
+): Promise<IHeld | null> {
+  if (!held_rails) return null;
   return {
     money: await held_money(db, npo_id),
-    rails: npo.stripe_deauthorized_at ? "none" : "stripe",
+    rails: held_rails,
+    bank_pending,
     connect_href: connect_start_href({ kind: "npo", npo_id }),
   };
 }
@@ -83,7 +112,7 @@ function Page({ loaderData: page1, params }: Route.ComponentProps) {
       load(`?${p.toString()}`);
     },
   });
-  const { sent, held } = page1;
+  const { sent, held, has_bank, bank_pending } = page1;
   const payouts_heading_id = useId();
   // the bank table's empty row is this page's only content off Connect, and
   // where card gifts land once they stop routing. beside a live stripe list it
@@ -106,12 +135,25 @@ function Page({ loaderData: page1, params }: Route.ComponentProps) {
         <PayoutsHeldCard
           held={held.money}
           rails={held.rails}
+          bank_pending={held.bank_pending}
           add_bank_href={href("/admin/:id/banking/new", { id: params.id })}
           connect_href={held.connect_href}
         />
       )}
-      {sent && show_bank && <WhereMoneyShows link={stripe_link(sent)} />}
-      {sent && <SentToStripe sent={sent} />}
+      {sent && show_bank && (
+        <WhereMoneyShows
+          link={stripe_link(sent)}
+          has_bank={has_bank}
+          bank_pending={bank_pending}
+        />
+      )}
+      {sent && (
+        <SentToStripe
+          sent={sent}
+          has_bank={has_bank}
+          bank_pending={bank_pending}
+        />
+      )}
       {show_bank && sent && (
         <section aria-labelledby={payouts_heading_id} className="grid gap-3">
           <div className="grid gap-1">

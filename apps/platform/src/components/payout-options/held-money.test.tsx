@@ -237,7 +237,9 @@ describe("PayoutsHeldCard: Payouts", () => {
     no_wise(card);
   });
 
-  test("dates a payout by its UTC day, whatever the viewer's zone", async () => {
+  // chromium takes the host's zone, UTC in CI, so this can't tell a UTC day
+  // from a local one: `to_utc_day`'s own test pins a western zone
+  test("dates a payout by its UTC day", async () => {
     const screen = await in_router(
       <PayoutsHeldCard
         {...base}
@@ -278,6 +280,83 @@ test("both held tables right-align Amount, header and cells alike", async () => 
     expect(amounts.length).toBeGreaterThan(1);
     expect(new Set(amounts)).toEqual(new Set(["right"]));
   }
+});
+
+describe("a bank account under review", () => {
+  test.each<[string, typeof HeldMoneyCard, string, string]>([
+    [
+      "Banking",
+      HeldMoneyCard,
+      "Waiting for your bank account to be approved",
+      "Stripe can only receive Stripe donations. These can't go to Stripe, so they stay in your Better Giving balance until your bank account is approved. Nothing is lost.",
+    ],
+    [
+      "Payouts",
+      PayoutsHeldCard,
+      "On hold until your bank account is approved",
+      "Stripe can only receive Stripe donations, so everything else waits in your Better Giving balance until your bank account is approved. Nothing is lost.",
+    ],
+  ])(
+    "%s, Stripe linked: the money waits for the review, and no bank is asked for",
+    async (_, Card, heading, lead) => {
+      const screen = await in_router(<Card {...base} bank_pending />);
+      const card = screen.getByRole("region", { name: heading });
+      await expect.element(card.getByText(lead)).toBeVisible();
+      await expect
+        .element(
+          card.getByText(
+            "Once your bank account is approved, this money pays out with your bank payout, less any refunds or disputes owed, once your balance reaches your payout minimum."
+          )
+        )
+        .toBeVisible();
+      expect(card.getByRole("link").query()).toBeNull();
+      expect(card.element().textContent).not.toMatch(/add a bank/i);
+    }
+  );
+
+  test("Stripe disconnected: the money waits for the review, and Stripe can be connected again", async () => {
+    const screen = await in_router(
+      <HeldMoneyCard {...base} rails="none" bank_pending held={WITH_STRIPE} />
+    );
+    const card = screen.getByRole("region", {
+      name: "Waiting for your bank account to be approved",
+    });
+    await expect
+      .element(
+        card.getByText(
+          "Stripe is disconnected and your bank account is still under review, so every donation is held in your Better Giving balance. Nothing is lost. It pays out once your bank account is approved, or connect Stripe again to get paid there."
+        )
+      )
+      .toBeVisible();
+    expect(
+      card.getByRole("link", { name: "Add bank account" }).query()
+    ).toBeNull();
+    await expect
+      .element(card.getByRole("link", { name: "Connect Stripe" }))
+      .toHaveAttribute("href", base.connect_href);
+  });
+
+  test("Banking's bank section says the bank is under review, and offers no Add", async () => {
+    const screen = await in_router(
+      <BankPayoutSection
+        add_href="new"
+        table={<p>accounts table</p>}
+        stripe_status="incomplete"
+        holds_money={false}
+        bank_pending
+      />
+    );
+    const section = screen.getByRole("region", { name: "Bank payout" });
+    await expect
+      .element(
+        section.getByText(
+          "Your bank account is under review. Bank payouts start once it's approved.",
+          { exact: false }
+        )
+      )
+      .toBeVisible();
+    expect(section.getByRole("link").query()).toBeNull();
+  });
 });
 
 describe("BankPayoutSection: Banking", () => {

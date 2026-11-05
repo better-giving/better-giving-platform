@@ -3,6 +3,7 @@ import { admin_ctx } from "#/.server/auth";
 import { report_degraded } from "#/errors/report";
 import type { IBapp } from "@/banking";
 import type { IHeldMoney } from "@/payouts";
+import { stripe_standing } from "@/payouts/payout-to";
 import {
   connect_notice,
   connect_start_href,
@@ -16,7 +17,11 @@ import {
 } from "@/stripe-connect/readiness";
 import { stripe as stripe_env } from "$/env";
 import { db } from "$/pg/db";
-import { npo_bapps, npo_default_bapp } from "$/pg/queries/banking";
+import {
+  npo_bapp_in_review,
+  npo_bapps,
+  npo_default_bapp,
+} from "$/pg/queries/banking";
 import { held_money } from "$/pg/queries/held-money";
 import { type INpo, npo_get } from "$/pg/queries/npo";
 import { sync_npo_account } from "$/stripe-connect/sync";
@@ -28,9 +33,10 @@ export interface LoaderData {
   connect_routing: boolean;
   /** a default bank is on file: everything not routed to stripe pays out */
   has_bank: boolean;
+  /** no default bank, and one filed waits for review */
+  bank_pending: boolean;
   /** what waits for a bank, once stripe stands in for one. null beside a
-   * bank, and wherever stripe was never linked or routing is off: the held
-   * card speaks of stripe */
+   * bank, and wherever `stripe_standing` is: the held card speaks of stripe */
   held: IHeldMoney | null;
 }
 
@@ -38,32 +44,34 @@ export const loader = async (x: Route.LoaderArgs) => {
   const id = x.context.get(admin_ctx);
   const connect_routing = stripe_env.connect_routing;
 
-  const [page, stripe_part, bank] = await Promise.all([
+  const [page, npo, bank, in_review] = await Promise.all([
     npo_bapps(id),
-    connect_routing ? stripe_of(id, x.url) : Promise.resolve(null),
+    npo_get(id),
     npo_default_bapp(id),
+    npo_bapp_in_review(id),
   ]);
   const stripe: IConnectCardData = {
     status: "not_connected",
     start_href: connect_start_href({ kind: "npo", npo_id: id }),
-    ...stripe_part,
+    ...(connect_routing && (await stripe_of(npo, x.url))),
   };
+  const held_for = !bank && stripe_standing(npo, connect_routing);
   return {
     methods: page.items,
     stripe,
     connect_routing,
     has_bank: !!bank,
-    held:
-      bank || stripe.status === "not_connected"
-        ? null
-        : await held_money(db, id),
+    bank_pending: !bank && in_review,
+    held: held_for ? await held_money(db, id) : null,
   } satisfies LoaderData;
 };
 
 type TStripePart = Pick<IConnectCardData, "status" | "notice" | "ineligible">;
 
-async function stripe_of(npo_id: number, url: URL): Promise<TStripePart> {
-  const npo = await npo_get(npo_id);
+async function stripe_of(
+  npo: INpo | undefined,
+  url: URL
+): Promise<TStripePart> {
   const ineligible = npo && connect_ineligibility(npo);
   // the card offers nothing then, so stripe isn't asked and no notice shows
   if (ineligible) return { status: "not_connected", ineligible };

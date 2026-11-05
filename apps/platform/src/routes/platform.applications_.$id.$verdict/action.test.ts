@@ -345,6 +345,37 @@ describe("approve", () => {
       expect(report_error).toHaveBeenCalledWith(down);
     });
 
+    describe("whose account was disconnected in review", () => {
+      // what `reg_stripe_deauthorize` leaves on a review row
+      const disconnected = async () => {
+        await stripe_only();
+        await test_db.current!.db.update(registrations).set({
+          o_stripe_account_id: null,
+        });
+      };
+
+      test("refuses approval, saying why", async () => {
+        await disconnected();
+
+        const res = await verdict("approved");
+
+        expect(res.status).toBe(400);
+        expect(await res.text()).toMatch(/stripe account was disconnected/i);
+        expect((await reg_get(RID))?.status).toBe("02");
+        expect(await test_db.current!.db.select().from(npos)).toEqual([]);
+      });
+
+      test("is rejected, and the applicant mailed", async () => {
+        await disconnected();
+
+        const res = await verdict("rejected", "stripe disconnected");
+
+        expect(res.status).toBe(302);
+        expect((await reg_get(RID))?.status).toBe("04");
+        expect(reg_updates()).toHaveLength(1);
+      });
+    });
+
     test("is refused while routing is off", async () => {
       routing.on = false;
       await stripe_only();

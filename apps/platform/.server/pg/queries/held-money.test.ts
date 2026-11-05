@@ -11,7 +11,7 @@ import { donations } from "../schema/donation";
 import { npos } from "../schema/npo";
 import { payouts, settlements } from "../schema/payout";
 import { create_test_db, type TestDb } from "../test-utils/pglite";
-import { held_money } from "./held-money";
+import { has_held_money, held_money } from "./held-money";
 import type { DbOrTx } from "./helpers";
 
 let test_db: TestDb;
@@ -252,5 +252,19 @@ describe("held_money", () => {
       by_rail: [],
       items: [],
     });
+  });
+});
+
+describe("has_held_money", () => {
+  test("answers as held_money's total does", async () => {
+    const date = "2026-10-01T00:00:00.000Z";
+    const other = await seed_npo("EIN-OTHER");
+    await seed_gift_payout("paypal", 10, date, { type: "processing" });
+    await seed_gift_payout("paypal", 20, date, { type: "settled" });
+    await seed_gift_payout("paypal", 99, date, { npo: other });
+    expect(await has_held_money(pg(), npo_id)).toBe(false);
+
+    await seed_payout("liq", "liq-1", 5, date);
+    expect(await has_held_money(pg(), npo_id)).toBe(true);
   });
 });

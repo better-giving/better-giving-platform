@@ -12,6 +12,9 @@ export interface IBankPayoutSection {
   /** the held-money card shows above, carrying its own Add bank account, so
    *  the page keeps one primary button */
   holds_money: boolean;
+  /** a bank account is filed and under review: the section says so and asks
+   *  for no other */
+  bank_pending?: boolean;
   /** the add-bank page, through the router */
   add_href: string;
   /** outer placement only — margin, grid placement */
@@ -24,6 +27,7 @@ export function BankPayoutSection({
   table,
   stripe_status,
   holds_money,
+  bank_pending = false,
   add_href,
   classes = "",
 }: IBankPayoutSection) {
@@ -43,9 +47,16 @@ export function BankPayoutSection({
             {table && stripe_ready && (
               <> Everything except Stripe donations pays out here.</>
             )}
+            {bank_pending && (
+              <>
+                {" "}
+                Your bank account is under review. Bank payouts start once it's
+                approved.
+              </>
+            )}
           </p>
         </div>
-        {!holds_money && (
+        {!holds_money && !bank_pending && (
           <Button variant="primary" to={add_href} classes="md:shrink-0">
             <Plus aria-hidden className="mr-2 icon-md" />
             <span className="whitespace-nowrap">Add bank account</span>

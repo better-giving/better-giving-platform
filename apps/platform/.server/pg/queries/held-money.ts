@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { snap } from "@/helpers/decimal";
 import type { HeldRail, IHeldMoney } from "@/payouts";
 import { payout_cents } from "../../payouts/amount";
@@ -89,6 +89,32 @@ export async function held_money(
       amount: (item_cents.get(x) ?? 0) / 100,
     })),
   };
+}
+
+/** whether `held_money` holds anything, off one row rather than every
+ * pending payout: a load-more needs only this */
+export async function has_held_money(
+  pg: DbOrTx,
+  npo_id: number
+): Promise<boolean> {
+  const [row] = await pg
+    .select({ id: payouts.id })
+    .from(payouts)
+    .leftJoin(
+      dists,
+      and(eq(payouts.source, "donation"), eq(dists.id, payouts.source_id))
+    )
+    .leftJoin(donations, eq(donations.id, dists.donation_id))
+    .where(
+      and(
+        eq(payouts.npo_id, npo_id),
+        eq(payouts.type, "pending"),
+        gt(payouts.amount, 0),
+        sql`${rail} is not null`
+      )
+    )
+    .limit(1);
+  return !!row;
 }
 
 /**
