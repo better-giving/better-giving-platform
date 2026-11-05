@@ -943,7 +943,7 @@ describe("stripe connect card", () => {
     {
       status: "disconnected",
       seed: { ...READY, stripe_deauthorized_at: "2026-10-01T00:00:00.000Z" },
-      line: "Disconnected. Stripe donations go to your bank payout.",
+      line: "Disconnected",
     },
     {
       status: "incomplete",

@@ -148,8 +148,7 @@ function Comparison() {
           <span className="text-gray-11">
             Stripe donations go to your Stripe account and everything else goes
             to your bank. If you disconnect Stripe, new Stripe donations go back
-            to your bank. Donations already sent to your Stripe account stay
-            there.
+            to your bank.
           </span>
         </p>
       </div>

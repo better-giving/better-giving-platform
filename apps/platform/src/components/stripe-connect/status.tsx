@@ -34,7 +34,7 @@ const tones: Record<TConnectStatus, ITone> = {
     dot: "bg-success",
   },
   disconnected: {
-    label: "Disconnected. Stripe donations go to your bank payout.",
+    label: "Disconnected",
     ink: "text-warning-subtle-fg",
     dot: "bg-warning",
   },

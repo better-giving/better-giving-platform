@@ -61,13 +61,7 @@ describe("StripeConnectCard", () => {
     nav = capture_navigation();
     const screen = await render_card({ status: "disconnected" });
 
-    await expect
-      .element(
-        screen.getByText(
-          "Disconnected. Stripe donations go to your bank payout."
-        )
-      )
-      .toBeVisible();
+    await expect.element(screen.getByText("Disconnected")).toBeVisible();
     await expect
       .element(
         screen.getByRole("button", { name: /connect a different account/i })
@@ -205,8 +199,8 @@ describe("StripeConnectCard", () => {
     [
       "disconnected",
       [
-        "Stripe donations now go to your bank payout.",
-        "Reconnect Stripe to send them to your Stripe account again. Donations already sent to your Stripe account stay there.",
+        "Stripe donations go to your bank payout.",
+        "Reconnect Stripe to send them to your Stripe account again.",
       ],
     ],
     [
@@ -246,7 +240,7 @@ describe("StripeConnectCard", () => {
       const others = [
         "donations paid through Stripe go straight to it",
         "If you skip Stripe",
-        "Donations already sent to your Stripe account stay there.",
+        "Reconnect Stripe to send them to your Stripe account again.",
         "Until Stripe says your account is ready",
         "Stripe is reviewing your account",
         "now go straight to your Stripe account",

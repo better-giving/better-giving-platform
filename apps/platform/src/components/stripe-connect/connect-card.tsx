@@ -75,8 +75,8 @@ const bodies: Record<TConnectStatus, string[]> = {
     "Everything else still pays out to your bank: stocks, DAF grants, crypto, PayPal and cheques. If you skip Stripe, Stripe donations go to your bank too.",
   ],
   disconnected: [
-    "Stripe donations now go to your bank payout.",
-    "Reconnect Stripe to send them to your Stripe account again. Donations already sent to your Stripe account stay there.",
+    "Stripe donations go to your bank payout.",
+    "Reconnect Stripe to send them to your Stripe account again.",
   ],
   incomplete: [
     "Stripe needs a few more details before it can receive donations. Finish setup in your Stripe dashboard.",

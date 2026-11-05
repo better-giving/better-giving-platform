@@ -7,7 +7,7 @@ const labels: [TConnectStatus, string][] = [
   ["incomplete", "Finish setup on Stripe"],
   ["pending", "Pending review"],
   ["ready", "Ready to receive Stripe donations"],
-  ["disconnected", "Disconnected. Stripe donations go to your bank payout."],
+  ["disconnected", "Disconnected"],
 ];
 
 describe("StripeConnectStatus", () => {
