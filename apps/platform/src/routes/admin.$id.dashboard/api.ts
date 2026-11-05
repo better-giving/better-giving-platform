@@ -6,6 +6,7 @@ import { GRANTS_CRON, GRANTS_EXEC_DELAY_DAYS } from "@/constants/grants";
 import type { IComposition } from "@/nav/interfaces";
 import type { IPayout } from "@/payouts";
 import type { IPageKeyed } from "@/types/api";
+import { stripe as stripe_env } from "$/env";
 import { npo_default_bapp } from "$/pg/queries/banking";
 import { campaign_count, campaign_live_count } from "$/pg/queries/campaign";
 import { nav_ltd } from "$/pg/queries/nav";
@@ -13,6 +14,7 @@ import { npo_get } from "$/pg/queries/npo";
 import type { SettlementRow } from "$/pg/queries/payout";
 import { npo_payouts, npo_settlements } from "$/pg/queries/payout";
 import type { Route } from "./+types/route";
+import { payout_to, type TPayoutTo } from "./payout-to";
 
 export interface DashboardData {
   id: number;
@@ -24,6 +26,7 @@ export interface DashboardData {
   recent_settlements: IPageKeyed<SettlementRow>;
   next_payout: string;
   pm?: IBapp;
+  payout_to: TPayoutTo;
   composition: IComposition;
   total_inv_value: number;
   campaign_count: number;
@@ -65,6 +68,7 @@ export const loader = async (x: Route.LoaderArgs) => {
     recent_settlements,
     next_payout: next.toISOString(),
     pm,
+    payout_to: payout_to(pm, npo, stripe_env.connect_routing),
     composition: ltd.composition,
     total_inv_value: ltd.value,
     campaign_count: count,

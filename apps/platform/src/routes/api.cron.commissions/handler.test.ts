@@ -107,6 +107,7 @@ vi.mock("$/pg/db", () => ({
 }));
 
 const { index } = await import("./handler");
+const { report_error } = await import("#/errors/report");
 const { create_test_db } = await import("$/pg/test-utils/pglite");
 const { npos } = await import("$/pg/schema/npo");
 const { referrer_commissions, referrer_payouts } = await import(
@@ -938,6 +939,21 @@ describe("commissions cron", () => {
       expect(wise.transfer).not.toHaveBeenCalled();
       expect(await statuses()).toEqual({ "d-1": "pending" });
       expect(await entries()).toEqual([]);
+      expect(await db().select().from(referrer_payouts)).toEqual([]);
+    });
+
+    // a stripe-only npo has no default bank: its commissions wait for one
+    test("switched off, an npo referrer with no default bank is left pending, no transfer", async () => {
+      referrer.real = true;
+      vi.mocked(report_error).mockClear();
+      await seed("d-1", 120);
+
+      await index();
+
+      // a lookup that threw would also leave it pending
+      expect(report_error).not.toHaveBeenCalled();
+      expect(wise.transfer).not.toHaveBeenCalled();
+      expect(await statuses()).toEqual({ "d-1": "pending" });
       expect(await db().select().from(referrer_payouts)).toEqual([]);
     });
 

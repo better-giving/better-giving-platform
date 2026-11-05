@@ -2,12 +2,13 @@ import { to_usd } from "@better-giving/ui/helpers";
 import { format, formatDistance } from "date-fns";
 import { PencilIcon } from "lucide-react";
 import { Link } from "react-router";
+import type { TPayoutTo } from "./payout-to";
 
 interface Props {
   bal_cash: number;
   threshold: number;
   next_payout: string;
-  pm?: { bank_summary: string };
+  to: TPayoutTo;
   classes?: string;
 }
 
@@ -40,25 +41,57 @@ export function Payout({ classes = "", ...p }: Props) {
         }}
         className="py-1 rounded-full inset-shadow-track mb-2"
       />
-      <p className="text-sm">
-        {progress < 1 ? "Once desired amount is accumulated, " : ""}
-        will be paid out to{" "}
-        {
-          <Link to="../banking" className="link font-medium">
-            {p.pm?.bank_summary || "your default payout method"}
-          </Link>
-        }{" "}
-        on{" "}
-        {
-          <span className="">
-            {format(p.next_payout, "PP")}
-            <span className="text-gray-11">
-              - in {formatDistance(p.next_payout, new Date())}
+      {p.to.kind === "bank" ? (
+        <p className="text-sm">
+          {progress < 1 ? "Once desired amount is accumulated, " : ""}
+          will be paid out to{" "}
+          {
+            <Link to="../banking" className="link font-medium">
+              {p.to.summary}
+            </Link>
+          }{" "}
+          on{" "}
+          {
+            <span className="">
+              {format(p.next_payout, "PP")}
+              <span className="text-gray-11">
+                - in {formatDistance(p.next_payout, new Date())}
+              </span>
+              .
             </span>
-            .
-          </span>
-        }
-      </p>
+          }
+        </p>
+      ) : (
+        <Held to={p.to} />
+      )}
     </div>
+  );
+}
+
+interface IHeld {
+  to: Exclude<TPayoutTo, { kind: "bank" }>;
+}
+
+function Held({ to }: IHeld) {
+  const add_bank = (
+    <Link to="../banking" className="link font-medium">
+      add a bank account
+    </Link>
+  );
+  if (to.kind === "none") {
+    return (
+      <p className="text-sm">
+        You have no way to get paid right now. Donations wait in your Better
+        Giving balance until you {add_bank}. Nothing is lost.
+      </p>
+    );
+  }
+  return (
+    <p className="text-sm">
+      {to.ready
+        ? "Stripe donations go straight to your Stripe account. "
+        : "Stripe donations go to your Stripe account once Stripe says it's ready. "}
+      Everything else waits in your Better Giving balance until you {add_bank}.
+    </p>
   );
 }

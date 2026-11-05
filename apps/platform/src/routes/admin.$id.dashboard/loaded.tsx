@@ -151,12 +151,14 @@ export function Loaded({ classes = "", ...props }: Props) {
             <EmptyState classes="mt-2 mb-3">No grant items yet</EmptyState>
           )}
 
-          {props.recent_payouts.items.length > 0 && (
+          {/* no bank: what is held is news before any payout exists */}
+          {(props.recent_payouts.items.length > 0 ||
+            props.payout_to.kind !== "bank") && (
             <Payout
               next_payout={props.next_payout}
               bal_cash={props.bal_cash}
               threshold={payout_min}
-              pm={props.pm}
+              to={props.payout_to}
               classes=""
             />
           )}
