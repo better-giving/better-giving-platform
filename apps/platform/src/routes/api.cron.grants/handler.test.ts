@@ -529,4 +529,45 @@ describe("grants cron execute", () => {
     expect(await payout_types()).toEqual({ "p-1": "pending" });
     expect(await outstanding()).toEqual([93.2]);
   });
+
+  test.each([
+    ["off", false],
+    ["on", true],
+  ])(
+    "switched %s, an npo with no bank is held until it adds one, then the next run pays what was held",
+    async (_, on) => {
+      deductions.on = on;
+      const npo_id = await seed_npo({ cash: 100, recipient: false });
+      await seed_payout(npo_id, "p-1", 60);
+      await seed_payout(npo_id, "p-2", 40);
+
+      await index();
+
+      expect(report_error_mock).not.toHaveBeenCalled();
+      expect(wise.transfer).not.toHaveBeenCalled();
+      expect(await payout_types()).toEqual({
+        "p-1": "pending",
+        "p-2": "pending",
+      });
+      expect(await npo_cash(npo_id)).toBe(100);
+
+      await db()
+        .insert(banking_apps)
+        .values({ id: String(WISE_RECIPIENT), npo_id, status: "default" });
+      await index();
+
+      expect(report_error_mock).not.toHaveBeenCalled();
+      expect(wise_pay_mock).toHaveBeenCalledOnce();
+      expect(wise_pay_mock).toHaveBeenCalledWith(
+        WISE_RECIPIENT,
+        100,
+        expect.any(String)
+      );
+      expect(await payout_types()).toEqual({
+        "p-1": "settled",
+        "p-2": "settled",
+      });
+      expect(await npo_cash(npo_id)).toBe(0);
+    }
+  );
 });
