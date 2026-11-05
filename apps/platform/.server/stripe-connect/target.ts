@@ -100,8 +100,8 @@ export async function target_access(
 /** whether `acct` already belongs to an npo or a registration other than `t`.
  * approved registrations are skipped: their account lives on the npo now, or
  * was replaced there. rejected ones are skipped too: they keep the account to
- * resubmit with until another target claims it, which `release_rejected`
- * takes it from them. a pending one would collide with this one at approval. */
+ * resubmit with until another target claims it and `release_rejected` takes
+ * it from them. a pending one would collide with this one at approval. */
 export async function held_elsewhere(
   acct: string,
   t: TConnectTarget,

@@ -68,7 +68,7 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
   const [picked, set_picked] = useState<TPayoutOption | null>(null);
   const fetcher = useFetcher();
   // a change that landed redirects back to this same route, which stays
-  // mounted — so the form is closed here, as the save settles without a failure
+  // mounted, so the form is closed here, as the save settles without a failure
   const [fetcher_state, set_fetcher_state] = useState(fetcher.state);
   if (fetcher_state !== fetcher.state) {
     set_fetcher_state(fetcher.state);
