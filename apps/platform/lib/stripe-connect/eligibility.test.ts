@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { is_routable, routing_npo } from "./eligibility";
+import {
+  connect_ineligibility,
+  is_routable,
+  routing_npo,
+  TRANSFER_COUNTRIES,
+  TRANSFER_COUNTRIES_COPY,
+} from "./eligibility";
 
 /** the npo row columns routing reads, ready to route */
 const row = {
@@ -64,4 +70,82 @@ describe("is_routable", () => {
       expect(routable({ hq_country })).toBe(true);
     }
   );
+});
+
+describe("connect_ineligibility", () => {
+  test("a fiscally sponsored npo is ineligible as sponsored, whatever its country", () => {
+    expect(
+      connect_ineligibility({
+        fiscal_sponsored: true,
+        hq_country: "Philippines",
+      })
+    ).toEqual({ reason: "fiscal_sponsored" });
+  });
+
+  test.each(["Philippines", "Iceland", "Atlantis"])(
+    "an hq country of %s is ineligible, carried as stored",
+    (hq_country) => {
+      expect(
+        connect_ineligibility({ fiscal_sponsored: false, hq_country })
+      ).toEqual({ reason: "country", hq_country });
+    }
+  );
+
+  test("an unsponsored npo in the transfer set has nothing ruling it out", () => {
+    expect(
+      connect_ineligibility({ fiscal_sponsored: false, hq_country: "Germany" })
+    ).toBeNull();
+  });
+});
+
+describe("TRANSFER_COUNTRIES_COPY", () => {
+  // the oracle: EU-27 membership, independent of the transfer set
+  const EU_27 = [
+    "AT",
+    "BE",
+    "BG",
+    "HR",
+    "CY",
+    "CZ",
+    "DK",
+    "EE",
+    "FI",
+    "FR",
+    "DE",
+    "GR",
+    "HU",
+    "IE",
+    "IT",
+    "LV",
+    "LT",
+    "LU",
+    "MT",
+    "NL",
+    "PL",
+    "PT",
+    "RO",
+    "SK",
+    "SI",
+    "ES",
+    "SE",
+  ];
+  const codes_by_region: Record<string, string[]> = {
+    "the US": ["US"],
+    Canada: ["CA"],
+    "the UK": ["GB"],
+    Switzerland: ["CH"],
+    Liechtenstein: ["LI"],
+    Norway: ["NO"],
+    "EU countries": EU_27,
+  };
+  const regions = TRANSFER_COUNTRIES_COPY.split(/, | and /);
+
+  test("every region the copy names is one this pin knows", () => {
+    expect(regions.filter((r) => !(r in codes_by_region))).toEqual([]);
+  });
+
+  test("the copy names exactly the transfer set", () => {
+    const named = regions.flatMap((r) => codes_by_region[r] ?? []);
+    expect(new Set(named)).toEqual(new Set(TRANSFER_COUNTRIES));
+  });
 });
