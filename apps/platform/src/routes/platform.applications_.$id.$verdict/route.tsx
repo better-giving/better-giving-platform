@@ -84,7 +84,8 @@ export const action: ActionFunction = async ({ request, params }) => {
   }
 
   // only a new approval files banking; no need to look at fsa
-  const r = new Progress(reg).banking_with(stripe_env.connect_routing);
+  const routing_on = stripe_env.connect_routing;
+  const r = new Progress(reg, routing_on).banking_with(routing_on);
   if (!r) throw resp.status(400, "registration has incomplete steps");
   const npo = await npo_new(r);
   console.info("NPO approved:", npo);

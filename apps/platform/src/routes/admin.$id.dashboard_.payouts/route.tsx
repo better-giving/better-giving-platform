@@ -24,16 +24,25 @@ export const loader = async (x: Route.LoaderArgs) => {
   const { next } = search(x.url);
   const id = x.context.get(admin_ctx);
 
+  const [held, sent] = await Promise.all([
+    held_of(id),
+    next ? null : npo_sent_transfers(id),
+  ]);
+  // pending payouts the held card lists have no bank to go to, so the bank
+  // table pages past them: on every page, or a first page of them hides the
+  // paid history behind it
   const page = await npo_payouts(id, {
     next,
     limit: 5,
+    not_status: holds_money(held) ? "pending" : undefined,
   });
   // one shape either way: a load-more reads only the next payout page, and a
   // missing `sent` on that branch is what collapsed the list's type
   if (next) return { ...page, sent: null, held: null };
-  const [sent, held] = await Promise.all([npo_sent_transfers(id), held_of(id)]);
   return { ...page, sent, held };
 };
+
+const holds_money = (held: IHeld | null) => !!held && held.money.total > 0;
 
 interface IHeld {
   money: IHeldMoney;
@@ -76,15 +85,11 @@ function Page({ loaderData: page1, params }: Route.ComponentProps) {
   });
   const { sent, held } = page1;
   const payouts_heading_id = useId();
-  const holds_money = !!held && held.money.total > 0;
   // the bank table's empty row is this page's only content off Connect, and
   // where card gifts land once they stop routing. beside a live stripe list it
-  // would still say nothing was paid after a transfer. pending payouts the
-  // held card lists have no bank to go to, so they are not the bank list's
-  const bank_items = holds_money
-    ? page1.items.filter((p) => p.type !== "pending")
-    : page1.items;
-  const show_bank = (!sent?.on_stripe && !holds_money) || bank_items.length > 0;
+  // would still say nothing was paid after a transfer
+  const show_bank =
+    (!sent?.on_stripe && !holds_money(held)) || page1.items.length > 0;
 
   return (
     <div className="grid gap-6 content-start px-4 py-4 md:px-10 md:py-8">

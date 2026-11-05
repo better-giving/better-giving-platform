@@ -57,56 +57,57 @@ const banking = {
 const reg = (...parts: Partial<IReg>[]): IReg =>
   Object.assign({}, base, ...parts);
 
+/** with `STRIPE_CONNECT_ROUTING` on unless a case turns it off */
+const progress = (r: IReg, routing_on = true) => new Progress(r, routing_on);
+
 describe("Progress.step", () => {
   it("starts a fresh application on contact", () => {
-    expect(new Progress(reg(us_identity)).step).toBe(1);
+    expect(progress(reg(us_identity)).step).toBe(1);
   });
 
   it("moves to organization once contact is complete", () => {
-    expect(new Progress(reg(us_identity, contact)).step).toBe(2);
+    expect(progress(reg(us_identity, contact)).step).toBe(2);
   });
 
   it("puts a 501(c)(3) with org details straight on banking — there is no step 3 for it", () => {
-    const r = new Progress(reg(us_identity, contact, org));
+    const r = progress(reg(us_identity, contact, org));
     expect(r.step).toBe(4);
   });
 
   it("holds an international org at the agreement until it is signed", () => {
-    expect(new Progress(reg(intl_identity, contact, org)).step).toBe(3);
+    expect(progress(reg(intl_identity, contact, org)).step).toBe(3);
 
     const { o_fsa_signed_doc_url: _, ...unsigned } = fsa_docs;
-    expect(new Progress(reg(intl_identity, contact, org, unsigned)).step).toBe(
-      3
-    );
+    expect(progress(reg(intl_identity, contact, org, unsigned)).step).toBe(3);
   });
 
   it("moves an international org to banking once the agreement is signed", () => {
-    const r = new Progress(reg(intl_identity, contact, org, fsa_docs));
+    const r = progress(reg(intl_identity, contact, org, fsa_docs));
     expect(r.step).toBe(4);
   });
 
   it("reaches review from either branch once banking is done", () => {
-    expect(new Progress(reg(us_identity, contact, org, banking)).step).toBe(5);
+    expect(progress(reg(us_identity, contact, org, banking)).step).toBe(5);
     expect(
-      new Progress(reg(intl_identity, contact, org, fsa_docs, banking)).step
+      progress(reg(intl_identity, contact, org, fsa_docs, banking)).step
     ).toBe(5);
   });
 
   // without `reg_new`'s seeded country a 501(c)(3) strands at 2, silently
   it("strands a 501(c)(3) at organization when hq country was never seeded", () => {
     const { o_hq_country: _, ...no_country } = us_identity;
-    expect(new Progress(reg(no_country, contact, org, banking)).step).toBe(2);
+    expect(progress(reg(no_country, contact, org, banking)).step).toBe(2);
   });
 });
 
 describe("Progress.steps", () => {
   it("marks the agreement done for a 501(c)(3) that never signs one", () => {
-    const r = new Progress(reg(us_identity, contact, org, banking));
+    const r = progress(reg(us_identity, contact, org, banking));
     expect(r.steps).toEqual([true, true, true, true]);
   });
 
   it("leaves the agreement pending for an unsigned international org", () => {
-    const r = new Progress(reg(intl_identity, contact, org));
+    const r = progress(reg(intl_identity, contact, org));
     expect(r.steps).toEqual([true, true, false, false]);
   });
 });
@@ -115,7 +116,7 @@ describe("Progress.banking", () => {
   const stripe = { o_stripe_account_id: "acct_123" } as const;
 
   it("is done with a connected stripe account and no bank", () => {
-    const r = new Progress(reg(us_identity, contact, org, stripe));
+    const r = progress(reg(us_identity, contact, org, stripe));
     expect(r.step).toBe(5);
     expect(r.steps).toEqual([true, true, true, true]);
     expect(r.banking).toMatchObject({
@@ -125,32 +126,30 @@ describe("Progress.banking", () => {
   });
 
   it("holds a stripe-only applicant on banking while routing is off", () => {
-    const r = new Progress(reg(us_identity, contact, org, stripe), false);
+    const r = progress(reg(us_identity, contact, org, stripe), false);
     expect(r.step).toBe(4);
     expect(r.steps).toEqual([true, true, true, false]);
   });
 
   it("banking_with(false) refuses a stripe-only answer and keeps a bank", () => {
-    const stripe_only = new Progress(reg(us_identity, contact, org, stripe));
+    const stripe_only = progress(reg(us_identity, contact, org, stripe));
     expect(stripe_only.banking_with(false)).toBeUndefined();
     expect(stripe_only.banking_with(true)).toMatchObject({
       o_stripe_account_id: "acct_123",
     });
 
-    const banked = new Progress(
-      reg(us_identity, contact, org, banking, stripe)
-    );
+    const banked = progress(reg(us_identity, contact, org, banking, stripe));
     expect(banked.banking_with(false)).toMatchObject({ o_bank_id: "999" });
   });
 
   it("stays on banking with neither a bank nor stripe", () => {
-    const r = new Progress(reg(us_identity, contact, org));
+    const r = progress(reg(us_identity, contact, org));
     expect(r.step).toBe(4);
     expect(r.banking).toBeUndefined();
   });
 
   it("needs the bank from a fiscally sponsored org, stripe or not", () => {
-    const r = new Progress(reg(intl_identity, contact, org, fsa_docs, stripe));
+    const r = progress(reg(intl_identity, contact, org, fsa_docs, stripe));
     expect(r.step).toBe(4);
     expect(r.banking).toBeUndefined();
   });

@@ -1,3 +1,4 @@
+import { TRANSFER_COUNTRIES_COPY } from "@/stripe-connect/eligibility";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
 
 /** the two ways a nonprofit can get paid; having both is possible */
@@ -18,15 +19,18 @@ export const option_summaries: Record<TPayoutOption, string> = {
 
 export interface ICell {
   text: string;
-  /** the money waits in the balance: the Held badge leads the text */
+  /** the money waits in the balance: the Held badge leads the text, so the
+   *  text never opens on "Held" itself */
   held?: boolean;
 }
 
 export interface IRow {
   term: string;
-  /** step 4's radio cards; absent on a row only the comparison carries */
-  card?: Record<TPayoutOption, ICell>;
-  /** the card's Stripe sentence once Stripe says the account is ready */
+  /** step 4's radio cards; absent on a row only the comparison carries.
+   *  `stripe_with_bank` is the Stripe card's cell while a bank is on file */
+  card?: Record<TPayoutOption | "stripe_with_bank", ICell>;
+  /** the card's Stripe sentence once Stripe says the account is ready, bank
+   *  or not */
   card_stripe_ready?: string;
   /** Banking's side-by-side */
   compare: Record<TPayoutOption, ICell>;
@@ -34,11 +38,11 @@ export interface IRow {
 
 const to_bank: ICell = { text: "To your bank." };
 const held_others: ICell = {
-  text: "Held in your Better Giving balance until you add a bank account.",
+  text: "In your Better Giving balance until you add a bank account.",
   held: true,
 };
 const held_withdrawals: ICell = {
-  text: "Held until you add a bank account.",
+  text: "They stay in your balance until you add a bank account.",
   held: true,
 };
 
@@ -52,6 +56,9 @@ export const rows: IRow[] = [
       },
       stripe: {
         text: "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. Until then they're held. They skip your split.",
+      },
+      stripe_with_bank: {
+        text: "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. They skip your split. Until then, they go to your bank.",
       },
     },
     card_stripe_ready:
@@ -67,19 +74,23 @@ export const rows: IRow[] = [
   },
   {
     term: "PayPal, DAF grants, crypto, stocks, cheques",
-    card: { bank: to_bank, stripe: held_others },
+    card: { bank: to_bank, stripe: held_others, stripe_with_bank: to_bank },
     compare: { bank: to_bank, stripe: held_others },
   },
   {
     term: "Savings and Investments withdrawals",
-    card: { bank: to_bank, stripe: held_withdrawals },
+    card: {
+      bank: to_bank,
+      stripe: held_withdrawals,
+      stripe_with_bank: to_bank,
+    },
     compare: { bank: to_bank, stripe: held_withdrawals },
   },
   {
     term: "Available to",
     compare: {
       bank: { text: "Every nonprofit." },
-      stripe: { text: "Nonprofits Stripe is available to." },
+      stripe: { text: `Nonprofits in ${TRANSFER_COUNTRIES_COPY}.` },
     },
   },
 ];

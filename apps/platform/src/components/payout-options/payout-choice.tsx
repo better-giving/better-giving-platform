@@ -19,13 +19,18 @@ export interface IPayoutChoice {
    *  before anything is. null while neither */
   selected: TPayoutOption | null;
   onSelect: (option: TPayoutOption) => void;
-  /** a bank payout is saved on the registration */
+  /** a bank payout is saved on the registration, being changed or not */
   bank_saved: boolean;
+  /** the bank form is open over a saved bank (its Change was pressed). the
+   *  saved bank still pays out until a new one is saved. ignored while no
+   *  bank is saved, since the form is the only thing Bank shows then */
+  bank_form_open?: boolean;
   /** the registration's Stripe account; `not_connected` when it has none */
   stripe_status: TConnectStatus;
   /** under the options while Bank is chosen: `SavedBank`, or the bank form.
-   *  until a bank is saved the form carries its own Back and Submit, so this
-   *  component draws no Back then, and Continue only once Stripe is linked */
+   *  the form carries its own Back and Submit (and Cancel over a saved bank),
+   *  so this component draws no Back then, and Continue only once Stripe is
+   *  linked and no bank is saved */
   bank: ReactNode;
   /** under the options while Stripe is chosen: `StripeConnectCard` with
    *  `brief`, `heading_level={3}` and `has_bank` */
@@ -41,6 +46,7 @@ export function PayoutChoice({
   selected,
   onSelect,
   bank_saved,
+  bank_form_open = false,
   stripe_status,
   bank,
   stripe,
@@ -53,12 +59,12 @@ export function PayoutChoice({
   const stripe_linked = is_linked(stripe_status);
   const stripe_ready = stripe_status === "ready";
   const can_continue = bank_saved || stripe_linked;
+  // the bank form draws its own Back and Submit
+  const form_shown = selected === "bank" && (!bank_saved || bank_form_open);
   // the chosen option is set up, so there is nothing left to explain here
   const is_done =
-    (selected === "bank" && bank_saved) ||
+    (selected === "bank" && bank_saved && !form_shown) ||
     (selected === "stripe" && stripe_linked);
-  // the bank form draws its own Back and Submit
-  const form_shown = selected === "bank" && !bank_saved;
 
   const hint = can_continue
     ? null
@@ -73,7 +79,7 @@ export function PayoutChoice({
           Choose how you get paid
         </h2>
         <p className="text-sm text-gray-11">
-          {intro(selected, bank_saved, stripe_status)}
+          {intro(selected, bank_saved, form_shown, stripe_status)}
         </p>
       </section>
 
@@ -91,6 +97,7 @@ export function PayoutChoice({
             option={o}
             expanded={!selected || selected === o}
             stripe_ready={stripe_ready}
+            bank_saved={bank_saved}
           />
         ))}
         {!is_done && (
@@ -105,12 +112,13 @@ export function PayoutChoice({
       {selected === "stripe" && stripe}
       {selected === "stripe" && stripe_linked && !bank_saved && (
         <p className="text-sm text-gray-11">
-          Want everything to pay out? Add a bank account any time from Banking.
-          Held money is never lost.
+          Want everything to pay out? Add a bank account here too, or any time
+          from Banking. Held money is never lost.
         </p>
       )}
 
-      {form_shown && can_continue && (
+      {/* over a saved bank the form's Cancel is the way back to Continue */}
+      {form_shown && !bank_saved && stripe_linked && (
         <Actions>
           <Button variant="primary" to={continue_to} classes="min-w-32">
             Continue without a bank account
@@ -147,15 +155,19 @@ export function PayoutChoice({
 function intro(
   selected: TPayoutOption | null,
   bank_saved: boolean,
+  bank_form_shown: boolean,
   stripe_status: TConnectStatus
 ) {
   const linked = is_linked(stripe_status);
   if (selected === "bank" && bank_saved)
-    return "Your bank payout is saved. You can continue now, and add Stripe any time from Banking.";
+    return bank_form_shown
+      ? "Your saved bank payout stays in place until you save a new one."
+      : "Your bank payout is saved. You can continue now, and add Stripe here too, or any time from Banking.";
+  // the line under the Stripe card offers the bank while none is saved
   if (selected === "stripe" && linked)
     return stripe_status === "ready"
-      ? "Your Stripe account is ready. You can continue now, and add a bank account any time from Banking."
-      : "Your Stripe account is connected. You can continue now, and add a bank account any time from Banking.";
+      ? "Your Stripe account is ready. You can continue now."
+      : "Your Stripe account is connected. You can continue now.";
   // the other option is the one set up
   if (linked)
     return "Your Stripe account is connected, so you can continue now. Add a bank account here too, or any time from Banking.";
@@ -170,13 +182,20 @@ interface IOptionCard {
   expanded: boolean;
   /** the Stripe card's first row drops its until-ready clause */
   stripe_ready: boolean;
+  /** the Stripe card sends what it can't receive to the bank, not to held */
+  bank_saved: boolean;
 }
 
 // the radio's own dot, as `RadioGroup` draws it in @better-giving/ui
 const radio_control =
   "flex size-5 shrink-0 items-center justify-center rounded-full border border-input hover:not-data-disabled:border-input-hover bg-surface transition-colors data-[state=checked]:bg-primary data-[state=checked]:border-primary data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-ring";
 
-function OptionCard({ option, expanded, stripe_ready }: IOptionCard) {
+function OptionCard({
+  option,
+  expanded,
+  stripe_ready,
+  bank_saved,
+}: IOptionCard) {
   const desc_id = useId();
   return (
     // the label (Ark's Item) holds the radio, the option's name and its
@@ -208,9 +227,13 @@ function OptionCard({ option, expanded, stripe_ready }: IOptionCard) {
             {rows.map((r) => {
               if (!r.card) return null;
               const cell =
-                option === "stripe" && stripe_ready && r.card_stripe_ready
-                  ? { text: r.card_stripe_ready }
-                  : r.card[option];
+                option === "bank"
+                  ? r.card.bank
+                  : stripe_ready && r.card_stripe_ready
+                    ? { text: r.card_stripe_ready }
+                    : bank_saved
+                      ? r.card.stripe_with_bank
+                      : r.card.stripe;
               return (
                 <div
                   key={r.term}

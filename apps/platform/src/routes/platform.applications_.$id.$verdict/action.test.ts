@@ -490,7 +490,10 @@ describe("approve", () => {
 
 describe("reject", () => {
   const STRIPE_LINE =
-    "Your Stripe account is still connected, so you can resubmit. If you're not reapplying, you can disconnect Better Giving from your Stripe dashboard.";
+    "Your Stripe account is still connected to this application. If you're not reapplying, you can disconnect Better Giving from your Stripe dashboard.";
+  // every rejected application is editable, so every applicant resubmits
+  const RESUBMIT_LINE =
+    "You can rectify these issues and resubmit this application. If you have any questions at all, just get in touch at";
   /** the rejection mail as the applicant reads it */
   const mailed_text = async () => {
     await handle_reg_updated(reg_updates()[0].payload as any);
@@ -510,8 +513,9 @@ describe("reject", () => {
     const text = await mailed_text();
     expect(text).toContain("docs incomplete");
     expect(text).toContain(STRIPE_LINE);
-    expect(text).toContain("rectify these issues and resubmit");
-    expect(text).not.toContain("make a new application");
+    expect(text).toContain(RESUBMIT_LINE);
+    expect(text.match(/resubmit/gi)).toHaveLength(1);
+    expect(text).not.toContain("new application");
   });
 
   test("says nothing of stripe to an applicant who never connected it", async () => {
@@ -519,7 +523,8 @@ describe("reject", () => {
 
     const text = await mailed_text();
     expect(text).not.toMatch(/stripe/i);
-    expect(text).toContain("make a new application");
+    expect(text).toContain(RESUBMIT_LINE);
+    expect(text).not.toContain("new application");
   });
 
   test("a retry after the enqueue threw succeeds and enqueues", async () => {

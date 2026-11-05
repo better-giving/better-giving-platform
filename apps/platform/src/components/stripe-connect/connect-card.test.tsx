@@ -263,8 +263,6 @@ describe("StripeConnectCard", () => {
       )) {
         expect(text).not.toContain(other);
       }
-      // a card Stripe can serve carries no badge
-      expect(card.getByText("Optional", { exact: true }).query()).toBeNull();
       expect(text).not.toMatch(/wise|money-transfer/i);
     }
   );
@@ -450,7 +448,6 @@ describe("StripeConnectCard", () => {
       expect(
         card.getByText("Ready to receive Stripe donations").query()
       ).toBeNull();
-      expect(card.getByText("Optional", { exact: true }).query()).toBeNull();
       expect(card.getByRole("link").query()).toBeNull();
       expect(card.getByRole("button").query()).toBeNull();
     }

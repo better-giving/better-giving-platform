@@ -27,12 +27,13 @@ const HELD: IHeldMoney = {
     { rail: "stock_cheque", amount: 74 },
     { rail: "withdrawal", amount: 500 },
   ],
+  // out of order on purpose: the card sorts newest first
   items: [
-    { rail: "paypal", date: "2026-10-30T15:00:00Z", amount: 640 },
-    { rail: "daf", date: "2026-10-28T15:00:00Z", amount: 420 },
-    { rail: "withdrawal", date: "2026-10-27T15:00:00Z", amount: 500 },
     { rail: "crypto", date: "2026-10-25T15:00:00Z", amount: 150.5 },
+    { rail: "daf", date: "2026-10-28T15:00:00Z", amount: 420 },
     { rail: "stock_cheque", date: "2026-10-22T15:00:00Z", amount: 74 },
+    { rail: "paypal", date: "2026-10-30T15:00:00Z", amount: 640 },
+    { rail: "withdrawal", date: "2026-10-27T15:00:00Z", amount: 500 },
   ],
 };
 
@@ -97,7 +98,7 @@ describe("HeldMoneyCard: Banking", () => {
     await expect
       .element(
         card.getByText(
-          "Once you add a bank account, this money pays out with your bank payout."
+          "Once you add a bank account, this money pays out with your bank payout, less any refunds or disputes owed, once your balance reaches your payout minimum."
         )
       )
       .toBeVisible();
@@ -170,9 +171,10 @@ const STRIPE_LEAD =
 const WITH_STRIPE: IHeldMoney = {
   total: 2310,
   by_rail: [{ rail: "stripe", amount: 525.5 }, ...HELD.by_rail],
+  // the newest last, so its first place is the sort's doing
   items: [
-    { rail: "stripe", date: "2026-10-31T15:00:00Z", amount: 525.5 },
     ...HELD.items,
+    { rail: "stripe", date: "2026-10-31T15:00:00Z", amount: 525.5 },
   ],
 };
 
@@ -208,7 +210,7 @@ describe("Stripe linked, Stripe donations held", () => {
 });
 
 describe("PayoutsHeldCard: Payouts", () => {
-  test("Stripe only: one row per waiting payout, labelled by its rail", async () => {
+  test("Stripe only: one row per waiting payout, labelled by its rail, newest first", async () => {
     const screen = await in_router(<PayoutsHeldCard {...base} />);
     const card = screen.getByRole("region", {
       name: "On hold until you add a bank account",
@@ -304,6 +306,15 @@ describe("BankPayoutSection: Banking", () => {
     [
       "ready",
       "Add one to release held money and have everything else pay out to your bank.",
+    ],
+    // before ready, Stripe donations wait for a bank too
+    [
+      "incomplete",
+      "Add one to release held money and get everything paid out to your bank.",
+    ],
+    [
+      "pending",
+      "Add one to release held money and get everything paid out to your bank.",
     ],
     [
       "disconnected",

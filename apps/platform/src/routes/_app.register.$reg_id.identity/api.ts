@@ -8,6 +8,7 @@ import { resp } from "@/helpers/https";
 import type { IRegStartFv } from "@/reg";
 import { Progress } from "@/reg/progress";
 import { reg_id } from "@/reg/schema";
+import { stripe as stripe_env } from "$/env";
 import { reg_get } from "$/pg/queries/registration";
 import type { Route } from "./+types/route";
 
@@ -44,7 +45,7 @@ export const loader = async ({ params, request, url }: Route.LoaderArgs) => {
 
   return {
     /** where "Cancel" goes back to */
-    step: new Progress(reg).step,
+    step: new Progress(reg, stripe_env.connect_routing).step,
     values: {
       o_type,
       o_ein: reg.o_ein ?? "",

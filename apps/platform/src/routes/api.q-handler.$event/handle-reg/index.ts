@@ -11,7 +11,7 @@ import type { IRegCreatedPayload } from "@/queue";
 import { Progress } from "@/reg/progress";
 import type { IReg } from "@/reg/schema";
 import { send_email, send_email_or_throw } from "$/email";
-import { base_url, hubspot } from "$/env";
+import { base_url, hubspot, stripe as stripe_env } from "$/env";
 import { bg_sales } from "$/kit/slack";
 import { wise } from "$/kit/wise";
 import { reg_get } from "$/pg/queries/registration";
@@ -51,7 +51,7 @@ export async function handle_reg_created(r: IRegCreatedPayload) {
    * knows them. a row that has since been deleted still gets a mail; the wizard
    * is what tells them it is gone. */
   const reg = await reg_get(r.id);
-  const to = `/register/${r.id}/${reg ? new Progress(reg).step : 1}`;
+  const to = `/register/${r.id}/${reg ? new Progress(reg, stripe_env.connect_routing).step : 1}`;
 
   /* two audiences, one mail. an applicant who is already signed in has a
    * session and needs no key — a plain link lands them on the step, and the
@@ -81,7 +81,7 @@ export async function handle_reg_updated(reg: IReg) {
   let ctp: ContactProperties | undefined;
   let cmp: CompanyProperties | undefined;
 
-  const prog = new Progress(reg);
+  const prog = new Progress(reg, stripe_env.connect_routing);
   const c = prog.contact;
 
   if (c) {

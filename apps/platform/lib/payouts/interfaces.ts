@@ -60,6 +60,8 @@ export type IPayout<T extends PayoutStatus = PayoutStatus> = {
 export interface INpoPayoutsOptions {
   next?: string;
   status?: PayoutStatus["type"];
+  /** left out of the page, so the page fills with the rest */
+  not_status?: PayoutStatus["type"];
   limit?: number;
 }
 

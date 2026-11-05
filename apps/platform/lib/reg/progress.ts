@@ -6,9 +6,9 @@ export class Progress {
   routing_on: boolean;
 
   /** @param routing_on - the `STRIPE_CONNECT_ROUTING` switch, which only the
-   * server reads; `step` and `steps` honour it. a caller that omits it is
-   * judged as routing on */
-  constructor(reg: IReg, routing_on = true) {
+   * server reads, so a client caller takes it from its loader; `step` and
+   * `steps` honour it */
+  constructor(reg: IReg, routing_on: boolean) {
     this.r = reg;
     this.routing_on = routing_on;
   }

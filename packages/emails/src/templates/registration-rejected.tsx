@@ -25,20 +25,17 @@ function Jsx({
         the acceptance process for the following reason(s):
       </Text>
       <ErrorBand>{rejection_reason}</ErrorBand>
+      <Text>
+        You can rectify these issues and resubmit this application. If you have
+        any questions at all, just get in touch at <MailTo email={EMAILS.hi} />
+      </Text>
       {stripe_connected && (
         <Text>
-          Your Stripe account is still connected, so you can resubmit. If you're
+          Your Stripe account is still connected to this application. If you're
           not reapplying, you can disconnect Better Giving from your Stripe
           dashboard.
         </Text>
       )}
-      <Text>
-        {stripe_connected
-          ? "You will need to rectify these issues and resubmit, but"
-          : "You will need to make a new application that rectifies these issues, but"}{" "}
-        if you have any questions at all, just get in touch at{" "}
-        <MailTo email={EMAILS.hi} />
-      </Text>
     </PublicLayout>
   );
 }

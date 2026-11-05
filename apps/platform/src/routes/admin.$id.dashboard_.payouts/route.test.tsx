@@ -474,6 +474,46 @@ describe("the payouts page", () => {
     no_wise(screen);
   });
 
+  // the bank table holds what the card does not: paid history, past a first
+  // page that the newest pending payouts would fill
+  test("a stripe-only nonprofit's bank table keeps its paid history and leaves pending to the held card", async () => {
+    await npo("acct_sent");
+    await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+    for (const day of [5, 6, 7, 8, 9]) {
+      await db()
+        .insert(payouts)
+        .values({
+          id: `p-liq-${day}`,
+          source_id: `liq-${day}`,
+          npo_id,
+          source: "liq",
+          date: `2026-07-0${day}T00:00:00.000Z`,
+          amount: day,
+          type: "pending",
+        });
+    }
+    await db().insert(payouts).values({
+      id: "p-paid",
+      source_id: "liq-paid",
+      npo_id,
+      source: "liq",
+      date: "2026-06-01T00:00:00.000Z",
+      amount: 77,
+      type: "settled",
+      settled_date: "2026-06-04T00:00:00.000Z",
+    });
+
+    const screen = await render_page();
+
+    await expect
+      .element(held_region(screen).getByText("$35.00", { exact: true }).first())
+      .toBeVisible();
+    const table = screen.getByRole("region", { name: "Payouts", exact: true });
+    await expect.element(table.getByText("$77.00")).toBeVisible();
+    expect(table.getByText("Pending").query()).toBeNull();
+    expect(table.getByRole("row").elements()).toHaveLength(2);
+  });
+
   test("a stripe-only nonprofit with nothing waiting has no held card", async () => {
     await npo("acct_sent");
     await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));

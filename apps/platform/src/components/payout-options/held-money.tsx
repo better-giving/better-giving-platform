@@ -31,8 +31,10 @@ export interface IHeldMoneyCard {
 
 const usd = (n: number) => `$${humanize(n)}`;
 
+/** the total is gross; the payout nets refunds and disputes owed and waits
+ *  for the minimum */
 const RELEASE_LINE =
-  "Once you add a bank account, this money pays out with your bank payout.";
+  "Once you add a bank account, this money pays out with your bank payout, less any refunds or disputes owed, once your balance reaches your payout minimum.";
 
 /** the lead while Stripe donations are among what waits: true at every
  *  linked status, ready included, since a gift held before ready stays held */
@@ -85,6 +87,9 @@ export function HeldMoneyCard(props: IHeldMoneyCard) {
 export function PayoutsHeldCard(props: IHeldMoneyCard) {
   const { held, rails } = props;
   if (held.total <= 0) return null;
+  const newest_first = [...held.items].sort(
+    (a, b) => Date.parse(b.date) - Date.parse(a.date)
+  );
   const copy =
     rails === "none"
       ? NONE_COPY
@@ -105,7 +110,7 @@ export function PayoutsHeldCard(props: IHeldMoneyCard) {
           </tr>
         </thead>
         <tbody>
-          {held.items.map((it, i) => (
+          {newest_first.map((it, i) => (
             // a pending payout carries no id of its own here
             <tr key={i}>
               <td>{rail_labels[it.rail]}</td>

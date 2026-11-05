@@ -19,10 +19,13 @@ const no_wise = (l: { element: () => Element }) =>
   expect(l.element().textContent).not.toMatch(/wise|money-transfer/i);
 
 const HELD_OTHERS =
-  "Held in your Better Giving balance until you add a bank account.";
-const HELD_WITHDRAWALS = "Held until you add a bank account.";
+  "In your Better Giving balance until you add a bank account.";
+const HELD_WITHDRAWALS =
+  "They stay in your balance until you add a bank account.";
 const STRIPE_ROW_UNREADY =
   "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. Until then they're held. They skip your split.";
+const STRIPE_ROW_WITH_BANK =
+  "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. They skip your split. Until then, they go to your bank.";
 const STRIPE_ROW_READY =
   "Straight to your Stripe account as each donation's own transfer, after fees. They skip your split.";
 const BANK_ROW =
@@ -110,7 +113,10 @@ describe("PayoutOptions: compare your options", () => {
       ],
       ["PayPal, DAF grants, crypto, stocks, cheques", `Held${HELD_OTHERS}`],
       ["Savings and Investments withdrawals", `Held${HELD_WITHDRAWALS}`],
-      ["Available to", "Nonprofits Stripe is available to."],
+      [
+        "Available to",
+        "Nonprofits in the US, Canada, the UK, Switzerland, Liechtenstein, Norway and EU countries.",
+      ],
     ]);
     // the badge marks only Stripe's two held rows
     expect(stripe.getByText("Held", { exact: true }).elements()).toHaveLength(
@@ -205,7 +211,7 @@ describe("PayoutChoice: registration step 4", () => {
     await expect
       .element(
         screen.getByText(
-          "Your bank payout is saved. You can continue now, and add Stripe any time from Banking."
+          "Your bank payout is saved. You can continue now, and add Stripe here too, or any time from Banking."
         )
       )
       .toBeVisible();
@@ -238,12 +244,12 @@ describe("PayoutChoice: registration step 4", () => {
   test.each<[TConnectStatus, string, string]>([
     [
       "incomplete",
-      "Your Stripe account is connected. You can continue now, and add a bank account any time from Banking.",
+      "Your Stripe account is connected. You can continue now.",
       STRIPE_ROW_UNREADY,
     ],
     [
       "ready",
-      "Your Stripe account is ready. You can continue now, and add a bank account any time from Banking.",
+      "Your Stripe account is ready. You can continue now.",
       STRIPE_ROW_READY,
     ],
   ])(
@@ -252,7 +258,9 @@ describe("PayoutChoice: registration step 4", () => {
       const { view } = render_choice({ selected: "stripe", stripe_status });
       const screen = await view;
 
-      await expect.element(screen.getByText(line)).toBeVisible();
+      await expect
+        .element(screen.getByText(line, { exact: true }))
+        .toBeVisible();
       await expect
         .element(screen.getByText(stripe_row, { exact: true }))
         .toBeVisible();
@@ -265,7 +273,7 @@ describe("PayoutChoice: registration step 4", () => {
       await expect
         .element(
           screen.getByText(
-            "Want everything to pay out? Add a bank account any time from Banking. Held money is never lost."
+            "Want everything to pay out? Add a bank account here too, or any time from Banking. Held money is never lost."
           )
         )
         .toBeVisible();
@@ -334,6 +342,81 @@ describe("PayoutChoice: registration step 4", () => {
     await expect
       .element(continue_link(screen))
       .not.toHaveAttribute("aria-disabled", "true");
+
+    // the open Stripe card sends what it can't take to the saved bank
+    const stripe = card_of(screen, "Stripe");
+    const cells = [...stripe.querySelectorAll("dd")].map((d) => d.textContent);
+    expect(cells).toEqual([
+      STRIPE_ROW_WITH_BANK,
+      "To your bank.",
+      "To your bank.",
+    ]);
+    expect(stripe.textContent).not.toMatch(/held/i);
+  });
+
+  test("Stripe ready with a bank saved: the Stripe card's first row drops its until-ready clause", async () => {
+    const { view } = render_choice({
+      selected: "stripe",
+      bank_saved: true,
+      stripe_status: "ready",
+    });
+    const screen = await view;
+    const stripe = card_of(screen, "Stripe");
+    await expect
+      .element(screen.getByText(STRIPE_ROW_READY, { exact: true }))
+      .toBeVisible();
+    expect(stripe.textContent).not.toMatch(/held/i);
+    // a bank is saved: nothing left to offer under the card
+    expect(screen.getByText("Want everything to pay out?").query()).toBeNull();
+  });
+
+  test("changing a saved bank: the form owns the actions, and the saved bank still counts", async () => {
+    const { view } = render_choice({
+      selected: "bank",
+      bank_saved: true,
+      bank_form_open: true,
+      stripe_status: "ready",
+    });
+    const screen = await view;
+    await expect.element(screen.getByText("bank section")).toBeVisible();
+    await expect
+      .element(
+        screen.getByText(
+          "Your saved bank payout stays in place until you save a new one."
+        )
+      )
+      .toBeVisible();
+    expect(screen.getByRole("link", { name: "Back" }).query()).toBeNull();
+    expect(continue_link(screen).query()).toBeNull();
+    expect(
+      screen
+        .getByRole("link", { name: "Continue without a bank account" })
+        .query()
+    ).toBeNull();
+  });
+
+  test("Stripe pressed while changing a saved bank: the bank still counts, and Continue goes on", async () => {
+    const { view } = render_choice({
+      selected: "stripe",
+      bank_saved: true,
+      bank_form_open: true,
+    });
+    const screen = await view;
+    await expect
+      .element(
+        screen.getByText(
+          "Your bank payout is saved, so you can continue now. Connect Stripe here too, or any time from Banking."
+        )
+      )
+      .toBeVisible();
+    expect(screen.getByText(/We need one/).query()).toBeNull();
+    expect(screen.getByText("Connect Stripe to continue.").query()).toBeNull();
+    await expect
+      .element(continue_link(screen))
+      .not.toHaveAttribute("aria-disabled", "true");
+    expect(card_of(screen, "Stripe").textContent).toContain(
+      STRIPE_ROW_WITH_BANK
+    );
   });
 
   test("an option card firms its edge only over the part that selects", async () => {

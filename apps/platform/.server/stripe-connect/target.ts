@@ -137,9 +137,9 @@ export async function held_elsewhere(
 }
 
 /** `t` has claimed `acct`, so a rejected registration holding it drops it.
- * kept, the rejected one could be resubmitted onto the account `t` now holds,
- * since a resubmit never re-checks the claim. call inside the claim's
- * `lock_acct` transaction, once `t`'s write has won */
+ * kept, its resubmit would be refused on the account (step 5's submit re-runs
+ * `held_elsewhere` under `lock_acct`); dropped, banking asks it for another.
+ * call inside the claim's `lock_acct` transaction, once `t`'s write has won */
 export async function release_rejected(
   acct: string,
   t: TConnectTarget,

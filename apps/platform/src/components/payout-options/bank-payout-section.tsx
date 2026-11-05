@@ -2,7 +2,7 @@ import { Button, EmptyState } from "@better-giving/ui";
 import { Landmark, Plus } from "lucide-react";
 import { type ReactNode, useId } from "react";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
-import { BANK_PAYOUT_LINE, is_linked } from "./rows";
+import { BANK_PAYOUT_LINE } from "./rows";
 
 export interface IBankPayoutSection {
   /** the bank accounts table; absent while none is on file */
@@ -28,7 +28,9 @@ export function BankPayoutSection({
   classes = "",
 }: IBankPayoutSection) {
   const heading_id = useId();
-  const linked = is_linked(stripe_status);
+  // only a ready account takes Stripe donations off the bank; before ready
+  // (incomplete, pending) they wait for a bank like everything else
+  const stripe_ready = stripe_status === "ready";
   return (
     <section aria-labelledby={heading_id} className={`${classes} grid gap-3`}>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -38,7 +40,7 @@ export function BankPayoutSection({
           </h2>
           <p className="text-sm text-gray-11 max-w-3xl">
             {BANK_PAYOUT_LINE}
-            {table && stripe_status === "ready" && (
+            {table && stripe_ready && (
               <> Everything except Stripe donations pays out here.</>
             )}
           </p>
@@ -57,7 +59,7 @@ export function BankPayoutSection({
             heading="No bank account yet"
             icon={<Landmark className="icon-xl" />}
           >
-            {empty_line(linked, holds_money)}
+            {empty_line(stripe_ready, holds_money)}
           </EmptyState>
         </div>
       )}
@@ -65,8 +67,8 @@ export function BankPayoutSection({
   );
 }
 
-const empty_line = (stripe_linked: boolean, holds_money: boolean) => {
-  if (stripe_linked)
+const empty_line = (stripe_ready: boolean, holds_money: boolean) => {
+  if (stripe_ready)
     return holds_money
       ? "Add one to release held money and have everything else pay out to your bank."
       : "Add one to have everything else pay out to your bank.";

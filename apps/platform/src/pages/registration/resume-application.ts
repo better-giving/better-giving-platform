@@ -6,6 +6,7 @@ import { reg_cookie } from "#/.server/cookie";
 import type { IRegResumeFv } from "@/reg";
 import { Progress } from "@/reg/progress";
 import { reg_resume_fv } from "@/reg/schema";
+import { stripe as stripe_env } from "$/env";
 import { reg_get } from "$/pg/queries/registration";
 
 export const resume_application = async (
@@ -44,9 +45,12 @@ export const resume_application = async (
 
   // absolute: this action lives at /register, so a "../" hop would leave the
   // registration tree entirely.
-  return redirect(`/register/${reg.id}/${new Progress(reg).step}`, {
-    headers: {
-      "set-cookie": await reg_cookie.serialize(rc),
-    },
-  });
+  return redirect(
+    `/register/${reg.id}/${new Progress(reg, stripe_env.connect_routing).step}`,
+    {
+      headers: {
+        "set-cookie": await reg_cookie.serialize(rc),
+      },
+    }
+  );
 };

@@ -6,14 +6,14 @@ import type { Reg$IdData } from "#/pages/registration/types";
 import { Progress } from "@/reg/progress";
 
 export default function Layout() {
-  const { reg, user } = useRouteLoaderData(
+  const { reg, user, connect_routing } = useRouteLoaderData(
     "routes/_app.register.$reg_id"
   ) as Reg$IdData;
 
   return (
     <div className="w-full md:w-[90%] max-w-250 pt-8 grid md:grid-cols-[auto_1fr] bg-card rounded-card border border-hairline">
       <ProgressIndicator
-        step={new Progress(reg).step}
+        step={new Progress(reg, connect_routing).step}
         o_type={reg.o_type}
         classes="md:min-w-48 lg:min-w-62 md:mr-14"
       />

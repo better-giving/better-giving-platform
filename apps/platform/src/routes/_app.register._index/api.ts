@@ -6,6 +6,7 @@ import { reg_user } from "#/pages/registration/data/reg-user";
 import { new_application } from "#/pages/registration/new-application";
 import { resume_application } from "#/pages/registration/resume-application";
 import { Progress } from "@/reg/progress";
+import { stripe as stripe_env } from "$/env";
 import { reg_latest } from "$/pg/queries/registration";
 import type { Route } from "./+types/route";
 
@@ -25,7 +26,9 @@ export const loader = async ({ request, url }: Route.LoaderArgs) => {
   if (ru.grant) {
     const reg = await reg_latest(ru.user.email);
     if (!reg) return to_auth(url);
-    return redirect(`/register/${reg.id}/${new Progress(reg).step}`);
+    return redirect(
+      `/register/${reg.id}/${new Progress(reg, stripe_env.connect_routing).step}`
+    );
   }
 
   const rc = await reg_cookie

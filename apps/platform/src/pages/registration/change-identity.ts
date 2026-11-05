@@ -14,6 +14,7 @@ import { msg } from "@/queue";
 import type { IReg, IRegStartFv } from "@/reg";
 import { Progress } from "@/reg/progress";
 import { reg_id, reg_new, reg_start_fv } from "@/reg/schema";
+import { stripe as stripe_env } from "$/env";
 import { enqueue } from "$/kit/queue";
 import { db } from "$/pg/db";
 import { npo_owned_by_regnum } from "$/pg/queries/npo";
@@ -123,6 +124,9 @@ export const change_identity = async (
   // `reg_update`'s bare `.returning()` hands back the whole row, so nothing is
   // missing for `.step` — the cast is only IReg's optionals against the
   // columns' nulls, the same mismatch `reg_get` casts through.
-  const step = new Progress(updated as unknown as IReg).step;
+  const step = new Progress(
+    updated as unknown as IReg,
+    stripe_env.connect_routing
+  ).step;
   return redirect(`../${step}`);
 };

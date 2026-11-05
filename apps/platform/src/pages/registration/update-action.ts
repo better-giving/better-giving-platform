@@ -13,6 +13,7 @@ import {
   reg_id,
   reg_update as reg_update_schema,
 } from "@/reg/schema";
+import { stripe as stripe_env } from "$/env";
 import { enqueue } from "$/kit/queue";
 import { db } from "$/pg/db";
 import {
@@ -69,7 +70,7 @@ export const update_action =
     const attrs: TRegAttrs = { ...fields, status: "01" as const };
 
     //resets
-    const prog = new Progress(reg);
+    const prog = new Progress(reg, stripe_env.connect_routing);
     const done_fsa_url = prog.fsa_url;
 
     const contact_changed =
