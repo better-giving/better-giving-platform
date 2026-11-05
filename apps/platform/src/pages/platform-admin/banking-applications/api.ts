@@ -17,7 +17,7 @@ import { wise } from "$/kit/wise";
 import {
   bapp_get,
   bapp_update_status,
-  npo_bapp_count,
+  npo_default_bapp,
 } from "$/pg/queries/banking";
 import { npos_batch_get } from "$/pg/queries/npo";
 
@@ -78,9 +78,9 @@ export const action: ActionFunction = async ({ params, request }) => {
     if (!is_approvable({ ba: x, wacc_unavailable: !wacc })) {
       throw resp.status(409);
     }
-    // auto-default if npo has no other banking apps
-    const count = await npo_bapp_count(x.npo_id);
-    const new_status = count <= 1 ? "default" : "approved";
+    // auto-default when nothing pays out yet: rejected and pending rows don't count
+    const has_default = !!(await npo_default_bapp(x.npo_id));
+    const new_status = has_default ? "approved" : "default";
     const prev = await bapp_update_status(bank_id.toString(), {
       status: new_status,
     });

@@ -387,10 +387,10 @@ describe("approve flow", () => {
     );
   }
 
-  it("approves bapp — status becomes approved when npo has >1 bapp", async () => {
+  it("approves bapp — status becomes approved when npo already has a default", async () => {
     const npo = await seed_npo();
     const bapp_id = await seed_bapp(npo.id);
-    await seed_bapp(npo.id);
+    await seed_bapp(npo.id, { status: "default" });
     const row = await get_bapp(bapp_id);
 
     const screen = await render_with_approve(bapp_id, row);
@@ -440,6 +440,27 @@ describe("approve flow", () => {
 
     // the detail page renders "default" and "approved" identically, so only
     // the db distinguishes the auto-default
+    const updated = await get_bapp(bapp_id);
+    expect(updated.status).toBe("default");
+  });
+
+  it("defaults a bank filed after a rejected one", async () => {
+    const npo = await seed_npo();
+    await seed_bapp(npo.id, { status: "rejected" });
+    const bapp_id = await seed_bapp(npo.id);
+    const row = await get_bapp(bapp_id);
+
+    const screen = await render_with_approve(bapp_id, row);
+
+    await screen.getByRole("link", { name: /approve/i }).click();
+    await expect
+      .element(screen.getByText(/you are about to approve/i))
+      .toBeVisible();
+    (
+      screen.getByRole("button", { name: /submit/i }).element() as HTMLElement
+    ).click();
+    await expect.element(screen.getByTestId("success")).toBeVisible();
+
     const updated = await get_bapp(bapp_id);
     expect(updated.status).toBe("default");
   });
