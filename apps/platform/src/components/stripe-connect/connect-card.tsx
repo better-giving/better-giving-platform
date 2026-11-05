@@ -35,8 +35,17 @@ export interface IStripeConnectCard {
   notice?: IConnectNotice;
   /** set when the npo can never route: the card says so and offers nothing */
   ineligible?: TConnectIneligibility;
-  /** the Payouts page, linked from the ready state */
+  /** the Payouts page, linked from the ready state beside a bank */
   payouts_href?: string;
+  /** a bank payout is on file: what isn't Stripe's pays out there. without
+   *  one it waits in the balance, and so do Stripe donations until Stripe
+   *  says the account is ready */
+  has_bank?: boolean;
+  /** status, band and control only, where an option card above already
+   *  says what Stripe does: registration step 4 */
+  brief?: boolean;
+  /** 3 under a page's own h2, as on registration step 4 */
+  heading_level?: 2 | 3;
   /** outer placement only — margin, grid placement */
   classes?: string;
 }
@@ -59,36 +68,78 @@ function notice_message({ result, reason }: IConnectNotice) {
   return reason_messages.failed;
 }
 
-// each band is an authored surface + its own ink (design-system.md)
-const bands: Record<IConnectNotice["result"], string> = {
-  connected: "bg-success-subtle text-success-subtle-fg",
-  denied: "bg-warning-subtle text-warning-subtle-fg",
-  error: "bg-destructive-subtle text-destructive-subtle-fg",
-};
-
 const with_replace = (href: string) =>
   `${href}${href.includes("?") ? "&" : "?"}replace=1`;
 
-const bodies: Record<TConnectStatus, string[]> = {
-  not_connected: [
-    "Connect your own Stripe account and donations paid through Stripe go straight to it, after fees: cards, digital wallets and bank debits. Stripe then pays your bank on Stripe's schedule.",
-    "Everything else still pays out to your bank: PayPal, DAF grants (through Chariot), crypto (through NOWPayments), stocks and cheques. If you skip Stripe, Stripe donations go to your bank too.",
-  ],
-  disconnected: [
-    "Stripe donations go to your bank payout.",
-    "Reconnect Stripe to send them to your Stripe account again.",
-  ],
-  incomplete: [
-    "Stripe needs a few more details before it can receive donations. Finish setup on Stripe, in your Stripe dashboard.",
-    "Until you do and Stripe says your account is ready, Stripe donations go to your bank payout, so nothing is lost.",
-  ],
-  pending: [
-    "Stripe is reviewing your account. Until it's ready, Stripe donations go to your bank payout.",
-  ],
-  ready: [
-    "Donations paid through Stripe (cards, digital wallets and bank debits) now go straight to your Stripe account, after fees. Stripe pays them to your bank on its own schedule.",
-    "Everything else still pays out to your bank. If you disconnect Better Giving in your Stripe dashboard, new Stripe donations go back to your bank.",
-  ],
+const READY_STRIPE_ONLY =
+  "Stripe donations go straight to your Stripe account, after fees. What Stripe pays on to your own bank is in your Stripe dashboard.";
+
+const bodies = (status: TConnectStatus, has_bank: boolean): string[] => {
+  switch (status) {
+    case "not_connected":
+      return [
+        `Connect Stripe to get Stripe donations straight to your Stripe account, after fees, once Stripe says your account is ready.${has_bank ? " Everything else keeps paying out to your bank." : ""}`,
+      ];
+    case "disconnected":
+      return [
+        "Better Giving was disconnected from your Stripe account in your Stripe dashboard. Connect Stripe again to get Stripe donations straight to your Stripe account, after fees, once Stripe says your account is ready.",
+      ];
+    case "incomplete":
+      // without a bank, the standing band says it
+      return has_bank
+        ? [
+            "Stripe needs a few more details before it can receive donations. Finish setup on Stripe, in your Stripe dashboard.",
+            "Until you do and Stripe says your account is ready, Stripe donations go to your bank payout, so nothing is lost.",
+          ]
+        : [];
+    case "pending":
+      return has_bank
+        ? [
+            "Stripe is reviewing your account. Until it's ready, Stripe donations go to your bank payout.",
+          ]
+        : [];
+    case "ready":
+      return has_bank
+        ? [
+            "Stripe donations (cards, digital wallets and bank debits) go straight to your Stripe account, after fees. What Stripe pays on to your own bank is in your Stripe dashboard.",
+            "Everything else pays out to your bank. If you disconnect Better Giving in your Stripe dashboard, Stripe donations go back to your bank.",
+          ]
+        : [READY_STRIPE_ONLY];
+  }
+};
+
+type TBandTone = "success" | "warning" | "error";
+
+interface IBand {
+  tone: TBandTone;
+  text: string;
+}
+
+/** the band a status keeps while it lasts, notice or not */
+const standing_band = (
+  status: TConnectStatus,
+  has_bank: boolean
+): IBand | null => {
+  if (status === "ready")
+    return { tone: "success", text: "Your Stripe account is connected." };
+  if (has_bank) return null;
+  if (status === "incomplete")
+    return {
+      tone: "warning",
+      text: "Your Stripe account is connected, but Stripe hasn't finished setting it up. Finish on Stripe. Until it's ready, your Stripe donations are held too.",
+    };
+  if (status === "pending")
+    return {
+      tone: "warning",
+      text: "Stripe is reviewing your account. Until it's ready, your Stripe donations are held too.",
+    };
+  return null;
+};
+
+const notice_tones: Record<IConnectNotice["result"], TBandTone> = {
+  connected: "success",
+  denied: "warning",
+  error: "error",
 };
 
 const ineligible_reasons = (i: TConnectIneligibility) =>
@@ -103,6 +154,9 @@ export function StripeConnectCard({
   notice,
   ineligible,
   payouts_href,
+  has_bank = true,
+  brief = false,
+  heading_level = 2,
   classes = "",
 }: IStripeConnectCard) {
   const heading_id = useId();
@@ -112,6 +166,7 @@ export function StripeConnectCard({
     return (
       <CardShell
         heading_id={heading_id}
+        heading_level={heading_level}
         badge="Not available"
         classes={classes}
       >
@@ -126,37 +181,50 @@ export function StripeConnectCard({
     );
   }
 
+  const standing = standing_band(status, has_bank);
+  // a connect that landed is said by the status's own band where it has one
+  const band: IBand | null =
+    notice && !(notice.result === "connected" && standing)
+      ? { tone: notice_tones[notice.result], text: notice_message(notice) }
+      : standing;
+  const body = brief && band ? [] : bodies(status, has_bank);
+  const payouts_link = status === "ready" && has_bank && payouts_href;
+
   return (
     <CardShell
       heading_id={heading_id}
-      badge="Optional"
+      heading_level={heading_level}
       status={<StripeConnectStatus status={status} />}
       classes={classes}
     >
-      {notice && (
+      {band && (
         // keyed by the outcome, so a different one remounts and takes focus
-        <NoticeBand key={`${notice.result}:${notice.reason}`} notice={notice} />
+        <Band
+          key={notice ? `${notice.result}:${notice.reason}` : status}
+          band={band}
+          takes_focus={!!notice}
+        />
       )}
 
-      <Body>
-        {bodies[status].map((p) => (
-          <p key={p}>{p}</p>
-        ))}
-        {status === "ready" && payouts_href && (
-          <p>
-            <Link to={payouts_href} className="link">
-              See what's been sent on your Payouts page
-            </Link>
-          </p>
-        )}
-      </Body>
+      {(body.length > 0 || payouts_link) && (
+        <Body>
+          {body.map((p) => (
+            <p key={p}>{p}</p>
+          ))}
+          {payouts_link && (
+            <p>
+              <Link to={payouts_link} className="link">
+                See what's been sent on your Payouts page
+              </Link>
+            </p>
+          )}
+        </Body>
+      )}
 
       {status === "not_connected" || status === "disconnected" ? (
         // a revoked account has nothing left to replace, so nothing to confirm
-        <a href={start_href} className="btn btn-primary justify-self-start">
-          {status === "disconnected"
-            ? "Reconnect Stripe"
-            : "Connect with Stripe"}
+        <a href={start_href} className="btn btn-secondary justify-self-start">
+          Connect Stripe
         </a>
       ) : (
         <button
@@ -175,7 +243,8 @@ export function StripeConnectCard({
 
 interface ICardShell {
   heading_id: string;
-  badge: string;
+  heading_level: 2 | 3;
+  badge?: string;
   status?: ReactNode;
   classes: string;
   children: ReactNode;
@@ -183,11 +252,13 @@ interface ICardShell {
 
 function CardShell({
   heading_id,
+  heading_level,
   badge,
   status,
   classes,
   children,
 }: ICardShell) {
+  const Heading = `h${heading_level}` as const;
   return (
     <section
       aria-labelledby={heading_id}
@@ -196,10 +267,10 @@ function CardShell({
       <div className="grid gap-1">
         {/* the badge sits beside the h2, not in it: the heading names the region */}
         <div className="flex flex-wrap items-center gap-2">
-          <h2 id={heading_id} className="text-lg font-semibold">
+          <Heading id={heading_id} className="text-lg font-semibold">
             Stripe account
-          </h2>
-          <Badge tone="neutral">{badge}</Badge>
+          </Heading>
+          {badge && <Badge tone="neutral">{badge}</Badge>}
         </div>
         {status}
       </div>
@@ -218,31 +289,39 @@ function Body({ children }: IBody) {
   );
 }
 
-interface INoticeBand {
-  notice: IConnectNotice;
+// each band is an authored surface + its own ink (design-system.md)
+const band_looks: Record<TBandTone, string> = {
+  success: "bg-success-subtle text-success-subtle-fg",
+  warning: "bg-warning-subtle text-warning-subtle-fg",
+  error: "bg-destructive-subtle text-destructive-subtle-fg",
+};
+
+interface IBandView {
+  band: IBand;
+  /** the band says how the return from Stripe ended */
+  takes_focus: boolean;
 }
 
-function NoticeBand({ notice }: INoticeBand) {
+function Band({ band, takes_focus }: IBandView) {
   const ref = useRef<HTMLDivElement>(null);
-  const { result } = notice;
 
   // the notice arrives on a full page load back from Stripe: a live region
   // mounted already holding it is announced by nobody, so focus carries it
   useEffect(() => {
-    ref.current?.focus();
-  }, []);
+    if (takes_focus) ref.current?.focus();
+  }, [takes_focus]);
 
-  const Icon = result === "connected" ? CircleCheck : CircleAlert;
+  const Icon = band.tone === "success" ? CircleCheck : CircleAlert;
   return (
     <div
       ref={ref}
-      tabIndex={-1}
-      className={`flex items-start gap-2 rounded px-4 py-3 text-sm outline-0 ${bands[result]}`}
+      tabIndex={takes_focus ? -1 : undefined}
+      className={`flex items-start gap-2 rounded px-4 py-3 text-sm outline-0 ${band_looks[band.tone]}`}
     >
       <span className="h-lh flex items-center shrink-0">
         <Icon aria-hidden className="icon-md" />
       </span>
-      <p>{notice_message(notice)}</p>
+      <p>{band.text}</p>
     </div>
   );
 }

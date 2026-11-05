@@ -78,9 +78,8 @@ describe("BankDetails: currency list", () => {
     });
 
     await expect.element(field).toBeEnabled();
-    const hint = "The details Wise asks for next depend on this currency.";
-    await expect.element(screen.getByText(hint)).toBeVisible();
-    await expect.element(field).toHaveAccessibleDescription(hint);
+    // the currency picker speaks for itself: no payout provider is named
+    expect(screen.container.textContent).not.toMatch(/wise/i);
     await field.click();
     await expect
       .element(screen.getByRole("option", { name: /GBP - British Pound/ }))

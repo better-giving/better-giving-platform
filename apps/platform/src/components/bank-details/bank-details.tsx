@@ -80,7 +80,6 @@ export function BankDetails({
           // what wise supports, not from the default RESULT_LIMIT of 10 rows
           limit={Number.POSITIVE_INFINITY}
           label="Select your bank account currency:"
-          sub="The details Wise asks for next depend on this currency."
           required
           disabled={is_submitting || is_loading || currencies.is_error}
           classes={{ container: "md:w-80", control: "w-full" }}
