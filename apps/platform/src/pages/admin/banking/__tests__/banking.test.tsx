@@ -900,10 +900,9 @@ describe("stripe connect card", () => {
       .toBeVisible();
     // a connected npo has read the comparison already: it starts collapsed
     const explainer = screen.getByRole("region", { name: "How you get paid" });
-    await expect.element(explainer).toBeVisible();
-    expect(
-      explainer.getByRole("heading", { name: "How you get paid" }).query()
-    ).toBeNull();
+    await expect
+      .element(explainer.getByRole("button", { name: /how you get paid/i }))
+      .toHaveAttribute("aria-expanded", "false");
     const [e, b, c] = [explainer, bank, card].map((l) => l.element());
     expect(
       e.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING
@@ -930,11 +929,15 @@ describe("stripe connect card", () => {
         `/api/stripe-connect/start?kind=npo&npo_id=${npo.id}`
       );
     // nothing is set up on stripe yet, so the comparison starts open
+    const explainer = screen.getByRole("region", { name: "How you get paid" });
     await expect
       .element(
-        screen.getByRole("heading", { level: 2, name: "How you get paid" })
+        explainer.getByRole("heading", { level: 2, name: "How you get paid" })
       )
       .toBeVisible();
+    expect(
+      explainer.getByRole("button", { name: /how you get paid/i }).query()
+    ).toBeNull();
   });
 
   // only a nonprofit that never linked an account gets the comparison open;
@@ -965,13 +968,12 @@ describe("stripe connect card", () => {
       const card = screen.getByRole("region", { name: "Stripe account" });
       await expect.element(card.getByText(line)).toBeVisible();
       await expect
-        .element(screen.getByRole("region", { name: "How you get paid" }))
-        .toBeVisible();
-      expect(
-        screen
-          .getByRole("heading", { level: 2, name: "How you get paid" })
-          .query()
-      ).toBeNull();
+        .element(
+          screen
+            .getByRole("region", { name: "How you get paid" })
+            .getByRole("button", { name: /how you get paid/i })
+        )
+        .toHaveAttribute("aria-expanded", "false");
       expect(sync_npo_account).not.toHaveBeenCalled();
     }
   );

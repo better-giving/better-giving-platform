@@ -1,24 +1,36 @@
 import { describe, expect, test } from "vitest";
+import type { Locator } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { TRANSFER_COUNTRIES_COPY } from "@/stripe-connect/eligibility";
 import { PayoutOptions } from "./payout-options";
 
 const WHO_STRIPE = `Not available to fiscally sponsored nonprofits, or to nonprofits headquartered outside ${TRANSFER_COUNTRIES_COPY}.`;
 
+/** the one heading the box adds to the page: an h2, open or closed. the
+ * options are not headings — banking's own sections carry those names */
+const expect_one_h2 = async (box: Locator) => {
+  await expect
+    .element(box.getByRole("heading", { level: 2, name: "How you get paid" }))
+    .toBeVisible();
+  expect(box.getByRole("heading").elements()).toHaveLength(1);
+};
+
 describe("PayoutOptions", () => {
   test("open: both options side by side, with the footer in Stripe donations", async () => {
     const screen = await render(<PayoutOptions variant="open" />);
     const region = screen.getByRole("region", { name: "How you get paid" });
 
+    await expect_one_h2(region);
+    const [bank, stripe] = region.getByRole("listitem").all();
     await expect
-      .element(region.getByRole("heading", { name: "Bank payout" }))
+      .element(bank.getByText("Bank payout", { exact: true }))
       .toBeVisible();
-    await expect.element(region.getByText("Required")).toBeVisible();
+    await expect.element(bank.getByText("Required")).toBeVisible();
     await expect
-      .element(region.getByRole("heading", { name: "Stripe account" }))
+      .element(stripe.getByText("Stripe account", { exact: true }))
       .toBeVisible();
     await expect
-      .element(region.getByText("Optional", { exact: true }))
+      .element(stripe.getByText("Optional", { exact: true }))
       .toBeVisible();
     await expect
       .element(region.getByText(WHO_STRIPE, { exact: true }))
@@ -43,7 +55,12 @@ describe("PayoutOptions", () => {
 
   test("collapsed: closed until its trigger is pressed", async () => {
     const screen = await render(<PayoutOptions variant="collapsed" />);
-    const trigger = screen.getByRole("button", { name: /how you get paid/i });
+    const region = screen.getByRole("region", { name: "How you get paid" });
+    // heading navigation lands on the trigger itself while the box is closed
+    await expect_one_h2(region);
+    const trigger = region
+      .getByRole("heading", { level: 2 })
+      .getByRole("button", { name: /how you get paid/i });
 
     await expect
       .element(
@@ -60,6 +77,8 @@ describe("PayoutOptions", () => {
     await expect
       .element(screen.getByText(WHO_STRIPE, { exact: true }))
       .toBeVisible();
+    // opening it adds nothing below the h2, so the outline matches the open box
+    await expect_one_h2(region);
   });
 
   test("collapsed: the subtitle prop replaces the default line", async () => {

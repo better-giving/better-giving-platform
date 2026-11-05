@@ -14,6 +14,9 @@ interface Props {
   /** `compact` is a tight list inside a card; `divided` is a padded, ruled
    * list for a page section */
   variant?: "compact" | "divided";
+  /** wraps each trigger in a heading of this level, so the rows sit in the
+   * page outline; leave it off when a heading above the list already names it */
+  heading_level?: 2 | 3 | 4 | 5 | 6;
   /** outer placement only — width, margin */
   className?: string;
 }
@@ -36,25 +39,46 @@ const looks = {
 export function Accordion({
   items,
   variant = "compact",
+  heading_level,
   className = "",
 }: Props) {
   const look = looks[variant];
+  const Heading = heading_level ? (`h${heading_level}` as const) : null;
   return (
     <Ark.Root collapsible className={`${look.root} ${className}`}>
       {items.map((it) => (
         <Ark.Item key={it.value} value={it.value} className="group">
-          <Ark.ItemTrigger className={look.trigger}>
-            <span className={look.label}>{it.trigger}</span>
-            <DrawerIcon
-              is_open={false}
-              className="icon-lg shrink-0 group-data-[state=open]:rotate-180"
-            />
-          </Ark.ItemTrigger>
+          {Heading ? (
+            // base.css sets headings in the display face at bold, and the
+            // button inherits it; the trigger keeps the body face either way
+            <Heading className="font-body font-normal">
+              <Trigger look={look}>{it.trigger}</Trigger>
+            </Heading>
+          ) : (
+            <Trigger look={look}>{it.trigger}</Trigger>
+          )}
           <Ark.ItemContent className="overflow-hidden data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
             <div className={look.content}>{it.content}</div>
           </Ark.ItemContent>
         </Ark.Item>
       ))}
     </Ark.Root>
+  );
+}
+
+interface ITrigger {
+  look: (typeof looks)[keyof typeof looks];
+  children: ReactNode;
+}
+
+function Trigger({ look, children }: ITrigger) {
+  return (
+    <Ark.ItemTrigger className={look.trigger}>
+      <span className={look.label}>{children}</span>
+      <DrawerIcon
+        is_open={false}
+        className="icon-lg shrink-0 group-data-[state=open]:rotate-180"
+      />
+    </Ark.ItemTrigger>
   );
 }

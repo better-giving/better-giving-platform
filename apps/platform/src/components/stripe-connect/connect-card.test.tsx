@@ -220,7 +220,8 @@ describe("StripeConnectCard", () => {
       "ready",
       [
         "now go straight to your Stripe account, after fees.",
-        "Stripe donations go back to your bank.",
+        // "new": what was already sent stays in Stripe
+        "new Stripe donations go back to your bank.",
       ],
     ],
   ])(

@@ -3,8 +3,9 @@ import { useId } from "react";
 import { TRANSFER_COUNTRIES_COPY } from "@/stripe-connect/eligibility";
 
 export interface IPayoutOptions {
-  /** `open` on banking while Stripe isn't connected, saved bank methods or
-   * not; `collapsed` once it is, and always on registration step 4 */
+  /** `open` on banking only while no Stripe account was ever linked
+   * (`not_connected`); `collapsed` once one was, however far it got or if it
+   * was disconnected since, and always on registration step 4 */
   variant: "open" | "collapsed";
   /** the collapsed trigger's second line */
   subtitle?: string;
@@ -88,7 +89,9 @@ export function PayoutOptions({
   if (variant === "collapsed") {
     return (
       <section aria-label="How you get paid" className={`${classes} card`}>
+        {/* the h2 the open variant writes, wrapped round the trigger */}
         <Accordion
+          heading_level={2}
           items={[
             {
               value: "how-you-get-paid",
@@ -130,11 +133,13 @@ function Comparison() {
       {/* columns follow the box, not the viewport: registration's column is
           narrower than the banking page's at the same window width */}
       <div className="@container">
-        <div className="grid gap-4 @3xl:grid-cols-2">
+        {/* not headings: the banking page's own sections are already named
+            "Bank payout" and "Stripe account", and the outline would say each twice */}
+        <ul className="grid gap-4 @3xl:grid-cols-2">
           {options.map((o) => (
             <Option key={o.title} {...o} />
           ))}
-        </div>
+        </ul>
       </div>
       <div className="grid gap-2 border-t border-hairline pt-4">
         <p>
@@ -158,9 +163,9 @@ function Comparison() {
 
 function Option({ title, badge, tone, lede, facts }: IOption) {
   return (
-    <div className="bg-panel rounded p-4 grid gap-3 content-start">
+    <li className="bg-panel rounded p-4 grid gap-3 content-start">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="font-semibold">{title}</h3>
+        <p className="font-semibold">{title}</p>
         <Badge tone={tone}>{badge}</Badge>
       </div>
       <p className="text-gray-11">{lede}</p>
@@ -172,6 +177,6 @@ function Option({ title, badge, tone, lede, facts }: IOption) {
           </div>
         ))}
       </dl>
-    </div>
+    </li>
   );
 }

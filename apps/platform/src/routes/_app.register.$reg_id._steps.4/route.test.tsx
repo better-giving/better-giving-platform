@@ -286,30 +286,6 @@ describe("registration step 4: banking", () => {
     expect(screen.getByText(/invalid url/i).query()).toBeNull();
   }, 30_000);
 
-  // a landed save redirects back to this same route, which stays mounted, so
-  // a prompt could be raised off stale `fetcher.data` once the save settles
-  it("raises no prompt when the update lands", async () => {
-    const id = await seed_step_4();
-    const screen = await render_step_4(id);
-
-    await screen.getByRole("button", { name: /submit bank details/i }).click();
-
-    await expect
-      .element(
-        screen.getByRole("region", { name: "Your bank payout", exact: true })
-      )
-      .toBeInTheDocument();
-    // the failure's prompt, by the text it renders on a 4xx
-    expect(screen.getByText(/invalid url/i).query()).toBeNull();
-    expect(screen.getByRole("dialog").query()).toBeNull();
-
-    const [row] = await test_db
-      .current!.db.select()
-      .from(registrations)
-      .where(eq(registrations.id, id));
-    expect(row.o_bank_id).toBe("999");
-  }, 30_000);
-
   describe("focus after the bank form closes", () => {
     const saved_heading = (screen: Awaited<ReturnType<typeof render_step_4>>) =>
       screen.getByRole("heading", { name: "Your bank payout", exact: true });

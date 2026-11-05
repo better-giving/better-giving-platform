@@ -87,7 +87,7 @@ const bodies: Record<TConnectStatus, string[]> = {
   ],
   ready: [
     "Donations paid through Stripe (cards, digital wallets and bank debits) now go straight to your Stripe account, after fees. Stripe pays them to your bank on its own schedule.",
-    "Everything else still pays out to your bank. If you disconnect Better Giving in your Stripe dashboard, Stripe donations go back to your bank.",
+    "Everything else still pays out to your bank. If you disconnect Better Giving in your Stripe dashboard, new Stripe donations go back to your bank.",
   ],
 };
 
