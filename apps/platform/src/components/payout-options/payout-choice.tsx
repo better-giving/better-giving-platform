@@ -62,7 +62,7 @@ export function PayoutChoice({
   const hint = can_continue
     ? null
     : selected === "stripe"
-      ? "Connect your Stripe account to continue."
+      ? "Connect Stripe to continue."
       : "Choose an option to continue.";
 
   return (

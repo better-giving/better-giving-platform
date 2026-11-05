@@ -65,7 +65,10 @@ describe("PayoutOptions: compare your options", () => {
     const screen = await render(
       <PayoutOptions current={{ bank: false, stripe: true }} />
     );
-    const region = screen.getByRole("region", { name: "Compare your options" });
+    const region = screen.getByRole("region", {
+      name: "Compare your options",
+      exact: true,
+    });
     const trigger = region.getByRole("button");
     await trigger.click();
     await expect.element(trigger).toHaveAttribute("aria-expanded", "true");
@@ -185,7 +188,7 @@ describe("PayoutChoice: registration step 4", () => {
     await expect
       .element(next)
       .toHaveAccessibleDescription("Choose an option to continue.");
-    expect(screen.getByText("Required").query()).toBeNull();
+    expect(screen.getByText("Required", { exact: true }).query()).toBeNull();
     // neither section shows before a choice
     expect(screen.getByText("bank section").query()).toBeNull();
     expect(screen.getByText("stripe section").query()).toBeNull();
@@ -228,7 +231,7 @@ describe("PayoutChoice: registration step 4", () => {
     ).toBeNull();
     // set up, so the footnote has nothing left to explain
     expect(screen.getByText(FOOTNOTE).query()).toBeNull();
-    expect(screen.getByText("Required").query()).toBeNull();
+    expect(screen.getByText("Required", { exact: true }).query()).toBeNull();
     expect(screen.container.textContent).not.toMatch(/wise|money-transfer/i);
   });
 
@@ -269,7 +272,7 @@ describe("PayoutChoice: registration step 4", () => {
       await expect
         .element(continue_link(screen))
         .not.toHaveAttribute("aria-disabled", "true");
-      expect(screen.getByText("Required").query()).toBeNull();
+      expect(screen.getByText("Required", { exact: true }).query()).toBeNull();
       expect(screen.container.textContent).not.toMatch(/wise|money-transfer/i);
     }
   );
@@ -281,7 +284,7 @@ describe("PayoutChoice: registration step 4", () => {
       .element(continue_link(screen))
       .toHaveAttribute("aria-disabled", "true");
     await expect
-      .element(screen.getByText("Connect your Stripe account to continue."))
+      .element(screen.getByText("Connect Stripe to continue."))
       .toBeVisible();
     expect(screen.getByText("Want everything to pay out?").query()).toBeNull();
   });
@@ -305,7 +308,9 @@ describe("BankRequired: can't use Stripe", () => {
     await expect
       .element(screen.getByRole("heading", { name: "Set up your bank payout" }))
       .toBeVisible();
-    await expect.element(screen.getByText("Required")).toBeVisible();
+    await expect
+      .element(screen.getByText("Required", { exact: true }))
+      .toBeVisible();
     await expect
       .element(
         screen.getByText(
@@ -330,7 +335,9 @@ describe("BankRequired: can't use Stripe", () => {
         <p>bank form</p>
       </BankRequired>
     );
-    await expect.element(screen.getByText("Required")).toBeVisible();
+    await expect
+      .element(screen.getByText("Required", { exact: true }))
+      .toBeVisible();
     expect(screen.getByText("Stripe isn't available").query()).toBeNull();
   });
 });
