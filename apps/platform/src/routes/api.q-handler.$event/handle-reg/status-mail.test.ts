@@ -13,7 +13,11 @@ const send_alert = vi.hoisted(() => vi.fn());
 
 vi.mock("$/email", () => ({ send_email, send_email_or_throw: vi.fn() }));
 vi.mock("#/errors/report", () => ({ report_error }));
-vi.mock("$/env", () => ({ base_url: "http://x", hubspot: { owner_id: "1" } }));
+vi.mock("$/env", () => ({
+  base_url: "http://x",
+  hubspot: { owner_id: "1" },
+  stripe: { connect_routing: true },
+}));
 vi.mock("$/kit/slack", () => ({ bg_sales: { send_alert } }));
 vi.mock("$/kit/wise", () => ({ wise: { v2_account: vi.fn() } }));
 vi.mock("#/.server/auth/auth", () => ({ auth: {} }));
@@ -103,6 +107,13 @@ describe("registration status mails", () => {
 
     const { text } = await sent();
     expect(text).toMatch(/Hi there,/);
+  });
+
+  test("a rejection links back to the application it asks them to resubmit", async () => {
+    await handle_reg_updated(reg({ status: "04" }));
+
+    const { text } = await sent();
+    expect(text).toMatch(/http:\/\/x\/register\/reg-1\/1\b/);
   });
 
   test("the footer's social links each keep their url whole in the text part", async () => {

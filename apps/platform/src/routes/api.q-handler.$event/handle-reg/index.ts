@@ -161,10 +161,17 @@ export async function handle_reg_updated(reg: IReg) {
   // skip the contact/company sync at the foot of this function. a refused status
   // mail is reported and left rather than re-driving everything around it.
   if (reg.status === "04") {
+    // a plain link, as `handle_reg_created` sends a signed-in applicant: only
+    // the wizard submits, so a verified account owns this address already
+    const resume_url = new URL(
+      `/register/${reg.id}/${prog.step}`,
+      base_url
+    ).toString();
     const { node, subject } = registration_rejected.template({
       registrant_first_name: reg.r_first_name || "there",
       rejection_reason: reg.status_rejected_reason || "not specified",
       stripe_connected: !!reg.o_stripe_account_id,
+      resume_url,
     });
     const res = await send_email({ node, subject, to: [reg.r_id] });
     console.info(res.data?.id);
