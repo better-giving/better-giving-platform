@@ -29,12 +29,12 @@ const tones: Record<TConnectStatus, ITone> = {
     dot: "bg-warning",
   },
   ready: {
-    label: "Ready to receive card donations",
+    label: "Ready to receive Stripe donations",
     ink: "text-success-subtle-fg",
     dot: "bg-success",
   },
   disconnected: {
-    label: "Disconnected — card donations settle to your bank details",
+    label: "Disconnected. Stripe donations go to your bank payout.",
     ink: "text-warning-subtle-fg",
     dot: "bg-warning",
   },

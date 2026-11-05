@@ -1,6 +1,8 @@
 import { AskHost } from "@better-giving/ui";
+import { createRoutesStub } from "react-router";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
+import { TRANSFER_COUNTRIES_COPY } from "@/stripe-connect/eligibility";
 import { type IStripeConnectCard, StripeConnectCard } from "./connect-card";
 
 const START = "/api/stripe-connect/start?npo=42";
@@ -62,7 +64,7 @@ describe("StripeConnectCard", () => {
     await expect
       .element(
         screen.getByText(
-          "Disconnected — card donations settle to your bank details"
+          "Disconnected. Stripe donations go to your bank payout."
         )
       )
       .toBeVisible();
@@ -103,7 +105,7 @@ describe("StripeConnectCard", () => {
     const screen = await render_card({ status: "ready" });
 
     await expect
-      .element(screen.getByText("Ready to receive card donations"))
+      .element(screen.getByText("Ready to receive Stripe donations"))
       .toBeVisible();
     await expect
       .element(screen.getByRole("link", { name: "Connect with Stripe" }))
@@ -193,8 +195,78 @@ describe("StripeConnectCard", () => {
   test("no notice, no band and no focus taken", async () => {
     const screen = await render_card({ status: "ready" });
     await expect
-      .element(screen.getByText("Ready to receive card donations"))
+      .element(screen.getByText("Ready to receive Stripe donations"))
       .toBeVisible();
     expect(screen.container.querySelector("[tabindex='-1']")).toBeNull();
   });
+
+  test("ready: links the Payouts page when given its href", async () => {
+    const Stub = createRoutesStub([
+      {
+        path: "/",
+        Component: () => (
+          <StripeConnectCard
+            status="ready"
+            start_href={START}
+            payouts_href="/admin/42/payouts"
+          />
+        ),
+      },
+    ]);
+    const screen = await render(<Stub />);
+    await expect
+      .element(
+        screen.getByRole("link", {
+          name: "See what's been sent on your Payouts page",
+        })
+      )
+      .toHaveAttribute("href", "/admin/42/payouts");
+  });
+
+  test("ready: no Payouts link without its href", async () => {
+    // registration passes none, and renders outside any router
+    const screen = await render_card({ status: "ready" });
+    await expect
+      .element(screen.getByText("Ready to receive Stripe donations"))
+      .toBeVisible();
+    expect(
+      screen.getByRole("link", { name: /payouts page/i }).query()
+    ).toBeNull();
+  });
+
+  test.each<[NonNullable<IStripeConnectCard["ineligible"]>, string]>([
+    [
+      { reason: "fiscal_sponsored" },
+      "Stripe isn't available to fiscally sponsored nonprofits, so there's nothing to connect.",
+    ],
+    [
+      { reason: "country", hq_country: "Brazil" },
+      `Stripe isn't available for nonprofits headquartered in Brazil. We can send Stripe donations to nonprofits headquartered in ${TRANSFER_COUNTRIES_COPY}.`,
+    ],
+  ])(
+    "not eligible (%o): says why, offers nothing",
+    async (ineligible, reason) => {
+      const screen = await render_card({ status: "ready", ineligible });
+      const card = screen.getByRole("region", { name: "Stripe account" });
+
+      await expect.element(card.getByText("Not available")).toBeVisible();
+      await expect
+        .element(card.getByText(reason, { exact: true }))
+        .toBeVisible();
+      await expect
+        .element(
+          card.getByText(
+            "All your donations, Stripe donations included, pay out to your bank. You don't need to do anything."
+          )
+        )
+        .toBeVisible();
+      // no status line, no dashboard link, no control of any kind
+      expect(
+        card.getByText("Ready to receive Stripe donations").query()
+      ).toBeNull();
+      expect(card.getByText("Optional", { exact: true }).query()).toBeNull();
+      expect(card.getByRole("link").query()).toBeNull();
+      expect(card.getByRole("button").query()).toBeNull();
+    }
+  );
 });

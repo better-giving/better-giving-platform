@@ -91,6 +91,9 @@ export function BankDetails({
             )
           }
         />
+        <p className="mt-1 text-sm text-gray-11">
+          The details Wise asks for next depend on this currency.
+        </p>
         {/* a failed list can't open, so the reason sits under the field. it is
           not the field's error: the selected currency is fine, so the edge
           stays neutral rather than marking the value invalid. announced when
