@@ -1,6 +1,6 @@
 import { Actions, Badge, ExtLink, use_ask_prompt } from "@better-giving/ui";
 import { SquareArrowOutUpRight } from "lucide-react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { NavLink, useFetcher } from "react-router";
 import { BankDetails, type OnSubmit } from "#/components/bank-details";
 import { PayoutOptions } from "#/components/payout-options";
@@ -65,6 +65,7 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
   const [fetcher_state, set_fetcher_state] = useState(fetcher.state);
   if (fetcher_state !== fetcher.state) {
     set_fetcher_state(fetcher.state);
+    // sound only while every success redirects and every failure is `resp.fail`
     if (fetcher.state === "idle" && !fetcher.data?.message) {
       set_is_changing(false);
     }
@@ -86,6 +87,9 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
       o_bank_statement: bank_statement,
       o_bank_id: recipient.id.toString(),
     };
+    // a redirect brings no data, so the last failure's would outlive the save
+    // that follows it and hold the form open
+    fetcher.reset();
     fetcher.submit(update, {
       method: "PATCH",
       encType: "application/json",
@@ -94,7 +98,7 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
 
   // a rejected update resolves the submit instead of throwing: the action
   // returns a tagged failure (`resp.fail`) the client reads off `fetcher.data`,
-  // while a landed save redirects and never lands here.
+  // while a landed save redirects and leaves it empty.
   useEffect(() => {
     if (fetcher.state !== "idle" || !fetcher.data?.message) return;
     ask_prompt(
@@ -105,12 +109,27 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
     );
   }, [fetcher.state, fetcher.data, ask_prompt]);
 
-  if (reg.o_bank_id && !is_changing) {
+  const shows_saved = !!reg.o_bank_id && !is_changing;
+  // the form that held focus is gone once the saved panel replaces it; a
+  // saved bank there on arrival is not a change, so focus stays put
+  const saved_heading = useRef<HTMLHeadingElement>(null);
+  const showed_saved = useRef(shows_saved);
+  useEffect(() => {
+    if (shows_saved && !showed_saved.current) saved_heading.current?.focus();
+    showed_saved.current = shows_saved;
+  }, [shows_saved]);
+
+  if (shows_saved) {
     return (
       <div className="grid gap-6 content-start">
         <section aria-labelledby={heading_id} className="grid gap-3">
           <div className="flex items-center gap-2">
-            <h2 id={heading_id} className="text-xl">
+            <h2
+              id={heading_id}
+              ref={saved_heading}
+              tabIndex={-1}
+              className="text-xl"
+            >
               Your bank payout
             </h2>
             <Badge tone="success">Saved</Badge>

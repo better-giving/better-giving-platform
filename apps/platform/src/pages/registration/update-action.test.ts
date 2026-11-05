@@ -160,6 +160,7 @@ describe("update_action — where a save lands", () => {
       status: "01",
       r_first_name: "Jane",
       r_last_name: "Doe",
+      r_contact_number: "1234567890",
       o_name: "Test Org",
       r_org_role: "ceo",
       rm: "search-engines",
@@ -198,18 +199,23 @@ describe("update_action — where a save lands", () => {
     const res = await save_bank("4");
 
     expect(res.headers.get("location")).toBe("../5");
+    expect(res.headers.has("X-Remix-Replace")).toBe(false);
+    expect((await reg_get(RID))?.o_bank_id).toBe("999");
   });
 
+  // a fetcher's redirect pushes a history entry unless the response says
+  // replace, and back onto the same step reads as a back press doing nothing
   test.each([
     ["a first save", null],
     ["a change of a saved bank", "111"],
-  ])("`next_always` sends %s to `next`", async (_, o_bank_id) => {
+  ])("`next_always` sends %s to `next` in place", async (_, o_bank_id) => {
     await seed_banking(o_bank_id);
 
     const res = await save_bank("4", { next_always: true });
 
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("../4");
+    expect(res.headers.get("X-Remix-Replace")).toBe("true");
     expect((await reg_get(RID))?.o_bank_id).toBe("999");
   });
 });
