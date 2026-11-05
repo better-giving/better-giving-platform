@@ -360,9 +360,23 @@ describe("payout methods list", () => {
     const npo = await seed_npo();
     const screen = await render_list(npo.id);
 
+    const bank = screen.getByRole("region", { name: "Bank payout" });
     await expect
-      .element(screen.getByText(/no payout methods yet/i))
+      .element(bank.getByText(/no payout methods yet/i))
       .toBeVisible();
+    await expect
+      .element(bank.getByText("Required", { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(
+        bank.getByText(
+          "Grants are sent to your bank through Wise, a money-transfer service, in the currency you choose. Every kind of donation can pay out here, every 3 days once your balance reaches your payout minimum."
+        )
+      )
+      .toBeVisible();
+    await expect
+      .element(bank.getByRole("link", { name: "Add bank account" }))
+      .toHaveAttribute("href", `/admin/${npo.id}/banking/new`);
   });
 });
 
@@ -860,7 +874,7 @@ describe("stripe connect card", () => {
     stripe_synced_at: new Date().toISOString(),
   };
 
-  it("sits above the wise table, reading the status off the mirror", async () => {
+  it("follows the bank payout, reading the status off the mirror", async () => {
     const npo = await seed_npo(READY);
     await seed_bapp(npo.id, {
       status: "approved",
@@ -871,13 +885,31 @@ describe("stripe connect card", () => {
 
     const card = screen.getByRole("region", { name: "Stripe account" });
     await expect
-      .element(card.getByText("Ready to receive card donations"))
+      .element(card.getByText("Ready to receive Stripe donations"))
       .toBeVisible();
-    const row = screen.getByText("USD account ending in 1234");
-    await expect.element(row).toBeVisible();
+    await expect
+      .element(
+        card.getByRole("link", {
+          name: /what's been sent on your payouts page/i,
+        })
+      )
+      .toHaveAttribute("href", `/admin/${npo.id}/dashboard/payouts`);
+    const bank = screen.getByRole("region", { name: "Bank payout" });
+    await expect
+      .element(bank.getByText("USD account ending in 1234"))
+      .toBeVisible();
+    // a connected npo has read the comparison already: it starts collapsed
+    const explainer = screen.getByRole("region", { name: "How you get paid" });
+    await expect.element(explainer).toBeVisible();
     expect(
-      card.element().compareDocumentPosition(row.element()) &
-        Node.DOCUMENT_POSITION_FOLLOWING
+      explainer.getByRole("heading", { name: "How you get paid" }).query()
+    ).toBeNull();
+    const [e, b, c] = [explainer, bank, card].map((l) => l.element());
+    expect(
+      e.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      b.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     // a synced mirror is read as it stands
     expect(sync_npo_account).not.toHaveBeenCalled();
@@ -897,7 +929,55 @@ describe("stripe connect card", () => {
         "href",
         `/api/stripe-connect/start?kind=npo&npo_id=${npo.id}`
       );
+    // nothing is set up on stripe yet, so the comparison starts open
+    await expect
+      .element(
+        screen.getByRole("heading", { level: 2, name: "How you get paid" })
+      )
+      .toBeVisible();
   });
+
+  it.each([
+    {
+      why: "fiscally sponsored",
+      seed: { fiscal_sponsored: true },
+      says: /fiscally sponsored nonprofits/i,
+    },
+    {
+      why: "headquartered outside the transfer countries",
+      seed: { hq_country: "Brazil" },
+      says: /headquartered in Brazil/,
+    },
+  ])(
+    "a $why npo is told stripe is not available, and nothing else",
+    async ({ seed, says }) => {
+      const npo = await seed_npo({ ...seed, stripe_account_id: "acct_new" });
+      await seed_bapp(npo.id, { bank_summary: "USD account ending in 1234" });
+
+      const screen = await render_list(npo.id, "?stripe_connect=connected");
+
+      const card = screen.getByRole("region", { name: "Stripe account" });
+      await expect.element(card.getByText(says)).toBeVisible();
+      await expect
+        .element(card.getByText("Not available", { exact: true }))
+        .toBeVisible();
+      await expect
+        .element(screen.getByText("USD account ending in 1234"))
+        .toBeVisible();
+      expect(
+        screen.getByRole("region", { name: "How you get paid" }).query()
+      ).toBeNull();
+      expect(screen.getByRole("link", { name: /stripe/i }).query()).toBeNull();
+      expect(
+        screen.getByRole("button", { name: /account/i }).query()
+      ).toBeNull();
+      expect(
+        screen.getByText("Your Stripe account is connected.").query()
+      ).toBeNull();
+      // connecting would change nothing, so stripe is not asked
+      expect(sync_npo_account).not.toHaveBeenCalled();
+    }
+  );
 
   it("asks stripe for a linked account it has never synced", async () => {
     const npo = await seed_npo({ stripe_account_id: "acct_new" });
@@ -913,7 +993,7 @@ describe("stripe connect card", () => {
 
     const card = screen.getByRole("region", { name: "Stripe account" });
     await expect
-      .element(card.getByText("Ready to receive card donations"))
+      .element(card.getByText("Ready to receive Stripe donations"))
       .toBeVisible();
     expect(sync_npo_account).toHaveBeenCalledWith(npo.id);
   });
@@ -1019,6 +1099,12 @@ describe("stripe connect card", () => {
     expect(
       screen.getByText(/already linked to another nonprofit/i).query()
     ).toBeNull();
+    expect(
+      screen.getByRole("region", { name: "How you get paid" }).query()
+    ).toBeNull();
+    const bank = screen.getByRole("region", { name: "Bank payout" });
+    await expect.element(bank).toBeVisible();
+    expect(screen.container.textContent).not.toMatch(/stripe/i);
     expect(sync_npo_account).not.toHaveBeenCalled();
   });
 });

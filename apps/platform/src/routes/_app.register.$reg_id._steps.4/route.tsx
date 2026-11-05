@@ -1,8 +1,9 @@
-import { Actions, ExtLink, use_ask_prompt } from "@better-giving/ui";
+import { Actions, Badge, ExtLink, use_ask_prompt } from "@better-giving/ui";
 import { SquareArrowOutUpRight } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { NavLink, useFetcher } from "react-router";
 import { BankDetails, type OnSubmit } from "#/components/bank-details";
+import { PayoutOptions } from "#/components/payout-options";
 import { StripeConnectCard } from "#/components/stripe-connect/connect-card";
 import { submit_error_prompt } from "#/helpers/error-prompt";
 import { use_strip_connect_params } from "#/hooks/use-strip-connect-params";
@@ -14,6 +15,7 @@ import {
   connect_notice,
   connect_start_href,
   type IConnectCardData,
+  reg_ineligibility,
 } from "@/stripe-connect/card-data";
 import { stripe as stripe_env } from "$/env";
 import { account_status_live } from "$/stripe-connect/sync";
@@ -28,15 +30,26 @@ export const loader = async (args: Route.LoaderArgs) => {
   if (reg instanceof Response) return reg;
   const connect_routing = stripe_env.connect_routing;
   const acct = reg.o_stripe_account_id;
+  // both are set by the steps before this one; unset reads as nothing to judge
+  const ineligible =
+    (connect_routing &&
+      reg_ineligibility({
+        o_type: reg.o_type ?? "",
+        o_hq_country: reg.o_hq_country ?? "",
+      })) ||
+    undefined;
   const stripe: IConnectCardData = {
+    // the not-available card shows no status, so stripe isn't asked for one
     status:
-      connect_routing && acct
+      connect_routing && acct && !ineligible
         ? await account_status_live(acct)
         : "not_connected",
     start_href: connect_start_href({ kind: "reg", reg_id: reg.id }),
-    ...(connect_routing && {
-      notice: connect_notice(args.url),
-    }),
+    ...(connect_routing &&
+      !ineligible && {
+        notice: connect_notice(args.url),
+      }),
+    ...(ineligible && { ineligible }),
   };
   return { ...reg, stripe, connect_routing };
 };
@@ -46,12 +59,14 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
   const [is_changing, set_is_changing] = useState(false);
   const fetcher = useFetcher();
   const ask_prompt = use_ask_prompt();
+  const heading_id = useId();
   const back = before_banking(reg.o_type);
   // stable identity — BankDetails renders it as a component
   const FormButtons = useMemo(() => form_buttons(back), [back]);
   use_strip_connect_params(reg.connect_routing && !!reg.stripe.notice);
+  const offers_stripe = reg.connect_routing && !reg.stripe.ineligible;
   const stripe_card = reg.connect_routing ? (
-    <StripeConnectCard {...reg.stripe} classes="self-stretch mb-8" />
+    <StripeConnectCard {...reg.stripe} />
   ) : null;
 
   const submit: OnSubmit = async (recipient, bank_statement) => {
@@ -81,32 +96,45 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
 
   if (reg.o_bank_id && !is_changing) {
     return (
-      <div className="flex flex-col items-start max-sm:items-center">
+      <div className="grid gap-6 content-start">
+        <section aria-labelledby={heading_id} className="grid gap-3">
+          <div className="flex items-center gap-2">
+            <h2 id={heading_id} className="text-xl">
+              Your bank payout
+            </h2>
+            <Badge tone="success">Saved</Badge>
+          </div>
+          <p className="text-sm text-gray-11">
+            Grants are sent to this account through Wise, a money-transfer
+            service, every 3 days once your balance reaches your payout minimum.
+          </p>
+          <dl className="grid gap-0.5 mt-2 text-sm">
+            <dt className="font-semibold">Bank account reference</dt>
+            <dd className="text-gray-11">{reg.o_bank_id}</dd>
+            <dd className="text-xs text-gray-11">
+              Wise's reference for the account you entered.
+            </dd>
+          </dl>
+          <ExtLink
+            href={reg.o_bank_statement}
+            className="flex items-center gap-2 link justify-self-start text-sm"
+          >
+            <SquareArrowOutUpRight className="icon-md" />
+            <span>View bank statement</span>
+          </ExtLink>
+          <button
+            className="btn btn-secondary btn-sm justify-self-start"
+            type="button"
+            onClick={() => set_is_changing(true)}
+          >
+            Change bank details
+          </button>
+        </section>
+
+        {offers_stripe && <PayoutOptions variant="collapsed" />}
         {stripe_card}
-        <h2 className="text-center sm:text-left text-xl mb-2">
-          Banking details
-        </h2>
 
-        <p className="mt-6 mb-1 first-letter:uppercase">
-          <span className="text-sm font-semibold">account id: </span>
-          <span className="text-gray-11 ">{reg.o_bank_id}</span>
-        </p>
-        <ExtLink
-          href={reg.o_bank_statement}
-          className="flex items-center gap-2 link"
-        >
-          <SquareArrowOutUpRight className="icon-md" />
-          <span>Bank statement</span>
-        </ExtLink>
-        <button
-          className="btn btn-sm btn-destructive mt-2 mb-8"
-          type="button"
-          onClick={() => set_is_changing(true)}
-        >
-          change
-        </button>
-
-        <Actions classes="mt-auto">
+        <Actions>
           <NavLink to={`../${back}`} className="min-w-32 btn btn-secondary">
             Back
           </NavLink>
@@ -122,20 +150,47 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
   }
 
   return (
-    <div className="flex flex-col items-start max-sm:items-center">
-      {stripe_card}
-      {is_changing && (
-        <button
-          className="btn btn-sm btn-primary mt-2 mb-4"
-          type="button"
-          onClick={() => set_is_changing(false)}
-        >
-          cancel
-        </button>
+    <div className="grid gap-6 content-start">
+      <section aria-labelledby={heading_id} className="grid gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <h2 id={heading_id} className="text-xl">
+              {is_changing ? "Update" : "Set up"} your bank payout
+            </h2>
+            <Badge tone="primary">Required</Badge>
+          </div>
+          {is_changing && (
+            <button
+              className="btn btn-secondary btn-sm"
+              type="button"
+              onClick={() => set_is_changing(false)}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+        <p className="text-sm text-gray-11">
+          Grants are sent to this account through Wise, a money-transfer
+          service, in the currency you choose. Every kind of donation can pay
+          out here, every 3 days once your balance reaches your payout minimum.
+        </p>
+        {offers_stripe && (
+          <p className="text-sm text-gray-11">
+            Stripe is optional. You can connect it right after your bank details
+            are saved.
+          </p>
+        )}
+      </section>
+
+      {offers_stripe && (
+        <PayoutOptions
+          variant="collapsed"
+          subtitle="Compare your bank payout with Stripe."
+        />
       )}
-      <h2 className="text-center sm:text-left text-xl mb-4">
-        {is_changing ? "Update" : "Setup"} your banking details
-      </h2>
+      {/* stripe follows a saved bank, unless an account is already linked */}
+      {offers_stripe && reg.o_stripe_account_id && stripe_card}
+
       <BankDetails
         verified
         FormButtons={FormButtons}
