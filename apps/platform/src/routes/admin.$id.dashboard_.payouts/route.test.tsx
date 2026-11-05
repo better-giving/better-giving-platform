@@ -390,7 +390,7 @@ describe("the payouts page", () => {
     await expect
       .element(
         where.getByText(
-          "Everything else: stocks, DAF grants, crypto, PayPal, cheques and savings, sent to your bank through Wise. Stripe donations from before you connected Stripe are here too."
+          "PayPal, DAF grants, crypto, stocks, cheques, and any Stripe donations from before you connected Stripe: the Grant share of each, sent to your bank through Wise."
         )
       )
       .toBeVisible();

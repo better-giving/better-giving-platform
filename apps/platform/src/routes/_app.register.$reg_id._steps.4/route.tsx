@@ -15,6 +15,7 @@ import {
   connect_notice,
   connect_start_href,
   type IConnectCardData,
+  payout_options_variant,
   reg_ineligibility,
 } from "@/stripe-connect/card-data";
 import { stripe as stripe_env } from "$/env";
@@ -77,6 +78,9 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
   const FormButtons = useMemo(() => form_buttons(back), [back]);
   use_strip_connect_params(reg.connect_routing && !!reg.stripe.notice);
   const offers_stripe = reg.connect_routing && !reg.stripe.ineligible;
+  const payout_options = offers_stripe && (
+    <PayoutOptions variant={payout_options_variant(reg.stripe.status)} />
+  );
   const stripe_card = reg.connect_routing ? (
     <StripeConnectCard {...reg.stripe} />
   ) : null;
@@ -161,7 +165,7 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
           </button>
         </section>
 
-        {offers_stripe && <PayoutOptions variant="collapsed" />}
+        {payout_options}
         {stripe_card}
 
         <Actions>
@@ -212,12 +216,7 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
         )}
       </section>
 
-      {offers_stripe && (
-        <PayoutOptions
-          variant="collapsed"
-          subtitle="Compare your bank payout with Stripe."
-        />
-      )}
+      {payout_options}
       {/* stripe follows a saved bank, unless an account is already linked */}
       {offers_stripe && reg.o_stripe_account_id && stripe_card}
 

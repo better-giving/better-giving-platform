@@ -210,6 +210,28 @@ function render_step_4(id: string, search = "") {
   return render(<Stub initialEntries={[`/register/${id}/4${search}`]} />);
 }
 
+type TScreen = Awaited<ReturnType<typeof render_step_4>>;
+const explainer = (screen: TScreen) =>
+  screen.getByRole("region", { name: "How you get paid" });
+
+/** the comparison on show, with no trigger to open it */
+async function expect_explainer_open(screen: TScreen) {
+  const e = explainer(screen);
+  await expect
+    .element(e.getByRole("heading", { level: 2, name: "How you get paid" }))
+    .toBeVisible();
+  await expect.element(e.getByText("Bank only:")).toBeVisible();
+  expect(e.getByRole("button").query()).toBeNull();
+}
+
+async function expect_explainer_collapsed(screen: TScreen) {
+  await expect
+    .element(
+      explainer(screen).getByRole("button", { name: /how you get paid/i })
+    )
+    .toHaveAttribute("aria-expanded", "false");
+}
+
 // --- tests ---
 
 describe("registration step 4: banking", () => {
@@ -336,10 +358,7 @@ describe("registration step 4: banking", () => {
       .toBeVisible();
     await expect.element(bank.getByText(EMPTY_INTRO)).toBeVisible();
     await expect.element(bank.getByText(STRIPE_LATER)).toBeVisible();
-    const explainer = screen.getByRole("region", { name: "How you get paid" });
-    await expect
-      .element(explainer.getByText("Compare your bank payout with Stripe."))
-      .toBeVisible();
+    await expect_explainer_open(screen);
     // nothing to connect to until there is a bank to fall back on
     expect(
       screen.getByRole("region", { name: "Stripe account" }).query()
@@ -359,6 +378,8 @@ describe("registration step 4: banking", () => {
           .getByRole("link", { name: "Connect with Stripe" })
       )
       .toBeVisible();
+    // still nothing linked, so the comparison stays open
+    await expect_explainer_open(screen);
 
     // bank details alone complete the step
     await screen.getByRole("link", { name: "Continue" }).click();
@@ -403,6 +424,7 @@ describe("registration step 4: banking", () => {
     await expect
       .element(screen.getByRole("button", { name: /submit bank details/i }))
       .toBeVisible();
+    await expect_explainer_collapsed(screen);
   }, 30_000);
 
   it("shows the saved bank, then stripe, and lets the bank be changed", async () => {
@@ -430,12 +452,7 @@ describe("registration step 4: banking", () => {
       .toHaveAttribute("href", "https://example.com/bank.pdf");
     expect(screen.getByText(STRIPE_LATER).query()).toBeNull();
 
-    const explainer = screen.getByRole("region", { name: "How you get paid" });
-    await expect
-      .element(
-        explainer.getByText("Your bank payout is required. Stripe is optional.")
-      )
-      .toBeVisible();
+    await expect_explainer_open(screen);
     const card = screen.getByRole("region", { name: "Stripe account" });
     await expect
       .element(card.getByRole("link", { name: "Connect with Stripe" }))
@@ -631,6 +648,7 @@ describe("registration step 4: banking", () => {
     await expect
       .element(screen.getByRole("link", { name: "Continue" }))
       .toBeVisible();
+    await expect_explainer_collapsed(screen);
   }, 30_000);
 
   describe("while routing is off", () => {
@@ -660,6 +678,7 @@ describe("registration step 4: banking", () => {
       expect(
         screen.getByText("Your Stripe account is connected.").query()
       ).toBeNull();
+      expect(explainer(screen).query()).toBeNull();
       expect(screen.container.textContent).not.toMatch(/stripe/i);
 
       await screen
@@ -673,6 +692,7 @@ describe("registration step 4: banking", () => {
       expect(
         screen.getByRole("region", { name: "Stripe account" }).query()
       ).toBeNull();
+      expect(explainer(screen).query()).toBeNull();
       await screen.getByRole("link", { name: "Continue" }).click();
       await expect.element(screen.getByText(/summary/i)).toBeVisible();
     }, 30_000);
@@ -692,6 +712,7 @@ describe("registration step 4: banking", () => {
       expect(
         screen.getByText("Pending review", { exact: true }).query()
       ).toBeNull();
+      expect(explainer(screen).query()).toBeNull();
       expect(
         screen.getByText("Your Stripe account is connected.").query()
       ).toBeNull();

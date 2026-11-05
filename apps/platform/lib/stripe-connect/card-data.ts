@@ -65,6 +65,11 @@ export interface IConnectCardData {
   ineligible?: TConnectIneligibility;
 }
 
+/** "How you get paid" stays open until a stripe account is first linked;
+ * `disconnected` was linked once, so it collapses too */
+export const payout_options_variant = (status: TConnectStatus) =>
+  status === "not_connected" ? "open" : "collapsed";
+
 /** `connect_ineligibility` for a registration that is not an npo yet */
 export const reg_ineligibility = (reg: {
   o_type: string;

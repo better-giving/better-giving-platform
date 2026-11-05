@@ -7,6 +7,7 @@ import { PayoutOptions } from "#/components/payout-options";
 import { StripeConnectCard } from "#/components/stripe-connect/connect-card";
 import { use_strip_connect_params } from "#/hooks/use-strip-connect-params";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
+import { payout_options_variant } from "@/stripe-connect/card-data";
 import type { Route } from "./+types/route";
 import { Table } from "./table";
 
@@ -31,9 +32,7 @@ function Page({ loaderData, params }: Route.ComponentProps) {
     <div className="grid gap-8 content-start px-4 py-4 md:px-10 md:py-8 max-w-[1400px]">
       <h1 className="sr-only">Banking</h1>
       {show_options && (
-        <PayoutOptions
-          variant={stripe.status === "not_connected" ? "open" : "collapsed"}
-        />
+        <PayoutOptions variant={payout_options_variant(stripe.status)} />
       )}
 
       <section aria-labelledby={bank_heading_id} className="grid gap-3">
