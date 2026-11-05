@@ -69,14 +69,15 @@ const bands: Record<IConnectNotice["result"], string> = {
 const with_replace = (href: string) =>
   `${href}${href.includes("?") ? "&" : "?"}replace=1`;
 
-const NOT_CONNECTED_BODY = [
-  "Connect your own Stripe account and donations paid through Stripe go straight to it, after fees: cards, digital wallets and bank debits. Stripe then pays your bank on Stripe's schedule.",
-  "Everything else still pays out to your bank: stocks, DAF grants, crypto, PayPal and cheques. If you skip Stripe, Stripe donations go to your bank too.",
-];
-
 const bodies: Record<TConnectStatus, string[]> = {
-  not_connected: NOT_CONNECTED_BODY,
-  disconnected: NOT_CONNECTED_BODY,
+  not_connected: [
+    "Connect your own Stripe account and donations paid through Stripe go straight to it, after fees: cards, digital wallets and bank debits. Stripe then pays your bank on Stripe's schedule.",
+    "Everything else still pays out to your bank: stocks, DAF grants, crypto, PayPal and cheques. If you skip Stripe, Stripe donations go to your bank too.",
+  ],
+  disconnected: [
+    "Stripe donations now go to your bank payout.",
+    "Reconnect Stripe to send them to your Stripe account again. Donations already sent to your Stripe account stay there.",
+  ],
   incomplete: [
     "Stripe needs a few more details before it can receive donations. Finish setup in your Stripe dashboard.",
     "Until Stripe says your account is ready, Stripe donations go to your bank payout. Nothing is lost, and you don't need to do anything else.",

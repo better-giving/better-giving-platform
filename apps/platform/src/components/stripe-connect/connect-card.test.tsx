@@ -205,8 +205,8 @@ describe("StripeConnectCard", () => {
     [
       "disconnected",
       [
-        "donations paid through Stripe go straight to it, after fees",
-        "If you skip Stripe, Stripe donations go to your bank too.",
+        "Stripe donations now go to your bank payout.",
+        "Reconnect Stripe to send them to your Stripe account again. Donations already sent to your Stripe account stay there.",
       ],
     ],
     [
@@ -244,7 +244,9 @@ describe("StripeConnectCard", () => {
         .toBeVisible();
       // a status's body never carries another status's promise
       const others = [
+        "donations paid through Stripe go straight to it",
         "If you skip Stripe",
+        "Donations already sent to your Stripe account stay there.",
         "Until Stripe says your account is ready",
         "Stripe is reviewing your account",
         "now go straight to your Stripe account",
