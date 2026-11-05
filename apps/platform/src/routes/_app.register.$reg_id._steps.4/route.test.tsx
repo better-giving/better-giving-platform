@@ -312,7 +312,7 @@ describe("registration step 4: choose how you get paid", () => {
     await expect
       .element(
         screen.getByText(
-          "Your Stripe account is connected. You can continue now, and add a bank account any time from Banking."
+          "Your Stripe account is connected. You can continue now."
         )
       )
       .toBeVisible();
@@ -490,6 +490,34 @@ describe("registration step 4: choose how you get paid", () => {
         )
         .toHaveFocus();
       expect(screen.getByText(/summary/i).query()).toBeNull();
+    }, 30_000);
+
+    it("still counts the saved bank while its form is open", async () => {
+      const id = await seed_step_4();
+      await save_bank(id);
+      const screen = await render_step_4(id);
+
+      await saved_bank(screen).getByRole("button", { name: "Change" }).click();
+      await expect.element(submit_bank(screen)).toBeVisible();
+      await screen.getByText("Stripe", { exact: true }).click();
+      await expect
+        .element(continue_link(screen))
+        .not.toHaveAttribute("aria-disabled", "true");
+
+      // leaving Bank dropped the change, so coming back shows what is saved
+      await screen.getByText("Bank", { exact: true }).click();
+      await expect.element(saved_bank(screen)).toBeVisible();
+    }, 30_000);
+
+    it("does not offer to go on without a bank while one is saved", async () => {
+      account_status_live.mockResolvedValue("ready");
+      const id = await seed_step_4();
+      await save_bank(id, { o_stripe_account_id: "acct_123" });
+      const screen = await render_step_4(id);
+
+      await saved_bank(screen).getByRole("button", { name: "Change" }).click();
+      await expect.element(submit_bank(screen)).toBeVisible();
+      expect(screen.getByText(/without a bank account/i).query()).toBeNull();
     }, 30_000);
 
     it("keeps the form open when the change fails, and closes it once a retry lands", async () => {

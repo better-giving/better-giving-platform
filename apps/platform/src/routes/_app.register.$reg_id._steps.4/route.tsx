@@ -183,9 +183,13 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
   return (
     <PayoutChoice
       selected={picked ?? saved_choice}
-      onSelect={set_picked}
-      // a bank being changed holds the step on its form, as before a save
-      bank_saved={shows_saved}
+      onSelect={(option) => {
+        set_picked(option);
+        // the form unmounts off Bank, so its change is dropped with it
+        if (option !== "bank") set_is_changing(false);
+      }}
+      bank_saved={bank_saved}
+      bank_form_open={is_changing}
       stripe_status={reg.stripe.status}
       bank={bank}
       stripe={
