@@ -439,6 +439,13 @@ describe("the payouts page", () => {
       await expect
         .element(
           where.getByText(
+            "Stripe donations sent to your Stripe account before. New ones are not sent there."
+          )
+        )
+        .toBeVisible();
+      await expect
+        .element(
+          where.getByText(
             "Everything sent to your bank through Wise, new Stripe donations included."
           )
         )

@@ -12,8 +12,9 @@ export interface IAccordionItem {
 interface Props {
   items: IAccordionItem[];
   /** `compact` is a tight list inside a card; `divided` is a padded, ruled
-   * list for a page section */
-  variant?: "compact" | "divided";
+   * list for a page section; `box` is one row that is a card's whole content —
+   * no outer margins, and the trigger's type is the caller's */
+  variant?: "compact" | "divided" | "box";
   /** wraps each trigger in a heading of this level, so the rows sit in the
    * page outline; leave it off when a heading above the list already names it */
   heading_level?: 2 | 3 | 4 | 5 | 6;
@@ -33,6 +34,12 @@ const looks = {
     trigger: "flex items-center justify-between gap-2 w-full py-6 px-4",
     label: "text-left group-data-[state=open]:font-semibold",
     content: "pb-4 px-4",
+  },
+  box: {
+    root: "",
+    trigger: "flex items-start justify-between gap-2 w-full",
+    label: "text-left",
+    content: "pt-4",
   },
 };
 

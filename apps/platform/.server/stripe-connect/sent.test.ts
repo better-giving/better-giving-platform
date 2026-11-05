@@ -130,6 +130,25 @@ describe("npo_sent_transfers — on stripe", () => {
     expect(await npo_sent_transfers(id)).toBeNull();
   });
 
+  test.each([
+    ["pending review", { stripe_charges_enabled: false }],
+    ["incomplete", { stripe_details_submitted: false }],
+  ])(
+    "a linked nonprofit whose account is %s, with nothing sent, is not on stripe",
+    async (_, not_ready) => {
+      const id = await seed(not_ready);
+      expect(await npo_sent_transfers(id)).toBeNull();
+    }
+  );
+
+  test("a linked nonprofit whose account is not ready keeps its past transfers, off stripe", async () => {
+    const id = await seed({ stripe_details_submitted: false });
+    await sent_one(id);
+    const sent = await npo_sent_transfers(id);
+    expect(sent?.items.map((t) => t.id)).toEqual(["tr_past"]);
+    expect(sent).toMatchObject({ on_stripe: false, connected: true });
+  });
+
   test("with the routing switch off nothing is on stripe", async () => {
     flags.routing = false;
     const id = await seed();

@@ -118,4 +118,59 @@ describe("PayoutOptions", () => {
     // opening it adds nothing below the h2, so the outline matches the open box
     await expect_one_h2(region);
   });
+
+  test("collapsed: the title is the open box's h2 size, and the summary stays a plain line when opened", async () => {
+    const screen = await render(
+      <>
+        <PayoutOptions variant="open" />
+        <PayoutOptions variant="collapsed" />
+      </>
+    );
+    const [open, collapsed] = screen
+      .getByRole("heading", { level: 2, name: /how you get paid/i })
+      .all();
+    const title = collapsed.getByText("How you get paid", { exact: true });
+    const summary = collapsed.getByText(
+      "Your bank payout is required. Stripe is optional."
+    );
+    const style = (l: Locator) => getComputedStyle(l.element());
+
+    expect(style(title).fontSize).toBe(style(open).fontSize);
+    await collapsed.getByRole("button").click();
+    await expect
+      .element(collapsed.getByRole("button"))
+      .toHaveAttribute("aria-expanded", "true");
+    expect(style(summary).fontWeight).toBe("400");
+    expect(Number(style(title).fontWeight)).toBeGreaterThan(400);
+  });
+
+  test("collapsed: the card's padding is the only inset, closed and open", async () => {
+    const screen = await render(<PayoutOptions variant="collapsed" />);
+    const box = screen.getByRole("region", { name: "How you get paid" });
+    const trigger = box.getByRole("button");
+    const section = box.element() as HTMLElement;
+    const { paddingTop, paddingBottom } = getComputedStyle(section);
+
+    /** gap between the box's padding edge and its content, top and bottom */
+    const insets = () => {
+      const outer = section.getBoundingClientRect();
+      const top = trigger.element().getBoundingClientRect().top - outer.top;
+      const last = section.firstElementChild as HTMLElement;
+      const bottom = outer.bottom - last.getBoundingClientRect().bottom;
+      return [Math.round(top), Math.round(bottom)];
+    };
+    const border = Number.parseFloat(getComputedStyle(section).borderTopWidth);
+    const pad = [
+      Math.round(Number.parseFloat(paddingTop) + border),
+      Math.round(Number.parseFloat(paddingBottom) + border),
+    ];
+
+    expect(insets()).toEqual(pad);
+    await trigger.click();
+    await expect
+      .element(box.getByText(WHO_STRIPE, { exact: true }))
+      .toBeVisible();
+    // the panel's height animates in; measure once it has settled
+    await expect.poll(insets).toEqual(pad);
+  });
 });

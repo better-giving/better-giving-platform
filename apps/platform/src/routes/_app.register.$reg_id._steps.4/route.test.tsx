@@ -427,6 +427,28 @@ describe("registration step 4: banking", () => {
     await expect_explainer_collapsed(screen);
   }, 30_000);
 
+  it("does not promise stripe for later while changing a bank with a linked account", async () => {
+    account_status_live.mockResolvedValue("pending");
+    const id = await seed_step_4();
+    await save_bank(id, { o_stripe_account_id: "acct_123" });
+    const screen = await render_step_4(id);
+
+    await screen.getByRole("button", { name: "Change bank details" }).click();
+
+    const bank = screen.getByRole("region", {
+      name: "Update your bank payout",
+    });
+    await expect.element(bank.getByText(EMPTY_INTRO)).toBeVisible();
+    expect(screen.getByText(STRIPE_LATER).query()).toBeNull();
+    await expect
+      .element(
+        screen
+          .getByRole("region", { name: "Stripe account" })
+          .getByText("Pending review", { exact: true })
+      )
+      .toBeVisible();
+  }, 30_000);
+
   it("shows the saved bank, then stripe, and lets the bank be changed", async () => {
     const id = await seed_step_4();
     await save_bank(id);
@@ -522,6 +544,46 @@ describe("registration step 4: banking", () => {
         screen.getByRole("region", { name: "How you get paid" }).query()
       ).toBeNull();
       expect(account_status_live).not.toHaveBeenCalled();
+    }, 30_000);
+  });
+
+  describe("an ineligible registration that never linked an account", () => {
+    const unlinked = async () => {
+      const id = await seed_step_4();
+      await test_db
+        .current!.db.update(registrations)
+        .set({ o_hq_country: "Brazil" })
+        .where(eq(registrations.id, id));
+      await save_bank(id);
+      return id;
+    };
+
+    it("is told stripe is not available once the bank is saved", async () => {
+      const id = await unlinked();
+      const screen = await render_step_4(id);
+
+      const card = screen.getByRole("region", { name: "Stripe account" });
+      await expect
+        .element(card.getByText("Not available", { exact: true }))
+        .toBeVisible();
+      expect(card.getByRole("link").query()).toBeNull();
+      expect(account_status_live).not.toHaveBeenCalled();
+    }, 30_000);
+
+    it("shows no return notice when sent back from stripe", async () => {
+      const id = await unlinked();
+      const screen = await render_step_4(id, "?stripe_connect=connected");
+
+      await expect
+        .element(
+          screen
+            .getByRole("region", { name: "Stripe account" })
+            .getByText("Not available", { exact: true })
+        )
+        .toBeVisible();
+      expect(
+        screen.getByText("Your Stripe account is connected.").query()
+      ).toBeNull();
     }, 30_000);
   });
 

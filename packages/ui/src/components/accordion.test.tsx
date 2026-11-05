@@ -16,7 +16,7 @@ const items = [
 ];
 
 describe("Accordion", () => {
-  test.each(["compact", "divided"] as const)(
+  test.each(["compact", "divided", "box"] as const)(
     "%s: a trigger opens its content, and a second click collapses it",
     async (variant) => {
       const screen = await render(
@@ -57,6 +57,22 @@ describe("Accordion", () => {
       )
       .toHaveAttribute("aria-expanded", "false");
     expect(screen.getByRole("heading").elements()).toHaveLength(2);
+  });
+
+  test("box: no margin of its own and no open-state weight, so the card around it sets both", async () => {
+    const screen = await render(<Accordion items={items} variant="box" />);
+    const trigger = screen.getByRole("button", {
+      name: "Can I receive a tax receipt?",
+    });
+    await trigger.click();
+    await expect.element(trigger).toHaveAttribute("aria-expanded", "true");
+
+    const label = trigger.element().firstElementChild as HTMLElement;
+    const answer = screen.getByText("We will email you a tax receipt.");
+    const panel = answer.element().parentElement as HTMLElement;
+    expect(getComputedStyle(trigger.element()).marginBottom).toBe("0px");
+    expect(getComputedStyle(panel).marginBottom).toBe("0px");
+    expect(getComputedStyle(label).fontWeight).toBe("400");
   });
 
   test("without heading_level, the rows add nothing to the outline", async () => {

@@ -79,8 +79,8 @@ const bodies: Record<TConnectStatus, string[]> = {
     "Reconnect Stripe to send them to your Stripe account again.",
   ],
   incomplete: [
-    "Stripe needs a few more details before it can receive donations. Finish setup in your Stripe dashboard.",
-    "Until Stripe says your account is ready, Stripe donations go to your bank payout. Nothing is lost, and you don't need to do anything else.",
+    "Stripe needs a few more details before it can receive donations. Finish setup on Stripe, in your Stripe dashboard.",
+    "Until you do and Stripe says your account is ready, Stripe donations go to your bank payout, so nothing is lost.",
   ],
   pending: [
     "Stripe is reviewing your account. Until it's ready, Stripe donations go to your bank payout.",

@@ -95,14 +95,17 @@ export function PayoutOptions({ variant, classes = "" }: IPayoutOptions) {
       <section aria-label="How you get paid" className={`${classes} card`}>
         {/* the h2 the open variant writes, wrapped round the trigger */}
         <Accordion
+          variant="box"
           heading_level={2}
           items={[
             {
               value: "how-you-get-paid",
               trigger: (
-                <span className="grid">
-                  <span className="font-semibold">How you get paid</span>
-                  <span className="text-gray-11">
+                <span className="grid gap-1">
+                  <span className="text-lg font-semibold">
+                    How you get paid
+                  </span>
+                  <span className="text-sm font-normal text-gray-11">
                     Your bank payout is required. Stripe is optional.
                   </span>
                 </span>

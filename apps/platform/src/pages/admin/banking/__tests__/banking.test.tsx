@@ -966,7 +966,7 @@ describe("stripe connect card", () => {
 
       // the card renders this status, so the open/collapsed read is live
       const card = screen.getByRole("region", { name: "Stripe account" });
-      await expect.element(card.getByText(line)).toBeVisible();
+      await expect.element(card.getByText(line, { exact: true })).toBeVisible();
       await expect
         .element(
           screen
@@ -1016,6 +1016,33 @@ describe("stripe connect card", () => {
         screen.getByText("Your Stripe account is connected.").query()
       ).toBeNull();
       // connecting would change nothing, so stripe is not asked
+      expect(sync_npo_account).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { why: "fiscally sponsored", seed: { fiscal_sponsored: true } },
+    {
+      why: "headquartered outside the transfer countries",
+      seed: { hq_country: "Brazil" },
+    },
+  ])(
+    "a $why npo that never linked an account is still told stripe is not available",
+    async ({ seed }) => {
+      const npo = await seed_npo(seed);
+
+      const screen = await render_list(npo.id, "?stripe_connect=connected");
+
+      const card = screen.getByRole("region", { name: "Stripe account" });
+      await expect
+        .element(card.getByText("Not available", { exact: true }))
+        .toBeVisible();
+      expect(
+        screen.getByRole("link", { name: "Connect with Stripe" }).query()
+      ).toBeNull();
+      expect(
+        screen.getByText("Your Stripe account is connected.").query()
+      ).toBeNull();
       expect(sync_npo_account).not.toHaveBeenCalled();
     }
   );

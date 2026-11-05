@@ -207,8 +207,8 @@ describe("StripeConnectCard", () => {
     [
       "incomplete",
       [
-        "Stripe needs a few more details before it can receive donations.",
-        "Until Stripe says your account is ready, Stripe donations go to your bank payout.",
+        "Stripe needs a few more details before it can receive donations. Finish setup on Stripe",
+        "Until you do and Stripe says your account is ready, Stripe donations go to your bank payout",
       ],
     ],
     [
@@ -243,15 +243,37 @@ describe("StripeConnectCard", () => {
         "donations paid through Stripe go straight to it",
         "If you skip Stripe",
         "Reconnect Stripe to send them to your Stripe account again.",
-        "Until Stripe says your account is ready",
+        "Stripe says your account is ready",
         "Stripe is reviewing your account",
         "now go straight to your Stripe account",
       ].filter((p) => !phrases.some((own) => own.includes(p)));
       for (const other of others) {
         expect(card.getByText(other).query()).toBeNull();
       }
+      // the disconnected sentence is a substring of the pending and incomplete
+      // bodies, so it is matched as a whole paragraph
+      if (status !== "disconnected") {
+        expect(
+          card
+            .getByText("Stripe donations go to your bank payout.", {
+              exact: true,
+            })
+            .query()
+        ).toBeNull();
+      }
     }
   );
+
+  test("incomplete: the body asks for the same step as the status line, and never says it can wait", async () => {
+    const screen = await render_card({ status: "incomplete" });
+    const card = screen.getByRole("region", { name: "Stripe account" });
+    await expect
+      .element(card.getByText("Finish setup on Stripe", { exact: true }))
+      .toBeVisible();
+    expect(card.element().textContent).not.toMatch(
+      /don't need to do anything|nothing else/i
+    );
+  });
 
   test("no notice, no band and no focus taken", async () => {
     const screen = await render_card({ status: "ready" });
@@ -289,6 +311,33 @@ describe("StripeConnectCard", () => {
     const screen = await render_card({ status: "ready" });
     await expect
       .element(screen.getByText("Ready to receive Stripe donations"))
+      .toBeVisible();
+    expect(
+      screen.getByRole("link", { name: /payouts page/i }).query()
+    ).toBeNull();
+  });
+
+  test.each<IStripeConnectCard["status"]>([
+    "not_connected",
+    "disconnected",
+    "incomplete",
+    "pending",
+  ])("%s: no Payouts link even when given its href", async (status) => {
+    const Stub = createRoutesStub([
+      {
+        path: "/",
+        Component: () => (
+          <StripeConnectCard
+            status={status}
+            start_href={START}
+            payouts_href="/admin/42/payouts"
+          />
+        ),
+      },
+    ]);
+    const screen = await render(<Stub />);
+    await expect
+      .element(screen.getByRole("region", { name: "Stripe account" }))
       .toBeVisible();
     expect(
       screen.getByRole("link", { name: /payouts page/i }).query()

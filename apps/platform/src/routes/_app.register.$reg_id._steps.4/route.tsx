@@ -208,7 +208,7 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
           service, in the currency you choose. Every kind of donation can pay
           out here, every 3 days once your balance reaches your payout minimum.
         </p>
-        {offers_stripe && (
+        {offers_stripe && !reg.o_stripe_account_id && (
           <p className="text-sm text-gray-11">
             Stripe is optional. You can connect it right after your bank details
             are saved.
