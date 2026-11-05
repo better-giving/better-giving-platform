@@ -236,6 +236,27 @@ describe("PayoutsHeldCard: Payouts", () => {
       .toBeVisible();
     no_wise(card);
   });
+
+  test("dates a payout by its UTC day, whatever the viewer's zone", async () => {
+    const screen = await in_router(
+      <PayoutsHeldCard
+        {...base}
+        held={{
+          total: 74,
+          by_rail: [{ rail: "stock_cheque", amount: 74 }],
+          items: [
+            { rail: "stock_cheque", date: "2026-07-04T00:00:00Z", amount: 74 },
+          ],
+        }}
+      />
+    );
+    const card = screen.getByRole("region", {
+      name: "On hold until you add a bank account",
+    });
+    expect(body_rows(card)).toEqual([
+      ["Stock and cheque donations", "Jul 4, 2026", "$74.00"],
+    ]);
+  });
 });
 
 test("both held tables right-align Amount, header and cells alike", async () => {

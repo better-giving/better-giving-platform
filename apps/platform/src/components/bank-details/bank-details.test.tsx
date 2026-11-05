@@ -1,5 +1,6 @@
 import { AskHost } from "@better-giving/ui";
 import { HttpResponse, http } from "msw";
+import { createRef, type Ref } from "react";
 import { createRoutesStub } from "react-router";
 import { SWRConfig } from "swr";
 import { describe, expect, test } from "vitest";
@@ -21,7 +22,7 @@ const recipient_answers = () =>
   );
 
 /** a fresh swr cache per render: the currencies key is the same in every test */
-async function render_details() {
+async function render_details(first_field_ref?: Ref<HTMLInputElement>) {
   const Stub = createRoutesStub([
     {
       path: "/",
@@ -31,6 +32,7 @@ async function render_details() {
             FormButtons={() => null}
             onSubmit={async () => {}}
             is_loading={false}
+            first_field_ref={first_field_ref}
           />
           <AskHost />
         </SWRConfig>
@@ -88,4 +90,20 @@ describe("BankDetails: currency list", () => {
     // the live region is already mounted, so a later failure is announced
     await expect.element(screen.getByRole("status")).toBeEmptyDOMElement();
   });
+});
+
+test("the first-field ref is the currency field", async () => {
+  recipient_answers();
+  mswWorker.use(
+    http.get("/api/wise/v1/currencies", () =>
+      HttpResponse.json([{ code: "USD", name: "United States Dollar" }])
+    )
+  );
+  const ref = createRef<HTMLInputElement>();
+  const screen = await render_details(ref);
+  const field = screen.getByRole("combobox", {
+    name: "Select your bank account currency:",
+  });
+  await expect.element(field).toBeVisible();
+  expect(field.element()).toBe(ref.current);
 });

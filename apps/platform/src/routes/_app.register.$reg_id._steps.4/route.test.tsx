@@ -73,8 +73,9 @@ const bank_statement = vi.hoisted(() => ({
 }));
 
 vi.mock("#/components/bank-details", () => ({
-  BankDetails: ({ onSubmit, is_loading }: any) => (
+  BankDetails: ({ onSubmit, is_loading, first_field_ref }: any) => (
     <button
+      ref={first_field_ref}
       type="button"
       disabled={is_loading}
       onClick={() =>
@@ -468,6 +469,16 @@ describe("registration step 4: choose how you get paid", () => {
       await expect.element(submit_bank(screen)).toBeVisible();
       await screen.getByRole("button", { name: "Cancel", exact: true }).click();
       await expect.element(saved_bank(screen)).toBeVisible();
+    }, 30_000);
+
+    it("moves focus into the form Change opens", async () => {
+      const id = await seed_step_4();
+      await save_bank(id);
+      const screen = await render_step_4(id);
+
+      await saved_bank(screen).getByRole("button", { name: "Change" }).click();
+      // the stand-in carries the form's first-field ref
+      await expect.element(submit_bank(screen)).toHaveFocus();
     }, 30_000);
 
     it("comes back to the saved bank with focus on it once a change lands", async () => {

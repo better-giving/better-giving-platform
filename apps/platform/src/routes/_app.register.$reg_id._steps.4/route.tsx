@@ -123,6 +123,12 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
     showed_saved.current = shows_saved;
   }, [shows_saved]);
 
+  // Change unmounts the button that held focus, so it moves into the form
+  const bank_form_field = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (is_changing) bank_form_field.current?.focus();
+  }, [is_changing]);
+
   const bank = shows_saved ? (
     <SavedBank
       account_id={reg.o_bank_id ?? ""}
@@ -143,6 +149,7 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
       )}
       <BankDetails
         verified
+        first_field_ref={bank_form_field}
         FormButtons={FormButtons}
         onSubmit={submit}
         is_loading={fetcher.state !== "idle"}

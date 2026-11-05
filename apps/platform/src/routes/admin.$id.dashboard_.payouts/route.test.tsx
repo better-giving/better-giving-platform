@@ -453,9 +453,7 @@ describe("the payouts page", () => {
     await expect
       .element(held.getByText("$12.50", { exact: true }).first())
       .toBeVisible();
-    await expect
-      .element(held.getByText(format("2026-07-04T00:00:00.000Z", "PP")))
-      .toBeVisible();
+    await expect.element(held.getByText("Jul 4, 2026")).toBeVisible();
     await expect
       .element(held.getByRole("link", { name: "Add bank account" }))
       .toHaveAttribute("href", `/admin/${npo_id}/banking/new`);

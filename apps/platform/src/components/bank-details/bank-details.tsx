@@ -1,7 +1,7 @@
 import { Combo, DrawerIcon, MaskedInput, Separator } from "@better-giving/ui";
 import { dollar } from "@better-giving/ui/masks";
 import { LoaderCircle } from "lucide-react";
-import { useState } from "react";
+import { type Ref, useState } from "react";
 import { app_name } from "#/constants/env";
 import { report_error } from "#/errors/report";
 import { use_debouncer } from "#/hooks/use-debouncer";
@@ -28,6 +28,9 @@ type Props = {
   onSubmit: OnSubmit;
   is_loading: boolean;
   verified?: boolean;
+  /** the currency field, the form's first — for a caller that opens the form
+   *  in place of the control that held focus */
+  first_field_ref?: Ref<HTMLInputElement>;
 };
 
 export function BankDetails({
@@ -35,6 +38,7 @@ export function BankDetails({
   onSubmit,
   is_loading,
   verified,
+  first_field_ref,
 }: Props) {
   const currencies = use_currencies();
   const [is_submitting, set_submitting] = useState(false);
@@ -67,6 +71,7 @@ export function BankDetails({
     <div className="grid gap-6">
       <div className="grid md:w-80">
         <Combo
+          ref={first_field_ref}
           value={currency}
           on_change={(c) => c && setCurrency(c)}
           options={{

@@ -13,6 +13,14 @@ interface Props {
 }
 
 export function Payout({ classes = "", ...p }: Props) {
+  // with no bank nothing pays out at the minimum, so there is no bar to fill
+  if (p.to.kind !== "bank") {
+    return (
+      <div className={classes}>
+        <Held to={p.to} />
+      </div>
+    );
+  }
   const progress = Math.min(p.bal_cash / p.threshold, 1);
   return (
     <div className={`${classes}`}>
@@ -41,29 +49,25 @@ export function Payout({ classes = "", ...p }: Props) {
         }}
         className="py-1 rounded-full inset-shadow-track mb-2"
       />
-      {p.to.kind === "bank" ? (
-        <p className="text-sm">
-          {progress < 1 ? "Once desired amount is accumulated, " : ""}
-          will be paid out to{" "}
-          {
-            <Link to="../banking" className="link font-medium">
-              {p.to.summary}
-            </Link>
-          }{" "}
-          on{" "}
-          {
-            <span className="">
-              {format(p.next_payout, "PP")}
-              <span className="text-gray-11">
-                - in {formatDistance(p.next_payout, new Date())}
-              </span>
-              .
+      <p className="text-sm">
+        {progress < 1 ? "Once desired amount is accumulated, " : ""}
+        will be paid out to{" "}
+        {
+          <Link to="../banking" className="link font-medium">
+            {p.to.summary}
+          </Link>
+        }{" "}
+        on{" "}
+        {
+          <span className="">
+            {format(p.next_payout, "PP")}
+            <span className="text-gray-11">
+              - in {formatDistance(p.next_payout, new Date())}
             </span>
-          }
-        </p>
-      ) : (
-        <Held to={p.to} />
-      )}
+            .
+          </span>
+        }
+      </p>
     </div>
   );
 }
@@ -86,12 +90,21 @@ function Held({ to }: IHeld) {
       </p>
     );
   }
+  // a stripe gift that lands before ready stays held after ready too — the
+  // held cards' STRIPE_HELD_LEAD (components/payout-options/held-money.tsx)
+  if (!to.ready) {
+    return (
+      <p className="text-sm">
+        Stripe donations that arrive before your Stripe account is ready wait in
+        your Better Giving balance, along with everything else, until you{" "}
+        {add_bank}. Nothing is lost.
+      </p>
+    );
+  }
   return (
     <p className="text-sm">
-      {to.ready
-        ? "Stripe donations go straight to your Stripe account. "
-        : "Stripe donations go to your Stripe account once Stripe says it's ready. "}
-      Everything else waits in your Better Giving balance until you {add_bank}.
+      Stripe donations go straight to your Stripe account. Everything else waits
+      in your Better Giving balance until you {add_bank}.
     </p>
   );
 }

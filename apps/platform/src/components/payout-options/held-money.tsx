@@ -1,7 +1,7 @@
 import { Badge, Button } from "@better-giving/ui";
-import { format } from "date-fns";
 import { Plus } from "lucide-react";
 import { type ReactNode, useId } from "react";
+import { to_utc_day } from "@/helpers/date";
 import { humanize } from "@/helpers/decimal";
 import type { HeldRail, IHeldMoney } from "@/payouts";
 
@@ -114,7 +114,7 @@ export function PayoutsHeldCard(props: IHeldMoneyCard) {
             // a pending payout carries no id of its own here
             <tr key={i}>
               <td>{rail_labels[it.rail]}</td>
-              <td>{format(it.date, "PP")}</td>
+              <td>{to_utc_day(it.date)}</td>
               <td className="text-right">{usd(it.amount)}</td>
             </tr>
           ))}
