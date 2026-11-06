@@ -975,6 +975,23 @@ describe("commissions cron", () => {
       expect(await statuses()).toEqual({ "d-1": "paid" });
     });
 
+    test("switched off, an npo referrer whose bank was approved with no default flag is still paid", async () => {
+      referrer.real = true;
+      await db().insert(banking_apps).values({
+        id: "778",
+        npo_id,
+        status: "approved",
+        bank_summary: "USD account ending in 0778",
+      });
+      await seed("d-1", 120);
+
+      await index();
+
+      expect(wise.transfer).toHaveBeenCalledOnce();
+      expect(wise.transfer.mock.calls[0]![0].targetAccount).toBe("778");
+      expect(await statuses()).toEqual({ "d-1": "paid" });
+    });
+
     test("switched on, an npo referrer with no default bank whose owed covers its commissions is paid them as recovered", async () => {
       deductions.on = true;
       referrer.real = true;

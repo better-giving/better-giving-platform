@@ -152,7 +152,7 @@ async function seed_npo(o: {
       .values({
         id: String(WISE_RECIPIENT),
         npo_id: npo!.id,
-        status: "default",
+        status: o.bank_status ?? "default",
       });
   }
   return npo!.id;
@@ -570,4 +570,20 @@ describe("grants cron execute", () => {
       expect(await npo_cash(npo_id)).toBe(0);
     }
   );
+
+  test("an approved bank with no default flag is still paid", async () => {
+    const npo_id = await seed_npo({ cash: 100, bank_status: "approved" });
+    await seed_payout(npo_id, "p-1", 100);
+
+    await index();
+
+    expect(report_error_mock).not.toHaveBeenCalled();
+    expect(wise_pay_mock).toHaveBeenCalledOnce();
+    expect(wise_pay_mock).toHaveBeenCalledWith(
+      WISE_RECIPIENT,
+      100,
+      expect.any(String)
+    );
+    expect(await payout_types()).toEqual({ "p-1": "settled" });
+  });
 });
