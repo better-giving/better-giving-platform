@@ -629,6 +629,24 @@ describe("stripe-only application", () => {
     expect(wise.v2_account).not.toHaveBeenCalled();
   });
 
+  it("the approve dialog says there is no bank, not that a bank gets paid", async () => {
+    const id = await seed_reg({
+      ...ALL_FIELDS,
+      o_bank_id: null,
+      o_bank_statement: null,
+      o_stripe_account_id: "acct_only123",
+    });
+    const screen = await render_review_live(id);
+
+    await screen.getByRole("link", { name: /approve/i }).click();
+    await expect
+      .element(screen.getByText(/Stripe account and no bank account/i))
+      .toBeInTheDocument();
+    await expect
+      .element(screen.getByText(/newly linked bank account/i))
+      .not.toBeInTheDocument();
+  });
+
   it("says why Approve is off once its stripe account was disconnected in review", async () => {
     const id = await seed_reg({
       ...ALL_FIELDS,
