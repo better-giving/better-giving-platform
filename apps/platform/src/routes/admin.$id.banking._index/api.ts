@@ -16,13 +16,13 @@ import {
   type TConnectStatus,
 } from "@/stripe-connect/readiness";
 import { stripe as stripe_env } from "$/env";
+import { held_money_net } from "$/payouts/held-net";
 import { db } from "$/pg/db";
 import {
   npo_bapp_in_review,
   npo_bapps,
   npo_default_bapp,
 } from "$/pg/queries/banking";
-import { held_money } from "$/pg/queries/held-money";
 import { type INpo, npo_get } from "$/pg/queries/npo";
 import { sync_npo_account } from "$/stripe-connect/sync";
 import type { Route } from "./+types/route";
@@ -62,7 +62,7 @@ export const loader = async (x: Route.LoaderArgs) => {
     connect_routing,
     has_bank: !!bank,
     bank_pending: !bank && in_review,
-    held: held_for ? await held_money(db, id) : null,
+    held: held_for ? await held_money_net(db, id) : null,
   } satisfies LoaderData;
 };
 

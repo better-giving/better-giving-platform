@@ -83,6 +83,9 @@ export type HeldRail =
 /** usd an npo is owed by pending payouts, which only a bank payout can pay */
 export interface IHeldMoney {
   total: number;
+  /** what the payout run would pay of `total` after the amounts the npo owes
+   * Better Giving. absent: nothing is subtracted */
+  net?: number;
   /** rails with nothing pending are left out */
   by_rail: { rail: HeldRail; amount: number }[];
   /** one per pending payout, newest first */

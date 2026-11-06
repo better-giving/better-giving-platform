@@ -11,9 +11,10 @@ import type { IHeldMoney } from "@/payouts";
 import { stripe_standing } from "@/payouts/payout-to";
 import { connect_start_href } from "@/stripe-connect/card-data";
 import { stripe as stripe_env } from "$/env";
+import { held_money_net } from "$/payouts/held-net";
 import { db } from "$/pg/db";
 import { npo_bapp_in_review, npo_default_bapp } from "$/pg/queries/banking";
-import { has_held_money, held_money } from "$/pg/queries/held-money";
+import { has_held_money } from "$/pg/queries/held-money";
 import { npo_get } from "$/pg/queries/npo";
 import { npo_payouts } from "$/pg/queries/payout";
 import { npo_sent_transfers } from "$/stripe-connect/sent";
@@ -89,7 +90,7 @@ async function held_of(
 ): Promise<IHeld | null> {
   if (!held_rails) return null;
   return {
-    money: await held_money(db, npo_id),
+    money: await held_money_net(db, npo_id),
     rails: held_rails,
     bank_pending,
     connect_href: connect_start_href({ kind: "npo", npo_id }),
