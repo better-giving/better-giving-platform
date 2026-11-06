@@ -133,6 +133,8 @@ async function seed_npo(o: {
   cash: number;
   payout_minimum?: number;
   recipient?: boolean;
+  /** the bank's status; an old approval left it "approved", no default flag */
+  bank_status?: "default" | "approved";
 }) {
   const [npo] = await db()
     .insert(npos)
