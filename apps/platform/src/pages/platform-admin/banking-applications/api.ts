@@ -15,9 +15,9 @@ import type { V2RecipientAccount } from "@/wise";
 import { enqueue } from "$/kit/queue";
 import { wise } from "$/kit/wise";
 import {
+  bapp_approve,
   bapp_get,
   bapp_update_status,
-  npo_bapp_count,
 } from "$/pg/queries/banking";
 import { npos_batch_get } from "$/pg/queries/npo";
 
@@ -78,12 +78,8 @@ export const action: ActionFunction = async ({ params, request }) => {
     if (!is_approvable({ ba: x, wacc_unavailable: !wacc })) {
       throw resp.status(409);
     }
-    // auto-default if npo has no other banking apps
-    const count = await npo_bapp_count(x.npo_id);
-    const new_status = count <= 1 ? "default" : "approved";
-    const prev = await bapp_update_status(bank_id.toString(), {
-      status: new_status,
-    });
+    // auto-default when nothing pays out yet: rejected and pending rows don't count
+    const prev = await bapp_approve(bank_id.toString(), x.npo_id);
     if (prev?.status === "under-review") {
       await enqueue(msg("banking-approved", { npo_id: x.npo_id }));
     }

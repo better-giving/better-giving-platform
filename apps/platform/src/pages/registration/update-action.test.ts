@@ -36,7 +36,7 @@ import { get_session } from "#/.server/auth";
 import { enqueue } from "$/kit/queue";
 import { reg_get } from "$/pg/queries/registration";
 import { create_test_db } from "$/pg/test-utils/pglite";
-import { update_action } from "./update-action";
+import { type IUpdateActionOpts, update_action } from "./update-action";
 
 const RID = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const EMAIL = "jane@test.com";
@@ -148,4 +148,74 @@ describe("update_action — step save", () => {
       expect(enqueue).toHaveBeenCalledOnce();
     }
   );
+});
+
+describe("update_action — where a save lands", () => {
+  // every step before review is filled; `o_bank_id` decides whether
+  // `Progress` reads the application as on step 4 or 5
+  const seed_banking = (o_bank_id: string | null) =>
+    test_db.current!.db.insert(registrations).values({
+      id: RID,
+      r_id: EMAIL,
+      status: "01",
+      r_first_name: "Jane",
+      r_last_name: "Doe",
+      r_contact_number: "1234567890",
+      o_name: "Test Org",
+      r_org_role: "ceo",
+      rm: "search-engines",
+      o_website: "https://example.com",
+      o_designation: "Charity",
+      o_type: "501c3",
+      o_ein: "123456789",
+      o_hq_country: "United States",
+      o_bank_id,
+      o_bank_statement: o_bank_id && "https://example.com/old.pdf",
+    });
+
+  const save_bank = (next: string, opts?: IUpdateActionOpts) =>
+    settle(
+      update_action(
+        next,
+        opts
+      )({
+        request: new Request(`http://localhost/register/${RID}/4`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            update_type: "banking",
+            o_bank_id: "999",
+            o_bank_statement: "https://example.com/new.pdf",
+          }),
+        }),
+        params: { reg_id: RID },
+        context: {} as any,
+      } as any)
+    );
+
+  test("sends a save on a finished application to the summary", async () => {
+    await seed_banking("111");
+
+    const res = await save_bank("4");
+
+    expect(res.headers.get("location")).toBe("../5");
+    expect(res.headers.has("X-Remix-Replace")).toBe(false);
+    expect((await reg_get(RID))?.o_bank_id).toBe("999");
+  });
+
+  // a fetcher's redirect pushes a history entry unless the response says
+  // replace, and back onto the same step reads as a back press doing nothing
+  test.each([
+    ["a first save", null],
+    ["a change of a saved bank", "111"],
+  ])("`next_always` sends %s to `next` in place", async (_, o_bank_id) => {
+    await seed_banking(o_bank_id);
+
+    const res = await save_bank("4", { next_always: true });
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("../4");
+    expect(res.headers.get("X-Remix-Replace")).toBe("true");
+    expect((await reg_get(RID))?.o_bank_id).toBe("999");
+  });
 });

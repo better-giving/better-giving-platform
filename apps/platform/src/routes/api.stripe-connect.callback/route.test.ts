@@ -762,6 +762,86 @@ describe("stripe connect callback", () => {
   });
 
   // its account was copied onto the npo at approval, and may have moved since
+  describe("an account a rejected registration holds", () => {
+    test("a new registration claiming it takes it from the rejected one", async () => {
+      const rejected = await own_reg("cb-rejected@reg.test", {
+        o_stripe_account_id: "acct_was_rejected",
+        status: "04",
+      });
+      const reg_id = await own_reg("cb-after-rejected@reg.test");
+      token.mockResolvedValue({ stripe_user_id: "acct_was_rejected" });
+
+      const res = await call({
+        code: "ac_after_rejected",
+        state: sign_state({
+          t: { kind: "reg", reg_id },
+          uid: session.user!.id,
+          replace: false,
+        }),
+      });
+
+      expect(landed(res).result).toBe("connected");
+      expect(await reg_acct(reg_id)).toBe("acct_was_rejected");
+      expect(await reg_acct(rejected)).toBeNull();
+    });
+
+    test("the rejected one can't take it back once a new registration holds it", async () => {
+      const rejected = await own_reg("cb-rejected-back@reg.test", {
+        o_stripe_account_id: "acct_taken_back",
+        status: "04",
+      });
+      const reg_id = await own_reg("cb-new-holder@reg.test");
+      token.mockResolvedValue({ stripe_user_id: "acct_taken_back" });
+      await call({
+        code: "ac_new_holder",
+        state: sign_state({
+          t: { kind: "reg", reg_id },
+          uid: session.user!.id,
+          replace: false,
+        }),
+      });
+
+      session.user = {
+        id: "uid-cb-rejected-back@reg.test",
+        email: "cb-rejected-back@reg.test",
+        role: "user",
+      };
+      const res = await call({
+        code: "ac_take_back",
+        state: sign_state({
+          t: { kind: "reg", reg_id: rejected },
+          uid: session.user.id,
+          replace: false,
+        }),
+      });
+
+      expect(landed(res).reason).toBe("already_linked");
+      expect(await reg_acct(rejected)).toBeNull();
+      expect(await reg_acct(reg_id)).toBe("acct_taken_back");
+    });
+
+    test("a nonprofit claiming it takes it from the rejected one", async () => {
+      const rejected = await own_reg("cb-rejected-npo@reg.test", {
+        o_stripe_account_id: "acct_rejected_to_npo",
+        status: "04",
+      });
+      const { user, npo } = await member_of_npo("cb-npo-after-rejected");
+      token.mockResolvedValue({ stripe_user_id: "acct_rejected_to_npo" });
+
+      const res = await call({
+        code: "ac_npo_after_rejected",
+        state: sign_state({
+          t: { kind: "npo", npo_id: npo.id },
+          uid: user.id,
+          replace: false,
+        }),
+      });
+
+      expect(landed(res).result).toBe("connected");
+      expect(await reg_acct(rejected)).toBeNull();
+    });
+  });
+
   test("an approved registration's account doesn't block its nonprofit", async () => {
     await own_reg("cb-approved@reg.test", {
       o_stripe_account_id: "acct_from_approval",

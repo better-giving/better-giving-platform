@@ -1,12 +1,13 @@
 import { type ActionFunction, href, redirect } from "react-router";
 import { literal, object, safeParse, variant } from "valibot";
 import { review_get } from "#/routes/platform.applications_.$id/api";
-import { is_approvable } from "#/routes/platform.applications_.$id/approvable";
+import { lost_payout } from "#/routes/platform.applications_.$id/approvable";
 import { resp } from "@/helpers/https";
 import { msg } from "@/queue";
 import { Progress } from "@/reg/progress";
 import { reg_id } from "@/reg/schema";
 import { $ } from "@/schemas";
+import { stripe as stripe_env } from "$/env";
 import { enqueue, in_dedupe_window } from "$/kit/queue";
 import { db } from "$/pg/db";
 import { reg_get, reg_update_from } from "$/pg/queries/registration";
@@ -26,8 +27,8 @@ export const schema = variant("type", [approval, rejection]);
 /** the detail page disables Approve; this keeps the URL from going around it */
 export const loader = async (args: Route.LoaderArgs) => {
   if (args.params.verdict !== "approved") return null;
-  const { reg, wacc } = await review_get(args.params.id);
-  if (!is_approvable(reg, wacc)) {
+  const { approvable } = await review_get(args.params.id);
+  if (!approvable) {
     throw redirect(href("/platform/applications/:id", { id: args.params.id }));
   }
   return null;
@@ -51,9 +52,6 @@ export const action: ActionFunction = async ({ request, params }) => {
 
   const reg = await reg_get(id);
   if (!reg) throw new Response("Registration not found", { status: 404 });
-
-  const r = new Progress(reg).banking; // no need to look at fsa
-  if (!r) throw resp.status(400, "registration has incomplete steps");
 
   // a row already at this verdict's status is a repeat of it: a retry after
   // its response or enqueue was lost, or a stale prompt. inside qstash's dedupe
@@ -81,8 +79,22 @@ export const action: ActionFunction = async ({ request, params }) => {
     }
     return redirect("../success");
   }
-  const npo =
-    reg.status === "03" ? await announce_approval(reg) : await npo_new(r);
+  if (reg.status === "03") {
+    console.info("NPO approved:", await announce_approval(reg));
+    return redirect("../success");
+  }
+
+  // only a new approval files banking; no need to look at fsa
+  const routing_on = stripe_env.connect_routing;
+  if (lost_payout(reg)) {
+    throw resp.status(
+      400,
+      "The applicant's Stripe account was disconnected and no bank is on file. Reject the application so they can add one."
+    );
+  }
+  const r = new Progress(reg, routing_on).banking_with(routing_on);
+  if (!r) throw resp.status(400, "registration has incomplete steps");
+  const npo = await npo_new(r);
   console.info("NPO approved:", npo);
   return redirect("../success");
 };

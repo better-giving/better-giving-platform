@@ -336,11 +336,28 @@ describe("account.application.deauthorized → npo disconnected", () => {
           payload: expect.objectContaining({
             id: ev.id,
             alert: expect.objectContaining({
-              body: expect.stringContaining(`npo ${npo.id}`),
+              title: "Disconnected Nonprofit Has No Way To Get Paid",
+              body: [
+                `npo ${npo.id} disconnected stripe account acct_deauth-nobank-${status} (event ${ev.id}).`,
+                "it has no default bank details and no stripe account left: every donation is held in its better giving balance until it adds bank details. reconnecting stripe only routes its new stripe donations.",
+              ].join("\n"),
             }),
           }),
         })
       );
+    });
+
+    it("a redelivered disconnect re-sends the same keyed notice", async () => {
+      await seed_with_bank("deauth-nobank-again");
+      const ev = event("acct_deauth-nobank-again", T);
+
+      await handle_account_deauthorized(ev);
+      await handle_account_deauthorized(ev);
+
+      expect(enqueue).toHaveBeenCalledTimes(2);
+      const [first, again] = enqueue.mock.calls.map(([m]) => m);
+      expect(again).toEqual(first);
+      expect(first.payload.id).toBe(ev.id);
     });
 
     it("is not flagged when the npo's payouts have somewhere to go", async () => {

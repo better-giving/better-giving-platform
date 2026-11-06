@@ -18,7 +18,7 @@ export { ErrorBoundary } from "#/components/error";
 
 export default CacheRoute(Page);
 function Page({ loaderData }: Route.ComponentProps) {
-  const { reg, wacc, wacc_unavailable } = loaderData;
+  const { reg, wacc, wacc_unavailable, approvable } = loaderData;
 
   return (
     <div className="grid content-start gap-y-4 gap-x-3 px-4 py-4 md:px-10 md:py-8 w-full">
@@ -28,7 +28,12 @@ function Page({ loaderData }: Route.ComponentProps) {
           { label: reg.o_name || "Application review" },
         ]}
       />
-      <Loaded {...reg} bank={wacc} bank_unavailable={wacc_unavailable} />
+      <Loaded
+        {...reg}
+        bank={wacc}
+        bank_unavailable={wacc_unavailable}
+        approvable={approvable}
+      />
     </div>
   );
 }

@@ -11,7 +11,7 @@ import type { IRegCreatedPayload } from "@/queue";
 import { Progress } from "@/reg/progress";
 import type { IReg } from "@/reg/schema";
 import { send_email, send_email_or_throw } from "$/email";
-import { base_url, hubspot } from "$/env";
+import { base_url, hubspot, stripe as stripe_env } from "$/env";
 import { bg_sales } from "$/kit/slack";
 import { wise } from "$/kit/wise";
 import { reg_get } from "$/pg/queries/registration";
@@ -51,7 +51,7 @@ export async function handle_reg_created(r: IRegCreatedPayload) {
    * knows them. a row that has since been deleted still gets a mail; the wizard
    * is what tells them it is gone. */
   const reg = await reg_get(r.id);
-  const to = `/register/${r.id}/${reg ? new Progress(reg).step : 1}`;
+  const to = `/register/${r.id}/${reg ? new Progress(reg, stripe_env.connect_routing).step : 1}`;
 
   /* two audiences, one mail. an applicant who is already signed in has a
    * session and needs no key — a plain link lands them on the step, and the
@@ -81,7 +81,7 @@ export async function handle_reg_updated(reg: IReg) {
   let ctp: ContactProperties | undefined;
   let cmp: CompanyProperties | undefined;
 
-  const prog = new Progress(reg);
+  const prog = new Progress(reg, stripe_env.connect_routing);
   const c = prog.contact;
 
   if (c) {
@@ -161,9 +161,17 @@ export async function handle_reg_updated(reg: IReg) {
   // skip the contact/company sync at the foot of this function. a refused status
   // mail is reported and left rather than re-driving everything around it.
   if (reg.status === "04") {
+    // a plain link, as `handle_reg_created` sends a signed-in applicant: only
+    // the wizard submits, so a verified account owns this address already
+    const resume_url = new URL(
+      `/register/${reg.id}/${prog.step}`,
+      base_url
+    ).toString();
     const { node, subject } = registration_rejected.template({
       registrant_first_name: reg.r_first_name || "there",
       rejection_reason: reg.status_rejected_reason || "not specified",
+      stripe_connected: !!reg.o_stripe_account_id,
+      resume_url,
     });
     const res = await send_email({ node, subject, to: [reg.r_id] });
     console.info(res.data?.id);
@@ -189,11 +197,13 @@ export async function handle_reg_updated(reg: IReg) {
 
   // below the status mails and caught, on an at-most-once kind: a wise error
   // costs the crm its bank fields, not the applicant their mail.
-  const bnk = prog.banking;
+  // a stripe-only registration has no bank to copy
+  const { o_bank_id: bid, o_bank_statement: bos } = prog.banking ?? {};
+  const bnk = bid && bos ? { bid, bos } : undefined;
   const wacc =
     bnk &&
     cmp &&
-    (await wise.v2_account(+bnk.o_bank_id).catch((err) => {
+    (await wise.v2_account(+bnk.bid).catch((err) => {
       report_error(err, { reg_id: reg.id, during: "hubspot bank fields" });
     }));
   if (bnk && cmp && wacc) {
@@ -208,7 +218,7 @@ export async function handle_reg_updated(reg: IReg) {
       details.bankCode ||
       details.swiftCode ||
       "not specified";
-    cmp.bank_statament = bnk.o_bank_statement;
+    cmp.bank_statament = bnk.bos;
   }
 
   if (ctp) {

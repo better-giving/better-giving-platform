@@ -66,7 +66,8 @@ export async function handle_account_deauthorized(
   }
 
   // pooled pays out over wise to the default bank details, the grants run's
-  // recipient: without them the npo's share waits in its balance
+  // recipient: without them, and with the stripe account gone, nothing the
+  // npo is given reaches it
   if (!(await npo_default_bapp(npo.npo_id))) {
     // awaited: a lost notice fails the delivery, and the redelivery re-stamps
     // as a no-op. keyed on the event, so it collapses into one notice
@@ -76,10 +77,10 @@ export async function handle_account_deauthorized(
         alert: {
           type: "NOTICE",
           from: `stripe-connect-${stage}`,
-          title: "Disconnected Nonprofit Has No Bank Details",
+          title: "Disconnected Nonprofit Has No Way To Get Paid",
           body: [
             `npo ${npo.npo_id} disconnected stripe account ${acct} (event ${ev.id}).`,
-            "its card donations now settle pooled, but it has no default bank details: payouts wait until it adds some.",
+            "it has no default bank details and no stripe account left: every donation is held in its better giving balance until it adds bank details. reconnecting stripe only routes its new stripe donations.",
           ].join("\n"),
         },
       })

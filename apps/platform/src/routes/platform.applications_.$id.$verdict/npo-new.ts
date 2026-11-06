@@ -1,5 +1,7 @@
 import { addYears } from "date-fns";
 import { eq } from "drizzle-orm";
+import Stripe from "stripe";
+import { report_error } from "#/errors/report";
 import { referral_id } from "#/helpers/referral";
 import type { IBapp } from "@/banking";
 import { resp } from "@/helpers/https";
@@ -14,6 +16,7 @@ import { reg_update, reg_update_from } from "$/pg/queries/registration";
 import { userxnpo_put } from "$/pg/queries/user";
 import { user } from "$/pg/schema/auth";
 import { npos } from "$/pg/schema/npo";
+import { sync_npo_account } from "$/stripe-connect/sync";
 import { held_elsewhere, lock_acct } from "$/stripe-connect/target";
 
 type NpoInsert = typeof npos.$inferInsert;
@@ -39,6 +42,8 @@ export type EndowContentFromReg = Pick<
  * route's `IReg` and by a drizzle row alike */
 interface IApprovedRow {
   id: string;
+  /** a stripe-only approval files no bank, so announces none */
+  o_bank_id?: string | null;
   status: TStatus | null;
   updated_at: string | null;
   status_approved_npo_id?: number | null;
@@ -55,7 +60,10 @@ export async function announce_approval(row: IApprovedRow | null) {
   if (!row || npo_id == null)
     throw resp.status(409, "registration not in review");
   if (in_dedupe_window(row.updated_at)) {
-    await enqueue(msg("banking-new", { npo_id }), msg("reg-updated", row));
+    await enqueue(
+      ...(row.o_bank_id ? [msg("banking-new", { npo_id })] : []),
+      msg("reg-updated", row)
+    );
   }
   return npo_id;
 }
@@ -98,7 +106,14 @@ export const npo_new = async (r: NonNullable<Progress["banking"]>) => {
 
   ///////////// approval of new endowment /////////////
   // id is a PG IDENTITY column
-  const wacc = await wise.v2_account(+r.o_bank_id);
+  const bank =
+    r.o_bank_id && r.o_bank_statement
+      ? {
+          id: r.o_bank_id,
+          statement: r.o_bank_statement,
+          wacc: await wise.v2_account(+r.o_bank_id),
+        }
+      : null;
 
   const new_endow: NpoInsert = {
     ...ecfr,
@@ -148,25 +163,39 @@ export const npo_new = async (r: NonNullable<Progress["banking"]>) => {
       });
     const id = Number(inserted.id);
 
-    const now = new Date().toISOString();
-    const bank_new: IBapp = {
-      id: r.o_bank_id,
-      npo_id: id,
-      bank_statement_url: r.o_bank_statement,
-      bank_summary: wacc.longAccountSummary,
-      rejection_reason: "",
-      status: "default",
-      date_created: now,
-      updated_at: now,
-    };
+    if (bank) {
+      const now = new Date().toISOString();
+      const bank_new: IBapp = {
+        id: bank.id,
+        npo_id: id,
+        bank_statement_url: bank.statement,
+        bank_summary: bank.wacc.longAccountSummary,
+        rejection_reason: "",
+        status: "default",
+        date_created: now,
+        updated_at: now,
+      };
 
-    // a fresh npo can't own it yet: another npo does, so approve nothing
-    if (!(await bapp_put(tx, bank_new))) {
-      throw resp.status(409, `bank ${r.o_bank_id} is already registered`);
+      // a fresh npo can't own it yet: another npo does, so approve nothing
+      if (!(await bapp_put(tx, bank_new))) {
+        throw resp.status(409, `bank ${bank.id} is already registered`);
+      }
     }
     await userxnpo_put(tx, id, registrant_id);
     return reg_update(tx, r.id, { status_approved_npo_id: id });
   });
 
-  return announce_approval(approved);
+  const npo_id = await announce_approval(approved);
+  // the account's events while the registration held it matched no npo and
+  // were acked, so stripe won't resend them: the mirror is read here or never
+  if (acct) {
+    try {
+      await sync_npo_account(npo_id);
+    } catch (err) {
+      // approved regardless: account.updated or the banking page fills it
+      if (!(err instanceof Stripe.errors.StripeError)) throw err;
+      report_error(err);
+    }
+  }
+  return npo_id;
 };

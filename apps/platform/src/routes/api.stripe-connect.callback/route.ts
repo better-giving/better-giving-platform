@@ -18,6 +18,7 @@ import { mirror_unset, sync_npo_account } from "$/stripe-connect/sync";
 import {
   held_elsewhere,
   lock_acct,
+  release_rejected,
   return_path,
   target_access,
 } from "$/stripe-connect/target";
@@ -92,7 +93,10 @@ export async function loader({ request, url }: Route.LoaderArgs) {
           },
           held_as_read(registrations.o_stripe_account_id)
         );
-        if (won) return "connected";
+        if (won) {
+          await release_rejected(acct, t, tx);
+          return "connected";
+        }
         // submitted between target_access above and this write
         return row?.status && EDITABLE.includes(row.status)
           ? "replace_unconfirmed"
@@ -107,7 +111,9 @@ export async function loader({ request, url }: Route.LoaderArgs) {
         access.acct,
         mirror_unset
       );
-      return written ? "connected" : "replace_unconfirmed";
+      if (!written) return "replace_unconfirmed";
+      await release_rejected(acct, t, tx);
+      return "connected";
     });
   } catch (err) {
     // a duplicate written before claims took the lock, now held by an npo

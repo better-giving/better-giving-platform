@@ -1,6 +1,6 @@
 import { Field, LoadText, Select } from "@better-giving/ui";
 import type { SubmitHandler } from "react-hook-form";
-import { useFetcher, useNavigate } from "react-router";
+import { useFetcher, useNavigate, useRouteLoaderData } from "react-router";
 import { step_loader } from "#/pages/registration/data/step-loader";
 import {
   GRANT_STEP,
@@ -8,6 +8,7 @@ import {
   next_step,
   steps,
 } from "#/pages/registration/routes";
+import type { Reg$IdData } from "#/pages/registration/types";
 import { update_action } from "#/pages/registration/update-action";
 import type { TRegUpdate, TRole } from "@/reg";
 import { Progress } from "@/reg/progress";
@@ -36,9 +37,12 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
     dirtyFields: df,
   } = use_rhf(reg);
   const navigate = useNavigate();
+  const { connect_routing } = useRouteLoaderData(
+    "routes/_app.register.$reg_id"
+  ) as Reg$IdData;
 
   const submit: SubmitHandler<FV> = async (fv) => {
-    if (!isDirty && new Progress(reg).contact) {
+    if (!isDirty && new Progress(reg, connect_routing).contact) {
       return navigate(`../${steps.org_details}`); // go to latest step
     }
 

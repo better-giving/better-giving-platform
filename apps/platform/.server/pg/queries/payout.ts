@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type {
   INpoPayoutsOptions,
   INpoSettlementsOptions,
@@ -28,7 +28,7 @@ export async function npo_payouts(
   npo_id: number,
   opts: INpoPayoutsOptions
 ): Promise<IPage<IPayout>> {
-  const { limit = 10, next, status } = opts;
+  const { limit = 10, next, status, not_status } = opts;
   const cursor = decode_date_cursor(next);
 
   const rows = await db
@@ -38,6 +38,7 @@ export async function npo_payouts(
       and(
         eq(payouts.npo_id, npo_id),
         status ? eq(payouts.type, status) : undefined,
+        not_status ? ne(payouts.type, not_status) : undefined,
         cursor ? sql`${payouts.date} < ${cursor}` : undefined
       )
     )

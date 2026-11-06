@@ -8,10 +8,16 @@ import {
   UrlInput,
 } from "@better-giving/ui";
 import type { SubmitHandler } from "react-hook-form";
-import { NavLink, useFetcher, useNavigate } from "react-router";
+import {
+  NavLink,
+  useFetcher,
+  useNavigate,
+  useRouteLoaderData,
+} from "react-router";
 import { TERMS_OF_USE_NPO } from "#/constants/urls";
 import { step_loader } from "#/pages/registration/data/step-loader";
 import { after_org, steps } from "#/pages/registration/routes";
+import type { Reg$IdData } from "#/pages/registration/types";
 import { update_action } from "#/pages/registration/update-action";
 import { country_names as cnames } from "@/constants/countries";
 import type { TRegUpdate } from "@/reg";
@@ -28,6 +34,9 @@ export const action = update_action((reg) => after_org(reg.o_type));
 export default function Page({ loaderData: reg }: Route.ComponentProps) {
   const fetcher = useFetcher();
   const navigate = useNavigate();
+  const { connect_routing } = useRouteLoaderData(
+    "routes/_app.register.$reg_id"
+  ) as Reg$IdData;
 
   const {
     register,
@@ -40,7 +49,7 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
   } = use_rhf(reg);
 
   const submit: SubmitHandler<FV> = async (fv) => {
-    if (!isDirty && new Progress(reg).org) {
+    if (!isDirty && new Progress(reg, connect_routing).org) {
       return navigate(`../${after_org(reg.o_type)}`);
     }
 

@@ -22,6 +22,16 @@ export interface ISentTransfers {
   truncated: boolean;
 }
 
+/** the payouts page's stripe part: the routed transfers, and where the
+ * nonprofit's next card gift goes */
+export interface INpoSent extends ISentTransfers {
+  /** a card gift made now settles to the connected account: routing's own
+   * answer (`is_routable`), so false whenever banking says not available */
+  on_stripe: boolean;
+  /** an account is linked and the nonprofit has not disconnected it */
+  connected: boolean;
+}
+
 /**
  * what `reversed` cents of reversal records make of a transfer of `amount`
  * cents. nothing reversed is paid out; the whole amount (or more) is fully

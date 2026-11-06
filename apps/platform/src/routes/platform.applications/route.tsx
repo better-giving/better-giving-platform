@@ -36,6 +36,7 @@ function Applications({ loaderData: page1 }: Route.ComponentProps) {
       <Table
         items={items}
         empty_msg={empty_msgs[status_key] ?? empty_msgs[""]}
+        connect_routing={page1.connect_routing}
         {...props}
       />
     ),

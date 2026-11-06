@@ -16,6 +16,7 @@ import type { Reg$IdData } from "#/pages/registration/types";
 import { resp } from "@/helpers/https";
 import { Progress } from "@/reg/progress";
 import { reg_id, type TStatus } from "@/reg/schema";
+import { stripe as stripe_env } from "$/env";
 import { reg_get } from "$/pg/queries/registration";
 
 /** which child of `/register/:reg_id` this request matched. `params` says
@@ -50,6 +51,7 @@ export const reg_loader: LoaderFunction = async ({ params, request, url }) => {
   return {
     user,
     reg,
+    connect_routing: stripe_env.connect_routing,
   } satisfies Reg$IdData;
 };
 
@@ -97,7 +99,7 @@ export const step_loader =
       throw resp.status(403);
     }
 
-    const r = new Progress(reg);
+    const r = new Progress(reg, stripe_env.connect_routing);
 
     const exit = wizard_exit(reg, this_step);
     if (exit) return redirect(exit);

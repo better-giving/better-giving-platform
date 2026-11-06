@@ -10,12 +10,18 @@ const send_email = vi.hoisted(() =>
 );
 const report_error = vi.hoisted(() => vi.fn());
 const send_alert = vi.hoisted(() => vi.fn());
+const stripe_env = vi.hoisted(() => ({ connect_routing: true }));
+const v2_account = vi.hoisted(() => vi.fn());
 
 vi.mock("$/email", () => ({ send_email, send_email_or_throw: vi.fn() }));
 vi.mock("#/errors/report", () => ({ report_error }));
-vi.mock("$/env", () => ({ base_url: "http://x", hubspot: { owner_id: "1" } }));
+vi.mock("$/env", () => ({
+  base_url: "http://x",
+  hubspot: { owner_id: "1" },
+  stripe: stripe_env,
+}));
 vi.mock("$/kit/slack", () => ({ bg_sales: { send_alert } }));
-vi.mock("$/kit/wise", () => ({ wise: { v2_account: vi.fn() } }));
+vi.mock("$/kit/wise", () => ({ wise: { v2_account } }));
 vi.mock("#/.server/auth/auth", () => ({ auth: {} }));
 vi.mock("#/.server/auth/resume-link", () => ({ mint_resume_link: vi.fn() }));
 vi.mock("$/pg/queries/registration", () => ({ reg_get: vi.fn() }));
@@ -26,7 +32,8 @@ vi.mock("./hubspot", () => ({
 }));
 
 const { handle_reg_updated } = await import(".");
-const { create_deal, update_or_create_contact } = await import("./hubspot");
+const { create_deal, update_or_create_company, update_or_create_contact } =
+  await import("./hubspot");
 
 const reg = (o: Partial<IReg>) =>
   ({
@@ -45,7 +52,26 @@ const sent = async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  stripe_env.connect_routing = true;
 });
+
+/** a 501(c)(3) through contact, org and identity, with no bank: only a stripe
+ * account can carry it to step 5 */
+const stripe_only = (o: Partial<IReg> = {}) =>
+  reg({
+    r_first_name: "Ada",
+    r_last_name: "Lovelace",
+    o_name: "Analytical Engines",
+    r_org_role: "ceo",
+    rm: "other",
+    o_website: "https://ae.org",
+    o_hq_country: "United States",
+    o_designation: "Charity",
+    o_type: "501c3",
+    o_ein: "12-3456789",
+    o_stripe_account_id: "acct_1",
+    ...o,
+  });
 
 describe("registration status mails", () => {
   test("an approval for a blank first and org name greets and names without a placeholder", async () => {
@@ -105,6 +131,28 @@ describe("registration status mails", () => {
     expect(text).toMatch(/Hi there,/);
   });
 
+  test("a rejection links back to the application it asks them to resubmit", async () => {
+    await handle_reg_updated(reg({ status: "04" }));
+
+    const { text } = await sent();
+    expect(text).toMatch(/http:\/\/x\/register\/reg-1\/1\b/);
+  });
+
+  test("a rejected stripe-only application links back to review while routing is on", async () => {
+    await handle_reg_updated(stripe_only({ status: "04" }));
+
+    const { text } = await sent();
+    expect(text).toMatch(/http:\/\/x\/register\/reg-1\/5\b/);
+  });
+
+  test("a rejected stripe-only application links back to banking while routing is off", async () => {
+    stripe_env.connect_routing = false;
+    await handle_reg_updated(stripe_only({ status: "04" }));
+
+    const { text } = await sent();
+    expect(text).toMatch(/http:\/\/x\/register\/reg-1\/4\b/);
+  });
+
   test("the footer's social links each keep their url whole in the text part", async () => {
     await handle_reg_updated(reg({ status: "04" }));
 
@@ -139,5 +187,49 @@ describe("submitted registration", () => {
       "ada@test.com",
       expect.objectContaining({ email: "ada@test.com" })
     );
+  });
+});
+
+describe("hubspot bank fields", () => {
+  const company_of = () =>
+    vi.mocked(update_or_create_company).mock.calls[0]![1];
+
+  test("a bank with a statement copies its wise details to the company", async () => {
+    v2_account.mockResolvedValueOnce({
+      address: { city: "Austin", country: "US" },
+      accountNumber: "0012",
+      name: { fullName: "Analytical Engines" },
+      details: { abartn: "111000025" },
+    });
+
+    await handle_reg_updated(
+      stripe_only({
+        o_stripe_account_id: null,
+        o_bank_id: "777",
+        o_bank_statement: "https://s/statement.pdf",
+      })
+    );
+
+    expect(v2_account).toHaveBeenCalledWith(777);
+    expect(company_of()).toMatchObject({
+      bank_account_number: "0012",
+      bank_statament: "https://s/statement.pdf",
+    });
+  });
+
+  test("a stripe-only application skips wise and syncs the company without bank fields", async () => {
+    await handle_reg_updated(stripe_only());
+
+    expect(v2_account).not.toHaveBeenCalled();
+    expect(update_or_create_contact).toHaveBeenCalledOnce();
+    expect(company_of()).not.toHaveProperty("bank_account_number");
+    expect(company_of()).not.toHaveProperty("bank_statament");
+  });
+
+  test("a bank id without its statement counts as no bank", async () => {
+    await handle_reg_updated(stripe_only({ o_bank_id: "777" }));
+
+    expect(v2_account).not.toHaveBeenCalled();
+    expect(company_of()).not.toHaveProperty("bank_statament");
   });
 });

@@ -1,0 +1,219 @@
+import { Badge, Button } from "@better-giving/ui";
+import { Plus } from "lucide-react";
+import { type ReactNode, useId } from "react";
+import { to_utc_day } from "@/helpers/date";
+import { humanize } from "@/helpers/decimal";
+import type { HeldRail, IHeldMoney } from "@/payouts";
+
+export const rail_labels: Record<HeldRail, string> = {
+  stripe: "Stripe donations",
+  paypal: "PayPal donations",
+  daf: "DAF grants",
+  crypto: "Crypto donations",
+  stock_cheque: "Stock and cheque donations",
+  withdrawal: "Savings and Investments withdrawals",
+};
+
+/** `stripe`: a Stripe account is linked (ready or not yet) and no bank is
+ *  on file. `none`: neither, Stripe disconnected and no bank */
+export type THeldRails = "stripe" | "none";
+
+export interface IHeldMoneyCard {
+  held: IHeldMoney;
+  rails: THeldRails;
+  /** a bank account is filed and under review: the money waits for its
+   *  approval, so the card asks for no bank */
+  bank_pending?: boolean;
+  /** the add-bank page, through the router */
+  add_bank_href: string;
+  /** the Stripe connect start route, navigated to in full. `none` only */
+  connect_href?: string;
+  /** outer placement only — margin, grid placement */
+  classes?: string;
+}
+
+const usd = (n: number) => `$${humanize(n)}`;
+
+const until = (bank_pending: boolean) =>
+  bank_pending
+    ? "until your bank account is approved"
+    : "until you add a bank account";
+
+/** the total is net of what is owed when the query could say so; otherwise
+ *  the payout still nets refunds and disputes owed, and waits for the minimum */
+const release_line = (bank_pending: boolean, netted: boolean) =>
+  `Once ${bank_pending ? "your bank account is approved" : "you add a bank account"}, this money pays out with your bank payout${netted ? "" : ", less any refunds or disputes owed,"} once your balance reaches your payout minimum.`;
+
+/** the lead while Stripe donations are among what waits: true at every
+ *  linked status, ready included, since a gift held before ready stays held */
+const stripe_held_lead = (bank_pending: boolean) =>
+  `Stripe donations that arrive before your Stripe account is ready wait here, along with the donations Stripe can't receive. They stay in your Better Giving balance ${until(bank_pending)}. Nothing is lost.`;
+
+interface ICopy {
+  heading: string;
+  lead: string;
+}
+
+const none_copy = (bank_pending: boolean, pending_heading: string): ICopy =>
+  bank_pending
+    ? {
+        heading: pending_heading,
+        lead: "Stripe is disconnected and your bank account is still under review, so every donation is held in your Better Giving balance. Nothing is lost. It pays out once your bank account is approved, or connect Stripe again to get paid there.",
+      }
+    : {
+        heading: "No way to get paid right now",
+        lead: "Stripe is disconnected and you have no bank account, so every donation is held in your Better Giving balance. Nothing is lost. Add a bank account or connect Stripe again to get paid.",
+      };
+
+const BANKING_PENDING_HEADING = "Waiting for your bank account to be approved";
+
+/** Banking: what waits for a bank, by kind of money. renders nothing while
+ *  nothing waits */
+export function HeldMoneyCard(props: IHeldMoneyCard) {
+  const { held, rails, bank_pending = false } = props;
+  if (held.total <= 0) return null;
+  const copy =
+    rails === "none"
+      ? none_copy(bank_pending, BANKING_PENDING_HEADING)
+      : {
+          heading: bank_pending
+            ? BANKING_PENDING_HEADING
+            : "Waiting for a bank account",
+          lead: held.by_rail.some((r) => r.rail === "stripe")
+            ? stripe_held_lead(bank_pending)
+            : `Stripe can only receive Stripe donations. These can't go to Stripe, so they stay in your Better Giving balance ${until(bank_pending)}. Nothing is lost.`,
+        };
+  return (
+    <HeldShell {...props} {...copy}>
+      <table className="table">
+        <thead>
+          <tr>
+            <th>What's waiting</th>
+            <th className="text-right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {held.by_rail.map((r) => (
+            <tr key={r.rail}>
+              <td>{rail_labels[r.rail]}</td>
+              <td className="text-right">{usd(r.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </HeldShell>
+  );
+}
+
+const PAYOUTS_PENDING_HEADING = "On hold until your bank account is approved";
+
+/** Payouts: each pending payout waiting for a bank, newest first. renders
+ *  nothing while nothing waits */
+export function PayoutsHeldCard(props: IHeldMoneyCard) {
+  const { held, rails, bank_pending = false } = props;
+  if (held.total <= 0) return null;
+  const newest_first = [...held.items].sort(
+    (a, b) => Date.parse(b.date) - Date.parse(a.date)
+  );
+  const copy =
+    rails === "none"
+      ? none_copy(bank_pending, PAYOUTS_PENDING_HEADING)
+      : {
+          heading: bank_pending
+            ? PAYOUTS_PENDING_HEADING
+            : "On hold until you add a bank account",
+          lead: held.items.some((it) => it.rail === "stripe")
+            ? stripe_held_lead(bank_pending)
+            : `Stripe can only receive Stripe donations, so everything else waits in your Better Giving balance${bank_pending ? ` ${until(true)}` : ""}. Nothing is lost.`,
+        };
+  return (
+    <HeldShell {...props} {...copy}>
+      <table className="table">
+        <thead>
+          <tr>
+            <th>From</th>
+            <th>Date</th>
+            <th className="text-right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {newest_first.map((it, i) => (
+            // a pending payout carries no id of its own here
+            <tr key={i}>
+              <td>{rail_labels[it.rail]}</td>
+              <td>{to_utc_day(it.date)}</td>
+              <td className="text-right">{usd(it.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </HeldShell>
+  );
+}
+
+interface IHeldShell extends IHeldMoneyCard, ICopy {
+  /** the breakdown table */
+  children: ReactNode;
+}
+
+function HeldShell({
+  held,
+  rails,
+  bank_pending = false,
+  add_bank_href,
+  connect_href,
+  heading,
+  lead,
+  classes = "",
+  children,
+}: IHeldShell) {
+  const heading_id = useId();
+  const offers_connect = rails === "none" && !!connect_href;
+  const netted = held.net !== undefined && held.net < held.total;
+  return (
+    <section
+      aria-labelledby={heading_id}
+      className={`${classes} card border-warning grid gap-4 text-sm`}
+    >
+      <div className="grid gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 id={heading_id} className="text-lg font-semibold">
+            {heading}
+          </h2>
+          <Badge tone="warning">Held</Badge>
+        </div>
+        <p className="text-gray-11 max-w-3xl">{lead}</p>
+      </div>
+      <p className="grid gap-1">
+        <span className="text-gray-11">Held right now</span>
+        <span className="font-display text-3xl font-bold">
+          {usd(netted ? held.net! : held.total)}
+        </span>
+        {netted && (
+          <span className="text-gray-11">
+            After amounts you owe Better Giving
+          </span>
+        )}
+      </p>
+      <div className="table-scroll">{children}</div>
+      {rails === "stripe" && (
+        <p className="text-gray-11">{release_line(bank_pending, netted)}</p>
+      )}
+      {(!bank_pending || offers_connect) && (
+        <div className="flex flex-wrap gap-4">
+          {!bank_pending && (
+            <Button variant="primary" to={add_bank_href}>
+              <Plus aria-hidden className="mr-2 icon-md" />
+              <span>Add bank account</span>
+            </Button>
+          )}
+          {offers_connect && (
+            <a href={connect_href} className="btn btn-secondary">
+              Connect Stripe
+            </a>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}

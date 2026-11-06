@@ -1,4 +1,5 @@
 import {
+  CreditCardIcon,
   HandCoins,
   type LucideIcon,
   MoveRight,
@@ -7,11 +8,15 @@ import {
 } from "lucide-react";
 import type { IAllocation } from "@/donations";
 import { humanize } from "@/helpers/decimal";
+import type { TStripePayout } from "./helpers";
 
 interface Props {
   total: number;
   font_size?: number; // font size in pixels, defaults to 18
   allocation: IAllocation;
+  /** set when the net went to the npo's stripe account, which then stands
+   * in for the allocation */
+  stripe_payout?: TStripePayout;
 }
 
 interface Desc {
@@ -37,13 +42,33 @@ const desc_map: DescMap = {
   },
 };
 
-export function AmountFlow({ total, font_size = 14, allocation }: Props) {
-  const branches = (Object.entries(allocation) as [Acc, number][])
-    .filter(([, v]) => v > 0)
-    .map(([k]) => ({
-      ...desc_map[k],
-      amount: total * (allocation[k] / 100),
-    }));
+const stripe_text: { [k in TStripePayout]: string } = {
+  paid_out: "Paid out to Stripe",
+  sending: "Sending to Stripe",
+  not_sent: "Not sent to Stripe",
+};
+
+export function AmountFlow({
+  total,
+  font_size = 14,
+  allocation,
+  stripe_payout,
+}: Props) {
+  const branches = stripe_payout
+    ? [
+        {
+          Icon: CreditCardIcon,
+          class: "shrink-0",
+          text: stripe_text[stripe_payout],
+          amount: total,
+        },
+      ]
+    : (Object.entries(allocation) as [Acc, number][])
+        .filter(([, v]) => v > 0)
+        .map(([k]) => ({
+          ...desc_map[k],
+          amount: total * (allocation[k] / 100),
+        }));
 
   const icon_size = Math.max(16, font_size * 0.9); // icon size scales with font
 
