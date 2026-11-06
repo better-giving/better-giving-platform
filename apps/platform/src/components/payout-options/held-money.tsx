@@ -39,10 +39,10 @@ const until = (bank_pending: boolean) =>
     ? "until your bank account is approved"
     : "until you add a bank account";
 
-/** the total is gross; the payout nets refunds and disputes owed and waits
- *  for the minimum */
-const release_line = (bank_pending: boolean) =>
-  `Once ${bank_pending ? "your bank account is approved" : "you add a bank account"}, this money pays out with your bank payout, less any refunds or disputes owed, once your balance reaches your payout minimum.`;
+/** the total is net of what is owed when the query could say so; otherwise
+ *  the payout still nets refunds and disputes owed, and waits for the minimum */
+const release_line = (bank_pending: boolean, netted: boolean) =>
+  `Once ${bank_pending ? "your bank account is approved" : "you add a bank account"}, this money pays out with your bank payout${netted ? "" : ", less any refunds or disputes owed,"} once your balance reaches your payout minimum.`;
 
 /** the lead while Stripe donations are among what waits: true at every
  *  linked status, ready included, since a gift held before ready stays held */
@@ -169,6 +169,7 @@ function HeldShell({
 }: IHeldShell) {
   const heading_id = useId();
   const offers_connect = rails === "none" && !!connect_href;
+  const netted = held.net !== undefined && held.net < held.total;
   return (
     <section
       aria-labelledby={heading_id}
@@ -186,12 +187,17 @@ function HeldShell({
       <p className="grid gap-1">
         <span className="text-gray-11">Held right now</span>
         <span className="font-display text-3xl font-bold">
-          {usd(held.total)}
+          {usd(netted ? held.net! : held.total)}
         </span>
+        {netted && (
+          <span className="text-gray-11">
+            After amounts you owe Better Giving
+          </span>
+        )}
       </p>
       <div className="table-scroll">{children}</div>
       {rails === "stripe" && (
-        <p className="text-gray-11">{release_line(bank_pending)}</p>
+        <p className="text-gray-11">{release_line(bank_pending, netted)}</p>
       )}
       {(!bank_pending || offers_connect) && (
         <div className="flex flex-wrap gap-4">

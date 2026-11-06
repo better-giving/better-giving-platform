@@ -383,10 +383,12 @@ describe("payout methods list", () => {
     await expect
       .element(
         bank.getByText(
-          "Bank payout: we send it to your bank account every 3 days once your balance reaches your payout minimum."
+          "We send it to your bank account every 3 days once your balance reaches your payout minimum."
         )
       )
       .toBeVisible();
+    // the heading already says it
+    expect(screen.container.textContent).not.toContain("Bank payout:");
     expect(screen.container.textContent).not.toMatch(
       /\bwise\b|money-transfer/i
     );

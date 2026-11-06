@@ -100,6 +100,9 @@ export const rows: IRow[] = [
 export const is_linked = (s: TConnectStatus) =>
   s === "incomplete" || s === "pending" || s === "ready";
 
-/** the bank payout line every surface states, the saved bank card excepted */
-export const BANK_PAYOUT_LINE =
-  "Bank payout: we send it to your bank account every 3 days once your balance reaches your payout minimum.";
+/** the bank payout sentence under a "Bank payout" heading, which already names it */
+export const BANK_PAYOUT_SENTENCE =
+  "We send it to your bank account every 3 days once your balance reaches your payout minimum.";
+
+/** the same line where no such heading sits above it (step 4's footnote) */
+export const BANK_PAYOUT_LINE = `Bank payout: ${BANK_PAYOUT_SENTENCE.replace(/^W/, "w")}`;

@@ -55,6 +55,48 @@ const body_rows = (scope: Locator) =>
 const no_wise = (scope: Locator) =>
   expect(scope.element().textContent).not.toMatch(/wise|money-transfer/i);
 
+describe("held card, net of what is owed", () => {
+  const AFTER_OWED = "After amounts you owe Better Giving";
+
+  test.each([
+    ["Banking", HeldMoneyCard],
+    ["Payouts", PayoutsHeldCard],
+  ])(
+    "%s: shows the net as the amount, with the line under it",
+    async (_, Card) => {
+      const screen = await in_router(
+        <Card {...base} held={{ ...HELD, net: 1500 }} />
+      );
+      const region = screen.getByRole("region");
+      await expect.element(region.getByText("$1,500.00")).toBeVisible();
+      await expect.element(region.getByText(AFTER_OWED)).toBeVisible();
+      expect(region.element().textContent).not.toContain("$1,784.50 After");
+      expect(region.element().textContent).not.toContain("less any refunds");
+    }
+  );
+
+  test("owing all of it shows $0.00", async () => {
+    const screen = await in_router(
+      <HeldMoneyCard {...base} held={{ ...HELD, net: 0 }} />
+    );
+    const region = screen.getByRole("region");
+    await expect.element(region.getByText("$0.00")).toBeVisible();
+    await expect.element(region.getByText(AFTER_OWED)).toBeVisible();
+  });
+
+  test.each([
+    ["no net given", undefined],
+    ["a net equal to the total", HELD.total],
+  ])("%s: shows the total and no line", async (_, net) => {
+    const screen = await in_router(
+      <HeldMoneyCard {...base} held={{ ...HELD, net }} />
+    );
+    const region = screen.getByRole("region");
+    await expect.element(region.getByText("$1,784.50")).toBeVisible();
+    expect(region.element().textContent).not.toContain(AFTER_OWED);
+  });
+});
+
 describe("HeldMoneyCard: Banking", () => {
   test("nothing held: nothing renders", async () => {
     const screen = await in_router(
@@ -377,7 +419,7 @@ describe("BankPayoutSection: Banking", () => {
     await expect
       .element(
         section.getByText(
-          "Bank payout: we send it to your bank account every 3 days once your balance reaches your payout minimum.",
+          "We send it to your bank account every 3 days once your balance reaches your payout minimum.",
           { exact: true }
         )
       )

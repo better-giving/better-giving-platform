@@ -2,7 +2,7 @@ import { Button, EmptyState } from "@better-giving/ui";
 import { Landmark, Plus } from "lucide-react";
 import { type ReactNode, useId } from "react";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
-import { BANK_PAYOUT_LINE } from "./rows";
+import { BANK_PAYOUT_SENTENCE } from "./rows";
 
 export interface IBankPayoutSection {
   /** the bank accounts table; absent while none is on file */
@@ -43,7 +43,7 @@ export function BankPayoutSection({
             Bank payout
           </h2>
           <p className="text-sm text-gray-11 max-w-3xl">
-            {BANK_PAYOUT_LINE}
+            {BANK_PAYOUT_SENTENCE}
             {table && stripe_ready && (
               <> Everything except Stripe donations pays out here.</>
             )}
