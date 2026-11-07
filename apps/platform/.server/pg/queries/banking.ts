@@ -62,7 +62,11 @@ export async function npo_bapp_count(npo_id: number) {
  * row when it is the npo's only live bank. banks approved before an npo's
  * first one took the default have no default, and payouts and commissions
  * must keep paying them. two approved banks and no default stay unpicked:
- * guessing between them would move money to the wrong account
+ * guessing between them would move money to the wrong account.
+ *
+ * more than one "default" row can exist; the most recently moved one pays, so
+ * the choice does not hang on the order postgres returns rows in. `id` breaks
+ * a tie on the timestamp
  */
 export async function npo_default_bapp(npo_id: number) {
   const rows = await db
@@ -73,6 +77,12 @@ export async function npo_default_bapp(npo_id: number) {
         eq(banking_apps.npo_id, npo_id),
         inArray(banking_apps.status, ["default", "approved"])
       )
+    )
+    .orderBy(
+      desc(
+        sql`coalesce(${banking_apps.updated_at}, ${banking_apps.date_created})`
+      ),
+      desc(banking_apps.id)
     );
   const def = rows.find((r) => r.status === "default");
   if (def) return def;

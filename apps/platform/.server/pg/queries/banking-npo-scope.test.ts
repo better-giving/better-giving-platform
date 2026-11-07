@@ -179,6 +179,45 @@ describe("npo_default_bapp", () => {
     expect(await npo_default_bapp(own)).toBeUndefined();
   });
 
+  describe("two default rows", () => {
+    const stamp = (id: string, at: string) =>
+      test_db
+        .current!.db.update(banking_apps)
+        .set({ updated_at: at })
+        .where(eq(banking_apps.id, id));
+
+    beforeEach(async () => {
+      await test_db
+        .current!.db.delete(banking_apps)
+        .where(eq(banking_apps.npo_id, own));
+    });
+
+    test.each([
+      ["older first", ["d-old", "d-new"]],
+      ["newer first", ["d-new", "d-old"]],
+    ])("the newer updated_at wins, inserted %s", async (_, order) => {
+      const db = test_db.current!.db;
+      for (const id of order) {
+        await db.insert(banking_apps).values(bapp(id, own, "default"));
+      }
+      await stamp("d-old", "2024-01-01T00:00:00Z");
+      await stamp("d-new", "2025-01-01T00:00:00Z");
+
+      expect((await npo_default_bapp(own))?.id).toBe("d-new");
+    });
+
+    test("a tie on updated_at breaks on the greater id", async () => {
+      const db = test_db.current!.db;
+      await db
+        .insert(banking_apps)
+        .values([bapp("d-b", own, "default"), bapp("d-a", own, "default")]);
+      await stamp("d-a", "2025-01-01T00:00:00Z");
+      await stamp("d-b", "2025-01-01T00:00:00Z");
+
+      expect((await npo_default_bapp(own))?.id).toBe("d-b");
+    });
+  });
+
   test("a bank still under review is not one", async () => {
     const db = test_db.current!.db;
     await db.delete(banking_apps).where(eq(banking_apps.npo_id, own));
