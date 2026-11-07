@@ -64,9 +64,10 @@ export async function npo_bapp_count(npo_id: number) {
  * must keep paying them. two approved banks and no default stay unpicked:
  * guessing between them would move money to the wrong account.
  *
- * more than one "default" row can exist; the most recently moved one pays, so
+ * production has npos with two "default" rows (written before one default per
+ * npo was enforced in the app). the one with the newest `updated_at` pays, so
  * the choice does not hang on the order postgres returns rows in. `id` breaks
- * a tie on the timestamp
+ * a tie. `updated_at` is NOT NULL; the `date_created` fallback is belt and braces
  */
 export async function npo_default_bapp(npo_id: number) {
   const rows = await db
