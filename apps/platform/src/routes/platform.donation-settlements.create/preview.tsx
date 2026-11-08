@@ -1,4 +1,4 @@
-import { Actions, TabPanel, Tabs } from "@better-giving/ui";
+import { Actions, Tab, TabList, TabPanel, Tabs } from "@better-giving/ui";
 import { CodeIcon, TableIcon } from "lucide-react";
 import { humanize } from "@/helpers/decimal";
 import type { IFormValues, ISettlementPreview } from "./types";
@@ -88,32 +88,21 @@ export function Preview({
   );
 }
 
-const record_tabs = [
-  {
-    value: "table",
-    label: (
-      <>
-        <TableIcon className="icon-sm" />
-        Records
-      </>
-    ),
-  },
-  {
-    value: "json",
-    label: (
-      <>
-        <CodeIcon className="icon-sm" />
-        JSON
-      </>
-    ),
-  },
-];
-
 function RecordsTabs({ preview }: { preview: ISettlementPreview }) {
   return (
     <section className="mb-4">
-      <Tabs size="sm" items={record_tabs} defaultValue="table">
-        <TabPanel value="table" className="mt-3">
+      <Tabs defaultValue="table">
+        <TabList aria-label="Records">
+          <Tab value="table" classes="gap-2">
+            <TableIcon className="icon-sm" />
+            Records
+          </Tab>
+          <Tab value="json" classes="gap-2">
+            <CodeIcon className="icon-sm" />
+            JSON
+          </Tab>
+        </TabList>
+        <TabPanel value="table" classes="mt-3">
           <table className="table w-full">
             <thead>
               <tr>
@@ -133,7 +122,7 @@ function RecordsTabs({ preview }: { preview: ISettlementPreview }) {
           </table>
         </TabPanel>
 
-        <TabPanel value="json" className="mt-3">
+        <TabPanel value="json" classes="mt-3">
           <pre className="text-xs bg-panel rounded p-3 overflow-x-auto max-h-60 overflow-y-auto scrollbars">
             {JSON.stringify(preview.txs, null, 2)}
           </pre>

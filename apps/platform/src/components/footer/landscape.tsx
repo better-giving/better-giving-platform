@@ -7,7 +7,7 @@ interface ILandscape {
 /**
  * decorative winter landscape for the bottom of the marketing footer. the
  * raster is opaque and its sky is painted in --primary's hex mirror
- * (`blue_9` in packages/brand/src/colors.ts), so it only belongs on the
+ * (`accent_9` in packages/brand/src/colors.ts), so it only belongs on the
  * `surface-primary` band — moved onto another fill, its sky shows as a box.
  */
 export function Landscape({ className = "" }: ILandscape) {

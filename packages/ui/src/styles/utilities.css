@@ -67,7 +67,7 @@
 }
 
 @utility field-error {
-  @apply absolute -bottom-5 right-0 text-xs text-right text-destructive;
+  @apply absolute -bottom-5 right-0 text-xs text-right text-destructive-subtle-fg;
 }
 
 /* focus-visible, never focus — the house trigger, the same one `.btn` and every
@@ -79,10 +79,9 @@
    the text controls keep `:focus` and are not a hole in that rule: a pointer
    press on an <input> DOES match :focus-visible, so `.field-input-container`'s
    `:has(input:focus)` in styles/components.css is the same set of moments under
-   another name. ledger entry in packages/brand/design-system.md →
-   "Which states each control carries". */
+   another name. */
 @utility radio {
-  @apply flex items-center gap-4 data-[required=true]:after:ml-1 data-[required=true]:after:content-['*'] data-[required=true]:after:text-destructive;
+  @apply flex items-center gap-4 data-[required=true]:after:ml-1 data-[required=true]:after:content-['*'] data-[required=true]:after:text-destructive-subtle-fg;
   & > input {
     @apply appearance-none h-4 relative aspect-square border border-input hover:border-input-hover bg-surface rounded-full before:content-[''] before:h-2.5 before:aspect-square before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full checked:before:bg-primary disabled:checked:before:bg-gray-3 focus-visible:outline-2 focus-visible:outline-ring;
   }
@@ -102,13 +101,13 @@
 @utility check-field {
   @apply grid grid-cols-[auto_1fr] justify-items-start gap-x-3 items-center;
   & > label {
-    @apply data-[required=true]:after:ml-1 data-[required=true]:after:content-['*'] data-[required=true]:after:text-destructive;
+    @apply data-[required=true]:after:ml-1 data-[required=true]:after:content-['*'] data-[required=true]:after:text-destructive-subtle-fg;
   }
   & > input {
     @apply checkbox;
   }
   & > [data-error] {
-    @apply col-span-full text-xs text-destructive;
+    @apply col-span-full text-xs text-destructive-subtle-fg;
   }
 }
 
@@ -220,7 +219,7 @@
 /* icon size ladder, for lucide glyphs. css inline-/block-size beat the svg's
    own width/height attributes, so the class alone sets the box. flex-shrink is baked in for the reason glyph-btn bakes it:
    an svg is overflow:hidden, so its flex min-size is 0 and a row of text beside
-   it squeezes the glyph. ledger entry in packages/brand/design-system.md. */
+   it squeezes the glyph. */
 @utility icon-xs {
   inline-size: calc(var(--spacing) * 3) /* 12px */;
   block-size: calc(var(--spacing) * 3) /* 12px */;
@@ -261,7 +260,7 @@
    sized against the text beside it; a pictogram is sized against the surface it
    heads — a feature mark atop a marketing card, or the outcome check or alert
    that IS a panel's or page's message. neither ladder reaches the other's job,
-   which is why there are two. ledger entry in packages/brand/design-system.md. */
+   which is why there are two. */
 @utility pictogram-sm {
   inline-size: calc(var(--spacing) * 7.5) /* 30px */;
   block-size: calc(var(--spacing) * 7.5) /* 30px */;
@@ -280,6 +279,15 @@
   flex-shrink: 0;
 }
 
+/* a button label in sentence case on the control corner: the corner is the
+   same one a bare .btn has, and no uppercase transform is applied. */
+@utility btn-sentence {
+  border-radius: var(--radius);
+  text-transform: none;
+}
+
+/* @deprecated the same rule as btn-sentence; use btn-sentence. kept so copied
+   call sites keep compiling. */
 @utility btn-donate {
   border-radius: var(--radius);
   text-transform: none;
@@ -287,30 +295,40 @@
 
 @utility btn-form-primary {
   background-color: var(--form-primary);
-  color: var(--primary-fg);
-  /* --ring, not --secondary: --secondary is a near-white tint at Lc 0.0
-     against the page, under what apca can measure. --ring is remapped to
-     --form-primary inside #donation-container, so the ring follows
-     the host org's brand rather than pinning a value that may collide with an
-     unknown host page. */
+  color: var(--form-primary-fg);
+  /* --form-ring, not --secondary: --secondary is a near-white tint at Lc 0.0
+     against the page, under what apca can measure. --form-ring is --ring as
+     resolved on :root or the nearest [data-theme] (styles/variables.css), so
+     the ring follows the container's theme and the appearance rather than
+     pinning a value that may collide with an unknown host page. a --ring set
+     on any other element, surface-primary's included, does not reach it; set
+     --form-ring there instead.
+     hover and press mix --form-primary toward black unless the app sets
+     --form-primary-hover or -active: see styles/variables.css. */
   &:focus-visible {
-    outline: 2px solid var(--ring);
+    outline: 2px solid var(--form-ring);
     outline-offset: 2px;
   }
   &:hover:not(:disabled):not([aria-disabled="true"]) {
-    background-color: color-mix(in oklch, var(--form-primary) 90%, black);
+    background-color: var(
+      --form-primary-hover,
+      color-mix(in oklch, var(--form-primary) 90%, black)
+    );
   }
   &:active {
-    background-color: color-mix(in oklch, var(--form-primary) 85%, black);
+    background-color: var(
+      --form-primary-active,
+      color-mix(in oklch, var(--form-primary) 90%, black)
+    );
   }
   &:disabled {
     background-color: var(--gray-3);
     color: var(--gray-11);
   }
-  /* the in-flight rung, matching the six variants in components.css. it cannot
-     be picked up from there: --form-primary is a tenant value and this tier is
-     the only thing that paints it, so a fill it does not restate stays the
-     tenant's brand while the control is submitting. */
+  /* the in-flight rung, the same one the .btn-* variants get in components.css.
+     it cannot be picked up from there: that block does not list this class,
+     and a components-layer rule loses to this utility's own fill anyway, so
+     without it the control keeps its --form-primary fill while submitting. */
   &.pending {
     background-color: var(--gray-3);
     color: var(--gray-11);
@@ -323,14 +341,16 @@
    spacing and display stay the caller's, the same split the type roles keep
    below.
 
-   both rungs are the ramp's, read off the state ladder's filled row rather than
-   picked: step 9 at rest, step 10 hovered. `--primary` is the ledger's one
-   blessed ink for a text-only control; `--primary-hover` is the step the solid
-   variants already hover to, so a link and a button move together.
+   both rungs are the link roles', declared in the theme file per appearance:
+   the first step that reads as text (Lc 60 on the page and the card), picked
+   by the generator: in light the ramp's filled row (step 9 at rest, 10
+   hovered) wherever that reads, so a link and a button move together; in dark
+   the text rungs (11, 12), because the fill steps are tuned for a button and
+   read too faint as ink on the dark page. the hover is never the rest step.
 
    the hover is that colour shift and nothing else, in every context — an
    underline that appears or disappears on hover is not this recipe. a RESTING
-   underline is still the caller's and sixteen sites keep one.
+   underline is still the caller's.
 
    no `:not([aria-disabled="true"])` guard on the hover, unlike the button
    variants: `styles/base.css` gives a disabled anchor `pointer-events: none`,
@@ -340,16 +360,15 @@
    focus-visible, never focus — the house trigger, the same one `.btn` and every
    control in styles/components.css carries. stated in full rather than left to
    the UA outline that `styles/base.css` already colours: the width and the
-   offset are the ledger's focus row, and a UA outline has neither.
+   offset are the house focus ring, and a UA outline has neither.
 
    a link whose ink is NOT the brand colour is a different thing and keeps its
    own: the contrast ink on a brand fill (the footer, the announcement banner),
-   the error ink in a destructive band. `link-conformance.node.test.ts` names
-   that set. */
+   the error ink in a destructive band. */
 @utility link {
-  color: var(--primary);
+  color: var(--link);
   &:hover {
-    color: var(--primary-hover);
+    color: var(--link-hover);
   }
   &:focus-visible {
     outline: 2px solid var(--ring);
@@ -363,8 +382,8 @@
    and neither is picked to sit on a brand fill. --ring is the ramp's step 8
    and no longer equals --primary — it went from vanishing into the fill to
    merely being quiet on it, so this rebind is a smaller win than it was and
-   still the right one. same mechanism as #donation-container's --ring remap in
-   platform's index.css. */
+   still the right one. it reaches what reads --ring directly; --form-ring was
+   resolved further up, so btn-form-primary inside keeps the theme's ring. */
 @utility surface-primary {
   background-color: var(--primary);
   color: var(--primary-fg);
@@ -409,8 +428,7 @@
 }
 
 /* the in-flow container: a marketing card, a dashboard tile, a figure, a
-   callout, a link tile. the fill, the edge, the corner and the inset — the
-   shell's half of the ownership rule in packages/brand/design-system.md — and
+   callout, a link tile. the fill, the edge, the corner and the inset, and
    nothing else.
 
    radix's card: step 2 (`bg-card`) with a step-6 edge (`border-hairline`, the
@@ -421,7 +439,7 @@
 
    the inset is one value in every role — no tier, and no per-file variant —
    and one step per width: 16px on a phone, 24px from md, the same breakpoint
-   where the page gutter widens (PM, 2026-11-02).
+   where the page gutter widens.
 
    no layout and no type. `grid`, `flex`, a `gap`, a `divide-y`, a heading size
    are the arrangement of the contents, and the arrangement stays the caller's
@@ -430,8 +448,8 @@
 
    a surface with no inset has delegated it and is a different shell — a table
    shell, a `divide-y` list, an `overflow-hidden` media frame. it spells the
-   same fill, edge and corner itself, and `shell-conformance.node.test.ts` is
-   written to leave it alone. */
+   same fill, edge and corner itself, and a sweep for `card` should leave it
+   alone. */
 @utility card {
   @apply bg-card rounded-card border border-hairline p-4 md:p-6;
 }

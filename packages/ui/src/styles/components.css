@@ -125,9 +125,8 @@
 
   /* the filled button on a brand fill: --primary on --primary (or on
      --primary-deep) is no button at all, so it inverts to the fill's own ink.
-     no hover rung — the --primary-fg alpha ladder is unmeasured
-     (design-system.md, "--primary-fg alpha steps") — so it keeps only the
-     filled variants' press. its ring is below the shared one. */
+     no hover rung — the --primary-fg alpha ladder is unmeasured,
+     so it keeps only the filled variants' press. its ring is below the shared one. */
   .btn-inverse {
     background-color: var(--primary-fg);
     color: var(--primary);
@@ -187,7 +186,7 @@
   }
 
   /* the inverse button's ring is --primary-ring whatever scope it sits in: the
-     offset puts the ring on the brand fill around it, where --ring (blue-8)
+     offset puts the ring on the brand fill around it, where --ring (accent-8)
      does not read. after the shared ring, so it wins at equal specificity. */
   .btn-inverse:focus-visible {
     outline-color: var(--primary-ring);
@@ -253,8 +252,8 @@
     background-color: var(--surface);
     padding: calc(var(--spacing) * 3.5) calc(var(--spacing) * 4);
     min-block-size: var(--field-size);
-    /* --input, radix's interactive-border step 7 (under 1.4.11's 3:1 by PM
-       decision, packages/brand/src/colors.css). the hover leaves an invalid
+    /* --input, radix's interactive-border step 7 (under 1.4.11's 3:1, an accepted
+       miss recorded in packages/brand/src/colors.css). the hover leaves an invalid
        field's destructive edge alone. */
     border: 1px solid var(--input);
     outline-color: var(--ring);
@@ -340,7 +339,7 @@
   .field-err {
     text-align: right;
     font-size: var(--text-xs);
-    color: var(--destructive);
+    color: var(--destructive-subtle-fg);
   }
 
   .selector-btn {
@@ -372,7 +371,7 @@
     font-weight: var(--font-weight-medium);
     &[data-required="true"]::after {
       content: " *";
-      color: var(--destructive);
+      color: var(--destructive-subtle-fg);
     }
     &[data-required="false"]::after {
       content: " (optional)";
@@ -397,7 +396,7 @@
 
     &[data-required="true"]::after {
       content: " *";
-      color: var(--destructive);
+      color: var(--destructive-subtle-fg);
     }
     &[data-required="false"]::after {
       content: " (optional)";
@@ -441,7 +440,7 @@
   .table {
     --table-fill: var(--card);
     /* the control corner, not the card's: a 12px curve clips the header
-       row's first and last labels (PM, 2026-11-02). */
+       row's first and last labels. */
     --table-corner: var(--radius);
     min-width: 100%;
     border-collapse: separate;
@@ -459,7 +458,7 @@
     }
 
     /* the header row is a well on the table's fill: step 3 on step 2, so
-       the labels read apart from the rows under them (PM, 2026-11-02). */
+       the labels read apart from the rows under them. */
     /* biome-ignore lint/style/noDescendingSpecificity: unrelated to the shell selectors above */
     & thead th {
       background-color: var(--panel);

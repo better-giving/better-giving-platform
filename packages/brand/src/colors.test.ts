@@ -9,24 +9,22 @@ import { oklch_to_hex } from "./oklch.ts";
 // parses :root the same way a human eye would — a literal oklch() token, or a
 // var() alias followed to the literal it points at. color-mix() and --radius
 // fall out on their own: neither has one literal behind it.
-const css = readFileSync(
-  createRequire(import.meta.url).resolve("@better-giving/ui/colors.css"),
-  "utf8"
-);
+const require = createRequire(import.meta.url);
 
-function sole_block(selector: string): string {
-  const matches = [
-    ...css.matchAll(new RegExp(`${selector}\\s*{([^}]*)}`, "gs")),
-  ];
-  if (matches.length !== 1) {
-    throw new Error(
-      `expected exactly one ${selector} block, found ${matches.length}`
-    );
-  }
-  return matches[0][1];
+// the light half of each file: the block whose selector list opens with `:root`
+function light_block(path: string): string {
+  const css = readFileSync(path, "utf8");
+  const m = css.match(/(?:^|\n):root\s*(?:,[^{]*)?{([^}]*)}/s);
+  if (!m) throw new Error(`${path}: no :root block`);
+  return m[1];
 }
 
-const root_block = sole_block(":root");
+// the roles (colors.css) alias the scales (themes/default.css); both are the
+// registry's.
+const root_block = [
+  light_block(require.resolve("@better-giving/ui/colors.css")),
+  light_block(require.resolve("@better-giving/ui/themes/default.css")),
+].join("\n");
 
 // comments go before the split so a trailing /* #hex */ can't be read as part
 // of the next declaration.
@@ -65,6 +63,7 @@ function hex_of(name: string, seen: readonly string[] = []): string | null {
     // has to fail, not the comparison.
     const excluded =
       value.startsWith("color-mix(") ||
+      value.startsWith("color(") ||
       /^-?[\d.]+(rem|px|em|%|s|ms)?$/.test(value);
     if (excluded) return null;
     throw new Error(
@@ -129,7 +128,7 @@ describe("var() aliases mirror their target", () => {
 // still be the sRGB hex the palette tool emitted, recorded beside it.
 const ramp_steps = [
   ...root_block.matchAll(
-    /--((?:blue|red|green|amber|gray)-\d+):\s*(oklch\([^)]+\));\s*\/\* (#[0-9a-f]{6}) \*\//g
+    /--((?:accent|destructive|success|warning|gray)-\d+):\s*(oklch\([^)]+\));\s*\/\* (#[0-9a-f]{6}) \*\//g
   ),
 ];
 

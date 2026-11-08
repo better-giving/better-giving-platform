@@ -48,7 +48,7 @@ export function Hero({ classes = "" }: IHero) {
           </p>
           <div className="flex flex-wrap gap-2 max-w-lg max-sm:hidden">
             {gift_types.map((g) => (
-              <Badge key={g} size="md" tone="secondary">
+              <Badge key={g} variant="primary">
                 {g}
               </Badge>
             ))}

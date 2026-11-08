@@ -1,52 +1,37 @@
-import type { ReactNode } from "react";
+import type { ComponentProps } from "react";
 
-export type BadgeTone =
-  | "neutral"
-  | "secondary"
-  | "primary"
-  | "success"
-  | "warning"
-  | "destructive"
-  | "on-primary";
+type Variant = "neutral" | "primary" | "success" | "warning" | "destructive";
 
-interface Props {
-  tone?: BadgeTone;
-  /** `sm` inside a card or a dense row, `md` on a marketing section */
-  size?: "sm" | "md";
-  /** outer placement only — margin, self-alignment */
-  className?: string;
-  children: ReactNode;
-}
-
-// each tone is an authored surface + its own ink, never a fill tinted toward
-// its own step-9 text (see packages/brand/design-system.md).
-const tones: Record<BadgeTone, string> = {
-  neutral: "bg-gray-3 text-gray-11",
-  secondary: "bg-secondary text-gray-12",
-  primary: "bg-secondary text-blue-11",
+/** full literal class strings, never composed. every variant is a tinted chip
+ *  on the subtle fill with its subtle ink, which is the pair the palette
+ *  clears for body text; none of them paints a solid fill. */
+const variant_class: Record<Variant, string> = {
+  neutral: "bg-gray-3 text-gray-12",
+  primary: "bg-secondary text-accent-12",
   success: "bg-success-subtle text-success-subtle-fg",
   warning: "bg-warning-subtle text-warning-subtle-fg",
   destructive: "bg-destructive-subtle text-destructive-subtle-fg",
-  // only inside `surface-primary`
-  "on-primary": "bg-primary-fg/15 text-primary-fg",
 };
 
-const sizes = {
-  sm: "px-2 py-0.5",
-  md: "px-3 py-1.5",
+const base =
+  "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap";
+
+type Props = Omit<ComponentProps<"span">, "className"> & {
+  /** @default "neutral" */
+  variant?: Variant;
+  /** appended last. */
+  classes?: string;
 };
 
+/** a small status chip. it is not interactive: for an action use `Button`. */
 export function Badge({
-  tone = "neutral",
-  size = "sm",
-  className = "",
+  variant = "neutral",
+  classes = "",
   children,
+  ...props
 }: Props) {
   return (
-    <span
-      data-tone={tone}
-      className={`${className} inline-flex items-center rounded-full text-xs font-medium ${tones[tone]} ${sizes[size]}`}
-    >
+    <span className={`${base} ${variant_class[variant]} ${classes}`} {...props}>
       {children}
     </span>
   );

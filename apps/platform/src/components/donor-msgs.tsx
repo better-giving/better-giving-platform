@@ -233,7 +233,7 @@ function FeedHeading() {
 
 function HighlightCard({ highlight }: { highlight: IDonorHighlight }) {
   return (
-    <article className="flex items-start gap-3 rounded border border-green-6 bg-green-3 p-3">
+    <article className="flex items-start gap-3 rounded border border-success-6 bg-success-3 p-3">
       <Image
         src={highlight.photo || laira}
         alt=""

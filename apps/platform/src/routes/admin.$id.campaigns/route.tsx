@@ -1,4 +1,4 @@
-import { EmptyState, TabPanel, Tabs } from "@better-giving/ui";
+import { EmptyState, Tab, TabList, TabPanel, Tabs } from "@better-giving/ui";
 import { useId } from "react";
 import { href, Link, useSearchParams } from "react-router";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
@@ -93,21 +93,21 @@ export default function Page({ loaderData }: Route.ComponentProps) {
         </Link>
       )}
       <Tabs
-        className="grid gap-6"
+        classes="grid gap-6"
         value={tab}
-        onValueChange={(value) => {
+        onValueChange={({ value }) => {
           const next = new URLSearchParams(params);
           if (value === "supporters") next.set("tab", "supporters");
           else next.delete("tab");
           setParams(next, { preventScrollReset: true });
         }}
-        items={[
-          { value: "campaigns", label: "Your campaigns" },
-          { value: "supporters", label: "Supporter campaigns" },
-        ]}
       >
+        <TabList aria-label="Campaigns">
+          <Tab value="campaigns">Your campaigns</Tab>
+          <Tab value="supporters">Supporter campaigns</Tab>
+        </TabList>
         {loaderData.view === "campaigns" ? (
-          <TabPanel value="campaigns" className="grid gap-6">
+          <TabPanel value="campaigns" classes="grid gap-6">
             {no_campaigns ? (
               <EmptyState
                 action={
@@ -172,7 +172,7 @@ export default function Page({ loaderData }: Route.ComponentProps) {
             )}
           </TabPanel>
         ) : (
-          <TabPanel value="supporters" className="grid gap-6">
+          <TabPanel value="supporters" classes="grid gap-6">
             <FundsList
               funds={loaderData.funds}
               endow_id={endow.id}

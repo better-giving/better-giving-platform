@@ -92,9 +92,9 @@ function Content() {
         <Badge>Pending</Badge>
         <ChevronRight className="icon-xl" />
         {verdict === "approved" ? (
-          <Badge tone="success">Approved</Badge>
+          <Badge variant="success">Approved</Badge>
         ) : (
-          <Badge tone="destructive">Rejected</Badge>
+          <Badge variant="destructive">Rejected</Badge>
         )}
       </div>
 

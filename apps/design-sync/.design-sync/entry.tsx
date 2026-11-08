@@ -97,9 +97,11 @@ export { Info } from "../../../packages/ui/src/components/status/info";
 export { LoadingStatus } from "../../../packages/ui/src/components/status/loading-status";
 // feedback
 export { Status } from "../../../packages/ui/src/components/status/status";
-// `TabPanel` is a part of `Tabs`, not a card of its own — see the tooltip parts
-// below.
+// `Tab`, `TabList` and `TabPanel` are parts of `Tabs`, not cards of their own —
+// see the tooltip parts below.
 export {
+  Tab,
+  TabList,
   TabPanel,
   Tabs,
 } from "../../../packages/ui/src/components/tabs";

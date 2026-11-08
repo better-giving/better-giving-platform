@@ -1,123 +1,63 @@
-/* better giving design-token palette. single source for color across the
-   monorepo: the platform stylesheet `@import`s this verbatim for `:root`,
-   and `colors.ts` mirrors it as hex for the email templates
-   (mail clients strip stylesheets and don't support oklch()).
+/* design-token roles. the scales themselves (accent, gray and the status scales,
+   solid and alpha, light and dark) are a generated theme file, imported below;
+   this file names what the scales are FOR (--primary, --background, --border...)
+   and nothing here is a color of its own.
 
-   the palette is light-only: the product ships no theme toggle, never applies
-   `.dark` to any element, and has no prefers-color-scheme query — a dark half
-   would double the cost of every palette change for no user-visible benefit.
-   this is a decision, not an oversight: don't derive one without a product
-   decision to ship dark mode first. see design-system.md. */
+   themes: ./themes/default.css is the "default" theme, derived from accent
+   #1e6dab with a #e2e8f0 gray (pnpm theme:generate; the variables item's
+   usage note covers overriding and generating a theme). it applies to :root
+   and to [data-theme="default"]. another theme is another file with the same
+   variable names under its own selector.
+   the roles below are declared on :root AND on every [data-theme] element, so
+   a subtree that sets its own theme re-resolves them against its own scales:
+   a var() holding a var() is resolved where it is declared, not where it is
+   read.
 
-/* semantic design tokens — shadcn convention */
+   appearance: light is the base. dark is the `.dark` class on <html> (or on a
+   [data-theme] element) and swaps the scales only; the roles follow because
+   they are aliases. there is no prefers-color-scheme query: following the
+   system is the app's call (toggle the class from a media query listener).
 
-:root {
-  /* the generated ramp — radix colors' custom-palette tool, driven from the
-     brand blue with #e2e8f0 as the gray input and white as the background:
-     https://www.radix-ui.com/colors/custom?accent-light=1E6DAB&gray-light=E2E8F0&background-light=FFFFFF
-     step 9 of each accent scale is its input hex unmodified, which is what keeps
-     the brand color where it is. the tool renames a scale after the nearest
-     stock radix hue and emitted amber as orange; amber is the name here.
+   colors.ts mirrors the LIGHT, solid steps and roles as hex for consumers that
+   cannot read oklch() or custom properties (transactional email). */
 
-     each step is authored as the oklch() its source hex converts to, and the
-     trailing comment is that source hex — colors.test.ts converts one back into
-     the other, so a hand-tuned step fails the suite. a step is generated output:
-     nothing here is nudged, and a value the ramp doesn't have is a gap to take
-     back to the palette, not one to author.
+@import "./themes/default.css";
 
-     no alpha (-a1 … -a12) steps: the email mirror has no alpha channel. */
+/* roles, shadcn convention */
 
-  --blue-1: oklch(0.992 0.004 236.5); /* #fafdff */
-  --blue-2: oklch(0.979 0.01 247.9); /* #f3f9ff */
-  --blue-3: oklch(0.959 0.023 237.6); /* #e4f4ff */
-  --blue-4: oklch(0.934 0.035 240.3); /* #d5edff */
-  --blue-5: oklch(0.902 0.051 245.7); /* #c4e3ff */
-  --blue-6: oklch(0.861 0.066 247.9); /* #b0d6fb */
-  --blue-7: oklch(0.806 0.082 247.2); /* #95c5f2 */
-  --blue-8: oklch(0.731 0.109 247.3); /* #6daee9 */
-  --blue-9: oklch(0.52 0.1225 247.31); /* #1e6dab */
-  --blue-10: oklch(0.473 0.123 247.25); /* #055f9c */
-  --blue-11: oklch(0.526 0.122 247.1); /* #206fad */
-  --blue-12: oklch(0.35 0.065 248.2); /* #1c3d5b */
-
-  --red-1: oklch(0.993 0.003 17.2); /* #fffcfc */
-  --red-2: oklch(0.982 0.009 26); /* #fff7f6 */
-  --red-3: oklch(0.955 0.022 24.4); /* #ffebe9 */
-  --red-4: oklch(0.92 0.041 27.2); /* #ffdbd6 */
-  --red-5: oklch(0.89 0.058 26.2); /* #ffcdc7 */
-  --red-6: oklch(0.857 0.077 25.7); /* #ffbdb6 */
-  --red-7: oklch(0.808 0.093 25.8); /* #f7a9a1 */
-  --red-8: oklch(0.744 0.119 25.4); /* #ee8d85 */
-  --red-9: oklch(0.541 0.208 25.4); /* #cc1926 */
-  --red-10: oklch(0.498 0.203 26.4); /* #bb0016 */
-  --red-11: oklch(0.557 0.208 25.4); /* #d2222b */
-  --red-12: oklch(0.338 0.114 25.2); /* #661516 */
-
-  --green-1: oklch(0.994 0.004 157.2); /* #fbfefc */
-  --green-2: oklch(0.982 0.009 161.4); /* #f4fbf7 */
-  --green-3: oklch(0.959 0.02 164.6); /* #e6f6ee */
-  --green-4: oklch(0.933 0.032 163.2); /* #d7f0e3 */
-  --green-5: oklch(0.901 0.044 163.1); /* #c5e8d6 */
-  --green-6: oklch(0.859 0.057 162.7); /* #b0ddc6 */
-  --green-7: oklch(0.8 0.074 162.8); /* #92cdb0 */
-  --green-8: oklch(0.72 0.098 163.1); /* #66b893 */
-  --green-9: oklch(0.568 0.1195 163.02); /* #0e8c62 */
-  --green-10: oklch(0.524 0.115 161.9); /* #007e55 */
-  --green-11: oklch(0.53 0.116 162.2); /* #008057 */
-  --green-12: oklch(0.323 0.039 163.3); /* #203a2e */
-
-  --amber-1: oklch(0.994 0.003 84.6); /* #fefdfb */
-  --amber-2: oklch(0.98 0.024 88.2); /* #fff8e7 */
-  --amber-3: oklch(0.956 0.048 85.8); /* #ffefcd */
-  --amber-4: oklch(0.932 0.066 81.8); /* #ffe5b7 */
-  --amber-5: oklch(0.904 0.086 78.3); /* #ffd99e */
-  --amber-6: oklch(0.867 0.117 76.6); /* #ffc977 */
-  --amber-7: oklch(0.824 0.1414 70.39); /* #ffb453 */
-  --amber-8: oklch(0.7565 0.1641 69.75); /* #f19a00 */
-  --amber-9: oklch(0.769 0.1647 70.08); /* #f59e0b */
-  --amber-10: oklch(0.734 0.1603 68.78); /* #e99300 */
-  --amber-11: oklch(0.574 0.13 64.2); /* #ac6500 */
-  --amber-12: oklch(0.352 0.059 69.3); /* #4f3515 */
-
-  --gray-1: oklch(0.991 0.003 264.5); /* #fbfcfe */
-  --gray-2: oklch(0.981 0.006 255.5); /* #f6f9fd */
-  --gray-3: oklch(0.956 0.01 252.8); /* #ecf1f7 */
-  --gray-4: oklch(0.932 0.013 255.5); /* #e3e9f1 */
-  --gray-5: oklch(0.91 0.016 257.2); /* #dbe2ec */
-  --gray-6: oklch(0.888 0.019 255.5); /* #d2dbe7 */
-  --gray-7: oklch(0.854 0.018 253.4); /* #c7d0db */
-  --gray-8: oklch(0.795 0.019 253.4); /* #b4bdc8 */
-  --gray-9: oklch(0.646 0.019 253.4); /* #868f9a */
-  --gray-10: oklch(0.61 0.019 256.3); /* #7c848f */
-  --gray-11: oklch(0.503 0.019 254); /* #5d656f */
-  --gray-12: oklch(0.242 0.019 258.4); /* #1a2029 */
-
+:root,
+[data-theme] {
   /* two corners, one per job. --radius is the control's and the well's: a
      field, a button, a chip that is not a pill, a well inside a card.
      --radius-card is the container's: the card, and every layer that floats or
      sits over the page — dialog, menu, popover, select list, hovercard, toast.
      the ladder is closed otherwise (theme.css resets --radius-*); a third
-     corner is a decision to take back to the system, not one to spell. */
-  --radius: 0.375rem;
+     corner is a decision to take back to the system, not one to spell.
+     --radius-control is the same corner under the name a plain-css app reads
+     (styles/variables.css); --radius stays as the name the tailwind layer and
+     existing call sites bind to. */
+  --radius-control: 0.375rem;
+  --radius: var(--radius-control);
   --radius-card: 0.75rem;
 
   /* there is no --fg, and no -fg twin for any surface below: every one of them
-     would resolve to gray-12. each surface below is light, so the ink never
-     varies with the fill, and six names for one step is the shape the ramp
-     exists to remove. body copy is text-gray-12 and de-emphasised
-     copy is text-gray-11, at the call site, named as the rungs they are.
+     would resolve to gray-12. the page ink never varies with the surface
+     under it, and a name per surface for one step is the shape the ramp
+     exists to remove. body copy is text-gray-12 and de-emphasised copy is
+     text-gray-11, at the call site, named as the rungs they are.
      a -fg name survives only where the ink genuinely follows its fill —
      --primary-fg, --destructive-fg, --success-fg, --warning-fg. those four are
-     radix's per-ramp contrast token: three are white and --warning-fg is not,
-     because amber's step 9 sits light enough to need dark ink. they share a
-     value by coincidence of the ramps, not by duplication. */
+     each scale's generated contrast token (--accent-contrast and the status
+     ones). the generator picks white or dark per scale, and
+     scripts/generate-theme.ts swaps in the scale's darkest step where white
+     would read under Lc 60, which is what a warning fill needs. */
   /* the surface model, outside in: page -> card -> well -> field, each on the
-     radix step whose job it is (design-system.md, "Resting surfaces"):
+     radix step whose job it is:
      1-2 backgrounds, 3/4/5 a component at rest/hovered/pressed, 6 the edge of
      something you can't operate, 7/8 the edge of something you can, 9/10 a
      solid, 11/12 ink.
-     the PAGE is --background (step 1), on every app and marketing page alike,
-     painted once in platform's index.css. a CARD is step 2 with a step-6 edge
+     the PAGE is --background (step 1), on every page alike, painted once in
+     the base styles. a CARD is step 2 with a step-6 edge
      and no shadow. a WELL (--panel) is step 3, one rung in from the card. a
      FIELD is step 1 (--surface) with the --input edge. a FLOATING layer —
      menu, popover, select list, hovercard, toast, and the dialog — is step 1
@@ -126,23 +66,18 @@
   /* the in-flow container: `card`, `solo-card`, the delegated-inset shells and
      the `.table` shell. step 2 — radix names "card background" there — with a
      --hairline edge, and no shadow: the step-6 edge is what finds it on the
-     step-1 page, the marketing pages and a `--band` alike. */
+     step-1 page and on a `--band` alike. */
   --card: var(--gray-2);
   /* a WELL inside a card: a recessed block that groups a figure, a meter
-     track, a payout summary. step 3, one rung in from the card it sits in. */
+     track, a summary. step 3, one rung in from the card it sits in. */
   --panel: var(--gray-3);
-  /* the edge of something you can't operate: a card's outline, a header's or
-     footer's rule, a table's row lines, a divider between sections or list
-     rows. step 6, radix's "subtle borders on components which are not
-     interactive". not a control edge — that is --input. */
-  --hairline: var(--gray-6);
-  --primary: var(--blue-9); /* white-on-fill Lc 82.3 */
+  --primary: var(--accent-9); /* white-on-fill Lc 82.3 */
   /* the hovered rung of the filled control, and its pressed rung too. the ramp
      gives a solid fill two steps, 9 and 10; steps 11 and 12 are text and both
      sit LIGHTER than 10, so there is no third rung to press to. */
-  --primary-hover: var(--blue-10);
-  /* #ffffff — the ramp's own contrast color for the blue scale */
-  --primary-fg: oklch(1 0 0);
+  --primary-hover: var(--accent-10);
+  /* the accent scale's own contrast color */
+  --primary-fg: var(--accent-contrast);
   /* the dark brand ground: a full-bleed marketing hero, and the scrim that puts
      copy over a photograph. --primary is a control color tuned for white ink at
      Lc 82.3 — enough for a button, not enough to survive a translucent scrim over
@@ -154,7 +89,7 @@
      so 70 is the nearest 5% step over the floor, not the floor itself. ink is
      --primary-fg; there is no -deep-fg, because a second name for #ffffff is a
      drift trap the test can't catch. */
-  --primary-deep: var(--blue-12);
+  --primary-deep: var(--accent-ground);
   /* the brand tint's rungs, one job each, on radix's roles. step 2 is a
      page-level GROUND — the full-bleed marketing band, which nothing hovers.
      steps 3/4/5 are a tinted ui element at rest / hovered / pressed or
@@ -164,40 +99,40 @@
      invisible. a tinted surface presses UP the scale, not toward black, so
      every rung stays under its own ink. the neutral equivalents are the gray
      steps themselves (bg-gray-3/4/5), named at the call site. */
-  --band: var(--blue-2);
-  --secondary: var(--blue-3);
-  --secondary-hover: var(--blue-4);
-  --secondary-active: var(--blue-5);
+  --band: var(--accent-2);
+  --secondary: var(--accent-3);
+  --secondary-hover: var(--accent-4);
+  --secondary-active: var(--accent-5);
   /* the filled error control: white ink at Lc 81.3. a tinted band carrying
      error copy takes --destructive-subtle/-fg below instead — that pair clears
      Lc 60 on its own band, which is a fill's job to do, not this one's. */
-  --destructive: var(--red-9);
+  --destructive: var(--destructive-9);
   /* hovered and pressed rung of the filled error control — one step for both,
      see --primary-hover. */
-  --destructive-hover: var(--red-10);
-  --destructive-fg: oklch(1 0 0); /* #ffffff */
+  --destructive-hover: var(--destructive-10);
+  --destructive-fg: var(--destructive-contrast);
   /* de-emphasised destructive surface: an error panel, banner, or row that
      carries error ink as body copy rather than a filled control. step 11 on
      step 3 is Lc 64.8, over the Lc 60 status ink needs. --destructive-subtle-fg
      is the error ink EVERYWHERE, the page included, not only on this band —
      --destructive is a fill, and step 9 read as text clears Lc 60 (Lc 74.1 on
-     the page) only because red's step 9 happens to sit dark. green's clears it
-     too (Lc 67.0) and amber's does not (Lc 39.9), so ink follows the rung, not
-     the luck. an
-     icon is a shape, not text, and keeps step 9. */
-  --destructive-subtle: var(--red-3);
-  --destructive-subtle-fg: var(--red-11);
+     the page) only because the default destructive step 9 happens to sit dark. the
+     success step 9 clears it too (Lc 67.0) and warning's does not (Lc 39.9), so
+     ink follows the rung, not the luck. an icon is a shape, not text, and keeps
+     step 9. */
+  --destructive-subtle: var(--destructive-3);
+  --destructive-subtle-fg: var(--destructive-11);
   /* pressed rung for a control whose resting surface is --destructive-subtle.
      step 5 is the ramp's own active/selected rung. NOT the `color-mix(… 85%,
      black)` ladder the filled .btn variants use: on a near-white band that
      moves the surface away from the ink sitting on it and the pair fails. */
-  --destructive-subtle-active: var(--red-5);
+  --destructive-subtle-active: var(--destructive-5);
   /* white-on-fill Lc 74.3 — clears the Lc 60 a button label needs */
-  --success: var(--green-9);
+  --success: var(--success-9);
   /* hovered and pressed rung of the filled success control — one step for both,
      see --primary-hover. */
-  --success-hover: var(--green-10);
-  --success-fg: oklch(1 0 0); /* #ffffff */
+  --success-hover: var(--success-10);
+  --success-fg: var(--success-contrast);
   /* de-emphasised success surface, same shape as the destructive and warning
      bands: a confirmation panel, status pill, or row carrying success copy
      rather than a filled control. --success itself is a FILL and must never be
@@ -206,42 +141,49 @@
      way; --success-subtle-fg is the success ink everywhere, Lc 66.1 here. step
      3, radix's component background: step 2 sits on the gray-2 card at 1.005:1
      and leaves a pill or badge no visible fill (WCAG 4.45:1, reference only —
-     radix is the authority, PM rule 2026-11-01). an icon is a shape, not
-     text, and keeps step 9. gray-12 on the band stays far clear, so it also takes
-     neutral body copy. */
-  --success-subtle: var(--green-3);
-  --success-subtle-fg: var(--green-11);
-  --warning: var(--amber-9); /* a fill, never text */
+     radix is the authority). an icon is a shape, not text, and keeps step 9.
+     gray-12 on the band stays far clear, so it also takes neutral body copy. */
+  --success-subtle: var(--success-3);
+  --success-subtle-fg: var(--success-11);
+  --warning: var(--warning-9); /* a fill, never text */
   /* hovered and pressed rung of the filled warning control — one step for both,
      see --primary-hover. a fill like --warning; --warning-fg is its ink. */
-  --warning-hover: var(--amber-10);
-  /* dark ink on the amber fill, Lc 52.1 — under the Lc 60 a button label
-     needs, an accepted miss. not white: the palette tool emitted #fff for this
-     scale (Lc 46.4, weaker still) while stock radix amber pairs dark text with
-     it, so this is a generator artifact corrected, not a radix value
-     overridden. */
-  --warning-fg: var(--amber-12);
+  --warning-hover: var(--warning-10);
+  /* dark ink on a light warning fill, Lc 52.1 in the default theme: under the
+     Lc 60 a button label needs, an accepted miss. not white: the generator's
+     own pick is white (Lc 46.4, weaker still), so the theme script swaps in
+     the scale's darkest step. */
+  --warning-fg: var(--warning-contrast);
   /* de-emphasised warning surface: an advisory panel, banner, or row carrying
      warning copy rather than a filled control. --warning is a FILL and is not
      legible as text at any size; --warning-subtle-fg is the warning ink
-     everywhere — step 12, not the ramp's 11: amber-11 on this band is 4.00:1,
-     under the 4.5:1 warning copy needs; amber-12 is 9.98:1 (Lc 87.3). gray-12 on
+     everywhere — step 12, not the ramp's 11: warning-11 on this band is 4.00:1,
+     under the 4.5:1 warning copy needs; warning-12 is 9.98:1 (Lc 87.3). gray-12 on
      the band stays far clear, so it also takes neutral body copy. */
-  --warning-subtle: var(--amber-3);
-  --warning-subtle-fg: var(--amber-12);
+  --warning-subtle: var(--warning-3);
+  --warning-subtle-fg: var(--warning-12);
+  /* the edge of something you can't operate: a card's outline, a header's or
+     footer's rule, a table's row lines, a divider between sections or list
+     rows. step 6, radix's "subtle borders on components which are not
+     interactive". not a control edge — that is --input.
+     --hairline is declared in the theme file, per appearance: light takes
+     step 6, dark the first step at or past 6 whose contrast on the page and the
+     card is at least light's (scripts/generate-theme.ts, edge_steps). holding
+     that contrast puts the dark divider at or past the --input step; that
+     ordering is the cost of parity, and the fields keep their own fill. */
   /* what a bare `border` draws: the base `*` rule reads it, and
      `surface-primary` rebinds it so a line inside a brand fill is drawn against
-     that fill. step 6 at :root, the same rung as --hairline and the same job —
+     that fill. an alias of --hairline, the same rung and the same job —
      a bare edge is a non-interactive one. the separate name exists for the
      rebind, which --hairline does not take. */
-  --border: var(--gray-6);
+  --border: var(--hairline);
   /* the edge of a field, checkbox, radio and select trigger: radix's role —
      step 7 is the interactive component's border, step 8 the hovered/stronger
      one. under WCAG 1.4.11's 3:1 for an input's identifying boundary: 1.48:1
-     on the card, 1.52:1 on the page, 1.37:1 in a well. an accepted miss by PM
-     decision (2026-11-01), as the focus ring is — the field's label and
-     placeholder, and its step-1 fill against the step-2 card, also identify
-     it. fields and .btn-secondary share 7/8. */
+     on the card, 1.52:1 on the page, 1.37:1 in a well. an accepted miss, as
+     the focus ring is — the field's label and placeholder, and its step-1 fill
+     against the step-2 card, also identify it. fields and .btn-secondary share
+     7/8. */
   --input: var(--gray-7);
   /* the field edge under the pointer: radix's step 8, 1.80:1 on the card. */
   --input-hover: var(--gray-8);
@@ -256,31 +198,41 @@
      dialog. step 1 with shadow-floating — radix themes' panel-plus-shadow —
      so a layer over a step-2 card reads lighter than it and above it. */
   --popover: var(--gray-1);
+  /* the scrim a dialog lays over the page — radix's --color-overlay. --shadow-ink
+     at --overlay-strength, both set per appearance in the theme file (gray-12 at
+     30% in light, black at 60% in dark). the dialog above it is --popover with
+     shadow-floating — see the elevation set in packages/ui/src/styles/theme.css.
+     every backdrop takes it: the ark dialog backdrops, a drawer (a Modal
+     size="none" takes the house backdrop rather than one of its own), and a
+     native <dialog>, whose backdrop: pseudo-element takes the same token.
+     color-mix() has no single literal, so this has no email twin — mail has no
+     dialogs, so it needs none. */
+  --overlay: color-mix(
+    in oklch,
+    var(--shadow-ink) var(--overlay-strength),
+    transparent
+  );
   /* step 8 is the ramp's focus rung, and deliberately not --primary: a ring
      that equals the fill it surrounds measures Lc 0.0 against it and is not
-     there at all. on a --primary fill step 8 reaches Lc 30.0 — on the Lc 30 a
+     there at all. on a --primary fill step 8 reaches Lc 30.0 — exactly the Lc 30 a
      focus indicator needs, not over it, which is the job the `surface-primary`
      utility keeps.
      against the page the ring is Lc 44.6, Lc 42.7 on the card — the rung
      radix assigns, taken as generated, and clear of Lc 30. in WCAG 2 terms
      it is 2.30:1 on the page and 2.24:1 on the card, under the 3:1 1.4.11
-     asks of a state indicator: recorded in the ledger, not compensated here. */
-  --ring: var(--blue-8);
-  /* the scrim a dialog lays over the page — radix's --color-overlay. gray-12
-     at 30%, which is what all four dialog backdrops already carried; naming it
-     is what stops the fifth one being picked by eye. the dialog above it is
-     --popover with shadow-floating — see the elevation set in
-     packages/ui/src/styles/theme.css.
-     every backdrop in the app spells it: the four ark backdrops, the dashboard
-     drawer (a Modal size="none", so it takes the house backdrop rather than one
-     of its own), and the one native <dialog>, whose backdrop: pseudo-element
-     takes the same token. the docs site's embed playground spells it too; the
-     only backdrop outside it is demo-nonprofit's, a page that impersonates a
-     fictional org's website and would stop demonstrating that if it took a
-     system token.
-     color-mix() has no single literal, so this has no email twin — mail has no
-     dialogs, so it needs none. */
-  --overlay: color-mix(in oklch, var(--gray-12) 30%, transparent);
+     asks of a state indicator: recorded in contrast.test.ts, not compensated
+     here.
+     --ring is declared in the theme file, per appearance: light takes step 8,
+     dark the first step at or past 8 that reaches light's contrast on the page
+     and the card, skipping 9 and 10: those are the accent's fill and its hover,
+     and a ring the color of the button it surrounds is not there. */
+  /* --link and --link-hover are the ink of a text link, declared in the theme
+     file per appearance like --ring, each the first step with Lc 60 on the page
+     and the card: light takes the fill steps 9 and 10 where they read (so they
+     equal --primary and --primary-hover and a link moves with a button) and the
+     text steps 11 and 12 where a bright accent does not, dark the text steps 11
+     and 12. step 9 is a fill; as ink on the dark page it reads too faint (see
+     contrast.test.ts, the dark ledger). the hover is never the rest step. */
   /* ring + hairline for controls drawn ON a --primary fill.
      Lc 82.3 and about Lc 61 on --primary respectively — the second is a
      color-mix with no email twin and no checked value; read it out of a
@@ -288,9 +240,9 @@
   --primary-ring: var(--primary-fg);
   --primary-border: color-mix(in oklch, var(--primary-fg) 80%, var(--primary));
 
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --chart-1: var(--accent-9);
+  --chart-2: var(--success-9);
+  --chart-3: var(--warning-9);
+  --chart-4: var(--destructive-9);
+  --chart-5: var(--accent-11);
 }

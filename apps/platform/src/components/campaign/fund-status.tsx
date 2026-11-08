@@ -1,4 +1,4 @@
-import { Badge, type BadgeTone } from "@better-giving/ui";
+import { Badge, type BadgeVariant } from "@better-giving/ui";
 import { unpack } from "@better-giving/ui/helpers";
 import { fund_is_open } from "@/campaign/is-open";
 import { MAX_EXPIRATION_ISO } from "@/campaign/schema";
@@ -87,7 +87,7 @@ export const FundStatus = (props: IFundStatus) => {
 /** the status as a pill, for a fund card */
 export const FundStatusBadge = ({ status }: { status: IStatus }) => {
   if (!status.text) return null;
-  const tone = ((t): BadgeTone => {
+  const tone = ((t): BadgeVariant => {
     switch (t) {
       case "closed":
         return "destructive";
@@ -96,8 +96,8 @@ export const FundStatusBadge = ({ status }: { status: IStatus }) => {
       case "expired":
         return "neutral";
       default:
-        return "secondary";
+        return "primary";
     }
   })(status.text);
-  return <Badge tone={tone}>{status.text}</Badge>;
+  return <Badge variant={tone}>{status.text}</Badge>;
 };

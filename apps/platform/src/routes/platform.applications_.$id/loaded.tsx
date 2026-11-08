@@ -25,8 +25,8 @@ export default function Loaded(
     <>
       {prev_verdict && (
         <Badge
-          tone={prev_verdict === "approved" ? "success" : "destructive"}
-          className="justify-self-start -mt-3"
+          variant={prev_verdict === "approved" ? "success" : "destructive"}
+          classes="justify-self-start -mt-3"
         >
           {prev_verdict === "approved" ? "Approved" : "Rejected"}
         </Badge>

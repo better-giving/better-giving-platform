@@ -86,9 +86,9 @@ function Content({ verdict }: Props) {
         <Badge>Under review</Badge>
         <ChevronRight className="icon-xl" />
         {verdict === "approved" ? (
-          <Badge tone="success">Approved</Badge>
+          <Badge variant="success">Approved</Badge>
         ) : (
-          <Badge tone="destructive">Rejected</Badge>
+          <Badge variant="destructive">Rejected</Badge>
         )}
       </div>
 

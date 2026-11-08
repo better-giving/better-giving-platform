@@ -14,6 +14,8 @@
  * subpath-only outright, a namespace pair (`dollar`, `ein`) for that same
  * collision.
  */
+import type { ComponentProps } from "react";
+import type { Badge } from "./components/badge";
 
 // not in the published set: `AskHost` renders nothing of its own — it is where
 // `ask` mounts whatever it was handed — and `ask`/`ask_prompt` are functions.
@@ -27,7 +29,6 @@ export {
   use_ask,
 } from "./components/ask/ask";
 export { ask_prompt, use_ask_prompt } from "./components/ask/ask-prompt";
-export type { BadgeTone } from "./components/badge";
 export type { FileOutput, FileSpec } from "./components/file-dropzone/types";
 export {
   FloatingField,
@@ -60,8 +61,10 @@ export type {
   SyncSource,
 } from "./components/select/types";
 export type { StatusProps } from "./components/status/types";
-// not in the published set: a part of `Tabs`, not a card of its own.
-export { TabPanel } from "./components/tabs";
+// not in the published set: parts of `Tabs`, not cards of their own.
+export { Tab, TabList, TabPanel } from "./components/tabs";
+/** the registry badge exports no type for its variants; derived so call sites can type a map of them */
+export type BadgeVariant = NonNullable<ComponentProps<typeof Badge>["variant"]>;
 export type { ITarget, TTarget } from "./components/target";
 export { smart_next, to_target } from "./components/target";
 export { show_toast } from "./components/toaster";

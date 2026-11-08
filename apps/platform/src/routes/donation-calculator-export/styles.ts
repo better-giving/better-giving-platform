@@ -8,29 +8,29 @@ import { flat_colors as c } from "@better-giving/brand/flat";
    a step missing below is unused, not wrong. */
 
 export const blue = {
-  "3": c.blue_3,
-  "6": c.blue_6,
-  "8": c.blue_8,
-  "9": c.blue_9,
-  "11": c.blue_11,
-  "12": c.blue_12,
+  "3": c.accent_3,
+  "6": c.accent_6,
+  "8": c.accent_8,
+  "9": c.accent_9,
+  "11": c.accent_11,
+  "12": c.accent_12,
 };
 
 export const green = {
-  "2": c.green_2,
-  "6": c.green_6,
-  "8": c.green_8,
-  "9": c.green_9,
-  "11": c.green_11,
+  "2": c.success_2,
+  "6": c.success_6,
+  "8": c.success_8,
+  "9": c.success_9,
+  "11": c.success_11,
 };
 
 export const amber = {
-  "3": c.amber_3,
-  "6": c.amber_6,
-  "8": c.amber_8,
-  "9": c.amber_9,
-  "11": c.amber_11,
-  "12": c.amber_12,
+  "3": c.warning_3,
+  "6": c.warning_6,
+  "8": c.warning_8,
+  "9": c.warning_9,
+  "11": c.warning_11,
+  "12": c.warning_12,
 };
 
 export const gray = {
@@ -43,7 +43,7 @@ export const gray = {
 };
 
 export const red = {
-  "9": c.red_9,
+  "9": c.destructive_9,
 };
 
 export const fs = {

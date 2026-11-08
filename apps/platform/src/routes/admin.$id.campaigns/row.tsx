@@ -1,6 +1,6 @@
 import {
   Badge,
-  type BadgeTone,
+  type BadgeVariant,
   ImagePlaceholder,
   Target,
 } from "@better-giving/ui";
@@ -13,10 +13,10 @@ export type TRowStatus =
   | (typeof STATUS_WORD)[keyof typeof STATUS_WORD]
   | "Profile";
 
-const STATUS_TONE: Record<TRowStatus, BadgeTone> = {
+const STATUS_TONE: Record<TRowStatus, BadgeVariant> = {
   Live: "success",
   Draft: "neutral",
-  Ended: "secondary",
+  Ended: "primary",
   Closed: "destructive",
   Profile: "primary",
 };
@@ -29,7 +29,7 @@ interface IStatusBadge {
 
 export function StatusBadge({ status, className }: IStatusBadge) {
   return (
-    <Badge tone={STATUS_TONE[status]} className={className}>
+    <Badge variant={STATUS_TONE[status]} classes={className}>
       {status}
     </Badge>
   );
