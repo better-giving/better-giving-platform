@@ -138,6 +138,26 @@ describe("registration status mails", () => {
     expect(text).toMatch(/http:\/\/x\/register\/reg-1\/1\b/);
   });
 
+  test("a rejection tells them to fix the issues and resubmit, never to start a new application", async () => {
+    await handle_reg_updated(reg({ status: "04" }));
+
+    const { text } = await sent();
+    expect(text).toMatch(/rectify these issues and resubmit this application/);
+    expect(text).not.toMatch(/new application/i);
+    expect(text).not.toMatch(/Stripe/);
+  });
+
+  test("a rejection with Stripe connected says the account stays on the application they resubmit", async () => {
+    await handle_reg_updated(stripe_only({ status: "04" }));
+
+    const { text } = await sent();
+    expect(text).toMatch(/rectify these issues and resubmit this application/);
+    expect(text).toMatch(
+      /Stripe account is still connected to this application/
+    );
+    expect(text).not.toMatch(/new application/i);
+  });
+
   test("a rejected stripe-only application links back to review while routing is on", async () => {
     await handle_reg_updated(stripe_only({ status: "04" }));
 
