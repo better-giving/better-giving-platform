@@ -308,7 +308,7 @@ describe("organization — slug unset", () => {
     await expect
       .element(slug)
       .toHaveAccessibleDescription(
-        /Your campaign links start with it too \(…\/org\/acme-org\/…\)\. Letters, numbers, and - \. _ ~/
+        /The short name in your Better Giving links, as in [^ ]+\/org\/your-slug\. Your campaign links use it too\. Letters, numbers, and - \. _ ~\. You can set it once; it can't be changed after you save\./
       );
   });
 
@@ -365,7 +365,9 @@ describe("organization — slug unset", () => {
       .element(screen.getByRole("heading", { name: "Lock your profile link?" }))
       .not.toBeInTheDocument();
     expect((await npo_get(npo.id))?.slug).toBeFalsy();
-    await expect.element(screen.getByLabelText("Organization slug")).toBeEnabled();
+    await expect
+      .element(screen.getByLabelText("Organization slug"))
+      .toBeEnabled();
   });
 });
 

@@ -93,7 +93,7 @@ export function PublicLinkField({
   const url = segment ? base && `${base}${segment}` : empty_url;
   const url_text = url && break_at_slashes(url);
   const described = [
-    help ? sub_id : "",
+    help || tip ? sub_id : "",
     base ? prefix_id : "",
     error ? error_id : "",
     describedby ?? "",
@@ -112,6 +112,13 @@ export function PublicLinkField({
       {help && (
         <p id={sub_id} className="text-gray-11 text-sm mb-2 break-words">
           {help}
+        </p>
+      )}
+      {/* a tooltip is read only when its icon is focused; this copy
+          describes the input itself */}
+      {!help && tip && (
+        <p id={sub_id} className="sr-only">
+          {tip}
         </p>
       )}
       {/* the prefix gives way first: it truncates from its start so the org
