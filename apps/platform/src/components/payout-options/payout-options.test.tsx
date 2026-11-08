@@ -192,6 +192,12 @@ describe("PayoutChoice: registration step 4", () => {
     await expect
       .element(next)
       .toHaveAccessibleDescription("Choose an option to continue.");
+    // the hint sits directly under Continue, on its right edge
+    const hint_box = hint.element().getBoundingClientRect();
+    const next_box = next.element().getBoundingClientRect();
+    expect(hint_box.top).toBeGreaterThanOrEqual(next_box.bottom);
+    expect(hint_box.top - next_box.bottom).toBeLessThan(16);
+    expect(Math.abs(hint_box.right - next_box.right)).toBeLessThan(1);
     expect(screen.getByText("Required", { exact: true }).query()).toBeNull();
     // neither section shows before a choice
     expect(screen.getByText("bank section").query()).toBeNull();
