@@ -129,7 +129,6 @@ export function PayoutChoice({
       )}
       {!form_shown && (
         <div className="grid gap-2">
-          {/* the hint is Continue's: it sits under it, on the same edge */}
           <Actions>
             <Button variant="secondary" to={back_to} classes="min-w-32">
               Back
@@ -144,6 +143,7 @@ export function PayoutChoice({
               Continue
             </Button>
           </Actions>
+          {/* Continue's hint, so it sits on Continue's edge */}
           {hint && (
             <p id={hint_id} className="text-xs text-gray-11 text-right">
               {hint}

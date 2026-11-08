@@ -47,7 +47,7 @@ interface IUsd {
   classes?: string;
 }
 
-/** a dollar figure as the rest of the Payouts and Banking pages write it */
+/** a dollar figure, written as the Payouts tables write theirs */
 function Usd({ amount, classes = "" }: IUsd) {
   return (
     <span className={`${classes} figures`}>
