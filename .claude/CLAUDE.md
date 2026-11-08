@@ -8,7 +8,7 @@
 - The doop canvas `_gTDOwL8my` (https://doop-justin.fly.dev/c/_gTDOwL8my) and its guidelines doc `better-giving-design-system` are a picture of the registry. When they disagree, the registry wins.
 - A part the registry lacks is a registry gap for the design-system PM, not something to draw or build ad hoc.
 - Here the manifest is `packages/ui/bg-design.json` (paths relative to `packages/ui/src`); registry items take precedence, and the rest of `@better-giving/ui` stays the design system to reuse.
-- Contrast: the registry keeps the official Radix 12-step roles (6–8 borders, 8 the focus ring, 9–10 solid fills, 11–12 text) and judges contrast in APCA (Lc). Don't move a step, add a color or override a token to reach a WCAG contrast ratio, and decline review findings that ask for one; send an APCA miss to Pia. This covers text, non-text and focus indicators alike: never use or cite WCAG contrast ratios, including WCAG 1.4.3, 1.4.11, 2.4.11 and 2.4.13.
+- Contrast: the registry keeps the official Radix 12-step roles (6–8 borders, 8 the focus ring, 9–10 solid fills, 11–12 text) and judges contrast in APCA (Lc). Don't move a step, add a color or override a token to reach a WCAG contrast ratio, and decline review findings that ask for one; send an APCA miss to Pia. This covers text, non-text and focus indicators alike: never use or cite WCAG contrast ratios, including WCAG 1.4.3, 1.4.11 and 2.4.13.
 
 <!-- kru v0.159.0 · derived 2026-10-20 · /kru:setup to re-derive -->
 ## Team
