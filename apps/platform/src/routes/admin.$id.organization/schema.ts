@@ -32,10 +32,14 @@ export const bannerSpec: ImgSpec = {
   max_size: 4e6,
 };
 
-/** letters and digits from the legal name, for the empty slug's placeholder */
+/** the legal name as lowercase words joined by hyphens, for the empty slug's placeholder */
 export function suggest_slug(name: string): string {
-  const chars = name.replace(/[^a-zA-Z0-9]/g, "").slice(0, 30);
-  return chars || "myNonprofit";
+  const words = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .slice(0, 30)
+    .replace(/^-+|-+$/g, "");
+  return words || "my-nonprofit";
 }
 
 export const schema = v.object({
