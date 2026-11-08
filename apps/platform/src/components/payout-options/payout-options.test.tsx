@@ -192,12 +192,6 @@ describe("PayoutChoice: registration step 4", () => {
     await expect
       .element(next)
       .toHaveAccessibleDescription("Choose an option to continue.");
-    // the hint sits directly under Continue, on its right edge
-    const hint_box = hint.element().getBoundingClientRect();
-    const next_box = next.element().getBoundingClientRect();
-    expect(hint_box.top).toBeGreaterThanOrEqual(next_box.bottom);
-    expect(hint_box.top - next_box.bottom).toBeLessThan(16);
-    expect(Math.abs(hint_box.right - next_box.right)).toBeLessThan(1);
     expect(screen.getByText("Required", { exact: true }).query()).toBeNull();
     // neither section shows before a choice
     expect(screen.getByText("bank section").query()).toBeNull();
@@ -206,6 +200,24 @@ describe("PayoutChoice: registration step 4", () => {
     await screen.getByText("Stripe", { exact: true }).click();
     expect(on_select).toHaveBeenCalledWith("stripe");
     expect(screen.container.textContent).not.toMatch(/wise|money-transfer/i);
+  });
+
+  test("nothing chosen: the hint's text sits directly under Continue, on its right edge", async () => {
+    const screen = await render_choice().view;
+    const next = continue_link(screen);
+    const hint = screen.getByText("Choose an option to continue.");
+    await expect.element(hint).toBeVisible();
+
+    // the <p> is a full-width block, so its box shares Continue's right edge
+    // however the text is aligned; the text's own extent is what moves
+    const text = document.createRange();
+    text.selectNodeContents(hint.element());
+    const text_box = text.getBoundingClientRect();
+    const next_box = next.element().getBoundingClientRect();
+
+    expect(Math.abs(text_box.right - next_box.right)).toBeLessThan(1);
+    expect(text_box.top).toBeGreaterThanOrEqual(next_box.bottom - 1);
+    expect(text_box.top - next_box.bottom).toBeLessThan(16);
   });
 
   test("Bank saved: the Stripe card collapses to its summary, and Continue goes on", async () => {
