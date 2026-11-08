@@ -35,7 +35,7 @@ export function OwedHistory({ rows, run_noun, received_label }: IOwedHistory) {
         {run_noun}s.
       </p>
       <div className="table-scroll">
-        <table className="table" aria-labelledby="owed-history">
+        <table className="table whitespace-nowrap" aria-labelledby="owed-history">
           <thead>
             <tr className="whitespace-nowrap">
               <th>Gift</th>
