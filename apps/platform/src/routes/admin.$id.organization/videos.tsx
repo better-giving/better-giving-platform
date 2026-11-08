@@ -303,23 +303,30 @@ function AddVideo({ npo_id, help }: IAddVideo) {
       <label htmlFor={id} className="sr-only">
         Add a video
       </label>
-      <div className="flex items-center gap-2">
-        <input
-          id={id}
-          ref={add.ref}
-          type="text"
-          inputMode="url"
-          autoCapitalize="none"
-          autoComplete="off"
-          spellCheck={false}
-          placeholder="Paste a YouTube link"
-          value={add.value}
-          onChange={(e) => add.set_value(e.target.value)}
-          onKeyDown={on_enter(add.add)}
-          aria-invalid={!!add.error}
-          aria-describedby={described}
-          className="field-input flex-1 min-w-0"
-        />
+      <div className="flex items-start gap-2">
+        {/* the error sits in the input's column, so it reads as the input's
+            and not the button's */}
+        <div className="grid gap-1 flex-1 min-w-0">
+          <input
+            id={id}
+            ref={add.ref}
+            type="text"
+            inputMode="url"
+            autoCapitalize="none"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="Paste a YouTube link"
+            value={add.value}
+            onChange={(e) => add.set_value(e.target.value)}
+            onKeyDown={on_enter(add.add)}
+            aria-invalid={!!add.error}
+            aria-describedby={described}
+            className="field-input min-w-0"
+          />
+          <p id={err_id} className="field-err empty:hidden">
+            {add.error}
+          </p>
+        </div>
         <button
           type="button"
           onClick={add.add}
@@ -333,9 +340,6 @@ function AddVideo({ npo_id, help }: IAddVideo) {
           </span>
         </button>
       </div>
-      <p id={err_id} className="field-err empty:hidden">
-        {add.error}
-      </p>
       {help && (
         <p id={help_id} className="text-sm text-gray-11">
           {help}
@@ -539,8 +543,10 @@ function EditLink({ url, name, pending, answer, save, close }: IEditLink) {
   });
 
   return (
-    <div className="grid gap-1">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-start gap-2">
+      {/* the error sits in the input's column, so it reads as the input's
+          and not the buttons' */}
+      <div className="grid gap-1 flex-1 min-w-48">
         <input
           ref={input.ref}
           type="text"
@@ -554,8 +560,15 @@ function EditLink({ url, name, pending, answer, save, close }: IEditLink) {
           onKeyDown={on_enter(submit, close)}
           aria-invalid={!!error}
           aria-describedby={error ? err_id : undefined}
-          className="field-input flex-1 min-w-48"
+          className="field-input min-w-0"
         />
+        <p id={err_id} className="field-err empty:hidden">
+          {error}
+        </p>
+      </div>
+      {/* centred on the input's height, not the column's, so a shown error
+          doesn't move them */}
+      <div className="flex items-center gap-2 min-h-(--field-size)">
         <button
           type="button"
           onClick={submit}
@@ -569,9 +582,6 @@ function EditLink({ url, name, pending, answer, save, close }: IEditLink) {
           Cancel
         </button>
       </div>
-      <p id={err_id} className="field-err empty:hidden">
-        {error}
-      </p>
     </div>
   );
 }
