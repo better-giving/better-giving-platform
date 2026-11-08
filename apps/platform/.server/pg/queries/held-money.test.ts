@@ -246,6 +246,18 @@ describe("held_money", () => {
     ]);
   });
 
+  test("a donation payout whose dist is gone is not held, its rail being unknown", async () => {
+    const date = "2026-10-01T00:00:00.000Z";
+    await seed_payout("donation", "dist-gone", 99, date);
+    await seed_gift_payout("paypal", 10, date);
+
+    const held = await held_money(pg(), npo_id);
+
+    expect(held.total).toBe(10);
+    expect(held.by_rail).toEqual([{ rail: "paypal", amount: 10 }]);
+    expect(held.items).toEqual([{ rail: "paypal", date, amount: 10 }]);
+  });
+
   test("nothing pending holds nothing", async () => {
     expect(await held_money(pg(), npo_id)).toEqual({
       total: 0,
@@ -265,6 +277,15 @@ describe("has_held_money", () => {
     expect(await has_held_money(pg(), npo_id)).toBe(false);
 
     await seed_payout("liq", "liq-1", 5, date);
+    expect(await has_held_money(pg(), npo_id)).toBe(true);
+  });
+
+  test("a payout whose dist is gone holds nothing, though a live one beside it does", async () => {
+    const date = "2026-10-01T00:00:00.000Z";
+    await seed_payout("donation", "dist-gone", 99, date);
+    expect(await has_held_money(pg(), npo_id)).toBe(false);
+
+    await seed_gift_payout("paypal", 10, date);
     expect(await has_held_money(pg(), npo_id)).toBe(true);
   });
 });

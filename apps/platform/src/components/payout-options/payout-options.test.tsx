@@ -108,10 +108,7 @@ describe("PayoutOptions: compare your options", () => {
       ["Available to", "Every nonprofit."],
     ]);
     expect(ledger(stripe)).toEqual([
-      [
-        "Stripe donations",
-        "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. They skip your split.",
-      ],
+      ["Stripe donations", STRIPE_ROW_UNREADY],
       ["PayPal, DAF grants, crypto, stocks, cheques", `Held${HELD_OTHERS}`],
       ["Savings and Investments withdrawals", `Held${HELD_WITHDRAWALS}`],
       [

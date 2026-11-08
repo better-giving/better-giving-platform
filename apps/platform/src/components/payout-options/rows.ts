@@ -37,6 +37,10 @@ export interface IRow {
 }
 
 const to_bank: ICell = { text: "To your bank." };
+/** Stripe with no bank on file: the card's and the comparison's alike */
+const stripe_unready_held: ICell = {
+  text: "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. Until then they're held. They skip your split.",
+};
 const held_others: ICell = {
   text: "In your Better Giving balance until you add a bank account.",
   held: true,
@@ -54,9 +58,7 @@ export const rows: IRow[] = [
       bank: {
         text: "To your bank, after your Grant, Savings and Investments split.",
       },
-      stripe: {
-        text: "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. Until then they're held. They skip your split.",
-      },
+      stripe: stripe_unready_held,
       stripe_with_bank: {
         text: "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. They skip your split. Until then, they go to your bank.",
       },
@@ -67,9 +69,7 @@ export const rows: IRow[] = [
       bank: {
         text: "To your bank, every 3 days once your balance reaches your payout minimum, after your Grant, Savings and Investments split.",
       },
-      stripe: {
-        text: "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. They skip your split.",
-      },
+      stripe: stripe_unready_held,
     },
   },
   {

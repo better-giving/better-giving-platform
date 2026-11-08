@@ -84,7 +84,9 @@ export type HeldRail =
 export interface IHeldMoney {
   total: number;
   /** what the payout run would pay of `total` after the amounts the npo owes
-   * Better Giving. absent: nothing is subtracted */
+   * Better Giving, plus what Better Giving owes it back: `total` when nothing
+   * is owed, above `total` when only Better Giving owes. absent: owed netting
+   * is off, or nothing is held */
   net?: number;
   /** rails with nothing pending are left out */
   by_rail: { rail: HeldRail; amount: number }[];

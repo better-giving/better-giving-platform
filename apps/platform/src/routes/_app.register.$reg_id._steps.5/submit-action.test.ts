@@ -45,6 +45,26 @@ vi.mock("$/kit/queue", async (orig) => ({
   enqueue: vi.fn(async () => {}),
 }));
 
+// pglite runs one connection, so two submits cannot overlap and the claim lock
+// cannot be raced. what a test can see is whether it is held when the holder is
+// read: this records `pg_locks` at that moment.
+const held_check = vi.hoisted(() => ({ advisory_locks: [] as number[] }));
+vi.mock("$/stripe-connect/target", async (orig) => {
+  const real = await orig<typeof import("$/stripe-connect/target")>();
+  return {
+    ...real,
+    held_elsewhere: async (...args: Parameters<typeof real.held_elsewhere>) => {
+      const tx = args[2] as { execute: (q: unknown) => Promise<any> };
+      const { sql } = await import("drizzle-orm");
+      const res = await tx.execute(
+        sql`select count(*)::int as n from pg_locks where locktype = 'advisory' and pid = pg_backend_pid() and granted`
+      );
+      held_check.advisory_locks.push((res.rows ?? res)[0].n);
+      return real.held_elsewhere(...args);
+    },
+  };
+});
+
 const routing = vi.hoisted(() => ({ on: true }));
 vi.mock("$/env", async (importOriginal) => {
   const env = await importOriginal<typeof import("$/env")>();
@@ -103,6 +123,7 @@ beforeEach(async () => {
   test_db.before_update = () => {};
   test_db.before_transaction = async () => {};
   routing.on = true;
+  held_check.advisory_locks = [];
   await test_db.current!.db.delete(registrations);
   vi.mocked(enqueue).mockClear();
   vi.mocked(get_session).mockResolvedValue({
@@ -126,7 +147,10 @@ const seed = (
     ...fields,
   });
 
-/** a thrown `Response` is the refusal; anything else is the action's answer */
+/** what the action threw rather than returned: the route's error boundary */
+const thrown = new WeakSet<Response>();
+
+/** a thrown `Response` is caught and tagged; anything else is the action's answer */
 const submit = () =>
   Promise.resolve(
     submit_action({
@@ -138,11 +162,21 @@ const submit = () =>
     } as any)
   ).then(
     (res) => res as Response,
-    (thrown: unknown) => {
-      if (thrown instanceof Response) return thrown;
-      throw thrown;
+    (err: unknown) => {
+      if (err instanceof Response) {
+        thrown.add(err);
+        return err;
+      }
+      throw err;
     }
   );
+
+/** a refusal written for the applicant: returned as fetcher data so the
+ * summary stays up, never thrown to the error boundary */
+const refusal = async (res: Response) => {
+  expect(thrown.has(res)).toBe(false);
+  return res.json();
+};
 
 /** the payload under remix-toast's `data()` wrapper */
 const answer = (res: unknown) => (res as { data: unknown }).data;
@@ -277,12 +311,15 @@ describe("submit_action", () => {
     expect(enqueue).not.toHaveBeenCalled();
   });
 
-  test("refuses an incomplete application with 400", async () => {
+  test("refuses an incomplete application with a 400 refusal", async () => {
     await seed("01", { r_first_name: "Jane" });
 
     const res = await submit();
 
-    expect(res.status).toBe(400);
+    expect(await refusal(res)).toEqual({
+      status: 400,
+      message: "Registration not ready for submission",
+    });
     expect((await reg_get(RID))?.status).toBe("01");
   });
 
@@ -300,10 +337,11 @@ describe("submit_action", () => {
 
     const res = await submit();
 
-    expect(res.status).toBe(400);
-    expect(await res.text()).toBe(
-      "You need a bank account or a Stripe account to get paid. Add one to submit."
-    );
+    expect(await refusal(res)).toEqual({
+      status: 400,
+      message:
+        "You need a bank account or a Stripe account to get paid. Add one to submit.",
+    });
     expect((await reg_get(RID))?.status).toBe("01");
   });
 
@@ -324,10 +362,11 @@ describe("submit_action", () => {
 
     const res = await submit();
 
-    expect(res.status).toBe(400);
-    expect(await res.text()).toBe(
-      "Stripe isn't available to this nonprofit, so it needs a bank account. Add one to submit."
-    );
+    expect(await refusal(res)).toEqual({
+      status: 400,
+      message:
+        "Stripe isn't available to this nonprofit, so it needs a bank account. Add one to submit.",
+    });
     expect((await reg_get(RID))?.status).toBe("01");
   });
 
@@ -337,10 +376,11 @@ describe("submit_action", () => {
 
     const res = await submit();
 
-    expect(res.status).toBe(400);
-    expect(await res.text()).toBe(
-      "We aren't paying out through Stripe right now, so you need a bank account to get paid. Add one to submit."
-    );
+    expect(await refusal(res)).toEqual({
+      status: 400,
+      message:
+        "We aren't paying out through Stripe right now, so you need a bank account to get paid. Add one to submit.",
+    });
     expect((await reg_get(RID))?.status).toBe("01");
   });
 });
@@ -362,10 +402,11 @@ describe("submit_action, resubmitting with a stripe account", () => {
 
     const res = await submit();
 
-    expect(res.status).toBe(409);
-    expect(await res.text()).toBe(
-      "This Stripe account is now connected elsewhere on Better Giving. Connect a different account or add a bank account, then submit again."
-    );
+    expect(await refusal(res)).toEqual({
+      status: 409,
+      message:
+        "This Stripe account is now connected elsewhere on Better Giving. Connect a different account or add a bank account, then submit again.",
+    });
     expect((await reg_get(RID))?.status).toBe("04");
     expect(enqueue).not.toHaveBeenCalled();
   });
@@ -383,10 +424,11 @@ describe("submit_action, resubmitting with a stripe account", () => {
 
     const res = await submit();
 
-    expect(res.status).toBe(409);
-    expect(await res.text()).toBe(
-      "This Stripe account is now connected elsewhere on Better Giving. Connect a different account or add a bank account, then submit again."
-    );
+    expect(await refusal(res)).toEqual({
+      status: 409,
+      message:
+        "This Stripe account is now connected elsewhere on Better Giving. Connect a different account or add a bank account, then submit again.",
+    });
     expect((await reg_get(RID))?.status).toBe("04");
   });
 
@@ -402,11 +444,34 @@ describe("submit_action, resubmitting with a stripe account", () => {
 
     const res = await submit();
 
-    expect(res.status).toBe(409);
-    expect(await res.text()).toBe(
-      "Your banking details changed while you were submitting. Check them and submit again."
-    );
+    expect(await refusal(res)).toEqual({
+      status: 409,
+      message:
+        "Your banking details changed while you were submitting. Check them and submit again.",
+    });
     expect((await reg_get(RID))?.status).toBe("04");
+  });
+
+  test("refuses a resubmit whose application is gone by the write", async () => {
+    await seed("04", STRIPE_ONLY);
+    test_db.before_transaction = async () => {
+      await test_db.current!.db.delete(registrations);
+    };
+
+    const res = await submit();
+
+    expect(await refusal(res)).toEqual({
+      status: 409,
+      message: "This application has already been submitted or approved.",
+    });
+  });
+
+  test("reads who holds the account only under the claim lock", async () => {
+    await seed("04", STRIPE_ONLY);
+
+    await submit();
+
+    expect(held_check.advisory_locks).toEqual([1]);
   });
 
   test("resubmits a rejected application that still holds its account alone", async () => {

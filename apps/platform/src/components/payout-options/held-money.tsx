@@ -1,8 +1,8 @@
 import { Badge, Button } from "@better-giving/ui";
 import { Plus } from "lucide-react";
 import { type ReactNode, useId } from "react";
+import { Money } from "#/components/money";
 import { to_utc_day } from "@/helpers/date";
-import { humanize } from "@/helpers/decimal";
 import type { HeldRail, IHeldMoney } from "@/payouts";
 
 export const rail_labels: Record<HeldRail, string> = {
@@ -32,7 +32,24 @@ export interface IHeldMoneyCard {
   classes?: string;
 }
 
-const usd = (n: number) => `$${humanize(n)}`;
+interface IUsd {
+  amount: number;
+  classes?: string;
+}
+
+function Usd({ amount, classes }: IUsd) {
+  return <Money amount={amount} currency="USD" classes={classes} />;
+}
+
+/** what the payout takes off `total` for amounts owed (positive), or adds for
+ *  amounts due back (negative). null while nothing is netted */
+const net_adjustment = ({ total, net }: IHeldMoney): number | null =>
+  net === undefined || net === total
+    ? null
+    : Math.round((total - net) * 100) / 100;
+
+/** what is owed takes all of it: nothing pays out. `held_money_net` gives 0 */
+const is_covered = ({ net }: IHeldMoney) => net !== undefined && net <= 0;
 
 const until = (bank_pending: boolean) =>
   bank_pending
@@ -40,7 +57,8 @@ const until = (bank_pending: boolean) =>
     : "until you add a bank account";
 
 /** the total is net of what is owed when the query could say so; otherwise
- *  the payout still nets refunds and disputes owed, and waits for the minimum */
+ *  the payout still nets refunds and disputes owed, and waits for the minimum.
+ *  never while `is_covered`: nothing pays out */
 const release_line = (bank_pending: boolean, netted: boolean) =>
   `Once ${bank_pending ? "your bank account is approved" : "you add a bank account"}, this money pays out with your bank payout${netted ? "" : ", less any refunds or disputes owed,"} once your balance reaches your payout minimum.`;
 
@@ -96,10 +114,13 @@ export function HeldMoneyCard(props: IHeldMoneyCard) {
           {held.by_rail.map((r) => (
             <tr key={r.rail}>
               <td>{rail_labels[r.rail]}</td>
-              <td className="text-right">{usd(r.amount)}</td>
+              <td className="text-right">
+                <Usd amount={r.amount} />
+              </td>
             </tr>
           ))}
         </tbody>
+        <NetRows held={held} label_span={1} />
       </table>
     </HeldShell>
   );
@@ -142,14 +163,60 @@ export function PayoutsHeldCard(props: IHeldMoneyCard) {
             <tr key={i}>
               <td>{rail_labels[it.rail]}</td>
               <td>{to_utc_day(it.date)}</td>
-              <td className="text-right">{usd(it.amount)}</td>
+              <td className="text-right">
+                <Usd amount={it.amount} />
+              </td>
             </tr>
           ))}
         </tbody>
+        <NetRows held={held} label_span={2} />
       </table>
     </HeldShell>
   );
 }
+
+interface INetRows {
+  held: IHeldMoney;
+  /** the columns before Amount */
+  label_span: number;
+}
+
+/** the netting under the gross rows, so the table sums to the headline.
+ *  nothing while nothing is netted */
+function NetRows({ held, label_span }: INetRows) {
+  const adjustment = net_adjustment(held);
+  if (adjustment === null) return null;
+  return (
+    <tfoot>
+      <tr>
+        <td colSpan={label_span}>
+          {adjustment > 0
+            ? "Owed to Better Giving"
+            : "Due back to you from Better Giving"}
+        </td>
+        <td className="text-right">
+          <Usd amount={-adjustment} />
+        </td>
+      </tr>
+      <tr className="font-medium">
+        <td colSpan={label_span}>Total</td>
+        <td className="text-right">
+          <Usd amount={held.net ?? held.total} />
+        </td>
+      </tr>
+    </tfoot>
+  );
+}
+
+const COVERED_LINE =
+  "What you owe Better Giving covers all of it, so none of it will pay out to you.";
+
+const net_caption = (held: IHeldMoney, adjustment: number) =>
+  is_covered(held)
+    ? COVERED_LINE
+    : adjustment > 0
+      ? "After amounts you owe Better Giving"
+      : "With amounts Better Giving owes you";
 
 interface IHeldShell extends IHeldMoneyCard, ICopy {
   /** the breakdown table */
@@ -169,7 +236,9 @@ function HeldShell({
 }: IHeldShell) {
   const heading_id = useId();
   const offers_connect = rails === "none" && !!connect_href;
-  const netted = held.net !== undefined && held.net < held.total;
+  const adjustment = net_adjustment(held);
+  const netted = adjustment !== null;
+  const covered = is_covered(held);
   return (
     <section
       aria-labelledby={heading_id}
@@ -186,17 +255,16 @@ function HeldShell({
       </div>
       <p className="grid gap-1">
         <span className="text-gray-11">Held right now</span>
-        <span className="font-display text-3xl font-bold">
-          {usd(netted ? held.net! : held.total)}
-        </span>
+        <Usd
+          amount={held.net ?? held.total}
+          classes="font-display text-3xl font-bold"
+        />
         {netted && (
-          <span className="text-gray-11">
-            After amounts you owe Better Giving
-          </span>
+          <span className="text-gray-11">{net_caption(held, adjustment)}</span>
         )}
       </p>
       <div className="table-scroll">{children}</div>
-      {rails === "stripe" && (
+      {rails === "stripe" && !covered && (
         <p className="text-gray-11">{release_line(bank_pending, netted)}</p>
       )}
       {(!bank_pending || offers_connect) && (

@@ -6,11 +6,15 @@ import { humanize } from "@/helpers/decimal";
 import type { INpoSent, TSentStanding } from "@/stripe-connect/sent";
 
 /** where a card gift made now goes: the connected account (`on`), or the bank
- * while the account stays linked (`off`) or after a disconnect */
-export type TStripeLink = "on" | "off" | "disconnected";
+ * while the account stays linked (`off`, or `waiting` when nothing was ever
+ * sent to it) or after a disconnect */
+export type TStripeLink = "on" | "off" | "waiting" | "disconnected";
 
-export const stripe_link = (sent: INpoSent): TStripeLink =>
-  sent.on_stripe ? "on" : sent.connected ? "off" : "disconnected";
+export const stripe_link = (sent: INpoSent): TStripeLink => {
+  if (sent.on_stripe) return "on";
+  if (!sent.connected) return "disconnected";
+  return sent.items.length > 0 ? "off" : "waiting";
+};
 
 interface ICopy {
   heading: string;
@@ -43,6 +47,11 @@ const list_copy = (
       return {
         heading: "Sent to Stripe earlier",
         lead: `Stripe donations sent to your Stripe account before. New Stripe donations ${has_bank ? "pay out to your bank" : held_for_bank(bank_pending)}.`,
+      };
+    case "waiting":
+      return {
+        heading: "Your Stripe account",
+        lead: `Your Stripe account is connected but isn't receiving Stripe donations, so new Stripe donations ${has_bank ? "pay out to your bank" : held_for_bank(bank_pending)}.`,
       };
     case "disconnected":
       return {
@@ -207,11 +216,14 @@ const wells = (link: TStripeLink, bank: IBank): [IWell, IWell] => {
         },
       ];
     case "off":
+    case "waiting":
       return [
         {
           title,
           detail:
-            "Stripe donations sent to your Stripe account before. New ones are not sent there.",
+            link === "off"
+              ? "Stripe donations sent to your Stripe account before. New ones are not sent there."
+              : "Nothing has been sent to your Stripe account. New Stripe donations are not sent there.",
         },
         {
           title: "Payouts",

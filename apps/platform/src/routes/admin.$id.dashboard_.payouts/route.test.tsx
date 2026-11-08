@@ -451,7 +451,7 @@ describe("the payouts page", () => {
 
     const held = held_region(screen);
     await expect
-      .element(held.getByText("$12.50", { exact: true }).first())
+      .element(held.getByText("12.50", { exact: true }).first())
       .toBeVisible();
     await expect.element(held.getByText("Jul 4, 2026")).toBeVisible();
     await expect
@@ -504,7 +504,7 @@ describe("the payouts page", () => {
     const screen = await render_page();
 
     await expect
-      .element(held_region(screen).getByText("$35.00", { exact: true }).first())
+      .element(held_region(screen).getByText("35.00", { exact: true }).first())
       .toBeVisible();
     const table = screen.getByRole("region", { name: "Payouts", exact: true });
     await expect.element(table.getByText("$77.00")).toBeVisible();
@@ -535,7 +535,7 @@ describe("the payouts page", () => {
       name: "No way to get paid right now",
     });
     await expect
-      .element(held.getByText("$12.50", { exact: true }).first())
+      .element(held.getByText("12.50", { exact: true }).first())
       .toBeVisible();
     await expect
       .element(held.getByRole("link", { name: "Connect Stripe" }))
@@ -623,7 +623,7 @@ describe("the payouts page", () => {
       name: "On hold until your bank account is approved",
     });
     await expect
-      .element(held.getByText("$12.50", { exact: true }).first())
+      .element(held.getByText("12.50", { exact: true }).first())
       .toBeVisible();
     expect(held_region(screen).query()).toBeNull();
     expect(

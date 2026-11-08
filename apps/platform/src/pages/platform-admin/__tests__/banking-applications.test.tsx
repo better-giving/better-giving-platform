@@ -625,7 +625,11 @@ describe("reject flow", () => {
 });
 
 describe("action edge cases", () => {
-  it("two approvals at once leave one default", async () => {
+  // pglite is one connection, so the two transactions run one after the other
+  // whether or not `bapp_approve` locks the rows; the row lock itself cannot be
+  // raced here. what this holds is that "is there a default" is decided inside
+  // the write, after both presses have read the application
+  it("approvals that both read before either writes still leave one default", async () => {
     const npo = await seed_npo();
     const a = await seed_bapp(npo.id);
     const b = await seed_bapp(npo.id);
@@ -659,6 +663,45 @@ describe("action edge cases", () => {
 
     const statuses = [(await get_bapp(a)).status, (await get_bapp(b)).status];
     expect(statuses.sort()).toEqual(["approved", "default"]);
+  });
+
+  it("throws 409 and applies nothing when a rejection lands during the approve", async () => {
+    const npo = await seed_npo();
+    const id = await seed_bapp(npo.id);
+    // the rejection commits after the action read the application as under
+    // review and before the approve writes
+    vi.mocked(wise.v2_account).mockImplementationOnce(async () => {
+      await test_db
+        .current!.db.update(banking_apps)
+        .set({ status: "rejected", rejection_reason: "bad account" })
+        .where(eq(banking_apps.id, id));
+      return WISE_FIXTURE as never;
+    });
+    const form = new FormData();
+    form.set("type", "approved");
+
+    const thrown = await Promise.resolve(
+      (action as (...args: unknown[]) => unknown)({
+        params: { id },
+        ...doc_args(
+          new Request(`http://test/platform/banking-applications/${id}`, {
+            method: "POST",
+            body: form,
+          })
+        ),
+        context: {},
+      })
+    ).then(
+      () => undefined,
+      (e: unknown) => e
+    );
+
+    expect(thrown).toBeInstanceOf(Response);
+    expect((thrown as Response).status).toBe(409);
+    expect((await get_bapp(id)).status).toBe("rejected");
+    expect(get_outbox_events().some((e) => e.id === "banking-approved")).toBe(
+      false
+    );
   });
 
   it("throws 404 for non-existent bapp", async () => {

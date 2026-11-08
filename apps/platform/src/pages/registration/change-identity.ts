@@ -4,6 +4,7 @@ import { getValidatedFormData } from "remix-hook-form";
 import { safeParse } from "valibot";
 import { to_auth } from "#/.server/auth";
 import { reg_user } from "#/pages/registration/data/reg-user";
+import { wizard_exit } from "#/pages/registration/data/step-loader";
 import {
   type IDuplicate,
   identity_payload,
@@ -13,12 +14,16 @@ import { resp } from "@/helpers/https";
 import { msg } from "@/queue";
 import type { IReg, IRegStartFv } from "@/reg";
 import { Progress } from "@/reg/progress";
-import { reg_id, reg_new, reg_start_fv } from "@/reg/schema";
+import { EDITABLE, reg_id, reg_new, reg_start_fv } from "@/reg/schema";
 import { stripe as stripe_env } from "$/env";
 import { enqueue } from "$/kit/queue";
 import { db } from "$/pg/db";
 import { npo_owned_by_regnum } from "$/pg/queries/npo";
-import { reg_get, reg_update } from "$/pg/queries/registration";
+import {
+  reg_get,
+  reg_update_from,
+  type TRegAttrs,
+} from "$/pg/queries/registration";
 
 /** corrects the org type + identity of an application that already exists.
  * Only ever updates — the row is the applicant's; a change of mind is not a
@@ -50,11 +55,10 @@ export const change_identity = async (
   if (reg.r_id !== user.email && user.role !== "admin") {
     throw resp.status(401);
   }
-  // in review, approved and rejected are all closed to the applicant — the
-  // identity a reviewer is reading must not move under them.
-  if (reg.status !== "01") {
-    throw resp.status(400, `reg:${rid} is no longer editable`);
-  }
+  // in review and approved are closed to the applicant — the identity a
+  // reviewer is reading must not move under them. a rejected one is open: the
+  // rejection asks for it to be put right and resubmitted.
+  if (!reg.status || !EDITABLE.includes(reg.status)) return closed(reg);
 
   const p2 = safeParse(reg_new, identity_payload(fv.data, reg.r_id));
   if (p2.issues) throw resp.status(400, p2.issues[0].message);
@@ -80,8 +84,10 @@ export const change_identity = async (
     reg.o_type === "501c3" ? reg.o_ein : reg.o_registration_number;
   const replaced = switched || rn !== prev_rn || country !== reg.o_hq_country;
 
-  const attrs: Record<string, unknown> =
-    parsed.o_type === "501c3"
+  const attrs: TRegAttrs = {
+    // back to draft, as any edit of a rejected application is
+    status: "01",
+    ...(parsed.o_type === "501c3"
       ? {
           o_type: parsed.o_type,
           o_ein: parsed.o_ein,
@@ -93,7 +99,8 @@ export const change_identity = async (
           o_hq_country: parsed.o_hq_country,
           o_registration_number: parsed.o_registration_number,
           ...(switched && { o_ein: null }),
-        };
+        }),
+  };
 
   if (replaced) {
     // an agreement signed against a different legal identity is not evidence
@@ -115,18 +122,30 @@ export const change_identity = async (
     // never re-prompts. moving the payout is the applicant's to redo there.
   }
 
-  const updated = await reg_update(db, rid, attrs);
-  if (updated) await enqueue(msg("reg-updated", updated));
+  // a submit committing since the read must not be pulled back to draft
+  const updated = await reg_update_from(db, rid, EDITABLE, attrs);
+  if (!updated.won) return closed(updated.row);
+  await enqueue(msg("reg-updated", updated.row));
 
   /* nothing here maintains step state: `Progress` reads it off the columns, so
    * a 501(c)(3) sitting at banking that becomes international lands back on
    * the agreement on its own, and one that goes the other way skips it. */
-  // `reg_update`'s bare `.returning()` hands back the whole row, so nothing is
-  // missing for `.step` — the cast is only IReg's optionals against the
-  // columns' nulls, the same mismatch `reg_get` casts through.
+  // the guarded write's bare `.returning()` hands back the whole row, so
+  // nothing is missing for `.step` — the cast is only IReg's optionals against
+  // the columns' nulls, the same mismatch `reg_get` casts through.
   const step = new Progress(
-    updated as unknown as IReg,
+    updated.row as unknown as IReg,
     stripe_env.connect_routing
   ).step;
   return redirect(`../${step}`);
+};
+
+/** a row past editing: where its loader would send it, as `update_action` does */
+const closed = (row: Parameters<typeof wizard_exit>[0] | null) => {
+  const exit = row && wizard_exit(row);
+  if (exit) return redirect(exit);
+  throw resp.status(
+    409,
+    "This application can't be edited while it is under review or approved."
+  );
 };

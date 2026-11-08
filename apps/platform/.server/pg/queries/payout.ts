@@ -24,12 +24,26 @@ export async function payout_get(id: string): Promise<IPayout | undefined> {
   return row ? to_payout(row) : undefined;
 }
 
+/** one settlement stamps every payout in it with the same `date`, and a
+ * date-only `< cursor` drops every tied row past the page edge. `id` breaks the
+ * tie, carried as `<iso>|<id>` through the date cursor's base64url (an iso date
+ * has no pipe). a cursor without one is a date-only cursor an older page still
+ * holds, and pages as it always did: strictly older rows. */
+function payout_keyset(next?: string) {
+  const raw = decode_date_cursor(next);
+  if (!raw) return undefined;
+  const pipe = raw.indexOf("|");
+  if (pipe < 0) return sql`${payouts.date} < ${raw}`;
+  const date = raw.slice(0, pipe);
+  const id = raw.slice(pipe + 1);
+  return sql`(${payouts.date}, ${payouts.id}) < (${date}::timestamptz, ${id}::text)`;
+}
+
 export async function npo_payouts(
   npo_id: number,
   opts: INpoPayoutsOptions
 ): Promise<IPage<IPayout>> {
   const { limit = 10, next, status, not_status } = opts;
-  const cursor = decode_date_cursor(next);
 
   const rows = await db
     .select()
@@ -39,19 +53,21 @@ export async function npo_payouts(
         eq(payouts.npo_id, npo_id),
         status ? eq(payouts.type, status) : undefined,
         not_status ? ne(payouts.type, not_status) : undefined,
-        cursor ? sql`${payouts.date} < ${cursor}` : undefined
+        payout_keyset(next)
       )
     )
-    .orderBy(desc(payouts.date))
+    .orderBy(desc(payouts.date), desc(payouts.id))
     .limit(limit + 1);
 
   const has_more = rows.length > limit;
   const items = rows.slice(0, limit).map(to_payout);
+  const last = items[items.length - 1];
   return {
     items,
-    next: has_more
-      ? encode_date_cursor(items[items.length - 1]?.date ?? undefined)
-      : undefined,
+    next:
+      has_more && last
+        ? encode_date_cursor(`${last.date}|${last.id}`)
+        : undefined,
   };
 }
 

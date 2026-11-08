@@ -88,9 +88,15 @@ const bodies = (status: TConnectStatus, has_bank: boolean): string[] => {
         `Connect Stripe to get Stripe donations straight to your Stripe account, after fees, once Stripe says your account is ready.${has_bank ? " Everything else keeps paying out to your bank." : ""}`,
       ];
     case "disconnected":
-      return [
-        "Better Giving was disconnected from your Stripe account in your Stripe dashboard. Connect Stripe again to get Stripe donations straight to your Stripe account, after fees, once Stripe says your account is ready.",
-      ];
+      // with no bank they are held, which the held card says while any are
+      return has_bank
+        ? [
+            "Better Giving was disconnected from your Stripe account in your Stripe dashboard. Stripe donations now go to your bank payout.",
+            "Connect Stripe again to get them straight to your Stripe account, after fees, once Stripe says your account is ready. Donations already sent to your Stripe account stay there.",
+          ]
+        : [
+            "Better Giving was disconnected from your Stripe account in your Stripe dashboard. Connect Stripe again to get Stripe donations straight to your Stripe account, after fees, once Stripe says your account is ready.",
+          ];
     case "incomplete":
       // without a bank, the standing band says it
       return has_bank
@@ -286,7 +292,7 @@ function CardShell({
       className={`${classes} card grid gap-4`}
     >
       <div className="grid gap-1">
-        {/* the badge sits beside the h2, not in it: the heading names the region */}
+        {/* the badge sits beside the heading, not in it: the heading names the region */}
         <div className="flex flex-wrap items-center gap-2">
           <Heading id={heading_id} className="text-lg font-semibold">
             Stripe account

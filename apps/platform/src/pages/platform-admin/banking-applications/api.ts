@@ -80,9 +80,11 @@ export const action: ActionFunction = async ({ params, request }) => {
     }
     // auto-default when nothing pays out yet: rejected and pending rows don't count
     const prev = await bapp_approve(bank_id.toString(), x.npo_id);
-    if (prev?.status === "under-review") {
-      await enqueue(msg("banking-approved", { npo_id: x.npo_id }));
+    // a verdict that landed after the read above stands, and nothing applied
+    if (prev?.status !== "under-review") {
+      throw resp.status(409, "This application is no longer under review.");
     }
+    await enqueue(msg("banking-approved", { npo_id: x.npo_id }));
   } else {
     const prev = await bapp_update_status(bank_id.toString(), {
       status: fv.data.type,

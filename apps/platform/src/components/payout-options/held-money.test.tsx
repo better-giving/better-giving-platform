@@ -52,6 +52,16 @@ const body_rows = (scope: Locator) =>
     [...tr.querySelectorAll("td")].map((td) => td.textContent)
   );
 
+/** the foot's rows, as text: the netting under the gross */
+const foot_rows = (scope: Locator) =>
+  [...scope.element().querySelectorAll("tfoot tr")].map((tr) =>
+    [...tr.querySelectorAll("td")].map((td) => td.textContent)
+  );
+
+/** the headline's label, amount and any line under it, as one text */
+const headline = (scope: Locator) =>
+  scope.getByText("Held right now").element().parentElement?.textContent;
+
 const no_wise = (scope: Locator) =>
   expect(scope.element().textContent).not.toMatch(/wise|money-transfer/i);
 
@@ -62,38 +72,68 @@ describe("held card, net of what is owed", () => {
     ["Banking", HeldMoneyCard],
     ["Payouts", PayoutsHeldCard],
   ])(
-    "%s: shows the net as the amount, with the line under it",
+    "%s: the headline is the net, and the table's foot takes the gross down to it",
     async (_, Card) => {
       const screen = await in_router(
         <Card {...base} held={{ ...HELD, net: 1500 }} />
       );
       const region = screen.getByRole("region");
-      await expect.element(region.getByText("$1,500.00")).toBeVisible();
       await expect.element(region.getByText(AFTER_OWED)).toBeVisible();
-      expect(region.element().textContent).not.toContain("$1,784.50 After");
+      expect(headline(region)).toBe(`Held right nowUSD1,500.00${AFTER_OWED}`);
+      expect(foot_rows(region)).toEqual([
+        ["Owed to Better Giving", "USD-284.50"],
+        ["Total", "USD1,500.00"],
+      ]);
       expect(region.element().textContent).not.toContain("less any refunds");
     }
   );
 
-  test("owing all of it shows $0.00", async () => {
+  test("owing all of it: 0, said plainly, and no payout promised", async () => {
     const screen = await in_router(
       <HeldMoneyCard {...base} held={{ ...HELD, net: 0 }} />
     );
     const region = screen.getByRole("region");
-    await expect.element(region.getByText("$0.00")).toBeVisible();
-    await expect.element(region.getByText(AFTER_OWED)).toBeVisible();
+    const covered =
+      "What you owe Better Giving covers all of it, so none of it will pay out to you.";
+    await expect.element(region.getByText(covered)).toBeVisible();
+    expect(headline(region)).toBe(`Held right nowUSD0.00${covered}`);
+    expect(foot_rows(region)).toEqual([
+      ["Owed to Better Giving", "USD-1,784.50"],
+      ["Total", "USD0.00"],
+    ]);
+    expect(region.element().textContent).not.toMatch(/pays out with/);
+    expect(region.element().textContent).not.toContain(AFTER_OWED);
+    // a bank still pays out what arrives next
+    await expect
+      .element(region.getByRole("link", { name: "Add bank account" }))
+      .toBeVisible();
+  });
+
+  test("owed money back: the foot adds it, and the headline says so", async () => {
+    const screen = await in_router(
+      <PayoutsHeldCard {...base} held={{ ...HELD, net: 1800 }} />
+    );
+    const region = screen.getByRole("region");
+    const caption = "With amounts Better Giving owes you";
+    await expect.element(region.getByText(caption)).toBeVisible();
+    expect(headline(region)).toBe(`Held right nowUSD1,800.00${caption}`);
+    expect(foot_rows(region)).toEqual([
+      ["Due back to you from Better Giving", "USD15.50"],
+      ["Total", "USD1,800.00"],
+    ]);
   });
 
   test.each([
     ["no net given", undefined],
     ["a net equal to the total", HELD.total],
-  ])("%s: shows the total and no line", async (_, net) => {
+  ])("%s: shows the total, no line and no foot", async (_, net) => {
     const screen = await in_router(
       <HeldMoneyCard {...base} held={{ ...HELD, net }} />
     );
     const region = screen.getByRole("region");
-    await expect.element(region.getByText("$1,784.50")).toBeVisible();
-    expect(region.element().textContent).not.toContain(AFTER_OWED);
+    await expect.element(region.getByText("Held right now")).toBeVisible();
+    expect(headline(region)).toBe("Held right nowUSD1,784.50");
+    expect(region.element().querySelector("tfoot")).toBeNull();
   });
 });
 
@@ -126,16 +166,18 @@ describe("HeldMoneyCard: Banking", () => {
       )
       .toBeVisible();
     await expect.element(card.getByText("Held right now")).toBeVisible();
-    await expect.element(card.getByText("$1,784.50")).toBeVisible();
+    await expect
+      .element(card.getByText("1,784.50", { exact: true }))
+      .toBeVisible();
     await expect
       .element(card.getByText("What's waiting", { exact: true }))
       .toBeVisible();
     expect(body_rows(card)).toEqual([
-      ["PayPal donations", "$640.00"],
-      ["DAF grants", "$420.00"],
-      ["Crypto donations", "$150.50"],
-      ["Stock and cheque donations", "$74.00"],
-      ["Savings and Investments withdrawals", "$500.00"],
+      ["PayPal donations", "USD640.00"],
+      ["DAF grants", "USD420.00"],
+      ["Crypto donations", "USD150.50"],
+      ["Stock and cheque donations", "USD74.00"],
+      ["Savings and Investments withdrawals", "USD500.00"],
     ]);
     await expect
       .element(
@@ -177,8 +219,10 @@ describe("HeldMoneyCard: Banking", () => {
         )
       )
       .toBeVisible();
-    await expect.element(card.getByText("$2,310.00")).toBeVisible();
-    expect(body_rows(card)[0]).toEqual(["Stripe donations", "$525.50"]);
+    await expect
+      .element(card.getByText("2,310.00", { exact: true }))
+      .toBeVisible();
+    expect(body_rows(card)[0]).toEqual(["Stripe donations", "USD525.50"]);
     await expect
       .element(card.getByRole("link", { name: "Add bank account" }))
       .toHaveAttribute("href", "/admin/42/banking/new");
@@ -230,8 +274,10 @@ describe("Stripe linked, Stripe donations held", () => {
     });
     await expect.element(card.getByText(STRIPE_LEAD)).toBeVisible();
     expect(card.getByText(/These can't go to Stripe/).query()).toBeNull();
-    expect(body_rows(card)[0]).toEqual(["Stripe donations", "$525.50"]);
-    await expect.element(card.getByText("$2,310.00")).toBeVisible();
+    expect(body_rows(card)[0]).toEqual(["Stripe donations", "USD525.50"]);
+    await expect
+      .element(card.getByText("2,310.00", { exact: true }))
+      .toBeVisible();
   });
 
   test("Payouts: the lead says Stripe donations wait too, and the table lists them", async () => {
@@ -246,7 +292,7 @@ describe("Stripe linked, Stripe donations held", () => {
     expect(body_rows(card)[0]).toEqual([
       "Stripe donations",
       "Oct 31, 2026",
-      "$525.50",
+      "USD525.50",
     ]);
   });
 });
@@ -265,13 +311,15 @@ describe("PayoutsHeldCard: Payouts", () => {
         )
       )
       .toBeVisible();
-    await expect.element(card.getByText("$1,784.50")).toBeVisible();
+    await expect
+      .element(card.getByText("1,784.50", { exact: true }))
+      .toBeVisible();
     expect(body_rows(card)).toEqual([
-      ["PayPal donations", "Oct 30, 2026", "$640.00"],
-      ["DAF grants", "Oct 28, 2026", "$420.00"],
-      ["Savings and Investments withdrawals", "Oct 27, 2026", "$500.00"],
-      ["Crypto donations", "Oct 25, 2026", "$150.50"],
-      ["Stock and cheque donations", "Oct 22, 2026", "$74.00"],
+      ["PayPal donations", "Oct 30, 2026", "USD640.00"],
+      ["DAF grants", "Oct 28, 2026", "USD420.00"],
+      ["Savings and Investments withdrawals", "Oct 27, 2026", "USD500.00"],
+      ["Crypto donations", "Oct 25, 2026", "USD150.50"],
+      ["Stock and cheque donations", "Oct 22, 2026", "USD74.00"],
     ]);
     await expect
       .element(card.getByRole("link", { name: "Add bank account" }))
@@ -298,7 +346,7 @@ describe("PayoutsHeldCard: Payouts", () => {
       name: "On hold until you add a bank account",
     });
     expect(body_rows(card)).toEqual([
-      ["Stock and cheque donations", "Jul 4, 2026", "$74.00"],
+      ["Stock and cheque donations", "Jul 4, 2026", "USD74.00"],
     ]);
   });
 });

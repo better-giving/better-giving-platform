@@ -41,8 +41,10 @@ interface ITransferRecord {
 /**
  * routed transfers paid to `npo_id`, newest transfer first, each with what
  * its reversal records took back. null when card gifts to the nonprofit do
- * not route and it has none: the payouts page stays as it is. an empty list
- * is a routable nonprofit nothing has been sent to yet
+ * not route, no account is linked (or routing is switched off) and it has
+ * none: the payouts page stays as it is. an empty list is a nonprofit on
+ * stripe, or linked to an account card gifts don't route to, that nothing has
+ * been sent to
  */
 export async function npo_sent_transfers(
   npo_id: number
@@ -71,9 +73,10 @@ export async function npo_sent_transfers(
 
   const on_stripe =
     !!npo && is_routable(routing_npo(npo), stripe_env.connect_routing);
-  if (!on_stripe && rows.length === 0) return null;
   const connected =
     !!npo?.stripe_account_id && npo.stripe_deauthorized_at === null;
+  const linked = connected && stripe_env.connect_routing;
+  if (!on_stripe && !linked && rows.length === 0) return null;
 
   const truncated = rows.length > SENT_LIMIT;
   const listed = rows.slice(0, SENT_LIMIT).flatMap((row) =>

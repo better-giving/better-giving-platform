@@ -17,6 +17,7 @@ const stripe = vi.hoisted(() => ({
   transfers: { retrieve: vi.fn() },
 }));
 const report_degraded = vi.hoisted(() => vi.fn());
+const deductions = vi.hoisted(() => ({ on: false }));
 
 vi.mock("$/pg/db", () => ({
   db: new Proxy(
@@ -33,8 +34,20 @@ vi.mock("$/pg/db", () => ({
 vi.mock("$/kit/stripe", () => ({ stripe }));
 vi.mock("$/env", async (importOriginal) => {
   const real = await importOriginal<typeof import("$/env")>();
-  return { ...real, stripe: { ...real.stripe, connect_routing: true } };
+  return {
+    ...real,
+    stripe: { ...real.stripe, connect_routing: true },
+    get owed_deductions() {
+      return deductions.on;
+    },
+  };
 });
+// before every gift here, so a row a run may net once its notice is sent
+vi.mock("@/terms", async (io) => ({
+  ...(await io<typeof import("@/terms")>()),
+  TERMS_RECOVERY_FROM: "2026-01-01",
+  TERMS_POSTED: "",
+}));
 vi.mock("#/errors/report", () => ({ report_degraded }));
 vi.mock("#/.server/auth", async () =>
   (await import("$/auth/test-utils")).make_auth_mock()
@@ -45,12 +58,14 @@ vi.mock("remix-client-cache", () => ({
 }));
 
 import { seed_npo } from "#/__tests__/fixtures/funds";
+import { seed_held, seed_owed } from "#/__tests__/fixtures/owed";
 import type { INpoSent } from "@/stripe-connect/sent";
 import { admin_ctx } from "$/auth/test-utils";
 import { encode_date_cursor } from "$/pg/queries/helpers";
 import { dists } from "$/pg/schema/dist";
 import { donations } from "$/pg/schema/donation";
 import { npos } from "$/pg/schema/npo";
+import { owed_amounts, owed_notices } from "$/pg/schema/owed";
 import { payouts } from "$/pg/schema/payout";
 import { create_test_db } from "$/pg/test-utils/pglite";
 import { RETRIEVE_BATCH } from "$/stripe-connect/sent";
@@ -81,11 +96,14 @@ afterAll(async () => {
 beforeEach(async () => {
   records.clear();
   vi.clearAllMocks();
+  deductions.on = false;
   stripe.transfers.retrieve.mockImplementation(async (id: string) => {
     const t = records.get(id);
     if (!t) throw new Error(`missing transfer ${id}`);
     return { id, ...t };
   });
+  await db().delete(owed_notices);
+  await db().delete(owed_amounts);
   await db().delete(payouts);
   await db().delete(dists);
   await db().delete(donations);
@@ -405,6 +423,18 @@ describe("payouts loader — routed transfer standing", () => {
 
     expect(data.items.map((p) => p.id)).toEqual(["paid"]);
     expect(data.held).toBeNull();
+  });
+
+  test("the held card is net of what the npo owes", async () => {
+    deductions.on = true;
+    await npo({ acct: "acct_sent" });
+    await seed_held(db(), npo_id, 100);
+    await seed_owed(db(), npo_id, 30.5);
+
+    const data = await load();
+
+    expect(data.held?.money.total).toBe(100);
+    expect(data.held?.money.net).toBe(69.5);
   });
 
   test("load-more does not read stripe again", async () => {

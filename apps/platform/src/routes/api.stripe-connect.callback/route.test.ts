@@ -761,7 +761,6 @@ describe("stripe connect callback", () => {
     });
   });
 
-  // its account was copied onto the npo at approval, and may have moved since
   describe("an account a rejected registration holds", () => {
     test("a new registration claiming it takes it from the rejected one", async () => {
       const rejected = await own_reg("cb-rejected@reg.test", {
@@ -842,6 +841,7 @@ describe("stripe connect callback", () => {
     });
   });
 
+  // its account was copied onto the npo at approval, and may have moved since
   test("an approved registration's account doesn't block its nonprofit", async () => {
     await own_reg("cb-approved@reg.test", {
       o_stripe_account_id: "acct_from_approval",

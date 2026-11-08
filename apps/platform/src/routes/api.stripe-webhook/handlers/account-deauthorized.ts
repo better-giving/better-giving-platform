@@ -2,7 +2,7 @@ import type Stripe from "stripe";
 import { msg } from "@/queue";
 import { stage } from "$/env";
 import { enqueue } from "$/kit/queue";
-import { npo_default_bapp } from "$/pg/queries/banking";
+import { npo_bapp_in_review, npo_default_bapp } from "$/pg/queries/banking";
 import {
   npo_stripe_deauthorize,
   type TStripeDeauthorizeTie,
@@ -31,6 +31,9 @@ async function resolve_tie<T extends { status: string }>(
   if (first.status !== "tied") return first;
   return again((await account_access_live(acct)) ? "stale" : "mark");
 }
+
+const has_bank_on_file = async (npo_id: number) =>
+  !!(await npo_default_bapp(npo_id)) || (await npo_bapp_in_review(npo_id));
 
 /** `ev.account` disconnected us from its stripe dashboard. an npo holding it
  * is stamped, so its later settlements fall back to pooled; a registration
@@ -67,8 +70,9 @@ export async function handle_account_deauthorized(
 
   // pooled pays out over wise to the default bank details, the grants run's
   // recipient: without them, and with the stripe account gone, nothing the
-  // npo is given reaches it
-  if (!(await npo_default_bapp(npo.npo_id))) {
+  // npo is given reaches it. details in review are on file: they pay once
+  // approved
+  if (!(await has_bank_on_file(npo.npo_id))) {
     // awaited: a lost notice fails the delivery, and the redelivery re-stamps
     // as a no-op. keyed on the event, so it collapses into one notice
     await enqueue(

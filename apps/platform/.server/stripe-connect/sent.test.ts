@@ -125,8 +125,24 @@ describe("npo_sent_transfers — on stripe", () => {
     });
   });
 
-  test("a fiscally sponsored nonprofit with a linked account is not on stripe", async () => {
+  test("a fiscally sponsored nonprofit with a linked account is connected off stripe", async () => {
     const id = await seed({ fiscal_sponsored: true });
+    expect(await npo_sent_transfers(id)).toMatchObject({
+      items: [],
+      on_stripe: false,
+      connected: true,
+    });
+  });
+
+  test("a nonprofit with no account linked and nothing sent is not on stripe", async () => {
+    const id = await seed({ stripe_account_id: null });
+    expect(await npo_sent_transfers(id)).toBeNull();
+  });
+
+  test("a disconnected nonprofit with nothing sent is not on stripe", async () => {
+    const id = await seed({
+      stripe_deauthorized_at: "2026-08-01T00:00:00.000Z",
+    });
     expect(await npo_sent_transfers(id)).toBeNull();
   });
 
@@ -134,10 +150,15 @@ describe("npo_sent_transfers — on stripe", () => {
     ["pending review", { stripe_charges_enabled: false }],
     ["incomplete", { stripe_details_submitted: false }],
   ])(
-    "a linked nonprofit whose account is %s, with nothing sent, is not on stripe",
+    "a linked nonprofit whose account is %s, with nothing sent, is connected off stripe",
     async (_, not_ready) => {
       const id = await seed(not_ready);
-      expect(await npo_sent_transfers(id)).toBeNull();
+      expect(await npo_sent_transfers(id)).toEqual({
+        items: [],
+        truncated: false,
+        on_stripe: false,
+        connected: true,
+      });
     }
   );
 

@@ -197,6 +197,10 @@ describe("StripeConnectCard", () => {
     "Stripe donations go straight to your Stripe account, after fees. What Stripe pays on to your own bank is in your Stripe dashboard.";
   const DISCONNECTED =
     "Better Giving was disconnected from your Stripe account in your Stripe dashboard. Connect Stripe again to get Stripe donations straight to your Stripe account, after fees, once Stripe says your account is ready.";
+  const DISCONNECTED_WITH_BANK = [
+    "Better Giving was disconnected from your Stripe account in your Stripe dashboard. Stripe donations now go to your bank payout.",
+    "Connect Stripe again to get them straight to your Stripe account, after fees, once Stripe says your account is ready. Donations already sent to your Stripe account stay there.",
+  ];
   const INCOMPLETE_HELD =
     "Your Stripe account is connected, but Stripe hasn't finished setting it up. Finish on Stripe. Until it's ready, your Stripe donations are held too.";
   const PENDING_HELD =
@@ -209,6 +213,7 @@ describe("StripeConnectCard", () => {
     "Connect Stripe to get Stripe donations straight to your Stripe account, after fees, once Stripe says your account is ready.",
     "Everything else keeps paying out to your bank.",
     DISCONNECTED,
+    ...DISCONNECTED_WITH_BANK,
     "Stripe needs a few more details before it can receive donations.",
     "Until you do and Stripe says your account is ready, Stripe donations go to your bank payout, so nothing is lost.",
     "Stripe is reviewing your account. Until it's ready, Stripe donations go to your bank payout.",
@@ -227,7 +232,7 @@ describe("StripeConnectCard", () => {
         "Connect Stripe to get Stripe donations straight to your Stripe account, after fees, once Stripe says your account is ready. Everything else keeps paying out to your bank.",
       ],
     ],
-    ["disconnected", true, [DISCONNECTED]],
+    ["disconnected", true, DISCONNECTED_WITH_BANK],
     ["disconnected", false, [DISCONNECTED]],
     [
       "incomplete",

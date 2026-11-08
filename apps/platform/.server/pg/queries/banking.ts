@@ -260,8 +260,10 @@ export async function bapp_set_default(
 /**
  * approve `id`, as the npo's default when it has none. under the row lock
  * `bapp_set_default` takes, so of two approvals at once only the first sees
- * no default. returns the row's id and status as they were, undefined when
- * `id` is not the npo's
+ * no default. only an `under-review` row moves: a verdict that committed after
+ * the caller's read stands. returns the row's id and status as they were —
+ * anything but `under-review` means nothing changed — undefined when `id` is
+ * not the npo's
  */
 export async function bapp_approve(id: string, npo_id: number) {
   return db.transaction(async (tx) => {
@@ -276,6 +278,8 @@ export async function bapp_approve(id: string, npo_id: number) {
     const has_default = locked.some(
       (r) => r.id !== id && r.status === "default"
     );
+    // the row lock above means `prev.status` is what this guard sees, so
+    // `prev` reporting under-review is the update having landed
     await tx
       .update(banking_apps)
       .set({
@@ -283,7 +287,9 @@ export async function bapp_approve(id: string, npo_id: number) {
         rejection_reason: "",
         updated_at: new Date().toISOString(),
       })
-      .where(eq(banking_apps.id, id));
+      .where(
+        and(eq(banking_apps.id, id), eq(banking_apps.status, "under-review"))
+      );
     return prev;
   });
 }

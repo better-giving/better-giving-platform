@@ -964,7 +964,7 @@ describe("stripe connect card", () => {
       name: "Waiting for a bank account",
     });
     await expect
-      .element(held.getByText("$500.00", { exact: true }).first())
+      .element(held.getByText("500.00", { exact: true }).first())
       .toBeVisible();
     await expect
       .element(held.getByText("Savings and Investments withdrawals"))
@@ -1043,7 +1043,7 @@ describe("stripe connect card", () => {
       name: "Waiting for your bank account to be approved",
     });
     await expect
-      .element(held.getByText("$500.00", { exact: true }).first())
+      .element(held.getByText("500.00", { exact: true }).first())
       .toBeVisible();
     await expect
       .element(
@@ -1136,7 +1136,7 @@ describe("stripe connect card", () => {
       name: "No way to get paid right now",
     });
     await expect
-      .element(held.getByText("$500.00", { exact: true }).first())
+      .element(held.getByText("500.00", { exact: true }).first())
       .toBeVisible();
     await expect
       .element(held.getByRole("link", { name: "Connect Stripe" }))
