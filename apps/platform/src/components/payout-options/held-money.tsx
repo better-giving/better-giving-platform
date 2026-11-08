@@ -48,9 +48,9 @@ interface IUsd {
 }
 
 /** a dollar figure as the rest of the Payouts and Banking pages write it */
-function Usd({ amount, classes }: IUsd) {
+function Usd({ amount, classes = "" }: IUsd) {
   return (
-    <span className={classes}>
+    <span className={`${classes} figures`}>
       {amount < 0 ? "-" : ""}${humanize(Math.abs(amount))}
     </span>
   );
