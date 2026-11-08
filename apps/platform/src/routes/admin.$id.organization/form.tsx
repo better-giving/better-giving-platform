@@ -327,7 +327,7 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
   const uploading = form.logo.value === "loading";
   const profile_base = `${base_url}/org/`;
   const id_url = `${base_url}${href("/org/:org", { org: String(id) })}`;
-  const campaigns_note = `Your campaign links start with it too (…${href("/org/:org", { org: form.slug.trim() || "your-link" })}/…).`;
+  const slug_tip = `The short name in your Better Giving links, as in ${profile_base.replace(/^https?:\/\//, "")}your-slug. Your campaign links use it too. ${SLUG_HELP}. You can set it once; it can't be changed after you save.`;
   const setting_slug = !form.locked && form.slug !== "";
 
   return (
@@ -433,8 +433,8 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
               value={form.slug}
               base={profile_base}
               locked={false}
-              label="Profile link"
-              help={`${campaigns_note} ${SLUG_HELP}.`}
+              label="Organization slug"
+              tip={slug_tip}
               subject="your profile"
               placeholder={suggest_slug(form.name)}
               empty_url={id_url}

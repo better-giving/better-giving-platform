@@ -1,6 +1,7 @@
 import { ExtLink, Label } from "@better-giving/ui";
 import { Fragment } from "react";
 import type { UseFormRegisterReturn } from "react-hook-form";
+import { InfoTip } from "../admin.$id.donors/info-tip";
 import { SLUG_HELP, SLUG_LOCK_NOTE, SLUG_PUBLISH_LOCK } from "./copy";
 
 const PLACEHOLDER_SEGMENT = "your-campaign";
@@ -20,7 +21,9 @@ interface IPublicLinkField extends ILinkField {
   label: string;
   required?: boolean;
   /** the line under the label */
-  help: string;
+  help?: string;
+  /** what the field is for, behind an info icon beside the label */
+  tip?: string;
   /** what donors find at the link, e.g. "this campaign" */
   subject: string;
   placeholder?: string;
@@ -75,6 +78,7 @@ export function PublicLinkField({
   label,
   required,
   help,
+  tip,
   subject,
   placeholder,
   empty_url,
@@ -89,7 +93,7 @@ export function PublicLinkField({
   const url = segment ? base && `${base}${segment}` : empty_url;
   const url_text = url && break_at_slashes(url);
   const described = [
-    sub_id,
+    help ? sub_id : "",
     base ? prefix_id : "",
     error ? error_id : "",
     describedby ?? "",
@@ -99,12 +103,17 @@ export function PublicLinkField({
 
   return (
     <div className="min-w-0">
-      <Label required={required} htmlFor={id}>
-        {label}
-      </Label>
-      <p id={sub_id} className="text-gray-11 text-sm mb-2 break-words">
-        {help}
-      </p>
+      <div className={`flex items-center gap-1.5 ${help ? "" : "mb-2"}`}>
+        <Label required={required} htmlFor={id}>
+          {label}
+        </Label>
+        {tip && <InfoTip label={tip} />}
+      </div>
+      {help && (
+        <p id={sub_id} className="text-gray-11 text-sm mb-2 break-words">
+          {help}
+        </p>
+      )}
       {/* the prefix gives way first: it truncates from its start so the org
           segment beside the input stays readable, and the input keeps a floor */}
       <div className="field-input-container flex min-h-(--field-size)">

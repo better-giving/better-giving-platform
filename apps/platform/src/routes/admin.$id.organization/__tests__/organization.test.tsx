@@ -184,7 +184,7 @@ async function expect_locked(screen: Screen, slug: string) {
     .element(screen.getByRole("button", { name: "Copy page link" }))
     .toBeVisible();
   await expect.element(screen.getByText(note)).toBeVisible();
-  expect(screen.getByLabelText("Profile link").query()).toBeNull();
+  expect(screen.getByLabelText("Organization slug").query()).toBeNull();
   await expect
     .element(screen.getByRole("link", { name: new RegExp(`/donate/${slug}$`) }))
     .toBeVisible();
@@ -249,9 +249,9 @@ describe("organization — slug unset", () => {
     free_slug();
     const npo = await seed_npo();
     const screen = await render_org(npo.id);
-    const slug = screen.getByLabelText("Profile link");
+    const slug = screen.getByLabelText("Organization slug");
     await expect.element(slug).toBeEnabled();
-    await expect.element(slug).toHaveAttribute("placeholder", "TestCharity");
+    await expect.element(slug).toHaveAttribute("placeholder", "test-charity");
 
     await slug.fill("acme-org");
     expect(
@@ -286,7 +286,7 @@ describe("organization — slug unset", () => {
   it("previews the profile link as the slug is typed", async () => {
     const npo = await seed_npo();
     const screen = await render_org(npo.id);
-    const slug = screen.getByLabelText("Profile link");
+    const slug = screen.getByLabelText("Organization slug");
     await expect
       .element(
         screen.getByText(
@@ -331,7 +331,7 @@ describe("organization — slug unset", () => {
     free_slug();
     const npo = await seed_npo();
     const screen = await render_org(npo.id);
-    await screen.getByLabelText("Profile link").fill("acme-org");
+    await screen.getByLabelText("Organization slug").fill("acme-org");
     const website = screen.getByLabelText("Website of your organization");
     // a port that is not a number: chromium's parser escapes a space in a
     // host, so a spaced name would pass
@@ -356,7 +356,7 @@ describe("organization — slug unset", () => {
     free_slug();
     const npo = await seed_npo();
     const screen = await render_org(npo.id);
-    await screen.getByLabelText("Profile link").fill("acme-org");
+    await screen.getByLabelText("Organization slug").fill("acme-org");
     await screen.getByRole("button", { name: "Save organization" }).click();
     const cancel = screen.getByRole("button", { name: "Cancel", exact: true });
     await expect.element(cancel).toBeVisible();
@@ -365,7 +365,7 @@ describe("organization — slug unset", () => {
       .element(screen.getByRole("heading", { name: "Lock your profile link?" }))
       .not.toBeInTheDocument();
     expect((await npo_get(npo.id))?.slug).toBeFalsy();
-    await expect.element(screen.getByLabelText("Profile link")).toBeEnabled();
+    await expect.element(screen.getByLabelText("Organization slug")).toBeEnabled();
   });
 });
 
@@ -435,7 +435,7 @@ describe("organization — server refusal", () => {
   it("refuses a reserved slug", async () => {
     const npo = await seed_npo();
     const screen = await render_org(npo.id);
-    const slug = screen.getByLabelText("Profile link");
+    const slug = screen.getByLabelText("Organization slug");
     await slug.fill("donate");
     await screen.getByRole("button", { name: "Save organization" }).click();
     // refused before the lock prompt, which a slug that can't save never opens
@@ -472,7 +472,7 @@ describe("organization — server refusal", () => {
     });
 
     const screen = await render_org(npo.id);
-    await screen.getByLabelText("Profile link").fill("taken-slug");
+    await screen.getByLabelText("Organization slug").fill("taken-slug");
     await screen.getByRole("button", { name: "Save organization" }).click();
     (
       screen
@@ -658,7 +658,7 @@ describe("organization — renders pre-filled", () => {
 
     const tagline = screen.getByLabelText(/tagline/i);
     await tagline.fill("Unsaved tagline");
-    await screen.getByLabelText("Profile link").fill("acme-org");
+    await screen.getByLabelText("Organization slug").fill("acme-org");
     await screen.getByRole("button", { name: "Save organization" }).click();
     (
       screen
