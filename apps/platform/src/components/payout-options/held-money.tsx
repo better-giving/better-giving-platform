@@ -1,8 +1,8 @@
 import { Badge, Button } from "@better-giving/ui";
 import { Plus } from "lucide-react";
 import { type ReactNode, useId } from "react";
-import { Money } from "#/components/money";
 import { to_utc_day } from "@/helpers/date";
+import { humanize } from "@/helpers/decimal";
 import type { HeldRail, IHeldMoney } from "@/payouts";
 
 export const rail_labels: Record<HeldRail, string> = {
@@ -12,6 +12,16 @@ export const rail_labels: Record<HeldRail, string> = {
   crypto: "Crypto donations",
   stock_cheque: "Stock and cheque donations",
   withdrawal: "Savings and Investments withdrawals",
+};
+
+/** one pending payout, as the Payouts list names it */
+const item_labels: Record<HeldRail, string> = {
+  stripe: "Stripe donation",
+  paypal: "PayPal donation",
+  daf: "DAF grant",
+  crypto: "Crypto donation",
+  stock_cheque: "Stock or cheque donation",
+  withdrawal: "Savings withdrawal",
 };
 
 /** `stripe`: a Stripe account is linked (ready or not yet) and no bank is
@@ -37,8 +47,13 @@ interface IUsd {
   classes?: string;
 }
 
+/** a dollar figure as the rest of the Payouts and Banking pages write it */
 function Usd({ amount, classes }: IUsd) {
-  return <Money amount={amount} currency="USD" classes={classes} />;
+  return (
+    <span className={classes}>
+      {amount < 0 ? "-" : ""}${humanize(Math.abs(amount))}
+    </span>
+  );
 }
 
 /** what the payout takes off `total` for amounts owed (positive), or adds for
@@ -161,7 +176,7 @@ export function PayoutsHeldCard(props: IHeldMoneyCard) {
           {newest_first.map((it, i) => (
             // a pending payout carries no id of its own here
             <tr key={i}>
-              <td>{rail_labels[it.rail]}</td>
+              <td>{item_labels[it.rail]}</td>
               <td>{to_utc_day(it.date)}</td>
               <td className="text-right">
                 <Usd amount={it.amount} />

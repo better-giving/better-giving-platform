@@ -79,10 +79,10 @@ describe("held card, net of what is owed", () => {
       );
       const region = screen.getByRole("region");
       await expect.element(region.getByText(AFTER_OWED)).toBeVisible();
-      expect(headline(region)).toBe(`Held right nowUSD1,500.00${AFTER_OWED}`);
+      expect(headline(region)).toBe(`Held right now$1,500.00${AFTER_OWED}`);
       expect(foot_rows(region)).toEqual([
-        ["Owed to Better Giving", "USD-284.50"],
-        ["Total", "USD1,500.00"],
+        ["Owed to Better Giving", "-$284.50"],
+        ["Total", "$1,500.00"],
       ]);
       expect(region.element().textContent).not.toContain("less any refunds");
     }
@@ -96,10 +96,10 @@ describe("held card, net of what is owed", () => {
     const covered =
       "What you owe Better Giving covers all of it, so none of it will pay out to you.";
     await expect.element(region.getByText(covered)).toBeVisible();
-    expect(headline(region)).toBe(`Held right nowUSD0.00${covered}`);
+    expect(headline(region)).toBe(`Held right now$0.00${covered}`);
     expect(foot_rows(region)).toEqual([
-      ["Owed to Better Giving", "USD-1,784.50"],
-      ["Total", "USD0.00"],
+      ["Owed to Better Giving", "-$1,784.50"],
+      ["Total", "$0.00"],
     ]);
     expect(region.element().textContent).not.toMatch(/pays out with/);
     expect(region.element().textContent).not.toContain(AFTER_OWED);
@@ -116,10 +116,10 @@ describe("held card, net of what is owed", () => {
     const region = screen.getByRole("region");
     const caption = "With amounts Better Giving owes you";
     await expect.element(region.getByText(caption)).toBeVisible();
-    expect(headline(region)).toBe(`Held right nowUSD1,800.00${caption}`);
+    expect(headline(region)).toBe(`Held right now$1,800.00${caption}`);
     expect(foot_rows(region)).toEqual([
-      ["Due back to you from Better Giving", "USD15.50"],
-      ["Total", "USD1,800.00"],
+      ["Due back to you from Better Giving", "$15.50"],
+      ["Total", "$1,800.00"],
     ]);
   });
 
@@ -132,7 +132,7 @@ describe("held card, net of what is owed", () => {
     );
     const region = screen.getByRole("region");
     await expect.element(region.getByText("Held right now")).toBeVisible();
-    expect(headline(region)).toBe("Held right nowUSD1,784.50");
+    expect(headline(region)).toBe("Held right now$1,784.50");
     expect(region.element().querySelector("tfoot")).toBeNull();
   });
 });
@@ -167,17 +167,17 @@ describe("HeldMoneyCard: Banking", () => {
       .toBeVisible();
     await expect.element(card.getByText("Held right now")).toBeVisible();
     await expect
-      .element(card.getByText("1,784.50", { exact: true }))
+      .element(card.getByText("$1,784.50", { exact: true }))
       .toBeVisible();
     await expect
       .element(card.getByText("What's waiting", { exact: true }))
       .toBeVisible();
     expect(body_rows(card)).toEqual([
-      ["PayPal donations", "USD640.00"],
-      ["DAF grants", "USD420.00"],
-      ["Crypto donations", "USD150.50"],
-      ["Stock and cheque donations", "USD74.00"],
-      ["Savings and Investments withdrawals", "USD500.00"],
+      ["PayPal donations", "$640.00"],
+      ["DAF grants", "$420.00"],
+      ["Crypto donations", "$150.50"],
+      ["Stock and cheque donations", "$74.00"],
+      ["Savings and Investments withdrawals", "$500.00"],
     ]);
     await expect
       .element(
@@ -220,9 +220,9 @@ describe("HeldMoneyCard: Banking", () => {
       )
       .toBeVisible();
     await expect
-      .element(card.getByText("2,310.00", { exact: true }))
+      .element(card.getByText("$2,310.00", { exact: true }))
       .toBeVisible();
-    expect(body_rows(card)[0]).toEqual(["Stripe donations", "USD525.50"]);
+    expect(body_rows(card)[0]).toEqual(["Stripe donations", "$525.50"]);
     await expect
       .element(card.getByRole("link", { name: "Add bank account" }))
       .toHaveAttribute("href", "/admin/42/banking/new");
@@ -274,9 +274,9 @@ describe("Stripe linked, Stripe donations held", () => {
     });
     await expect.element(card.getByText(STRIPE_LEAD)).toBeVisible();
     expect(card.getByText(/These can't go to Stripe/).query()).toBeNull();
-    expect(body_rows(card)[0]).toEqual(["Stripe donations", "USD525.50"]);
+    expect(body_rows(card)[0]).toEqual(["Stripe donations", "$525.50"]);
     await expect
-      .element(card.getByText("2,310.00", { exact: true }))
+      .element(card.getByText("$2,310.00", { exact: true }))
       .toBeVisible();
   });
 
@@ -290,9 +290,9 @@ describe("Stripe linked, Stripe donations held", () => {
     await expect.element(card.getByText(STRIPE_LEAD)).toBeVisible();
     expect(card.getByText(/everything else waits/).query()).toBeNull();
     expect(body_rows(card)[0]).toEqual([
-      "Stripe donations",
+      "Stripe donation",
       "Oct 31, 2026",
-      "USD525.50",
+      "$525.50",
     ]);
   });
 });
@@ -312,14 +312,14 @@ describe("PayoutsHeldCard: Payouts", () => {
       )
       .toBeVisible();
     await expect
-      .element(card.getByText("1,784.50", { exact: true }))
+      .element(card.getByText("$1,784.50", { exact: true }))
       .toBeVisible();
     expect(body_rows(card)).toEqual([
-      ["PayPal donations", "Oct 30, 2026", "USD640.00"],
-      ["DAF grants", "Oct 28, 2026", "USD420.00"],
-      ["Savings and Investments withdrawals", "Oct 27, 2026", "USD500.00"],
-      ["Crypto donations", "Oct 25, 2026", "USD150.50"],
-      ["Stock and cheque donations", "Oct 22, 2026", "USD74.00"],
+      ["PayPal donation", "Oct 30, 2026", "$640.00"],
+      ["DAF grant", "Oct 28, 2026", "$420.00"],
+      ["Savings withdrawal", "Oct 27, 2026", "$500.00"],
+      ["Crypto donation", "Oct 25, 2026", "$150.50"],
+      ["Stock or cheque donation", "Oct 22, 2026", "$74.00"],
     ]);
     await expect
       .element(card.getByRole("link", { name: "Add bank account" }))
@@ -346,7 +346,7 @@ describe("PayoutsHeldCard: Payouts", () => {
       name: "On hold until you add a bank account",
     });
     expect(body_rows(card)).toEqual([
-      ["Stock and cheque donations", "Jul 4, 2026", "USD74.00"],
+      ["Stock or cheque donation", "Jul 4, 2026", "$74.00"],
     ]);
   });
 });
