@@ -99,11 +99,16 @@ export const step_loader =
       throw resp.status(403);
     }
 
-    const r = new Progress(reg, stripe_env.connect_routing);
-
     const exit = wizard_exit(reg, this_step);
     if (exit) return redirect(exit);
 
+    // in review, only the summary gets this far, and it shows what was
+    // submitted. payout details can stop meeting `Progress` after submission
+    // (routing turned off, or its only stripe account disconnected), and
+    // sending it back to a step would loop: `wizard_exit` returns it here.
+    if (reg.status === "02") return reg;
+
+    const r = new Progress(reg, stripe_env.connect_routing);
     if (this_step > r.step) {
       return redirect(`../${r.step}`);
     }

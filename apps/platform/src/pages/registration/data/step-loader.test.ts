@@ -110,6 +110,40 @@ describe("step_loader", () => {
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("../4");
   });
+
+  // step 4 would send it straight back to the summary: a redirect loop
+  test("opens the summary to a submitted stripe-only application while routing is off", async () => {
+    routing.on = false;
+    await test_db
+      .current!.db.update(registrations)
+      .set({ status: "02" });
+
+    const res = await step_loader(5)(args("5"));
+
+    expect(res).not.toBeInstanceOf(Response);
+  });
+
+  test("opens the summary to a submitted application whose stripe account was disconnected", async () => {
+    await test_db
+      .current!.db.update(registrations)
+      .set({ status: "02", o_stripe_account_id: null });
+
+    const res = await step_loader(5)(args("5"));
+
+    expect(res).not.toBeInstanceOf(Response);
+  });
+
+  test("still sends a submitted application from a step to its summary", async () => {
+    routing.on = false;
+    await test_db
+      .current!.db.update(registrations)
+      .set({ status: "02" });
+
+    const res = (await step_loader(4)(args("4"))) as Response;
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe(`/register/${RID}/5`);
+  });
 });
 
 describe("reg_loader", () => {
