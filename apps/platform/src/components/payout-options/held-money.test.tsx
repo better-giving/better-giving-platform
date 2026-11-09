@@ -547,3 +547,13 @@ describe("BankPayoutSection: Banking", () => {
       .toBeVisible();
   });
 });
+
+describe("held-money figures", () => {
+  test("stay tabular and carry no slashed zero", async () => {
+    const screen = await in_router(<PayoutsHeldCard {...base} />);
+    const table = screen.getByRole("table").first().element();
+    const features = getComputedStyle(table).fontFeatureSettings;
+    expect(features).toContain("tnum");
+    expect(features).not.toContain("zero");
+  });
+});

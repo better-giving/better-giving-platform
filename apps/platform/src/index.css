@@ -39,6 +39,13 @@
 }
 
 /* donation form: override ring so all focus outlines follow the theme */
+/* the held-money tables keep tabular figures and drop the slashed zero the
+   design system's `.table` adds: a held $500.00 and an account "ending in 0002"
+   read as plain digits. unlayered, so it outranks `.table` without a specificity race */
+.table.held-table {
+  font-feature-settings: "tnum";
+}
+
 #donation-container {
   --ring: var(--form-primary);
 }
