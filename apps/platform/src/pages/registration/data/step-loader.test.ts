@@ -114,9 +114,7 @@ describe("step_loader", () => {
   // step 4 would send it straight back to the summary: a redirect loop
   test("opens the summary to a submitted stripe-only application while routing is off", async () => {
     routing.on = false;
-    await test_db
-      .current!.db.update(registrations)
-      .set({ status: "02" });
+    await test_db.current!.db.update(registrations).set({ status: "02" });
 
     const res = await step_loader(5)(args("5"));
 
@@ -135,9 +133,7 @@ describe("step_loader", () => {
 
   test("still sends a submitted application from a step to its summary", async () => {
     routing.on = false;
-    await test_db
-      .current!.db.update(registrations)
-      .set({ status: "02" });
+    await test_db.current!.db.update(registrations).set({ status: "02" });
 
     const res = (await step_loader(4)(args("4"))) as Response;
 
