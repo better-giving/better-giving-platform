@@ -114,15 +114,15 @@ export const segment_shape = pipe(
   $,
   maxLength(
     segment_max_chars,
-    ({ requirement: r }) => `cannot exceed ${r} chars`
+    ({ requirement: r }) => `Use ${r} characters or fewer`
   ),
   //must not be id-like
-  regex(/^(?!^\d+$)/, "should not be an id"),
+  regex(/^(?!^\d+$)/, "Use at least one letter"),
   //valid characters
-  regex(/^[a-zA-Z0-9-._~]+$/, "allowed: numbers | letters | - | . | _ | ~"),
-  excludes("..", "should not contain double periods"),
-  custom((x) => !(x as string).startsWith("."), "should not start with dot"),
-  custom((x) => !(x as string).endsWith("."), "should not end with dot")
+  regex(/^[a-zA-Z0-9-._~]+$/, "Use only letters, numbers, and - . _ ~"),
+  excludes("..", "Don't use two dots in a row"),
+  custom((x) => !(x as string).startsWith("."), "Don't start with a dot"),
+  custom((x) => !(x as string).endsWith("."), "Don't end with a dot")
 );
 
 export const segment = pipe(

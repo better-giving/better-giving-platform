@@ -104,6 +104,9 @@ export function PublicLinkField({
           className="min-w-32 flex-1 bg-transparent py-3.5 px-4 outline-none"
         />
       </div>
+      <p id={error_id} className="field-err mt-1 text-start empty:hidden">
+        {error}
+      </p>
       {url && (
         <p className="mt-1 text-sm text-gray-11 break-words">
           Donors will find {subject} at{" "}
@@ -117,9 +120,6 @@ export function PublicLinkField({
           {!segment && empty_suffix}
         </p>
       )}
-      <p id={error_id} className="field-err mt-1 empty:hidden">
-        {error}
-      </p>
     </div>
   );
 }
