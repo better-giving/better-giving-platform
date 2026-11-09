@@ -752,10 +752,11 @@ describe("campaign pages", () => {
     expect(
       screen.getByRole("link", { name: "Winter", exact: true }).query()
     ).toBeNull();
-    // the same pill the list rows wear
-    await expect
-      .element(screen.getByText("Live", { exact: true }))
-      .toHaveAttribute("data-tone", "success");
+    // the same pill the list rows wear: Badge carries its variant as the
+    // subtle fill + ink pair, not as an attribute
+    const pill = screen.getByText("Live", { exact: true });
+    await expect.element(pill).toHaveClass("bg-success-subtle");
+    await expect.element(pill).toHaveClass("text-success-subtle-fg");
     const crumb = screen.getByRole("link", { name: "Campaigns" });
     expect((crumb.element() as HTMLElement).className).not.toContain(
       "pointer-events-none"

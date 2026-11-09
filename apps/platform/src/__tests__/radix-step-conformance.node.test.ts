@@ -75,7 +75,7 @@ const class_tokens = sources
     )
   );
 
-const SCALE = "(?:gray|blue|red|green|amber)";
+const SCALE = "(?:gray|accent|success|warning|destructive)";
 
 interface IRule {
   name: string;
