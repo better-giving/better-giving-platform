@@ -451,7 +451,6 @@ export function CampaignForm({
           ref={banner.ref}
           value={banner.value}
           spec={img_spec([4, 1])}
-          hint="Shown at 4:1 — wider images crop to fit."
           on_change={(v) => {
             banner.onChange(v);
             trigger("banner");

@@ -71,7 +71,7 @@ export default function Page({ loaderData: data }: Route.ComponentProps) {
               </NavLink>
               {data.to_type === "fund"
                 ? " campaign page"
-                : `${data.to_name.toLowerCase().endsWith("s") ? "'" : "'s"} profile.`}
+                : `${data.to_name.toLowerCase().endsWith("s") ? "'" : "'s"} Better Giving page.`}
             </span>
             <span className="ml-auto h-lh flex items-center shrink-0">
               <ChevronDownIcon className="icon-xl group-data-[state=open]:rotate-180 transition-transform" />

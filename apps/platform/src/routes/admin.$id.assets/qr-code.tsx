@@ -43,7 +43,7 @@ export function QrCode({
   const tabs: { id: QRCodeType; name: string }[] = campaign_url
     ? [{ id: "campaign", name: "Campaign" }]
     : [
-        { id: "profile", name: "Profile" },
+        { id: "profile", name: "Better Giving page" },
         { id: "donation", name: "Donation Page" },
       ];
   const [color, set_color] = useState("#000000");

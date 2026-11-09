@@ -84,8 +84,6 @@ const NPO_SEED: Omit<typeof npos.$inferInsert, "id"> = {
   url: "https://example.org",
 };
 
-const note = "Can't change once set, so links you've shared keep working.";
-
 beforeAll(async () => {
   test_db.current = await create_test_db();
 }, 30_000);
@@ -175,16 +173,20 @@ async function render_marketplace() {
 
 type Screen = Awaited<ReturnType<typeof render_org>>;
 
-/** a set link reads as text with a copy button, and its field is gone */
+/** a set link stays in its field, disabled, and reads as a link with a copy button */
 async function expect_locked(screen: Screen, slug: string) {
   await expect
-    .element(screen.getByRole("link", { name: new RegExp(`/org/${slug}$`) }))
+    .element(
+      screen.getByRole("link", { name: new RegExp(`/org/${slug}$`) }).first()
+    )
     .toBeVisible();
   await expect
     .element(screen.getByRole("button", { name: "Copy page link" }))
     .toBeVisible();
-  await expect.element(screen.getByText(note)).toBeVisible();
-  expect(screen.getByLabelText("Organization slug").query()).toBeNull();
+  const field = screen.getByLabelText("Organization slug");
+  await expect.element(field).toBeDisabled();
+  await expect.element(field).toHaveValue(slug);
+  expect(screen.getByText(/Can't change once set/).query()).toBeNull();
   await expect
     .element(screen.getByRole("link", { name: new RegExp(`/donate/${slug}$`) }))
     .toBeVisible();
@@ -263,10 +265,16 @@ describe("organization — slug unset", () => {
     await screen.getByRole("button", { name: "Save organization" }).click();
     const cancel = screen.getByRole("button", { name: "Cancel", exact: true });
     await expect
-      .element(screen.getByRole("heading", { name: "Lock your profile link?" }))
+      .element(
+        screen.getByRole("heading", {
+          name: "Lock your Better Giving page link?",
+        })
+      )
       .toBeVisible();
     await expect
-      .element(screen.getByText("Your profile link can't be changed later."))
+      .element(
+        screen.getByText("Your Better Giving page link can't be changed later.")
+      )
       .toBeVisible();
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(cancel.element());
@@ -283,7 +291,7 @@ describe("organization — slug unset", () => {
     await expect_locked(screen, "acme-org");
   });
 
-  it("previews the profile link as the slug is typed", async () => {
+  it("previews the Better Giving page link as the slug is typed", async () => {
     const npo = await seed_npo();
     const screen = await render_org(npo.id);
     const slug = screen.getByLabelText("Organization slug");
@@ -291,7 +299,7 @@ describe("organization — slug unset", () => {
       .element(
         screen.getByText(
           new RegExp(
-            `^Donors will find your profile at https?://[^/]+/org/${npo.id} until you set a link$`
+            `^Donors will find your Better Giving page at https?://[^/]+/org/${npo.id} until you set a link$`
           )
         )
       )
@@ -301,15 +309,14 @@ describe("organization — slug unset", () => {
     await expect
       .element(
         screen.getByText(
-          /^Donors will find your profile at https?:\/\/[^/]+\/org\/acme-org$/
+          /^Donors will find your Better Giving page at https?:\/\/[^/]+\/org\/acme-org$/
         )
       )
       .toBeVisible();
-    await expect
-      .element(slug)
-      .toHaveAccessibleDescription(
-        /The short name in your Better Giving links, as in [^ ]+\/org\/your-slug\. Your campaign links use it too\. Letters, numbers, and - \. _ ~\. You can set it once; it can't be changed after you save\./
-      );
+    // no tooltip, no prefix inside the input, no hidden description
+    expect(screen.getByRole("button", { name: /slug/i }).query()).toBeNull();
+    expect(screen.getByText("better.giving/org/").query()).toBeNull();
+    await expect.element(slug).not.toHaveAccessibleDescription(/short name/);
   });
 
   it("focuses the logo before a later invalid field", async () => {
@@ -341,14 +348,20 @@ describe("organization — slug unset", () => {
     await expect.element(website).toHaveFocus();
     await expect.element(screen.getByText("invalid url")).toBeVisible();
     expect(
-      screen.getByRole("heading", { name: "Lock your profile link?" }).query()
+      screen
+        .getByRole("heading", { name: "Lock your Better Giving page link?" })
+        .query()
     ).toBeNull();
 
     // fixed, the same press asks to lock
     await website.fill("acme.example");
     await screen.getByRole("button", { name: "Save organization" }).click();
     await expect
-      .element(screen.getByRole("heading", { name: "Lock your profile link?" }))
+      .element(
+        screen.getByRole("heading", {
+          name: "Lock your Better Giving page link?",
+        })
+      )
       .toBeVisible();
   });
 
@@ -362,7 +375,11 @@ describe("organization — slug unset", () => {
     await expect.element(cancel).toBeVisible();
     (cancel.element() as HTMLElement).click();
     await expect
-      .element(screen.getByRole("heading", { name: "Lock your profile link?" }))
+      .element(
+        screen.getByRole("heading", {
+          name: "Lock your Better Giving page link?",
+        })
+      )
       .not.toBeInTheDocument();
     expect((await npo_get(npo.id))?.slug).toBeFalsy();
     await expect
@@ -417,7 +434,7 @@ describe("organization — server refusal", () => {
     await expect
       .element(
         screen.getByText(
-          "Your profile link is already set and can't be changed"
+          "Your Better Giving page link is already set and can't be changed"
         )
       )
       .toBeVisible();
@@ -446,7 +463,9 @@ describe("organization — server refusal", () => {
       .toBeVisible();
     await expect.element(slug).toHaveFocus();
     expect(
-      screen.getByRole("heading", { name: "Lock your profile link?" }).query()
+      screen
+        .getByRole("heading", { name: "Lock your Better Giving page link?" })
+        .query()
     ).toBeNull();
     expect((await npo_get(npo.id))?.slug).toBeFalsy();
 

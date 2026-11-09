@@ -17,7 +17,8 @@ export default function Page() {
         className="mt-6 link underline decoration-1 text-center text-lg transition duration-slow"
         to={`${href("/admin/:id/organization", { id: id ?? "invalid id" })}#page`}
       >
-        Start filling out {name}’s profile and attract donors! Thank you!
+        Start filling out {name}’s Better Giving page and attract donors! Thank
+        you!
       </Link>
     </div>
   );

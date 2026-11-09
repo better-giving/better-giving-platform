@@ -218,7 +218,7 @@ describe("campaign slug", () => {
     );
     expect(res.status).toBe(400);
     expect(res.error).toBe(
-      "Set your profile link on Organization before creating a campaign."
+      "Set your Better Giving page link on Organization before creating a campaign."
     );
   });
 

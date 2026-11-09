@@ -48,18 +48,14 @@ async function render_form(
 }
 
 describe("campaign link field", () => {
-  it("shows the fixed part of the link beside the input and previews the full link", async () => {
+  it("previews the full link under the input, with no prefix inside it", async () => {
     const screen = await render_form(saved, "draft");
     const input = screen.getByLabelText("Campaign link", { exact: true });
     await expect.element(input).toHaveValue("winter");
-    await expect
-      .element(input)
-      .toHaveAccessibleDescription(
-        /Letters, numbers, and - \. _ ~\. The link can't change after you publish\./
-      );
-    await expect
-      .element(screen.getByText("x.test/org/acme/", { exact: true }))
-      .toBeVisible();
+    // the link's fixed part is not drawn inside the input; the preview has it
+    expect(screen.getByText("x.test/org/acme/", { exact: true }).query()).toBe(
+      null
+    );
     await expect
       .element(
         screen.getByText(
@@ -87,13 +83,11 @@ describe("campaign link field", () => {
       name: "https://x.test/org/acme/winter",
     });
     await expect.element(link).toHaveAttribute("target", "_blank");
+    await expect.element(screen.getByLabelText("Campaign link")).toBeDisabled();
     await expect
-      .element(
-        screen.getByText(
-          "This link is fixed because the campaign is published."
-        )
-      )
-      .toBeVisible();
+      .element(screen.getByLabelText("Campaign link"))
+      .toHaveValue("winter");
+    expect(screen.getByText(/fixed because/).query()).toBeNull();
   });
 
   it("suggests the link from the name on a new campaign until the link is edited", async () => {
@@ -127,7 +121,7 @@ describe("campaign link field", () => {
       .toHaveValue("winter");
   });
 
-  it("keeps the input on screen at 375px behind a long fixed part", async () => {
+  it("keeps the input on screen at 375px with a long link base", async () => {
     await page.viewport(375, 667);
     try {
       const screen = await render_form(
@@ -145,16 +139,6 @@ describe("campaign link field", () => {
         const doc = document.documentElement;
         expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
       });
-      // one line, clipped: the fixed part gives up its start, not the row height
-      const fixed = screen
-        .getByText(
-          "preview-branch.better-giving.example/org/a-rather-long-nonprofit-slug/",
-          { exact: true }
-        )
-        .element().parentElement as HTMLElement;
-      const line = Number.parseFloat(getComputedStyle(fixed).lineHeight);
-      expect(fixed.getBoundingClientRect().height).toBeLessThan(line * 1.5);
-      expect(fixed.scrollWidth).toBeGreaterThan(fixed.clientWidth);
     } finally {
       await page.viewport(1280, 900);
     }

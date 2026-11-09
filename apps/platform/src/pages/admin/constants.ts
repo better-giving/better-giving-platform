@@ -80,7 +80,7 @@ const group2: LinkGroup = {
 };
 
 const group3: LinkGroup = {
-  title: "Public Profile",
+  title: "Better Giving Page",
   links: [
     {
       title: "Programs",

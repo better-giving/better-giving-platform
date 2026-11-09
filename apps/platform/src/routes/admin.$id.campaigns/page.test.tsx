@@ -522,13 +522,7 @@ describe("campaign form", () => {
     ).toBeNull();
     const address = draft.screen.getByLabelText(/campaign link/i);
     await address.fill("winter-drive");
-    await expect
-      .element(
-        draft.screen.getByText(
-          "Letters, numbers, and - . _ ~. The link can't change after you publish."
-        )
-      )
-      .toBeVisible();
+    expect(draft.screen.getByText(/Letters, numbers/).query()).toBeNull();
     await draft.screen.getByRole("button", { name: "Publish" }).click();
     await expect
       .element(
@@ -555,12 +549,9 @@ describe("campaign form", () => {
       live.screen.getByRole("button", { name: "Save", exact: true }).query()
     ).toBeNull();
     await expect
-      .element(
-        live.screen.getByText(
-          "This link is fixed because the campaign is published."
-        )
-      )
-      .toBeVisible();
+      .element(live.screen.getByLabelText(/campaign link/i))
+      .toBeDisabled();
+    expect(live.screen.getByText(/fixed because/).query()).toBeNull();
     expect(
       live.screen.getByText("The link can't change after you publish.").query()
     ).toBeNull();
