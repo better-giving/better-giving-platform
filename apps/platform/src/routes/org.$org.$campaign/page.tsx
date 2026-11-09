@@ -325,7 +325,7 @@ function Mast(props: ICampaignPage) {
 function Notice(props: ICampaignPage) {
   if (props.thanks) {
     return (
-      <section className="order-1 flex flex-col gap-2 rounded border border-green-6 bg-green-2 p-4 lg:order-none">
+      <section className="order-1 flex flex-col gap-2 rounded border border-success-6 bg-success-2 p-4 lg:order-none">
         <h2 className="text-xl font-bold">Thank you</h2>
         <p>Your {props.thanks.amount} gift is in.</p>
         {props.thanks.receipt && (

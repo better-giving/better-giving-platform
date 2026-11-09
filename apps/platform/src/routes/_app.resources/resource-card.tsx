@@ -1,9 +1,9 @@
-import { Badge, type BadgeTone } from "@better-giving/ui";
+import { Badge, type BadgeVariant } from "@better-giving/ui";
 import { Download, ExternalLink, FileText } from "lucide-react";
 import { useState } from "react";
 import { type Resource, type ResourceType, TYPE_LABELS } from "./data";
 
-const badge_tones: Record<ResourceType, BadgeTone> = {
+const badge_tones: Record<ResourceType, BadgeVariant> = {
   templates: "neutral",
   guides: "success",
   whitepapers: "primary",
@@ -15,7 +15,7 @@ export function ResourceCard({ resource }: { resource: Resource }) {
     <div className="card grid grid-rows-[auto_auto_1fr_auto_auto] gap-3">
       <div className="flex items-center gap-3">
         <FileText className="text-primary shrink-0 icon-xl" />
-        <Badge tone={badge_tones[resource.type]}>
+        <Badge variant={badge_tones[resource.type]}>
           {TYPE_LABELS[resource.type]}
         </Badge>
       </div>

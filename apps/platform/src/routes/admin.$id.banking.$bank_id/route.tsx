@@ -35,11 +35,11 @@ export default function Page({ loaderData: d, params }: Route.ComponentProps) {
       />
       <div className="flex items-center gap-2">
         {prev_verdict && (
-          <Badge tone={is_approved ? "success" : "destructive"}>
+          <Badge variant={is_approved ? "success" : "destructive"}>
             {is_approved ? "Approved" : "Rejected"}
           </Badge>
         )}
-        {is_default && <Badge tone="primary">Default</Badge>}
+        {is_default && <Badge variant="primary">Default</Badge>}
       </div>
 
       {is_rejected && (

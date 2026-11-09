@@ -5,28 +5,29 @@ import { createRequire } from "node:module";
 
 import { oklch_to_hex } from "../oklch.ts";
 
-// colors.css is the registry's, copied into packages/ui; edit it there only via a
-// registry release.
-const css_path = createRequire(import.meta.url).resolve(
-  "@better-giving/ui/colors.css"
-);
+// colors.css (the roles) and themes/default.css (the scales they alias) are the
+// registry's, copied into packages/ui; edit them there only via a registry
+// release. the mirror is the LIGHT half of both: the theme's first block, and
+// the roles' `:root, [data-theme]` block.
+const require = createRequire(import.meta.url);
+const sources = [
+  require.resolve("@better-giving/ui/colors.css"),
+  require.resolve("@better-giving/ui/themes/default.css"),
+];
 const out_path = new URL("../colors.ts", import.meta.url);
 
-const css = readFileSync(css_path, "utf8");
-const root_matches = [...css.matchAll(/:root\s*{([^}]*)}/gs)];
-if (root_matches.length !== 1) {
-  throw new Error(
-    `expected exactly one :root block, found ${root_matches.length}`
-  );
-}
-const root_block = root_matches[0][1];
-
-// comments are stripped before splitting on `;` so a trailing /* #hex */ can't
-// be read as part of the next declaration.
 const decls = new Map<string, string>();
-for (const decl of root_block.replace(/\/\*[\s\S]*?\*\//g, "").split(";")) {
-  const m = decl.match(/^\s*--([a-z0-9-]+)\s*:\s*([\s\S]+)$/i);
-  if (m) decls.set(m[1], m[2].trim().replace(/\s+/g, " "));
+for (const path of sources) {
+  const css = readFileSync(path, "utf8");
+  // the light block is the one whose selector list opens with `:root`
+  const m = css.match(/(?:^|\n):root\s*(?:,[^{]*)?{([^}]*)}/s);
+  if (!m) throw new Error(`${path}: no :root block`);
+  // comments are stripped before splitting on `;` so a trailing /* #hex */
+  // can't be read as part of the next declaration.
+  for (const decl of m[1].replace(/\/\*[\s\S]*?\*\//g, "").split(";")) {
+    const d = decl.match(/^\s*--([a-z0-9-]+)\s*:\s*([\s\S]+)$/i);
+    if (d) decls.set(d[1], d[2].trim().replace(/\s+/g, " "));
+  }
 }
 
 // the oklch() channels a token is worth. `var(--other)` resolves through to
@@ -51,7 +52,8 @@ function channels(name: string, seen: readonly string[] = []): string | null {
   if (alias) return channels(alias[1], [...seen, name]);
   const oklch = value.match(/^oklch\(([^)]+)\)$/);
   if (oklch) return oklch[1];
-  if (value.startsWith("color-mix(")) return null;
+  // no single literal, or no alpha channel in mail: no twin
+  if (value.startsWith("color-mix(") || value.startsWith("color(")) return null;
   if (/^-?[\d.]+(rem|px|em|%|s|ms)?$/.test(value)) return null;
   throw new Error(
     `--${name}: ${value} is neither oklch(), a var() alias, a color-mix() nor a ` +
@@ -76,7 +78,7 @@ for (const name of decls.keys()) {
 const body = entries.map(([key, hex]) => `  ${key}: "${hex}",`).join("\n");
 
 const out = `// GENERATED — do not hand-edit; run \`pnpm --filter @better-giving/brand generate-colors\`.
-// hex twin of colors.css's light (:root) palette, for consumers that can't read
+// hex twin of the light palette (colors.css roles + themes/default.css scales), for consumers that can't read
 // oklch() or CSS custom properties — currently the transactional email templates.
 // no dark mode: the literal oklch() tokens plus the var() aliases that resolve to
 // one, converted. color-mix() has no single literal and is left out. keys are the

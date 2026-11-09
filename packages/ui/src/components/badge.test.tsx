@@ -3,19 +3,20 @@ import { render } from "vitest-browser-react";
 import { Badge } from "./badge";
 
 describe("Badge", () => {
-  test("renders its label with the tone it was given", async () => {
-    const screen = await render(<Badge tone="success">Completed</Badge>);
+  test("renders its label and defaults to neutral", async () => {
+    const screen = await render(<Badge>Completed</Badge>);
     const badge = screen.getByText("Completed");
     await expect.element(badge).toBeVisible();
-    await expect.element(badge).toHaveAttribute("data-tone", "success");
+    await expect.element(badge).toHaveClass("bg-gray-3");
   });
 
   test("a warning badge is the warning band with its own ink", async () => {
-    const screen = await render(<Badge tone="warning">Pending review</Badge>);
+    const screen = await render(
+      <Badge variant="warning">Pending review</Badge>
+    );
     const badge = screen.getByText("Pending review");
-    await expect.element(badge).toHaveAttribute("data-tone", "warning");
     // the authored pair, read off the rendered styles rather than the class
-    // string, so a tone that names a token nothing draws fails here
+    // string, so a variant that names a token nothing draws fails here
     const style = getComputedStyle(badge.element());
     const probe = document.createElement("span");
     probe.style.backgroundColor = "var(--warning-subtle)";

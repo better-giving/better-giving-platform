@@ -177,7 +177,7 @@ function CancelLink({ sub_id, to_name, classes = "" }: ICancelLink) {
     <Link
       to={`cancel/${sub_id}`}
       aria-label={`Cancel ${to_name}`}
-      className={`${classes} inline-block px-2 py-1 rounded text-xs font-bold text-destructive-subtle-fg hover:bg-red-4 active:bg-destructive-subtle-active focus-visible:outline-2 focus-visible:outline-ring`}
+      className={`${classes} inline-block px-2 py-1 rounded text-xs font-bold text-destructive-subtle-fg hover:bg-destructive-4 active:bg-destructive-subtle-active focus-visible:outline-2 focus-visible:outline-ring`}
     >
       Cancel
     </Link>

@@ -15,6 +15,9 @@
  * - `dvh`, not `vh`: `vh` is the largest viewport height and ignores mobile
  *   browser chrome.
  */
+const sheet_box =
+  "fixed z-modal shadow-floating flex w-full flex-col max-sm:inset-0 max-sm:h-dvh max-sm:overflow-hidden sm:top-1/2 sm:left-1/2 sm:h-auto sm:w-[480px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-h-[90dvh] sm:overflow-y-auto sm:scrollbars sm:rounded-card";
+
 export const modal_box = {
   /** 448px — prompts, confirms, filter panels */
   panel:
@@ -26,14 +29,15 @@ export const modal_box = {
   /** 768px — the widest: tabular admin forms, embedded third-party frames */
   lg: "fixed-center rounded-card shadow-floating z-modal w-[90vw] sm:w-full sm:max-w-3xl max-h-[90dvh] overflow-y-auto scrollbars",
   /**
-   * 480px dialog, full-viewport sheet below `sm`.
+   * 480px dialog (named `sheet`), full-viewport sheet below `sm`.
    * not `fixed-center`: `inset-0` and `top`/`left` set the same properties,
    * and two of them in one string resolve by stylesheet order.
    * `max-h-[90dvh]` is the desktop cap the conformance sweep requires.
    * the sheet's own height is `h-dvh`.
    */
-  donate:
-    "fixed z-modal shadow-floating flex w-full flex-col max-sm:inset-0 max-sm:h-dvh max-sm:overflow-hidden sm:top-1/2 sm:left-1/2 sm:h-auto sm:w-[480px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-h-[90dvh] sm:overflow-y-auto sm:scrollbars sm:rounded-card",
+  sheet: sheet_box,
+  /** @deprecated the same box as `sheet`; use `sheet`. kept so copied call sites keep compiling. */
+  donate: sheet_box,
 } as const;
 
 export type ModalSize = keyof typeof modal_box;

@@ -151,9 +151,11 @@ describe("org hero", () => {
       "www.riverside.org",
       "EIN 12-3456789",
     ]);
-    expect(items[0].firstElementChild).toHaveAttribute(
-      "data-tone",
-      "secondary"
+    // Badge carries its variant as classes: the designation is the tinted
+    // `primary` chip (bg-secondary + accent ink)
+    expect(items[0].firstElementChild).toHaveClass(
+      "bg-secondary",
+      "text-accent-12"
     );
     for (const li of items.slice(1)) {
       expect(li.querySelector("svg")).toHaveAttribute("aria-hidden", "true");

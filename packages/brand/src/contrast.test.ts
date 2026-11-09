@@ -195,7 +195,7 @@ const pairings: Pairing[] = [
     min.body
   ),
   p(
-    "gray-12 on --secondary-hover (blue-4)",
+    "gray-12 on --secondary-hover (accent-4)",
     colors.gray_12,
     colors.secondary_hover,
     90.6,
@@ -206,7 +206,7 @@ const pairings: Pairing[] = [
   p("gray-8 on gray-1", colors.gray_8, page, 34.3, min.spot),
   p("gray-11 on gray-1", colors.gray_11, page, 77.7, min.content),
   p("gray-12 on gray-1", colors.gray_12, page, 101.5, min.body_preferred),
-  p("--ring (blue-8) on gray-1", colors.ring, page, 44.6, min.spot),
+  p("--ring (accent-8) on gray-1", colors.ring, page, 44.6, min.spot),
   // on the line and not over it, which is what surface-primary's ring rebind
   // exists for.
   p("--ring on --primary", colors.ring, colors.primary, 30.0, min.spot),
@@ -358,10 +358,22 @@ const pairings: Pairing[] = [
     min.content,
     "the pressed rung of a subtle error control; transient, and radix guarantees step 11 against step 2 only"
   ),
-  p("red-11 on red-2", colors.red_11, colors.red_2, 70.3, min.content),
-  // red-4 carries no token: the row is the ledger's illustration of a step-11
+  p(
+    "destructive-11 on destructive-2",
+    colors.destructive_11,
+    colors.destructive_2,
+    70.3,
+    min.content
+  ),
+  // destructive-4 carries no token: the row is the ledger's illustration of a step-11
   // ink degrading as the surface climbs its own scale.
-  p("red-11 on red-4", colors.red_11, colors.red_4, 57.6, null),
+  p(
+    "destructive-11 on destructive-4",
+    colors.destructive_11,
+    colors.destructive_4,
+    57.6,
+    null
+  ),
   p(
     "--success-subtle-fg on --success-subtle",
     colors.success_subtle_fg,
@@ -377,9 +389,9 @@ const pairings: Pairing[] = [
     min.content
   ),
   p(
-    "--success-subtle-fg on green-2",
+    "--success-subtle-fg on success-2",
     colors.success_subtle_fg,
-    colors.green_2,
+    colors.success_2,
     70.3,
     min.content
   ),
@@ -398,9 +410,9 @@ const pairings: Pairing[] = [
     min.content
   ),
   p(
-    "--warning-subtle-fg on amber-2",
+    "--warning-subtle-fg on warning-2",
     colors.warning_subtle_fg,
-    colors.amber_2,
+    colors.warning_2,
     92.0,
     min.content
   ),
@@ -754,17 +766,23 @@ describe("the pairings the ledger records under their threshold still are", () =
 // covered above. the recipe is read out of the css the way colors.test.ts reads
 // :root — a hardcoded percentage here would keep passing against a stale one —
 // while the ingredients still come from the guarded mirror.
-const css = readFileSync(
-  createRequire(import.meta.url).resolve("@better-giving/ui/colors.css"),
-  "utf8"
-);
+// the roles live in colors.css and the scales (and per-appearance values, light
+// first) in themes/default.css, so the recipe is looked up in both.
+const css = ["colors.css", "themes/default.css"]
+  .map((f) =>
+    readFileSync(
+      createRequire(import.meta.url).resolve(`@better-giving/ui/${f}`),
+      "utf8"
+    )
+  )
+  .join("\n");
 
 type Recipe = { first: string; pct: number; second: string };
 
 function recipe(token: string): Recipe {
   const m = css.match(
     new RegExp(
-      `--${token}:\\s*color-mix\\(\\s*in oklch,\\s*var\\(--([a-z0-9-]+)\\)\\s*([\\d.]+)%,\\s*(transparent|var\\(--[a-z0-9-]+\\))\\s*\\)`
+      `--${token}:\\s*color-mix\\(\\s*in oklch,\\s*var\\(--([a-z0-9-]+)\\)\\s*([\\d.]+%|var\\(--[a-z0-9-]+\\)),\\s*(transparent|var\\(--[a-z0-9-]+\\))\\s*\\)`
     )
   );
   if (!m) {
@@ -772,7 +790,14 @@ function recipe(token: string): Recipe {
       `--${token}: no color-mix(in oklch, var(--x) n%, …) declaration to measure`
     );
   }
-  return { first: m[1], pct: Number(m[2]), second: m[3] };
+  // the strength may itself be a custom property; light's value is declared first
+  const strength = m[2].startsWith("var(")
+    ? css.match(new RegExp(`${m[2].slice(4, -1)}:\\s*([\\d.]+)%`))?.[1]
+    : m[2].replace("%", "");
+  if (strength === undefined) {
+    throw new Error(`--${token}: cannot resolve the mix strength ${m[2]}`);
+  }
+  return { first: m[1], pct: Number(strength), second: m[3] };
 }
 
 const hex_of = (name: string): string => {
@@ -888,8 +913,8 @@ describe("the audited WCAG 2 pairings clear", () => {
   // had no visible fill on the gray-2 card. kept on role by PM rule
   // (2026-11-01): APCA Lc 66.1 clears content, and the WCAG figure is pinned
   // just under 4.5:1 so a step move lands back here as a new decision.
-  it("--success-subtle is radix green-3; its ink's WCAG reference is just under 4.5:1", () => {
-    expect(colors.success_subtle).toBe(colors.green_3);
+  it("--success-subtle is radix success-3; its ink's WCAG reference is just under 4.5:1", () => {
+    expect(colors.success_subtle).toBe(colors.success_3);
     expect(ratio(colors.success_subtle_fg, colors.success_subtle)).toBeLessThan(
       4.5
     );

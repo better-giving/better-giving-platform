@@ -1,5 +1,5 @@
 import { QrCode as Ark } from "@ark-ui/react/qr-code";
-import { Group, TabPanel, Tabs } from "@better-giving/ui";
+import { Group, Tab, TabList, TabPanel, Tabs } from "@better-giving/ui";
 import { ArrowDownToLineIcon } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import org_building from "#/assets/icons/org-building.svg";
@@ -216,13 +216,19 @@ export function QrCode({
   const body =
     tabs.length > 1 ? (
       <Tabs
-        className="w-full max-w-96"
-        items={tabs.map((tab) => ({ value: tab.id, label: tab.name }))}
+        classes="w-full max-w-96"
         defaultValue={tabs[0].id}
-        onValueChange={set_selected_tab}
+        onValueChange={(e) => set_selected_tab(e.value as QRCodeType)}
       >
+        <TabList aria-label="QR code">
+          {tabs.map((tab) => (
+            <Tab key={tab.id} value={tab.id}>
+              {tab.name}
+            </Tab>
+          ))}
+        </TabList>
         {tabs.map((tab) => (
-          <TabPanel key={tab.id} value={tab.id} className="mt-6">
+          <TabPanel key={tab.id} value={tab.id} classes="mt-6">
             {panel(tab)}
           </TabPanel>
         ))}

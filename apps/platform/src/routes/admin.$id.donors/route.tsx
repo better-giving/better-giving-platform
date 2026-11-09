@@ -1,4 +1,4 @@
-import { Tabs } from "@better-giving/ui";
+import { Tab, TabList, Tabs } from "@better-giving/ui";
 import {
   Outlet,
   type ShouldRevalidateFunction,
@@ -43,24 +43,20 @@ export default function Page({
       <div className="grid gap-4">
         <h1 className="sr-only">Donors</h1>
         <Tabs
-          className="w-full"
-          stretch
+          classes="w-full"
           value={tab}
-          onValueChange={(value) => {
+          onValueChange={({ value }) => {
             navigate(value === "subscribers" ? `${base}/subscribers` : base);
           }}
-          items={[
-            {
-              value: "donors",
-              label: `All donors ${donor_total.toLocaleString("en-US")}`,
-            },
-            {
-              value: "subscribers",
-              label: `Subscribers ${sub_count.toLocaleString("en-US")}`,
-            },
-          ]}
         >
-          {null}
+          <TabList aria-label="Donors">
+            <Tab value="donors" classes="flex-1 justify-center">
+              {`All donors ${donor_total.toLocaleString("en-US")}`}
+            </Tab>
+            <Tab value="subscribers" classes="flex-1 justify-center">
+              {`Subscribers ${sub_count.toLocaleString("en-US")}`}
+            </Tab>
+          </TabList>
         </Tabs>
       </div>
       <div className="mt-6">

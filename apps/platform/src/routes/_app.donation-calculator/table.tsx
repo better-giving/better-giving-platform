@@ -1,4 +1,4 @@
-import { Image, TabPanel, Tabs } from "@better-giving/ui";
+import { Image, Tab, TabList, TabPanel, Tabs } from "@better-giving/ui";
 import { to_usd } from "@better-giving/ui/helpers";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { useState } from "react";
@@ -52,16 +52,18 @@ export function Table({ classes = "", ...v }: Props) {
           />
         )}
       </div>
-      <Tabs
-        stretch
-        items={periods.map((p) => ({ value: p.label, label: p.label }))}
-        value={tab}
-        onValueChange={set_tab}
-      >
+      <Tabs value={tab} onValueChange={(e) => set_tab(e.value)}>
+        <TabList aria-label="Projection period">
+          {periods.map((p) => (
+            <Tab key={p.value} value={p.label} classes="flex-1 justify-center">
+              {p.label}
+            </Tab>
+          ))}
+        </TabList>
         {periods.map((p) => {
           const x = v.projection[p.value - 1];
           return (
-            <TabPanel key={p.value} value={p.label} className="mt-4">
+            <TabPanel key={p.value} value={p.label} classes="mt-4">
               <div className="table-scroll">
                 <table className="table">
                   <thead>

@@ -1,4 +1,4 @@
-import { TabPanel, Tabs } from "@better-giving/ui";
+import { Tab, TabList, TabPanel, Tabs } from "@better-giving/ui";
 import { Outlet, useSearchParams } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
@@ -40,14 +40,20 @@ function Page({ loaderData: endow }: Route.ComponentProps) {
     <div className="w-full max-w-[1400px] px-4 py-4 md:px-10 md:py-8">
       <h1 className="sr-only">Settings</h1>
       <Tabs
-        items={TABS.map((item) => ({ value: item.id, label: item.name }))}
         value={tab}
-        onValueChange={(value) => {
+        onValueChange={({ value }) => {
           const next = new URLSearchParams(params);
           next.set("tab", value);
           set_params(next, { preventScrollReset: true });
         }}
       >
+        <TabList aria-label="Settings">
+          {TABS.map((item) => (
+            <Tab key={item.id} value={item.id}>
+              {item.name}
+            </Tab>
+          ))}
+        </TabList>
         <div className="card mt-4 md:mt-8">
           <TabPanel value="donation">
             <DonationTab

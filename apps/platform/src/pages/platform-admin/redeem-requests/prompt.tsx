@@ -73,9 +73,9 @@ function Content({ verdict, fetcher_key }: IContent) {
         <Badge>Pending</Badge>
         <ChevronRight className="icon-xl" />
         {verdict === "approve" ? (
-          <Badge tone="success">Approved</Badge>
+          <Badge variant="success">Approved</Badge>
         ) : (
-          <Badge tone="destructive">Cancelled</Badge>
+          <Badge variant="destructive">Cancelled</Badge>
         )}
       </div>
 

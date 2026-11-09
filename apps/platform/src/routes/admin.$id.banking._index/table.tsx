@@ -1,4 +1,4 @@
-import { Badge, type BadgeTone } from "@better-giving/ui";
+import { Badge, type BadgeVariant } from "@better-giving/ui";
 import { FolderIcon } from "lucide-react";
 import { NavLink } from "react-router";
 import type { IBapp, TStatus } from "@/banking";
@@ -46,7 +46,7 @@ export function Table({ methods, classes = "" }: Props) {
   );
 }
 
-const tone: { [key in TStatus]: BadgeTone } = {
+const tone: { [key in TStatus]: BadgeVariant } = {
   default: "primary",
   approved: "success",
   "under-review": "neutral",
@@ -61,5 +61,5 @@ const text: { [key in TStatus]: string } = {
 };
 
 function Status({ status }: { status: TStatus }) {
-  return <Badge tone={tone[status]}>{text[status]}</Badge>;
+  return <Badge variant={tone[status]}>{text[status]}</Badge>;
 }

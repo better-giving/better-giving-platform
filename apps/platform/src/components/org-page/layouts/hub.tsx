@@ -1,4 +1,4 @@
-import { TabPanel, Tabs } from "@better-giving/ui";
+import { Tab, TabList, TabPanel, Tabs } from "@better-giving/ui";
 import { type ReactNode, useId, useState } from "react";
 import { RichText, to_text } from "#/components/rich-text";
 import { BrandBand } from "../brand-band";
@@ -115,12 +115,19 @@ export function Hub(props: IOrgLayout) {
           <Section heading={label(tabs[0])}>{content(tabs[0])}</Section>
         )}
         {tabs.length > 1 && (
-          <Tabs
-            items={tabs.map((t) => ({ value: t, label: tab_label(t) }))}
-            defaultValue={tabs[0]}
-          >
+          <Tabs defaultValue={tabs[0]}>
+            <TabList
+              aria-label="Sections"
+              classes="scrollbars scroll-fade-x overflow-x-auto"
+            >
+              {tabs.map((t) => (
+                <Tab key={t} value={t} classes="shrink-0 whitespace-nowrap">
+                  {tab_label(t)}
+                </Tab>
+              ))}
+            </TabList>
             {tabs.map((t) => (
-              <TabPanel key={t} value={t} className="pt-6">
+              <TabPanel key={t} value={t} classes="pt-6">
                 <h2 className="sr-only">{label(t)}</h2>
                 {content(t)}
               </TabPanel>

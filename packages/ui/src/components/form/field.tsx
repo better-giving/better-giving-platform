@@ -60,9 +60,9 @@ export function Field<T extends InputType = InputType>({
   sub,
   describedby,
   required, //extract from props to disable native validation
-  // off by default: most fields here are somebody else's data (a nonprofit's
-  // details, a donation's recipient), which the browser must not prefill from
-  // the visitor's own saved values
+  // off by default: most fields here are somebody else's data (a contact's
+  // details, a delivery address), which the browser must not prefill from
+  // the user's own saved values
   autoComplete = "off",
   error,
   ref,

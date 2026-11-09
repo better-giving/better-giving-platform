@@ -54,7 +54,7 @@ describe("the table scroller", () => {
     // markup.
     const exempt = [
       // a tab row wider than its box
-      "packages/ui/src/components/tabs.tsx",
+      "apps/platform/src/components/org-page/layouts/hub.tsx",
       // a row of campaign cards, swiped
       "apps/platform/src/components/org-page/swipe-row.tsx",
       // the org page's section links, under the header on narrow widths

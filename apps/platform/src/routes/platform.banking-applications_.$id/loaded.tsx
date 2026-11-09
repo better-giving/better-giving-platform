@@ -16,8 +16,8 @@ export function Loaded(props: LoaderData) {
     <>
       {prev_verdict && (
         <Badge
-          tone={is_approved ? "success" : "destructive"}
-          className="justify-self-start -mt-3"
+          variant={is_approved ? "success" : "destructive"}
+          classes="justify-self-start -mt-3"
         >
           {is_approved ? "Approved" : "Rejected"}
         </Badge>

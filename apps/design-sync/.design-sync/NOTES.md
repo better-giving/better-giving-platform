@@ -826,7 +826,7 @@ with a gray-6 `border-hairline` edge and no shadow (`shadow-card` deleted), a we
 gray-3, a field is gray-1 with the `--input` edge (gray-7, hovered gray-8: Radix's
 interactive-border role, under WCAG 1.4.11's 3:1, an accepted miss by PM decision),
 and floating layers and dialogs are the new `--popover` (gray-1) with `shadow-floating`.
-`--secondary-hover` (blue-4) is new; `--ground` is gone. Done in this directory:
+`--secondary-hover` (accent-4) is new; `--ground` is gone. Done in this directory:
 `styles-entry.css` lists `popover`, `input`, `input-hover`, `secondary-hover`;
 `check-conventions.mjs` knows them; `conventions.md` and `docs/Group.md` describe the
 new card. **Not done, next sync:** the previews' panel-shaped wrappers still spell
