@@ -72,6 +72,29 @@ describe("is_routable", () => {
   );
 });
 
+describe("hq country aliases", () => {
+  test.each([
+    "USA",
+    "US",
+    "U.S.",
+    "U.S.A.",
+    "us",
+    "United States of America",
+    "UK",
+    "GB",
+    "DE",
+  ])("an hq country of %s routes", (hq_country) => {
+    expect(routable({ hq_country })).toBe(true);
+  });
+
+  test.each(["PH", "IS", "Philippines"])(
+    "an hq country of %s stays pooled",
+    (hq_country) => {
+      expect(routable({ hq_country })).toBe(false);
+    }
+  );
+});
+
 describe("connect_ineligibility", () => {
   test("a fiscally sponsored npo is ineligible as sponsored, whatever its country", () => {
     expect(

@@ -87,8 +87,24 @@ const is_ready = (npo: IRoutingNpo) =>
   npo.stripe_account_id !== null &&
   connect_status(npo.mirror, npo.deauthorized_at) === "ready";
 
+/** spellings an npo's stored `hq_country` takes besides the name `countries`
+ * uses, keyed by lowercase with dots and spaces stripped */
+const COUNTRY_ALIASES: Readonly<Record<string, string>> = {
+  us: "US",
+  usa: "US",
+  unitedstatesofamerica: "US",
+  uk: "GB",
+  gb: "GB",
+  greatbritain: "GB",
+  england: "GB",
+};
+
 const in_transfer_set = (country: string) => {
-  const code = country_code(country);
+  const squashed = country.toLowerCase().replace(/[.\s]/g, "");
+  const code =
+    COUNTRY_ALIASES[squashed] ??
+    country_code(country) ??
+    (squashed.length === 2 ? squashed.toUpperCase() : undefined);
   return !!code && TRANSFER_COUNTRIES.has(code);
 };
 
