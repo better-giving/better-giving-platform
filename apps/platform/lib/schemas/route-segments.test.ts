@@ -70,7 +70,9 @@ describe("reserved segments", () => {
   it("rejects every top-level segment and reserved word, and keeps organizations", () => {
     for (const word of reserved_words) {
       const parsed = safeParse(segment, word);
-      expect(parsed.issues?.[0]?.message).toBe(`${word} is reserved`);
+      expect(parsed.issues?.[0]?.message).toBe(
+        `Pick a different slug: ${word} is reserved`
+      );
     }
     for (const word of top_level_route_segments) {
       const parsed = safeParse(segment, word);
@@ -78,21 +80,23 @@ describe("reserved segments", () => {
       if (!otherwise_ok(word)) continue;
       const message = parsed.issues?.[0]?.message;
       if ((reserved_words as readonly string[]).includes(word)) {
-        expect(message).toBe(`${word} is reserved`);
+        expect(message).toBe(`Pick a different slug: ${word} is reserved`);
       } else {
-        expect(message).toBe(`${word} matches a top-level route`);
+        expect(message).toBe(
+          `Pick a different slug: ${word} is already used by Better Giving`
+        );
       }
     }
     expect(safeParse(segment, "organizations").success).toBe(true);
     expect(safeParse(slug, "pricing").success).toBe(true);
     expect(safeParse(org_slug, "pricing").issues?.[0]?.message).toBe(
-      "pricing matches a top-level route"
+      "Pick a different slug: pricing is already used by Better Giving"
     );
     expect(safeParse(segment, "Donate").issues?.[0]?.message).toBe(
-      "Donate matches a top-level route"
+      "Pick a different slug: Donate is already used by Better Giving"
     );
     expect(safeParse(segment, "ORG").issues?.[0]?.message).toBe(
-      "ORG is reserved"
+      "Pick a different slug: ORG is reserved"
     );
   });
 });

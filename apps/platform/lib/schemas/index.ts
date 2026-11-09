@@ -117,19 +117,24 @@ export const segment_shape = pipe(
     ({ requirement: r }) => `Use ${r} characters or fewer`
   ),
   //must not be id-like
-  regex(/^(?!^\d+$)/, "Use at least one letter"),
+  regex(/^(?!^\d+$)/, "Don't use only numbers"),
   //valid characters
-  regex(/^[a-zA-Z0-9-._~]+$/, "Use only letters, numbers, and - . _ ~"),
+  regex(
+    /^[a-zA-Z0-9-._~]+$/,
+    "Use only English letters (a-z), numbers, and - . _ ~"
+  ),
   excludes("..", "Don't use two dots in a row"),
-  custom((x) => !(x as string).startsWith("."), "Don't start with a dot"),
-  custom((x) => !(x as string).endsWith("."), "Don't end with a dot")
+  custom((x) => {
+    const v = x as string;
+    return !v.startsWith(".") && !v.endsWith(".");
+  }, "Don't start or end with a dot")
 );
 
 export const segment = pipe(
   segment_shape,
   custom(
     (x) => segment_block(x as string) === undefined,
-    (issue) => segment_block(String(issue.input)) ?? "invalid segment"
+    (issue) => segment_block(String(issue.input)) ?? "Pick a different slug"
   )
 );
 

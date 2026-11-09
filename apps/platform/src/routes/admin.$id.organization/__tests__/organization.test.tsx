@@ -459,7 +459,11 @@ describe("organization — server refusal", () => {
     await screen.getByRole("button", { name: "Save organization" }).click();
     // refused before the lock prompt, which a slug that can't save never opens
     await expect
-      .element(screen.getByText("donate matches a top-level route"))
+      .element(
+        screen.getByText(
+          "Pick a different slug: donate is already used by Better Giving"
+        )
+      )
       .toBeVisible();
     await expect.element(slug).toHaveFocus();
     expect(
@@ -471,7 +475,9 @@ describe("organization — server refusal", () => {
 
     await cleanup();
     const posted = await post(npo.id, { slug: "org" });
-    await expect.element(posted.getByText("org is reserved")).toBeVisible();
+    await expect
+      .element(posted.getByText("Pick a different slug: org is reserved"))
+      .toBeVisible();
     expect((await npo_get(npo.id))?.slug).toBeFalsy();
   });
 
