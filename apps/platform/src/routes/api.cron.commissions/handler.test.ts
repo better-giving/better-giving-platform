@@ -107,8 +107,10 @@ vi.mock("$/pg/db", () => ({
 }));
 
 const { index } = await import("./handler");
+const { report_error } = await import("#/errors/report");
 const { create_test_db } = await import("$/pg/test-utils/pglite");
 const { npos } = await import("$/pg/schema/npo");
+const { banking_apps } = await import("$/pg/schema/banking");
 const { referrer_commissions, referrer_payouts } = await import(
   "$/pg/schema/referrer"
 );
@@ -939,6 +941,55 @@ describe("commissions cron", () => {
       expect(await statuses()).toEqual({ "d-1": "pending" });
       expect(await entries()).toEqual([]);
       expect(await db().select().from(referrer_payouts)).toEqual([]);
+    });
+
+    // a stripe-only npo has no default bank: its commissions wait for one
+    test("switched off, an npo referrer with no default bank is left pending, no transfer", async () => {
+      referrer.real = true;
+      vi.mocked(report_error).mockClear();
+      await seed("d-1", 120);
+
+      await index();
+
+      // a lookup that threw would also leave it pending
+      expect(report_error).not.toHaveBeenCalled();
+      expect(wise.transfer).not.toHaveBeenCalled();
+      expect(await statuses()).toEqual({ "d-1": "pending" });
+      expect(await db().select().from(referrer_payouts)).toEqual([]);
+    });
+
+    test("switched off, the same npo referrer is paid to its default bank once it has one", async () => {
+      referrer.real = true;
+      await db().insert(banking_apps).values({
+        id: "777",
+        npo_id,
+        status: "default",
+        bank_summary: "USD account ending in 0777",
+      });
+      await seed("d-1", 120);
+
+      await index();
+
+      expect(wise.transfer).toHaveBeenCalledOnce();
+      expect(wise.transfer.mock.calls[0]![0].targetAccount).toBe("777");
+      expect(await statuses()).toEqual({ "d-1": "paid" });
+    });
+
+    test("switched off, an npo referrer whose bank was approved with no default flag is still paid", async () => {
+      referrer.real = true;
+      await db().insert(banking_apps).values({
+        id: "778",
+        npo_id,
+        status: "approved",
+        bank_summary: "USD account ending in 0778",
+      });
+      await seed("d-1", 120);
+
+      await index();
+
+      expect(wise.transfer).toHaveBeenCalledOnce();
+      expect(wise.transfer.mock.calls[0]![0].targetAccount).toBe("778");
+      expect(await statuses()).toEqual({ "d-1": "paid" });
     });
 
     test("switched on, an npo referrer with no default bank whose owed covers its commissions is paid them as recovered", async () => {

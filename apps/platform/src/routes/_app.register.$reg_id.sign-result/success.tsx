@@ -9,10 +9,10 @@ export default function Success({
   documentGroupEid,
 }: SignerCompleteQueryParams) {
   const navigation = useNavigation();
-  const { reg } = useRouteLoaderData(
+  const { reg, connect_routing } = useRouteLoaderData(
     "routes/_app.register.$reg_id"
   ) as Reg$IdData;
-  const step = new Progress(reg).step;
+  const step = new Progress(reg, connect_routing).step;
 
   const is_loading = navigation.state === "loading";
 

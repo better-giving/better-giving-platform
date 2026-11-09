@@ -3,6 +3,7 @@ import { step_loader } from "#/pages/registration/data/step-loader";
 import { next_step, steps } from "#/pages/registration/routes";
 import { update_action } from "#/pages/registration/update-action";
 import { Progress } from "@/reg/progress";
+import { stripe as stripe_env } from "$/env";
 import type { Route } from "./+types/route";
 import { FsaForm } from "./fsa";
 
@@ -20,7 +21,7 @@ export { ErrorBoundary } from "#/components/error";
 export const loader = async (args: Route.LoaderArgs) => {
   const res = await step_loader(3)(args);
   if (res instanceof Response) return res;
-  const past_this_step = new Progress(res).step > 3;
+  const past_this_step = new Progress(res, stripe_env.connect_routing).step > 3;
   if (res.o_type === "501c3" && past_this_step) {
     return redirect(`../${steps.banking}`);
   }

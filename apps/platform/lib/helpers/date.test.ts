@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { to_pretty_utc } from "./date";
+import { to_pretty_utc, to_utc_day } from "./date";
 
 const tz = process.env.TZ;
 
@@ -19,5 +19,23 @@ describe("to_pretty_utc", () => {
     expect(to_pretty_utc(new Date("2026-09-21T02:30:05.000Z"))).toBe(
       "2026-09-21 02:30:05 (UTC)"
     );
+  });
+});
+
+describe("to_utc_day", () => {
+  // midnight UTC is still the evening before in los angeles
+  const AT = "2026-07-04T00:00:00Z";
+
+  test("prints the UTC day whatever zone the process runs in", () => {
+    process.env.TZ = "America/Los_Angeles";
+    // the zone took: a local-zone formatter would print the day before
+    expect(
+      new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(
+        new Date(AT)
+      )
+    ).toBe("Jul 3, 2026");
+
+    expect(to_utc_day(AT)).toBe("Jul 4, 2026");
+    expect(to_utc_day(new Date(AT))).toBe("Jul 4, 2026");
   });
 });

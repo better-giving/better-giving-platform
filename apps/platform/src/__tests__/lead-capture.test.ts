@@ -43,6 +43,7 @@ vi.mock("$/email", () => ({
 vi.mock("$/env", () => ({
   app: { session_secret: "test-secret-at-least-32-characters-long!!" },
   base_url: "http://localhost:4200",
+  stripe: { connect_routing: true },
 }));
 
 // the auth surface under test is real — only the better-auth instance beneath

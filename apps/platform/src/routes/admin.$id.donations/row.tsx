@@ -82,6 +82,7 @@ export function Row(props: IRow) {
         <AmountFlow
           total={+props.net_usd}
           allocation={props.allocation ?? default_allocation}
+          stripe_payout={props.stripe_payout}
         />
       </td>
       <td>

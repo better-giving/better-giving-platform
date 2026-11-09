@@ -9,6 +9,7 @@ import { msg } from "@/queue";
 import type { IFsaSigner, IReg } from "@/reg";
 import { Progress } from "@/reg/progress";
 import { fsa_docs_or_signer, type IFsaDocs, reg_id } from "@/reg/schema";
+import { stripe as stripe_env } from "$/env";
 import { enqueue } from "$/kit/queue";
 import { reg_fsa_packet, reg_get } from "$/pg/queries/registration";
 
@@ -16,7 +17,7 @@ import { reg_fsa_packet, reg_get } from "$/pg/queries/registration";
  * form, or the ones already on the row when the sign-result page asks for the
  * packet again. */
 const signer_of = (reg: IReg, docs_or_eid: IFsaDocs | string): IFsaSigner => {
-  const prog = new Progress(reg);
+  const prog = new Progress(reg, stripe_env.connect_routing);
   let r: Progress["org"];
   let docs: IFsaDocs;
   if (typeof docs_or_eid === "string") {

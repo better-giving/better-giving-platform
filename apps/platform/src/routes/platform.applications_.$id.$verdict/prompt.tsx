@@ -78,8 +78,9 @@ function Content() {
 
       {verdict === "approved" ? (
         <div className="px-6 pb-4 text-center text-gray-11">
-          This will immediately payout all pending funds to newly linked bank
-          account and is irreversible.
+          {review?.reg.o_bank_id
+            ? "This will immediately payout all pending funds to newly linked bank account and is irreversible."
+            : "This registration has a Stripe account and no bank account. Donations Stripe can't receive will wait in the nonprofit's balance until it adds a bank account. This is irreversible."}
         </div>
       ) : null}
 

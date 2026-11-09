@@ -2,15 +2,17 @@ import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import Stripe from "stripe";
 import { report_degraded } from "#/errors/report";
 import { to_units } from "@/helpers/decimal";
+import { is_routable, routing_npo } from "@/stripe-connect/eligibility";
 import {
+  type INpoSent,
   type ISentTransfer,
-  type ISentTransfers,
   transfer_standing,
 } from "@/stripe-connect/sent";
+import { stripe as stripe_env } from "../env";
 import { stripe } from "../kit/stripe";
 import { db } from "../pg/db";
+import { npo_get } from "../pg/queries/npo";
 import { dists } from "../pg/schema/dist";
-import { npos } from "../pg/schema/npo";
 
 /** one retrieve per transfer; past this the page names that it stopped */
 const SENT_LIMIT = 100;
@@ -38,22 +40,17 @@ interface ITransferRecord {
 
 /**
  * routed transfers paid to `npo_id`, newest transfer first, each with what
- * its reversal records took back. null when the nonprofit is not on Connect
- * and has none: the payouts page stays as it is. an empty list is a connected
- * nonprofit nothing has been sent to yet
+ * its reversal records took back. null when card gifts to the nonprofit do
+ * not route, no account is linked (or routing is switched off) and it has
+ * none: the payouts page stays as it is. an empty list is a nonprofit on
+ * stripe, or linked to an account card gifts don't route to, that nothing has
+ * been sent to
  */
 export async function npo_sent_transfers(
   npo_id: number
-): Promise<ISentTransfers | null> {
+): Promise<INpoSent | null> {
   const [npo, rows] = await Promise.all([
-    db
-      .select({
-        acct: npos.stripe_account_id,
-        deauthorized_at: npos.stripe_deauthorized_at,
-      })
-      .from(npos)
-      .where(eq(npos.id, npo_id))
-      .then((r) => r[0]),
+    npo_get(npo_id),
     db
       .select({
         id: dists.stripe_transfer_id,
@@ -74,8 +71,12 @@ export async function npo_sent_transfers(
       .limit(SENT_LIMIT + 1),
   ]);
 
-  const connected = !!npo?.acct && npo.deauthorized_at === null;
-  if (!connected && rows.length === 0) return null;
+  const on_stripe =
+    !!npo && is_routable(routing_npo(npo), stripe_env.connect_routing);
+  const connected =
+    !!npo?.stripe_account_id && npo.stripe_deauthorized_at === null;
+  const linked = connected && stripe_env.connect_routing;
+  if (!on_stripe && !linked && rows.length === 0) return null;
 
   const truncated = rows.length > SENT_LIMIT;
   const listed = rows.slice(0, SENT_LIMIT).flatMap((row) =>
@@ -91,7 +92,7 @@ export async function npo_sent_transfers(
   );
   const items = await in_batches(listed, (row) => sent_of(npo_id, row));
   items.sort((a, b) => b.date.localeCompare(a.date));
-  return { items, truncated };
+  return { items, truncated, on_stripe, connected };
 }
 
 /** `run` over `items`, RETRIEVE_BATCH at a time, in that order. a rejection

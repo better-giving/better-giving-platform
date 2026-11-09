@@ -1,4 +1,4 @@
-import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
+import { and, eq, isNull, ne, notInArray, or, sql } from "drizzle-orm";
 import { steps } from "#/pages/registration/routes";
 import { EDITABLE } from "@/reg/schema";
 import {
@@ -99,7 +99,9 @@ export async function target_access(
 
 /** whether `acct` already belongs to an npo or a registration other than `t`.
  * approved registrations are skipped: their account lives on the npo now, or
- * was replaced there. a pending one would collide with this one at approval. */
+ * was replaced there. rejected ones are skipped too: they keep the account to
+ * resubmit with until another target claims it and `release_rejected` takes
+ * it from them. a pending one would collide with this one at approval. */
 export async function held_elsewhere(
   acct: string,
   t: TConnectTarget,
@@ -123,12 +125,36 @@ export async function held_elsewhere(
     .where(
       and(
         eq(registrations.o_stripe_account_id, acct),
-        or(isNull(registrations.status), ne(registrations.status, "03")),
+        or(
+          isNull(registrations.status),
+          notInArray(registrations.status, ["03", "04"])
+        ),
         t.kind === "reg" ? ne(registrations.id, t.reg_id) : undefined
       )
     )
     .limit(1);
   return !!reg;
+}
+
+/** `t` has claimed `acct`, so a rejected registration holding it drops it.
+ * kept, its resubmit would be refused on the account (step 5's submit re-runs
+ * `held_elsewhere` under `lock_acct`); dropped, banking asks it for another.
+ * call inside the claim's `lock_acct` transaction, once `t`'s write has won */
+export async function release_rejected(
+  acct: string,
+  t: TConnectTarget,
+  tx: DbOrTx
+) {
+  await tx
+    .update(registrations)
+    .set({ o_stripe_account_id: null, o_stripe_connected_at: null })
+    .where(
+      and(
+        eq(registrations.o_stripe_account_id, acct),
+        eq(registrations.status, "04"),
+        t.kind === "reg" ? ne(registrations.id, t.reg_id) : undefined
+      )
+    );
 }
 
 /** one claim of `acct` at a time, until `tx` ends. registrations carry no

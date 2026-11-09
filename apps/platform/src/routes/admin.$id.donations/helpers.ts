@@ -1,4 +1,4 @@
-import type { IAllocation } from "@/donations";
+import { type IAllocation, is_reversed } from "@/donations";
 import { via_name } from "@/donations/helpers";
 import type { INpoDonation } from "$/pg/queries/dist";
 
@@ -13,6 +13,17 @@ export interface IFees {
   processing: number;
   processing_allowance: number;
 }
+
+/** where a stripe-routed dist's net went; a routed dist stores `ALL_CASH`,
+ * so its allocation would read as a grant to the bank */
+export type TStripePayout = "paid_out" | "sending" | "not_sent";
+
+const stripe_payout_of = (x: INpoDonation): TStripePayout | undefined => {
+  if (!x.stripe_routed_to) return undefined;
+  if (x.stripe_transfer_id) return "paid_out";
+  // a refund before the transfer cancels it
+  return is_reversed(x.status) ? "not_sent" : "sending";
+};
 
 export interface IRow {
   id: string;
@@ -44,6 +55,7 @@ export interface IRow {
   recipient_id: number;
   allocation?: IAllocation;
   status?: "settled" | "refunded" | "refunded_loss";
+  stripe_payout?: TStripePayout;
 }
 
 export const to_csv_row = (x: INpoDonation): IRow => {
@@ -85,6 +97,7 @@ export const to_csv_row = (x: INpoDonation): IRow => {
     recipient_id: x.to_id ?? 0,
     allocation: x.alloc ?? undefined,
     status: x.status,
+    stripe_payout: stripe_payout_of(x),
   };
   return row;
 };

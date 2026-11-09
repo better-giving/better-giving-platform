@@ -21,8 +21,15 @@ vi.mock("../db", () => ({
   }),
 }));
 
-const { bapp_delete, bapp_delete_guarded, bapp_put, bapp_set_default } =
-  await import("./banking");
+const {
+  bapp_approve,
+  bapp_delete,
+  bapp_delete_guarded,
+  bapp_put,
+  bapp_set_default,
+  npo_bapp_in_review,
+  npo_default_bapp,
+} = await import("./banking");
 
 let own: number;
 let other: number;
@@ -47,7 +54,7 @@ const npo = (registration_number: string) => ({
 const bapp = (
   id: string,
   npo_id: number,
-  status: "default" | "approved" | "under-review"
+  status: "default" | "approved" | "under-review" | "rejected"
 ) => ({ id, npo_id, status });
 
 const status_of = async (id: string) => {
@@ -100,6 +107,49 @@ describe("bapp_set_default", () => {
   });
 });
 
+describe("bapp_approve", () => {
+  test("approves beside the npo's default, leaving the default in place", async () => {
+    expect((await bapp_approve("own-review", own))?.status).toBe(
+      "under-review"
+    );
+
+    expect(await status_of("own-review")).toBe("approved");
+    expect(await status_of("own-default")).toBe("default");
+  });
+
+  test("becomes the default when the npo has none", async () => {
+    await test_db
+      .current!.db.delete(banking_apps)
+      .where(eq(banking_apps.id, "own-default"));
+
+    await bapp_approve("own-review", own);
+
+    expect(await status_of("own-review")).toBe("default");
+  });
+
+  test("a rejection that lands first stands, and reports not under review", async () => {
+    // the admin rejected it after the approve action read it as under review
+    await test_db
+      .current!.db.update(banking_apps)
+      .set({ status: "rejected", rejection_reason: "bad account" })
+      .where(eq(banking_apps.id, "own-review"));
+
+    const prev = await bapp_approve("own-review", own);
+
+    expect(prev?.status).toBe("rejected");
+    expect(await status_of("own-review")).toBe("rejected");
+  });
+
+  test("another npo's method is not approved", async () => {
+    await test_db
+      .current!.db.insert(banking_apps)
+      .values(bapp("other-review", other, "under-review"));
+
+    expect(await bapp_approve("other-review", own)).toBeUndefined();
+    expect(await status_of("other-review")).toBe("under-review");
+  });
+});
+
 describe("bapp_delete", () => {
   test("deletes the npo's own method", async () => {
     expect(await bapp_delete("own-approved", own)).toBe(true);
@@ -148,5 +198,103 @@ describe("bapp_put", () => {
     expect(await bapp_put(test_db.current!.db as any, row)).toBe(false);
 
     expect(await status_of("retry")).toBe("under-review");
+  });
+});
+
+describe("npo_default_bapp", () => {
+  test("the default row wins over other approved rows", async () => {
+    expect((await npo_default_bapp(own))?.id).toBe("own-default");
+  });
+
+  test("an approved bank with no default flag is the one that pays", async () => {
+    await test_db
+      .current!.db.delete(banking_apps)
+      .where(eq(banking_apps.id, "own-default"));
+
+    expect((await npo_default_bapp(own))?.id).toBe("own-approved");
+  });
+
+  test("two approved banks and no default stay unpicked", async () => {
+    const db = test_db.current!.db;
+    await db.delete(banking_apps).where(eq(banking_apps.id, "own-default"));
+    await db
+      .insert(banking_apps)
+      .values(bapp("own-approved-2", own, "approved"));
+
+    expect(await npo_default_bapp(own)).toBeUndefined();
+  });
+
+  describe("two default rows", () => {
+    const stamp = (id: string, at: string) =>
+      test_db
+        .current!.db.update(banking_apps)
+        .set({ updated_at: at })
+        .where(eq(banking_apps.id, id));
+
+    beforeEach(async () => {
+      await test_db
+        .current!.db.delete(banking_apps)
+        .where(eq(banking_apps.npo_id, own));
+    });
+
+    test.each([
+      ["older first", ["d-old", "d-new"]],
+      ["newer first", ["d-new", "d-old"]],
+    ])("the newer updated_at wins, inserted %s", async (_, order) => {
+      const db = test_db.current!.db;
+      for (const id of order) {
+        await db.insert(banking_apps).values(bapp(id, own, "default"));
+      }
+      await stamp("d-old", "2024-01-01T00:00:00Z");
+      await stamp("d-new", "2025-01-01T00:00:00Z");
+
+      expect((await npo_default_bapp(own))?.id).toBe("d-new");
+    });
+
+    test("a tie on updated_at breaks on the greater id", async () => {
+      const db = test_db.current!.db;
+      await db
+        .insert(banking_apps)
+        .values([bapp("d-b", own, "default"), bapp("d-a", own, "default")]);
+      await stamp("d-a", "2025-01-01T00:00:00Z");
+      await stamp("d-b", "2025-01-01T00:00:00Z");
+
+      expect((await npo_default_bapp(own))?.id).toBe("d-b");
+    });
+  });
+
+  test("a bank still under review is not one", async () => {
+    const db = test_db.current!.db;
+    await db.delete(banking_apps).where(eq(banking_apps.npo_id, own));
+    await db
+      .insert(banking_apps)
+      .values(bapp("own-review-2", own, "under-review"));
+
+    expect(await npo_default_bapp(own)).toBeUndefined();
+  });
+});
+
+describe("npo_bapp_in_review", () => {
+  const only = async (id: string, status: Parameters<typeof bapp>[2]) => {
+    const db = test_db.current!.db;
+    await db.delete(banking_apps).where(eq(banking_apps.npo_id, own));
+    await db.insert(banking_apps).values(bapp(id, own, status));
+  };
+
+  test("a method under review waits, beside a default and an approved one", async () => {
+    expect(await npo_bapp_in_review(own)).toBe(true);
+  });
+
+  test.each(["default", "approved", "rejected"] as const)(
+    "a %s method alone is not waiting for review",
+    async (status) => {
+      await only("own-one", status);
+
+      expect(await npo_bapp_in_review(own)).toBe(false);
+    }
+  );
+
+  test("another npo's method under review is not this npo's", async () => {
+    expect(await npo_bapp_in_review(other)).toBe(false);
   });
 });

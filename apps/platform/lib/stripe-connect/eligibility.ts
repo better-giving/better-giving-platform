@@ -17,7 +17,7 @@ import {
  * list also holds every recipient-agreement destination, so it is a superset
  * of this one and never a drop-in.
  */
-const TRANSFER_COUNTRIES: ReadonlySet<string> = new Set([
+export const TRANSFER_COUNTRIES: ReadonlySet<string> = new Set([
   "US",
   "CA",
   "GB",
@@ -52,6 +52,10 @@ const TRANSFER_COUNTRIES: ReadonlySet<string> = new Set([
   "LI",
   "NO",
 ]);
+
+/** `TRANSFER_COUNTRIES` in words; eligibility.test.ts fails when the two drift */
+export const TRANSFER_COUNTRIES_COPY =
+  "the US, Canada, the UK, Switzerland, Liechtenstein, Norway and EU countries";
 
 /** what routing decides on */
 export interface IRoutingNpo {
@@ -88,10 +92,24 @@ const in_transfer_set = (country: string) => {
   return !!code && TRANSFER_COUNTRIES.has(code);
 };
 
+export type TConnectIneligibility =
+  | { reason: "fiscal_sponsored" }
+  | { reason: "country"; hq_country: string };
+
+/** why `npo` can never route, whatever its stripe account's state; null when
+ * nothing rules it out */
+export const connect_ineligibility = (npo: {
+  fiscal_sponsored: boolean;
+  hq_country: string;
+}): TConnectIneligibility | null => {
+  if (npo.fiscal_sponsored) return { reason: "fiscal_sponsored" };
+  if (!in_transfer_set(npo.hq_country)) {
+    return { reason: "country", hq_country: npo.hq_country };
+  }
+  return null;
+};
+
 /** whether a card donation to `npo` routes to its connected account
  * @param routing_on - the `STRIPE_CONNECT_ROUTING` switch */
 export const is_routable = (npo: IRoutingNpo, routing_on: boolean) =>
-  routing_on &&
-  !npo.fiscal_sponsored &&
-  is_ready(npo) &&
-  in_transfer_set(npo.hq_country);
+  routing_on && connect_ineligibility(npo) === null && is_ready(npo);

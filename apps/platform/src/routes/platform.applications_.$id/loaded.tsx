@@ -4,7 +4,7 @@ import type { PropsWithChildren } from "react";
 import { href, NavLink, Outlet } from "react-router";
 import type { V2RecipientAccount } from "#/types/bank-details";
 import type { IReg } from "@/reg";
-import { is_approvable } from "./approvable";
+import { is_stripe_only, lost_payout } from "./approvable";
 import { Container } from "./container";
 
 export default function Loaded(
@@ -12,6 +12,8 @@ export default function Loaded(
     bank: V2RecipientAccount | null;
     /** wise was unreachable; the account may still exist */
     bank_unavailable: boolean;
+    /** `is_approvable`, judged on the server where the routing switch is */
+    approvable: boolean;
   }
 ) {
   const prev_verdict =
@@ -104,6 +106,26 @@ export default function Loaded(
           </dl>
         </Container>
       )}
+      {is_stripe_only(props) && (
+        <Container title="Payout">
+          <dl className="grid sm:grid-cols-[auto_auto_1fr]">
+            <Row label="Payout method">Stripe only, no bank account</Row>
+            <Row label="Stripe account ID">{props.o_stripe_account_id}</Row>
+          </dl>
+        </Container>
+      )}
+      {lost_payout(props) && (
+        <Container title="Payout">
+          <dl className="grid sm:grid-cols-[auto_auto_1fr]">
+            <Row label="Payout method">None on file (Stripe disconnected)</Row>
+          </dl>
+          <p className="p-3 text-sm text-gray-11">
+            The applicant disconnected their Stripe account after submitting, so
+            this application can't be approved. Reject it so the applicant can
+            add a bank account or connect Stripe again, then resubmit.
+          </p>
+        </Container>
+      )}
       {props.bank_unavailable && (
         <Container title="Banking details">
           <dl className="grid sm:grid-cols-[auto_auto_1fr]">
@@ -113,7 +135,7 @@ export default function Loaded(
             </Row>
           </dl>
           <p className="p-3 text-sm text-gray-11">
-            Bank account details couldn't be loaded from Wise.
+            Bank account details couldn't be loaded from the payout provider.
           </p>
         </Container>
       )}
@@ -133,8 +155,10 @@ export default function Loaded(
           Reject
         </NavLink>
         <NavLink
-          // approval reads the account: none on file, or wise unreachable
-          aria-disabled={!is_approvable(props, props.bank)}
+          // approval reads a bank account on file, so wise unreachable
+          // disables it; so does having neither a bank nor stripe, or
+          // stripe alone while routing is off
+          aria-disabled={!props.approvable}
           to="approved"
           className="min-w-24 btn btn-success"
           preventScrollReset
