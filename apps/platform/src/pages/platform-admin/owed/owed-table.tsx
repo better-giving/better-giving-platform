@@ -61,7 +61,7 @@ export function OwedTable({
         classes={{ container: "mb-4 sm:w-56", option: "text-sm" }}
       />
       <div className="table-scroll">
-        <table className="table" data-owed-table>
+        <table className="table whitespace-nowrap" data-owed-table>
           <thead>
             <tr>
               <th scope="col">Gift</th>
