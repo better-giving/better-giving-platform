@@ -58,11 +58,10 @@ export async function npo_bapp_count(npo_id: number) {
 }
 
 /**
- * the bank that pays out. the "default" row; failing that, the one "approved"
- * row when it is the npo's only live bank. banks approved before an npo's
- * first one took the default have no default, and payouts and commissions
- * must keep paying them. two approved banks and no default stay unpicked:
- * guessing between them would move money to the wrong account.
+ * the bank that pays out. the "default" row; failing that, the most recently
+ * updated "approved" row. banks approved before an npo's first one took the
+ * default have no default, and payouts and commissions must keep paying them:
+ * with two approved banks and no default, leaving both unpicked pays nobody.
  *
  * production has npos with two "default" rows (written before one default per
  * npo was enforced in the app). the one with the newest `updated_at` pays, so
@@ -87,7 +86,7 @@ export async function npo_default_bapp(npo_id: number) {
     );
   const def = rows.find((r) => r.status === "default");
   if (def) return def;
-  return rows.length === 1 ? rows[0] : undefined;
+  return rows[0];
 }
 
 /** a bank application waits for review: it pays out once approved */
