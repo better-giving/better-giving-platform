@@ -275,6 +275,19 @@ describe("the payouts page", () => {
     expect(screen.container.textContent).not.toMatch(/stripe/i);
   });
 
+  test("the breadcrumb ends on Payouts", async () => {
+    await npo("acct_sent");
+
+    const screen = await render_page();
+
+    await expect
+      .element(
+        screen.getByRole("heading", { level: 1, name: "Payouts", exact: true })
+      )
+      .toBeVisible();
+    expect(screen.getByText("Grant items").query()).toBeNull();
+  });
+
   test("a connected nonprofit with nothing sent keeps an empty state", async () => {
     await npo("acct_sent");
 

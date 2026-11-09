@@ -129,7 +129,7 @@ function Page({ loaderData: page1, params }: Route.ComponentProps) {
             label: "Dashboard",
             to: href("/admin/:id/dashboard", { id: params.id }),
           },
-          { label: "Grant items" },
+          { label: "Payouts" },
         ]}
       />
       {held && (
