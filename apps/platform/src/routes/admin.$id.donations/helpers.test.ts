@@ -86,6 +86,14 @@ describe("to_csv_row's stripe payout", () => {
     }
   );
 
+  test("a routed dist with no transfer a day on was never sent", () => {
+    const row = to_csv_row({
+      ...routed,
+      date_created: "2026-01-01T00:00:00.000Z",
+    });
+    expect(row.stripe_payout).toBe("not_sent");
+  });
+
   test("a routed dist refunded after its transfer reads fully reversed", () => {
     const row = to_csv_row({
       ...routed,

@@ -8,6 +8,7 @@ import {
   routed_label,
   type TRoutedKind,
   type TSentStanding,
+  type TUnsentKind,
 } from "@/stripe-connect/sent";
 
 /** where a card gift made now goes: the connected account (`on`), or the bank
@@ -18,7 +19,7 @@ export type TStripeLink = "on" | "off" | "waiting" | "disconnected";
 export const stripe_link = (sent: INpoSent): TStripeLink => {
   if (sent.on_stripe) return "on";
   if (!sent.connected) return "disconnected";
-  return sent.items.length > 0 ? "off" : "waiting";
+  return sent.items.length > 0 || sent.unsent.length > 0 ? "off" : "waiting";
 };
 
 interface ICopy {
@@ -119,7 +120,7 @@ const tones: Record<TRoutedKind, ITone> = {
 };
 
 interface IStanding {
-  standing: TSentStanding;
+  standing: TSentStanding | { kind: TUnsentKind };
 }
 
 function Standing({ standing }: IStanding) {
@@ -177,28 +178,39 @@ export function SentToStripe({
             </tr>
           </thead>
           <tbody>
-            {sent.items.length === 0 ? (
+            {sent.items.length === 0 && sent.unsent.length === 0 ? (
               <EmptyRow col_span={3}>No transfers yet</EmptyRow>
             ) : (
-              sent.items.map((t) => (
-                <tr key={t.id}>
-                  <td>
-                    <span
-                      className={
-                        t.standing.kind === "reversed"
-                          ? "line-through text-destructive-subtle-fg"
-                          : ""
-                      }
-                    >
-                      {usd(t.amount)}
-                    </span>
-                  </td>
-                  <td>{format(t.date, "PP")}</td>
-                  <td>
-                    <Standing standing={t.standing} />
-                  </td>
-                </tr>
-              ))
+              <>
+                {sent.unsent.map((u) => (
+                  <tr key={u.id}>
+                    <td>{usd(u.amount)}</td>
+                    <td>{format(u.date, "PP")}</td>
+                    <td>
+                      <Standing standing={{ kind: u.kind }} />
+                    </td>
+                  </tr>
+                ))}
+                {sent.items.map((t) => (
+                  <tr key={t.id}>
+                    <td>
+                      <span
+                        className={
+                          t.standing.kind === "reversed"
+                            ? "line-through text-destructive-subtle-fg"
+                            : ""
+                        }
+                      >
+                        {usd(t.amount)}
+                      </span>
+                    </td>
+                    <td>{format(t.date, "PP")}</td>
+                    <td>
+                      <Standing standing={t.standing} />
+                    </td>
+                  </tr>
+                ))}
+              </>
             )}
           </tbody>
         </table>

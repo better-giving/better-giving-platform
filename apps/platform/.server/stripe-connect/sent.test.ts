@@ -120,6 +120,7 @@ describe("npo_sent_transfers — on stripe", () => {
     expect(await npo_sent_transfers(id)).toEqual({
       items: [],
       truncated: false,
+      unsent: [],
       on_stripe: true,
       connected: true,
     });
@@ -155,6 +156,7 @@ describe("npo_sent_transfers — on stripe", () => {
       const id = await seed(not_ready);
       expect(await npo_sent_transfers(id)).toEqual({
         items: [],
+        unsent: [],
         truncated: false,
         on_stripe: false,
         connected: true,
@@ -192,5 +194,74 @@ describe("npo_sent_transfers — on stripe", () => {
     const sent = await npo_sent_transfers(id);
     expect(sent?.items.map((t) => t.id)).toEqual(["tr_past"]);
     expect(sent).toMatchObject({ on_stripe: false, connected: false });
+  });
+});
+
+describe("npo_sent_transfers — routed with no transfer", () => {
+  const unsent = async (
+    npo_id: number,
+    id: string,
+    o: { status?: "settled" | "refunded"; date: string }
+  ) => {
+    await db()
+      .insert(donations)
+      .values({
+        id: `don-${id}`,
+        upusd: 1,
+        status: "settled",
+        amount_base: 40,
+        amount_tip: 0,
+        amount_fee_allowance: 0,
+        currency: "USD",
+        frequency: "one-time",
+        source: "bg-marketplace",
+        via: "stripe:card",
+      });
+    await db()
+      .insert(dists)
+      .values({
+        id,
+        donation_id: `don-${id}`,
+        status: o.status ?? "settled",
+        date_created: o.date,
+        to_id: npo_id,
+        amount_denom: "USD",
+        net: 40,
+        stripe_routed_to: "acct_on",
+      });
+  };
+
+  test("lists routed donations no transfer paid, by how they stand", async () => {
+    const id = await seed();
+    const recent = new Date(Date.now() - 60_000).toISOString();
+    const old = "2026-01-01T00:00:00.000Z";
+    await unsent(id, "d-recent", { date: recent });
+    await unsent(id, "d-old", { date: old });
+    await unsent(id, "d-refunded", { date: recent, status: "refunded" });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items).toEqual([]);
+    expect(Object.fromEntries(sent!.unsent.map((u) => [u.id, u.kind]))).toEqual(
+      {
+        "d-recent": "sending",
+        "d-old": "not_sent",
+        "d-refunded": "not_sent",
+      }
+    );
+    expect(sent!.unsent.every((u) => u.amount === 40)).toBe(true);
+  });
+
+  test("a pooled dist is not listed", async () => {
+    const id = await seed();
+    await unsent(id, "d-pooled", { date: "2026-01-01T00:00:00.000Z" });
+    await db().update(dists).set({ stripe_routed_to: null });
+    expect((await npo_sent_transfers(id))?.unsent).toEqual([]);
+  });
+
+  test("an npo off stripe with only an unsent routed donation still gets the section", async () => {
+    const id = await seed({ stripe_account_id: null });
+    await unsent(id, "d-old", { date: "2026-01-01T00:00:00.000Z" });
+    expect((await npo_sent_transfers(id))?.unsent).toHaveLength(1);
   });
 });

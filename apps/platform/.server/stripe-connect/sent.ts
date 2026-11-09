@@ -1,11 +1,14 @@
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import Stripe from "stripe";
 import { report_degraded } from "#/errors/report";
+import { is_reversed } from "@/donations/settle";
 import { to_units } from "@/helpers/decimal";
 import { is_routable, routing_npo } from "@/stripe-connect/eligibility";
 import {
   type INpoSent,
   type ISentTransfer,
+  type IUnsentTransfer,
+  routed_kind,
   transfer_standing,
 } from "@/stripe-connect/sent";
 import { stripe as stripe_env } from "../env";
@@ -49,7 +52,7 @@ interface ITransferRecord {
 export async function npo_sent_transfers(
   npo_id: number
 ): Promise<INpoSent | null> {
-  const [npo, rows] = await Promise.all([
+  const [npo, rows, unsent_rows] = await Promise.all([
     npo_get(npo_id),
     db
       .select({
@@ -69,14 +72,43 @@ export async function npo_sent_transfers(
         desc(dists.id)
       )
       .limit(SENT_LIMIT + 1),
+    db
+      .select({
+        id: dists.id,
+        net: dists.net,
+        status: dists.status,
+        routed_at: dists.date_created,
+      })
+      .from(dists)
+      .where(
+        and(
+          eq(dists.to_id, npo_id),
+          isNotNull(dists.stripe_routed_to),
+          isNull(dists.stripe_transfer_id)
+        )
+      )
+      .orderBy(desc(dists.date_created), desc(dists.id))
+      .limit(SENT_LIMIT),
   ]);
+  const unsent: IUnsentTransfer[] = unsent_rows.map((r) => ({
+    id: r.id,
+    amount: r.net ?? 0,
+    date: r.routed_at,
+    kind: routed_kind({
+      transfer_id: null,
+      reversed: is_reversed(r.status),
+      routed_at: r.routed_at,
+    }) as IUnsentTransfer["kind"],
+  }));
 
   const on_stripe =
     !!npo && is_routable(routing_npo(npo), stripe_env.connect_routing);
   const connected =
     !!npo?.stripe_account_id && npo.stripe_deauthorized_at === null;
   const linked = connected && stripe_env.connect_routing;
-  if (!on_stripe && !linked && rows.length === 0) return null;
+  if (!on_stripe && !linked && rows.length === 0 && unsent.length === 0) {
+    return null;
+  }
 
   const truncated = rows.length > SENT_LIMIT;
   const listed = rows.slice(0, SENT_LIMIT).flatMap((row) =>
@@ -92,7 +124,7 @@ export async function npo_sent_transfers(
   );
   const items = await in_batches(listed, (row) => sent_of(npo_id, row));
   items.sort((a, b) => b.date.localeCompare(a.date));
-  return { items, truncated, on_stripe, connected };
+  return { items, unsent, truncated, on_stripe, connected };
 }
 
 /** `run` over `items`, RETRIEVE_BATCH at a time, in that order. a rejection

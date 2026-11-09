@@ -5,6 +5,7 @@ import { SentToStripe, stripe_link, WhereMoneyShows } from "./sent";
 
 const sent = (p: Pick<INpoSent, "on_stripe" | "connected">): INpoSent => ({
   items: [],
+  unsent: [],
   truncated: false,
   ...p,
 });
@@ -171,4 +172,37 @@ test("a bank on file: new Stripe donations pay out to it", async () => {
       )
     )
     .toBeVisible();
+});
+
+describe("routed donations with no transfer", () => {
+  test("are listed, worded as the donations list words them", async () => {
+    const screen = await render(
+      <SentToStripe
+        sent={{
+          ...sent({ on_stripe: true, connected: true }),
+          unsent: [
+            {
+              id: "d1",
+              amount: 40,
+              date: "2026-07-01T00:00:00.000Z",
+              kind: "sending",
+            },
+            {
+              id: "d2",
+              amount: 25,
+              date: "2026-06-01T00:00:00.000Z",
+              kind: "not_sent",
+            },
+          ],
+        }}
+      />
+    );
+    await expect
+      .element(screen.getByText("Sending to Stripe", { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText("Not sent to Stripe", { exact: true }))
+      .toBeVisible();
+    expect(screen.getByText("No transfers yet").query()).toBeNull();
+  });
 });
