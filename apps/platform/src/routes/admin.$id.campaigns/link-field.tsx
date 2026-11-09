@@ -45,7 +45,7 @@ function break_at_slashes(url: string) {
   ));
 }
 
-/** the slug input for the campaign's public link; the preview under it shows the whole link */
+/** the slug input for a campaign's public link */
 export function LinkField(props: ILinkField) {
   return (
     <PublicLinkField
