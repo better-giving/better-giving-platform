@@ -1,4 +1,8 @@
 import * as v from "valibot";
+import {
+  connect_ineligibility,
+  type TConnectIneligibility,
+} from "./eligibility";
 import type { TConnectStatus } from "./readiness";
 import {
   CONNECT_REASON_PARAM,
@@ -57,4 +61,21 @@ export interface IConnectCardData {
   status: TConnectStatus;
   start_href: string;
   notice?: TConnectNotice;
+  /** set when the npo can never route, so connecting would not change that */
+  ineligible?: TConnectIneligibility;
 }
+
+/** `connect_ineligibility` for a registration that is not an npo yet */
+export const reg_ineligibility = (reg: {
+  o_type: string;
+  o_hq_country: string;
+}): TConnectIneligibility | null => {
+  const fiscal_sponsored = reg.o_type === "other";
+  // `reg_new` requires the country at creation (a 501c3's is always the US),
+  // so an empty one is a row stored without it: nothing to judge
+  if (!fiscal_sponsored && reg.o_hq_country === "") return null;
+  return connect_ineligibility({
+    fiscal_sponsored,
+    hq_country: reg.o_hq_country,
+  });
+};

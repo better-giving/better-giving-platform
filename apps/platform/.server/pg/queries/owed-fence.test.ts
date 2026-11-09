@@ -3,7 +3,8 @@ import { type Source, sources_of } from "#/__tests__/conformance/walk";
 
 // the owed ledger is written only through queries/owed.ts's verbs, each by its
 // owner. matched as words, not import statements, so a namespace import
-// (`o.credit_owed`), an alias, the schema barrel and raw sql are all seen
+// (`o.credit_owed`), an alias, the schema barrel and raw sql are all seen.
+// test files and the shared test fixtures seed rows and are not the app
 const platform = "apps/platform";
 const in_refund_core = (file: string) =>
   file.startsWith(`${platform}/.server/refund/`);
@@ -41,6 +42,9 @@ const uncommented = (text: string) =>
 function offenders(sources: Source[]): string[] {
   return sources
     .filter(({ file }) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
+    .filter(
+      ({ file }) => !file.startsWith(`${platform}/src/__tests__/fixtures/`)
+    )
     .filter(({ file }) => !LEDGER_HOME.includes(file))
     .flatMap(({ file, text }) => [
       ...[...text.matchAll(TABLE)].map(([name]) => `${file}: ${name}`),

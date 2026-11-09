@@ -57,15 +57,52 @@ export async function npo_bapp_count(npo_id: number) {
   return row?.c ?? 0;
 }
 
+/**
+ * the bank that pays out. the "default" row; failing that, the one "approved"
+ * row when it is the npo's only live bank. banks approved before an npo's
+ * first one took the default have no default, and payouts and commissions
+ * must keep paying them. two approved banks and no default stay unpicked:
+ * guessing between them would move money to the wrong account.
+ *
+ * production has npos with two "default" rows (written before one default per
+ * npo was enforced in the app). the one with the newest `updated_at` pays, so
+ * the choice does not hang on the order postgres returns rows in. `id` breaks
+ * a tie. `updated_at` is NOT NULL; the `date_created` fallback is belt and braces
+ */
 export async function npo_default_bapp(npo_id: number) {
-  const [row] = await db
+  const rows = await db
     .select()
     .from(banking_apps)
     .where(
-      and(eq(banking_apps.npo_id, npo_id), eq(banking_apps.status, "default"))
+      and(
+        eq(banking_apps.npo_id, npo_id),
+        inArray(banking_apps.status, ["default", "approved"])
+      )
+    )
+    .orderBy(
+      desc(
+        sql`coalesce(${banking_apps.updated_at}, ${banking_apps.date_created})`
+      ),
+      desc(banking_apps.id)
+    );
+  const def = rows.find((r) => r.status === "default");
+  if (def) return def;
+  return rows.length === 1 ? rows[0] : undefined;
+}
+
+/** a bank application waits for review: it pays out once approved */
+export async function npo_bapp_in_review(npo_id: number) {
+  const [row] = await db
+    .select({ id: banking_apps.id })
+    .from(banking_apps)
+    .where(
+      and(
+        eq(banking_apps.npo_id, npo_id),
+        eq(banking_apps.status, "under-review")
+      )
     )
     .limit(1);
-  return row;
+  return !!row;
 }
 
 interface BappCursor {
@@ -217,6 +254,43 @@ export async function bapp_set_default(
         )
       );
     return true;
+  });
+}
+
+/**
+ * approve `id`, as the npo's default when it has none. under the row lock
+ * `bapp_set_default` takes, so of two approvals at once only the first sees
+ * no default. only an `under-review` row moves: a verdict that committed after
+ * the caller's read stands. returns the row's id and status as they were —
+ * anything but `under-review` means nothing changed — undefined when `id` is
+ * not the npo's
+ */
+export async function bapp_approve(id: string, npo_id: number) {
+  return db.transaction(async (tx) => {
+    const locked = await tx
+      .select({ id: banking_apps.id, status: banking_apps.status })
+      .from(banking_apps)
+      .where(eq(banking_apps.npo_id, npo_id))
+      .orderBy(banking_apps.id)
+      .for("update");
+    const prev = locked.find((r) => r.id === id);
+    if (!prev) return undefined;
+    const has_default = locked.some(
+      (r) => r.id !== id && r.status === "default"
+    );
+    // the row lock above means `prev.status` is what this guard sees, so
+    // `prev` reporting under-review is the update having landed
+    await tx
+      .update(banking_apps)
+      .set({
+        status: has_default ? "approved" : "default",
+        rejection_reason: "",
+        updated_at: new Date().toISOString(),
+      })
+      .where(
+        and(eq(banking_apps.id, id), eq(banking_apps.status, "under-review"))
+      );
+    return prev;
   });
 }
 

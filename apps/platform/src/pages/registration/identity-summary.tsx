@@ -1,5 +1,6 @@
 import { href, NavLink } from "react-router";
 import type { IReg } from "@/reg";
+import { EDITABLE } from "@/reg/schema";
 
 type Props = {
   reg: IReg;
@@ -33,8 +34,8 @@ export function IdentitySummary({ reg, classes = "" }: Props) {
         {label ?? "Organization type not set"}
         {detail ? ` · ${detail}` : ""}
       </span>
-      {/* in review, approved and rejected are all closed to edits */}
-      {reg.status === "01" && (
+      {/* in review and approved are closed to edits; rejected is reopened */}
+      {reg.status && EDITABLE.includes(reg.status) && (
         <NavLink
           to={href("/register/:reg_id/identity", { reg_id: reg.id })}
           className="ml-auto underline link"

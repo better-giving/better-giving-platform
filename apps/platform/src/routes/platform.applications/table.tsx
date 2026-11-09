@@ -9,6 +9,8 @@ import type { TRegsSortKey } from "@/reg/schema";
 
 interface Props extends IPaginator<IReg> {
   empty_msg?: string;
+  /** the `STRIPE_CONNECT_ROUTING` switch, for each draft's step dots */
+  connect_routing: boolean;
 }
 
 const step_labels = ["Contact", "Org", "Agreement", "Banking"];
@@ -20,6 +22,7 @@ export function Table({
   loading,
   load_next,
   empty_msg = "No applications found",
+  connect_routing,
 }: Props) {
   const [params, setParams] = useSearchParams();
   const sort_key = (params.get("sort_key") ?? "updated_at") as TRegsSortKey;
@@ -97,7 +100,11 @@ export function Table({
                 <td className="whitespace-nowrap">{toPP(row.updated_at)}</td>
                 <td>{row.o_hq_country}</td>
                 <td>
-                  <Status status={row.status} reg={row} />
+                  <Status
+                    status={row.status}
+                    reg={row}
+                    connect_routing={connect_routing}
+                  />
                 </td>
                 <td>
                   <NavLink
@@ -155,10 +162,11 @@ const text: { [key in TStatus]: string } = {
 interface IStatusProps {
   status: TStatus;
   reg: IReg;
+  connect_routing: boolean;
 }
 
-function Status({ status, reg }: IStatusProps) {
-  const progress = status === "01" ? new Progress(reg) : null;
+function Status({ status, reg, connect_routing }: IStatusProps) {
+  const progress = status === "01" ? new Progress(reg, connect_routing) : null;
 
   return (
     <div className="inline-flex flex-col items-center gap-1.5">

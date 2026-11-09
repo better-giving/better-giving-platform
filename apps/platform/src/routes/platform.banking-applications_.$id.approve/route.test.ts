@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { doc_args } from "#/__tests__/fixtures/route-args";
 
 const q = vi.hoisted(() => ({
+  bapp_approve: vi.fn(),
   bapp_get: vi.fn(),
   bapp_update_status: vi.fn(),
-  npo_bapp_count: vi.fn(),
+  npo_default_bapp: vi.fn(),
 }));
 const wise = vi.hoisted(() => ({ v2_account: vi.fn() }));
 
@@ -110,14 +111,12 @@ describe("the approve submit, posted around the page", () => {
 
   it("approves an application under review whose account wise returns", async () => {
     q.bapp_get.mockResolvedValue(bapp("under-review"));
-    q.npo_bapp_count.mockResolvedValue(2);
-    q.bapp_update_status.mockResolvedValue({ status: "under-review" });
+    q.npo_default_bapp.mockResolvedValue({ id: "39999", status: "default" });
+    q.bapp_approve.mockResolvedValue({ status: "under-review" });
 
     await submit("approved");
 
-    expect(q.bapp_update_status).toHaveBeenCalledWith(String(BAPP_ID), {
-      status: "approved",
-    });
+    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7);
   });
 
   it("still lets a reject through while wise is down", async () => {

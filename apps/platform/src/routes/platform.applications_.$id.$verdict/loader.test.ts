@@ -13,6 +13,14 @@ vi.mock("$/kit/wise", () => ({ wise }));
 vi.mock("$/kit/queue", () => ({ enqueue: vi.fn(), in_dedupe_window: vi.fn() }));
 vi.mock("#/errors/report", () => ({ report_degraded_null: () => null }));
 vi.mock("./npo-new", () => ({ npo_new: vi.fn(), announce_approval: vi.fn() }));
+const routing = vi.hoisted(() => ({ on: true }));
+vi.mock("$/env", () => ({
+  stripe: {
+    get connect_routing() {
+      return routing.on;
+    },
+  },
+}));
 
 import { loader } from "./route";
 
@@ -47,6 +55,7 @@ beforeEach(() => {
   reg_get.mockReset();
   wise.v2_account.mockReset();
   wise.v2_account.mockResolvedValue({ id: 777, currency: "USD" });
+  routing.on = true;
 });
 
 describe("the approve prompt opened by URL", () => {
@@ -67,6 +76,24 @@ describe("the approve prompt opened by URL", () => {
 
   it("sends an application with no bank account on file back to its detail page", async () => {
     reg_get.mockResolvedValue(reg({ o_bank_id: null }));
+
+    expect(await redirected_to("approved")).toBe(DETAIL);
+  });
+
+  it("renders for a stripe-only application without reading wise", async () => {
+    reg_get.mockResolvedValue(
+      reg({ o_bank_id: null, o_stripe_account_id: "acct_1" })
+    );
+
+    expect(await redirected_to("approved")).toBeNull();
+    expect(wise.v2_account).not.toHaveBeenCalled();
+  });
+
+  it("sends a stripe-only application back to its detail page while routing is off", async () => {
+    routing.on = false;
+    reg_get.mockResolvedValue(
+      reg({ o_bank_id: null, o_stripe_account_id: "acct_1" })
+    );
 
     expect(await redirected_to("approved")).toBe(DETAIL);
   });

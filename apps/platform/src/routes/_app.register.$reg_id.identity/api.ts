@@ -7,7 +7,8 @@ import { routes, steps } from "#/pages/registration/routes";
 import { resp } from "@/helpers/https";
 import type { IRegStartFv } from "@/reg";
 import { Progress } from "@/reg/progress";
-import { reg_id } from "@/reg/schema";
+import { EDITABLE, reg_id } from "@/reg/schema";
+import { stripe as stripe_env } from "$/env";
 import { reg_get } from "$/pg/queries/registration";
 import type { Route } from "./+types/route";
 
@@ -30,8 +31,11 @@ export const loader = async ({ params, request, url }: Route.LoaderArgs) => {
     const to = `../../${routes.success}?name=${reg.o_name}&id=${reg.status_approved_npo_id}`;
     return redirect(to);
   }
-  // submitted or rejected — the wizard is read-only, and so is the identity
-  if (reg.status !== "01") return redirect(`../${steps.summary}`);
+  // in review — the wizard is read-only, and so is the identity. a rejected
+  // one stays open, as every other step does for its resubmit.
+  if (!reg.status || !EDITABLE.includes(reg.status)) {
+    return redirect(`../${steps.summary}`);
+  }
 
   /* a row with no `o_type` at all predates the column, so nothing on it says
    * which branch it belonged to except an hq country that isn't the one the
@@ -44,7 +48,7 @@ export const loader = async ({ params, request, url }: Route.LoaderArgs) => {
 
   return {
     /** where "Cancel" goes back to */
-    step: new Progress(reg).step,
+    step: new Progress(reg, stripe_env.connect_routing).step,
     values: {
       o_type,
       o_ein: reg.o_ein ?? "",

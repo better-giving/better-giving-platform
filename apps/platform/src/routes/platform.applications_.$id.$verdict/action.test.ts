@@ -59,6 +59,20 @@ vi.mock("$/kit/wise", () => ({
   },
 }));
 
+const routing = vi.hoisted(() => ({ on: true }));
+vi.mock("$/env", async (importOriginal) => {
+  const env = await importOriginal<typeof import("$/env")>();
+  return {
+    ...env,
+    stripe: {
+      ...env.stripe,
+      get connect_routing() {
+        return routing.on;
+      },
+    },
+  };
+});
+
 // the delivery half: the handler the approval's payload lands in, with its
 // outbound calls stubbed so only its branching is exercised.
 vi.mock("$/email", () => ({
@@ -77,7 +91,12 @@ vi.mock("#/routes/api.q-handler.$event/handle-reg/hubspot", () => ({
 vi.mock("#/.server/auth/auth", () => ({ auth: {} }));
 const report_error = vi.hoisted(() => vi.fn());
 vi.mock("#/errors/report", () => ({ report_error }));
+const accounts = vi.hoisted(() => ({ retrieve: vi.fn() }));
+vi.mock("$/kit/stripe", () => ({ stripe: { accounts } }));
 
+import type { ReactNode } from "react";
+import { render } from "react-email";
+import Stripe from "stripe";
 import { handle_reg_updated } from "#/routes/api.q-handler.$event/handle-reg";
 import { DEDUPE_WINDOW_MS, enqueue } from "$/kit/queue";
 import { wise } from "$/kit/wise";
@@ -107,6 +126,14 @@ const IN_REVIEW = {
   o_bank_statement: "https://example.com/bank.pdf",
 } as const;
 
+/** an account stripe has heard nothing from yet */
+const NOT_READY = {
+  charges_enabled: false,
+  payouts_enabled: false,
+  details_submitted: false,
+  requirements: { currently_due: [] },
+};
+
 beforeAll(async () => {
   test_db.current = await create_test_db();
 }, 30_000);
@@ -117,6 +144,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   test_db.before_update = () => {};
+  routing.on = true;
   const db = test_db.current!.db;
   await db.delete(user_npo_memberships);
   await db.delete(banking_apps);
@@ -127,6 +155,7 @@ beforeEach(async () => {
   send_email.mockClear();
   report_error.mockClear();
   vi.mocked(wise.v2_account).mockClear();
+  accounts.retrieve.mockReset().mockResolvedValue(NOT_READY);
 
   await db.insert(user).values({
     id: "u-1",
@@ -246,7 +275,6 @@ describe("approve", () => {
       stripe_payouts_enabled: false,
       stripe_details_submitted: false,
       stripe_requirements_due: [],
-      stripe_synced_at: null,
     });
   });
 
@@ -255,6 +283,132 @@ describe("approve", () => {
 
     const [npo] = await test_db.current!.db.select().from(npos);
     expect(npo?.stripe_account_id).toBeNull();
+    expect(accounts.retrieve).not.toHaveBeenCalled();
+  });
+
+  describe("a stripe-only registration", () => {
+    const stripe_only = () =>
+      test_db.current!.db.update(registrations).set({
+        o_bank_id: null,
+        o_bank_statement: null,
+        o_stripe_account_id: "acct_only",
+      });
+
+    test("approves into an npo with no bank, without asking wise", async () => {
+      await stripe_only();
+
+      const res = await verdict("approved");
+
+      expect(res.status).toBe(302);
+      const db = test_db.current!.db;
+      const [npo] = await db.select().from(npos);
+      expect(npo?.stripe_account_id).toBe("acct_only");
+      expect(await db.select().from(banking_apps)).toEqual([]);
+      expect(wise.v2_account).not.toHaveBeenCalled();
+      expect(enqueued.map((m) => m.id)).toEqual(["reg-updated"]);
+      expect((await reg_get(RID))?.status_approved_npo_id).toBe(npo?.id);
+    });
+
+    test("reads the account's readiness from stripe onto the new npo", async () => {
+      await stripe_only();
+      accounts.retrieve.mockResolvedValue({
+        charges_enabled: true,
+        payouts_enabled: true,
+        details_submitted: true,
+        requirements: { currently_due: [] },
+      });
+
+      await verdict("approved");
+
+      expect(accounts.retrieve).toHaveBeenCalledWith("acct_only");
+      const [npo] = await test_db.current!.db.select().from(npos);
+      expect(npo).toMatchObject({
+        stripe_charges_enabled: true,
+        stripe_payouts_enabled: true,
+        stripe_details_submitted: true,
+        stripe_synced_at: expect.any(String),
+      });
+    });
+
+    test("approves when stripe can't be read, leaving the mirror for later", async () => {
+      await stripe_only();
+      const down = new Stripe.errors.StripeAPIError({ message: "stripe down" });
+      accounts.retrieve.mockRejectedValue(down);
+
+      const res = await verdict("approved");
+
+      expect(res.status).toBe(302);
+      expect((await reg_get(RID))?.status).toBe("03");
+      expect(reg_updates()).toHaveLength(1);
+      const [npo] = await test_db.current!.db.select().from(npos);
+      expect(npo?.stripe_synced_at).toBeNull();
+      expect(report_error).toHaveBeenCalledWith(down);
+    });
+
+    describe("whose account was disconnected in review", () => {
+      // what `reg_stripe_deauthorize` leaves on a review row
+      const disconnected = async () => {
+        await stripe_only();
+        await test_db.current!.db.update(registrations).set({
+          o_stripe_account_id: null,
+        });
+      };
+
+      test("refuses approval, saying why", async () => {
+        await disconnected();
+
+        const res = await verdict("approved");
+
+        expect(res.status).toBe(400);
+        expect(await res.text()).toMatch(/stripe account was disconnected/i);
+        expect((await reg_get(RID))?.status).toBe("02");
+        expect(await test_db.current!.db.select().from(npos)).toEqual([]);
+      });
+
+      test("is rejected, and the applicant mailed", async () => {
+        await disconnected();
+
+        const res = await verdict("rejected", "stripe disconnected");
+
+        expect(res.status).toBe(302);
+        expect((await reg_get(RID))?.status).toBe("04");
+        expect(reg_updates()).toHaveLength(1);
+      });
+    });
+
+    test("is refused while routing is off", async () => {
+      routing.on = false;
+      await stripe_only();
+
+      const res = await verdict("approved");
+
+      expect(res.status).toBe(400);
+      expect((await reg_get(RID))?.status).toBe("02");
+      expect(await test_db.current!.db.select().from(npos)).toEqual([]);
+    });
+
+    test("is rejected while routing is off", async () => {
+      routing.on = false;
+      await stripe_only();
+
+      const res = await verdict("rejected", "docs incomplete");
+
+      expect(res.status).toBe(302);
+      expect((await reg_get(RID))?.status).toBe("04");
+      expect(reg_updates()).toHaveLength(1);
+    });
+
+    test("approved, is announced again after routing goes off", async () => {
+      await stripe_only();
+      await verdict("approved");
+      enqueued.length = 0;
+      routing.on = false;
+
+      const res = await verdict("approved");
+
+      expect(res.status).toBe(302);
+      expect(reg_updates()).toHaveLength(1);
+    });
   });
 
   // a stale prompt pressed long after: the same keys would mail again
@@ -414,6 +568,44 @@ describe("approve", () => {
 });
 
 describe("reject", () => {
+  const STRIPE_LINE =
+    "Your Stripe account is still connected to this application. If you're not reapplying, you can disconnect Better Giving from your Stripe dashboard.";
+  // every rejected application is editable, so every applicant resubmits
+  const RESUBMIT_LINE =
+    "You can rectify these issues and resubmit this application. If you have any questions at all, just get in touch at";
+  /** the rejection mail as the applicant reads it */
+  const mailed_text = async () => {
+    await handle_reg_updated(reg_updates()[0].payload as any);
+    const { node } = send_email.mock.calls[0][0] as unknown as {
+      node: ReactNode;
+    };
+    return (await render(node, { plainText: true })).replace(/\s+/g, " ");
+  };
+
+  test("tells an applicant whose stripe account stays connected how to disconnect it", async () => {
+    await test_db
+      .current!.db.update(registrations)
+      .set({ o_stripe_account_id: "acct_kept" });
+
+    await verdict("rejected", "docs incomplete");
+
+    const text = await mailed_text();
+    expect(text).toContain("docs incomplete");
+    expect(text).toContain(STRIPE_LINE);
+    expect(text).toContain(RESUBMIT_LINE);
+    expect(text.match(/resubmit/gi)).toHaveLength(1);
+    expect(text).not.toContain("new application");
+  });
+
+  test("says nothing of stripe to an applicant who never connected it", async () => {
+    await verdict("rejected", "docs incomplete");
+
+    const text = await mailed_text();
+    expect(text).not.toMatch(/stripe/i);
+    expect(text).toContain(RESUBMIT_LINE);
+    expect(text).not.toContain("new application");
+  });
+
   test("a retry after the enqueue threw succeeds and enqueues", async () => {
     vi.mocked(enqueue).mockRejectedValueOnce(new Error("qstash down"));
     await expect(verdict("rejected")).rejects.toThrow("qstash down");

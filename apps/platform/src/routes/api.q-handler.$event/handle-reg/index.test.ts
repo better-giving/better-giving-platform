@@ -12,6 +12,7 @@ const send_email_or_throw = vi.hoisted(() =>
   }))
 );
 const enqueued = vi.hoisted(() => [] as { id: string; payload: any }[]);
+const routing = vi.hoisted(() => ({ on: true }));
 
 // --- mocks ---
 
@@ -27,6 +28,19 @@ vi.mock("$/pg/db", () => ({
     }
   ),
 }));
+
+vi.mock("$/env", async (importOriginal) => {
+  const env = await importOriginal<typeof import("$/env")>();
+  return {
+    ...env,
+    stripe: {
+      ...env.stripe,
+      get connect_routing() {
+        return routing.on;
+      },
+    },
+  };
+});
 
 vi.mock("$/email", () => ({
   send_email_or_throw,
@@ -121,6 +135,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  routing.on = true;
   enqueued.length = 0;
   const db = test_db.current!.db;
   await db.delete(verification);
@@ -311,6 +326,35 @@ describe("handle_reg_created", () => {
       0
     );
   });
+
+  // a stripe account answers banking only while routing is on, so the mail's
+  // link is the one place the handler reads the switch
+  it.each([
+    [true, 5],
+    [false, 4],
+  ])(
+    "links an application holding only a stripe account to its step: routing %s",
+    async (on, step) => {
+      routing.on = on;
+      await verified("founder@example.org");
+      const rid = await seed_reg("founder@example.org", {
+        ...mid_way,
+        // stripe serves a US organization only
+        o_hq_country: "United States",
+        o_stripe_account_id: "acct_1",
+      });
+
+      await handle_reg_created({
+        id: rid,
+        r_id: "founder@example.org",
+        unproven: false,
+      });
+
+      expect(link_in_mail(await sent_html(), rid)).toBe(
+        `${BASE_URL}/register/${rid}/${step}`
+      );
+    }
+  );
 
   it("outlives a login link without lengthening one", async () => {
     await create_unverified_user({ email: "lead@example.org" });

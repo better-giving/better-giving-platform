@@ -1291,7 +1291,7 @@ describe("new_application", () => {
       .where(eq(registrations.id, created.id));
 
     const row = await get_reg(created.id);
-    expect(new Progress(row as unknown as IReg).step).toBe(5);
+    expect(new Progress(row as unknown as IReg, true).step).toBe(5);
   });
 
   it("writes o_type together with country + registration number on the international branch", async () => {

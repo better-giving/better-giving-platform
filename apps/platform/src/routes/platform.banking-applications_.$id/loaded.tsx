@@ -70,8 +70,9 @@ export function Loaded(props: LoaderData) {
       </dl>
       {props.wacc_unavailable && (
         <p className="text-sm text-gray-11 -mt-2">
-          Bank account details couldn't be loaded from Wise, so this application
-          can't be approved right now. Everything else on it is up to date.
+          Bank account details couldn't be loaded from the payout provider, so
+          this application can't be approved right now. Everything else on it is
+          up to date.
         </p>
       )}
       <Actions>

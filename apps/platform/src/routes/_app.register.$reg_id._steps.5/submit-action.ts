@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { type ActionFunctionArgs, redirect } from "react-router";
 import { safeParse } from "valibot";
 import { get_session, to_auth } from "#/.server/auth";
@@ -7,9 +8,17 @@ import { resp } from "@/helpers/https";
 import { msg } from "@/queue";
 import { Progress } from "@/reg/progress";
 import { EDITABLE, reg_id } from "@/reg/schema";
+import { stripe as stripe_env } from "$/env";
 import { enqueue, in_dedupe_window } from "$/kit/queue";
 import { db } from "$/pg/db";
-import { reg_get, reg_update_from } from "$/pg/queries/registration";
+import {
+  reg_get,
+  reg_update_from,
+  type TRegAttrs,
+  type TRegCas,
+} from "$/pg/queries/registration";
+import { registrations } from "$/pg/schema/registration";
+import { held_elsewhere, lock_acct } from "$/stripe-connect/target";
 
 export const submit_action = async ({
   request,
@@ -25,19 +34,24 @@ export const submit_action = async ({
   const reg = await reg_get(id);
 
   if (!reg) throw resp.status(404, `reg:${id} not found`);
-
-  const r = new Progress(reg).banking;
-  if (!r) throw resp.status(400, "Registration not ready for submission");
-
-  if (user.email !== r.r_id && user.role !== "admin") {
+  // before readiness: why it can't submit names the nonprofit's stripe standing
+  if (user.email !== reg.r_id && user.role !== "admin") {
     throw resp.status(403);
   }
 
+  const routing_on = stripe_env.connect_routing;
+  const prog = new Progress(reg, routing_on);
+  const r = prog.banking_with(routing_on);
+  if (!r) return resp.fail(400, not_ready(prog, routing_on));
+
   //reset previous review
-  const { won, row } = await reg_update_from(db, r.id, EDITABLE, {
-    status: "02",
-    status_rejected_reason: null,
-  });
+  const to_review = { status: "02", status_rejected_reason: null } as const;
+  const acct = r.o_stripe_account_id;
+  const res = acct
+    ? await submit_holding(r.id, acct, to_review)
+    : await reg_update_from(db, r.id, EDITABLE, to_review);
+  if ("refusal" in res) return resp.fail(409, res.refusal);
+  const { won, row } = res;
   // in review on a miss too: an earlier press committed this submit. inside
   // qstash's dedupe window its message is enqueued again under the same key,
   // which reaches the queue only if the first enqueue never did. past the
@@ -46,7 +60,7 @@ export const submit_action = async ({
   if (row?.status !== "02") {
     const exit = row && wizard_exit(row, 5);
     if (exit) return redirect(exit);
-    throw resp.status(
+    return resp.fail(
       409,
       "This application has already been submitted or approved."
     );
@@ -61,3 +75,51 @@ export const submit_action = async ({
     "Your application has been submitted. We will get back to you soon!"
   );
 };
+
+/** why `prog` can't submit, in the applicant's words once only step 4 is left */
+const not_ready = (prog: Progress, routing_on: boolean) => {
+  if (prog.step < 4) return "Registration not ready for submission";
+  if (!prog.stripe_eligible) {
+    return "Stripe isn't available to this nonprofit, so it needs a bank account. Add one to submit.";
+  }
+  if (!routing_on) {
+    return "We aren't paying out through Stripe right now, so you need a bank account to get paid. Add one to submit.";
+  }
+  return "You need a bank account or a Stripe account to get paid. Add one to submit.";
+};
+
+/** the submit of a registration holding `acct`, under the claim lock, or the
+ * applicant's reason it could not be — nothing is written in that case. a claim
+ * elsewhere skips a rejected holder in `held_elsewhere`, and its
+ * `release_rejected` skips one already back in review, so a resubmit racing
+ * that claim would leave both holding the account: only the resubmit, holding
+ * the same lock, can see the other claim and refuse */
+const submit_holding = (
+  id: string,
+  acct: string,
+  attrs: TRegAttrs
+): Promise<TRegCas | { refusal: string }> =>
+  db.transaction(async (tx) => {
+    await lock_acct(tx, acct);
+    if (await held_elsewhere(acct, { kind: "reg", reg_id: id }, tx)) {
+      return {
+        refusal:
+          "This Stripe account is now connected elsewhere on Better Giving. Connect a different account or add a bank account, then submit again.",
+      };
+    }
+    const res = await reg_update_from(
+      tx,
+      id,
+      EDITABLE,
+      attrs,
+      eq(registrations.o_stripe_account_id, acct)
+    );
+    // still editable, so the account moved off this row since it was read
+    if (!res.won && res.row?.status && EDITABLE.includes(res.row.status)) {
+      return {
+        refusal:
+          "Your banking details changed while you were submitting. Check them and submit again.",
+      };
+    }
+    return res;
+  });

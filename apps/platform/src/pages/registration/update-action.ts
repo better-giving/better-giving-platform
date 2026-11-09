@@ -1,4 +1,4 @@
-import { type ActionFunction, redirect } from "react-router";
+import { type ActionFunction, redirect, replace } from "react-router";
 import { safeParse } from "valibot";
 import { check_email_url, request_login_link, to_auth } from "#/.server/auth";
 import { reg_user } from "#/pages/registration/data/reg-user";
@@ -13,6 +13,7 @@ import {
   reg_id,
   reg_update as reg_update_schema,
 } from "@/reg/schema";
+import { stripe as stripe_env } from "$/env";
 import { enqueue } from "$/kit/queue";
 import { db } from "$/pg/db";
 import {
@@ -28,6 +29,11 @@ export interface IUpdateActionOpts {
   /** the contact step: reachable by a draft-grant holder, whose address is not
    * proven yet. finishing it is what asks for the proof. */
   registrant?: boolean;
+  /** redirect to `next` even when the application is already complete, where
+   * a save otherwise goes straight to the summary. banking: its saved state is
+   * where the stripe card shows. the redirect replaces the history entry, so
+   * a `next` that is the posting step itself leaves no duplicate behind Back. */
+  next_always?: boolean;
 }
 
 /** `next` is a function where the step it hands off to depends on the
@@ -64,7 +70,7 @@ export const update_action =
     const attrs: TRegAttrs = { ...fields, status: "01" as const };
 
     //resets
-    const prog = new Progress(reg);
+    const prog = new Progress(reg, stripe_env.connect_routing);
     const done_fsa_url = prog.fsa_url;
 
     const contact_changed =
@@ -110,6 +116,8 @@ export const update_action =
       return redirect(check_email_url({ email: user.email, redirect_to: to }));
     }
 
-    if (prog.step === 5) return redirect(`../${steps.summary}`);
-    return redirect(`../${typeof next === "string" ? next : next(reg)}`);
+    if (prog.step === 5 && !opts?.next_always)
+      return redirect(`../${steps.summary}`);
+    const to = `../${typeof next === "string" ? next : next(reg)}`;
+    return opts?.next_always ? replace(to) : redirect(to);
   };

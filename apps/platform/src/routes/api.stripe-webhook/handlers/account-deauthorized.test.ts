@@ -320,12 +320,9 @@ describe("account.application.deauthorized → npo disconnected", () => {
       return npo!;
     };
 
-    it.each([
-      ["no bank details", undefined],
-      ["bank details still in review", "under-review" as const],
-    ])("is flagged to ops when the npo has %s", async (_case, status) => {
-      const npo = await seed_with_bank(`deauth-nobank-${status}`, status);
-      const ev = event(`acct_deauth-nobank-${status}`, T);
+    it("is flagged to ops when the npo has no bank details", async () => {
+      const npo = await seed_with_bank("deauth-nobank");
+      const ev = event("acct_deauth-nobank", T);
 
       await handle_account_deauthorized(ev);
 
@@ -336,17 +333,38 @@ describe("account.application.deauthorized → npo disconnected", () => {
           payload: expect.objectContaining({
             id: ev.id,
             alert: expect.objectContaining({
-              body: expect.stringContaining(`npo ${npo.id}`),
+              title: "Disconnected Nonprofit Has No Way To Get Paid",
+              body: [
+                `npo ${npo.id} disconnected stripe account acct_deauth-nobank (event ${ev.id}).`,
+                "it has no default bank details and no stripe account left: every donation is held in its better giving balance until it adds bank details. reconnecting stripe only routes its new stripe donations.",
+              ].join("\n"),
             }),
           }),
         })
       );
     });
 
-    it("is not flagged when the npo's payouts have somewhere to go", async () => {
-      await seed_with_bank("deauth-bank", "default");
+    it("a redelivered disconnect re-sends the same keyed notice", async () => {
+      await seed_with_bank("deauth-nobank-again");
+      const ev = event("acct_deauth-nobank-again", T);
 
-      await handle_account_deauthorized(event("acct_deauth-bank", T));
+      await handle_account_deauthorized(ev);
+      await handle_account_deauthorized(ev);
+
+      expect(enqueue).toHaveBeenCalledTimes(2);
+      const [first, again] = enqueue.mock.calls.map(([m]) => m);
+      expect(again).toEqual(first);
+      expect(first.payload.id).toBe(ev.id);
+    });
+
+    // a bank in review pays out once approved, as the payouts page tells the npo
+    it.each([
+      ["a default bank", "default" as const],
+      ["bank details in review", "under-review" as const],
+    ])("is not flagged when the npo has %s", async (_case, status) => {
+      await seed_with_bank(`deauth-bank-${status}`, status);
+
+      await handle_account_deauthorized(event(`acct_deauth-bank-${status}`, T));
 
       expect(enqueue).not.toHaveBeenCalled();
     });

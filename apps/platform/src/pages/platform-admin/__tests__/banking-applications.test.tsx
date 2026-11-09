@@ -227,7 +227,7 @@ describe("wise outage", () => {
     const screen = await render_detail_live(bapp_id);
 
     await expect
-      .element(screen.getByText(/couldn't be loaded from wise/i))
+      .element(screen.getByText(/couldn't be loaded from the payout provider/i))
       .toBeInTheDocument();
     // the application row is ours and survives
     await expect
@@ -387,10 +387,10 @@ describe("approve flow", () => {
     );
   }
 
-  it("approves bapp — status becomes approved when npo has >1 bapp", async () => {
+  it("approves bapp — status becomes approved when npo already has a default", async () => {
     const npo = await seed_npo();
     const bapp_id = await seed_bapp(npo.id);
-    await seed_bapp(npo.id);
+    await seed_bapp(npo.id, { status: "default" });
     const row = await get_bapp(bapp_id);
 
     const screen = await render_with_approve(bapp_id, row);
@@ -443,6 +443,51 @@ describe("approve flow", () => {
     const updated = await get_bapp(bapp_id);
     expect(updated.status).toBe("default");
   });
+
+  it("defaults a bank filed after a rejected one", async () => {
+    const npo = await seed_npo();
+    await seed_bapp(npo.id, { status: "rejected" });
+    const bapp_id = await seed_bapp(npo.id);
+    const row = await get_bapp(bapp_id);
+
+    const screen = await render_with_approve(bapp_id, row);
+
+    await screen.getByRole("link", { name: /approve/i }).click();
+    await expect
+      .element(screen.getByText(/you are about to approve/i))
+      .toBeVisible();
+    (
+      screen.getByRole("button", { name: /submit/i }).element() as HTMLElement
+    ).click();
+    await expect.element(screen.getByTestId("success")).toBeVisible();
+
+    const updated = await get_bapp(bapp_id);
+    expect(updated.status).toBe("default");
+  });
+
+  it.each(["approved", "under-review"] as const)(
+    "defaults a bank filed beside an %s one when none is default",
+    async (sibling) => {
+      const npo = await seed_npo();
+      await seed_bapp(npo.id, { status: sibling });
+      const bapp_id = await seed_bapp(npo.id);
+      const row = await get_bapp(bapp_id);
+
+      const screen = await render_with_approve(bapp_id, row);
+
+      await screen.getByRole("link", { name: /approve/i }).click();
+      await expect
+        .element(screen.getByText(/you are about to approve/i))
+        .toBeVisible();
+      (
+        screen.getByRole("button", { name: /submit/i }).element() as HTMLElement
+      ).click();
+      await expect.element(screen.getByTestId("success")).toBeVisible();
+
+      const updated = await get_bapp(bapp_id);
+      expect(updated.status).toBe("default");
+    }
+  );
 
   it("approve button disabled after verdict", async () => {
     const npo = await seed_npo();
@@ -580,6 +625,85 @@ describe("reject flow", () => {
 });
 
 describe("action edge cases", () => {
+  // pglite is one connection, so the two transactions run one after the other
+  // whether or not `bapp_approve` locks the rows; the row lock itself cannot be
+  // raced here. what this holds is that "is there a default" is decided inside
+  // the write, after both presses have read the application
+  it("approvals that both read before either writes still leave one default", async () => {
+    const npo = await seed_npo();
+    const a = await seed_bapp(npo.id);
+    const b = await seed_bapp(npo.id);
+    // both reach the default check together, as two reviewers' presses do
+    let release = () => {};
+    const both_in = new Promise<void>((r) => {
+      release = r;
+    });
+    let entered = 0;
+    vi.mocked(wise.v2_account).mockImplementation(async () => {
+      if (++entered === 2) release();
+      await both_in;
+      return WISE_FIXTURE as never;
+    });
+    const approve = (id: string) => {
+      const form = new FormData();
+      form.set("type", "approved");
+      return (action as (...args: unknown[]) => Promise<unknown>)({
+        params: { id },
+        ...doc_args(
+          new Request(`http://test/platform/banking-applications/${id}`, {
+            method: "POST",
+            body: form,
+          })
+        ),
+        context: {},
+      });
+    };
+
+    await Promise.all([approve(a), approve(b)]);
+
+    const statuses = [(await get_bapp(a)).status, (await get_bapp(b)).status];
+    expect(statuses.sort()).toEqual(["approved", "default"]);
+  });
+
+  it("throws 409 and applies nothing when a rejection lands during the approve", async () => {
+    const npo = await seed_npo();
+    const id = await seed_bapp(npo.id);
+    // the rejection commits after the action read the application as under
+    // review and before the approve writes
+    vi.mocked(wise.v2_account).mockImplementationOnce(async () => {
+      await test_db
+        .current!.db.update(banking_apps)
+        .set({ status: "rejected", rejection_reason: "bad account" })
+        .where(eq(banking_apps.id, id));
+      return WISE_FIXTURE as never;
+    });
+    const form = new FormData();
+    form.set("type", "approved");
+
+    const thrown = await Promise.resolve(
+      (action as (...args: unknown[]) => unknown)({
+        params: { id },
+        ...doc_args(
+          new Request(`http://test/platform/banking-applications/${id}`, {
+            method: "POST",
+            body: form,
+          })
+        ),
+        context: {},
+      })
+    ).then(
+      () => undefined,
+      (e: unknown) => e
+    );
+
+    expect(thrown).toBeInstanceOf(Response);
+    expect((thrown as Response).status).toBe(409);
+    expect((await get_bapp(id)).status).toBe("rejected");
+    expect(get_outbox_events().some((e) => e.id === "banking-approved")).toBe(
+      false
+    );
+  });
+
   it("throws 404 for non-existent bapp", async () => {
     const form = new FormData();
     form.set("type", "approved");

@@ -1,4 +1,5 @@
 import { Outlet, useFetcher } from "react-router";
+import { FormNotice } from "#/pages/@sections/form-notice";
 import { step_loader } from "#/pages/registration/data/step-loader";
 import type { Route } from "./+types/route";
 import { EndowmentStatus } from "./endowment-status";
@@ -12,6 +13,9 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
   const fetcher = useFetcher({ key: "reg-sub" });
 
   const is_steps_disabled = fetcher.state !== "idle" || reg.status === "02";
+  // a refusal is `resp.fail`'s body; a landed submit answers `{ first }`
+  const refusal: string | undefined =
+    fetcher.state === "idle" ? fetcher.data?.message : undefined;
 
   return (
     <div className="grid">
@@ -27,6 +31,7 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
       {reg.o_type === "other" && <Step num={3} disabled={is_steps_disabled} />}
       <Step num={4} disabled={is_steps_disabled} />
 
+      {refusal && <FormNotice classes="mt-6">{refusal}</FormNotice>}
       <EndowmentStatus status={reg.status} classes="mt-6" />
       {/** render prompts */}
       <Outlet />

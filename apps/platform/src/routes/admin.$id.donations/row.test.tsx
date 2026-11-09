@@ -114,3 +114,67 @@ describe("a reversed donation's net", () => {
     });
   });
 });
+
+describe("where a donation's net went", () => {
+  async function render_row(row: IRow) {
+    const Stub = createRoutesStub([
+      {
+        path: "/",
+        Component: () => (
+          <table>
+            <tbody>
+              <tr>
+                <Row {...row} />
+              </tr>
+            </tbody>
+          </table>
+        ),
+      },
+    ]);
+    const screen = await render(<Stub initialEntries={["/"]} />);
+    const cells = screen.getByRole("cell");
+    await expect.element(cells.first()).toBeVisible();
+    const [net, allocation] = cells.elements().slice(6, 8);
+    return {
+      flow: allocation.textContent,
+      struck:
+        getComputedStyle(net.firstElementChild as HTMLElement)
+          .textDecorationLine === "line-through",
+    };
+  }
+  const settled = { ...refunded, status: "settled" } satisfies IRow;
+
+  test("a transferred stripe-routed donation says it was paid out to stripe", async () => {
+    const { flow } = await render_row({
+      ...settled,
+      stripe_payout: "paid_out",
+    });
+    expect(flow).toBe("$14.32- Paid out to Stripe");
+  });
+
+  test("a stripe-routed donation with no transfer yet says it is sending", async () => {
+    const { flow } = await render_row({ ...settled, stripe_payout: "sending" });
+    expect(flow).toBe("$14.32- Sending to Stripe");
+  });
+
+  test("a pooled donation keeps its grant, savings and investments split", async () => {
+    const { flow } = await render_row({
+      ...settled,
+      net_usd: 100,
+      allocation: { cash: 50, liq: 30, lock: 20 },
+    });
+    expect(flow).toBe("$50.00- Grant$30.00- Savings$20.00- Investments");
+  });
+
+  test("a refunded stripe-routed donation still strikes its net", async () => {
+    expect(
+      await render_row({ ...refunded, stripe_payout: "paid_out" })
+    ).toEqual({ flow: "$14.32- Paid out to Stripe", struck: true });
+  });
+
+  test("a stripe-routed donation refunded before its transfer says it was not sent", async () => {
+    expect(
+      await render_row({ ...refunded, stripe_payout: "not_sent" })
+    ).toEqual({ flow: "$14.32- Not sent to Stripe", struck: true });
+  });
+});

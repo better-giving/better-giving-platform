@@ -30,7 +30,20 @@ vi.mock("$/pg/db", () => ({
     }
   ),
 }));
+const routing = vi.hoisted(() => ({ on: true }));
 vi.mock("$/kit/stripe", () => ({ stripe }));
+vi.mock("$/env", async (importOriginal) => {
+  const real = await importOriginal<typeof import("$/env")>();
+  return {
+    ...real,
+    stripe: {
+      ...real.stripe,
+      get connect_routing() {
+        return routing.on;
+      },
+    },
+  };
+});
 vi.mock("#/.server/auth", async () =>
   (await import("$/auth/test-utils")).make_auth_mock()
 );
@@ -41,6 +54,7 @@ vi.mock("remix-client-cache", () => ({
 
 import { seed_npo } from "#/__tests__/fixtures/funds";
 import { admin_ctx } from "$/auth/test-utils";
+import { banking_apps } from "$/pg/schema/banking";
 import { dists } from "$/pg/schema/dist";
 import { donations } from "$/pg/schema/donation";
 import { npos } from "$/pg/schema/npo";
@@ -72,6 +86,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   records.clear();
+  routing.on = true;
   vi.clearAllMocks();
   stripe.transfers.retrieve.mockImplementation(async (id: string) => {
     const t = records.get(id);
@@ -79,6 +94,7 @@ beforeEach(async () => {
     return { id, ...t };
   });
   await db().delete(payouts);
+  await db().delete(banking_apps);
   await db().delete(dists);
   await db().delete(donations);
   await db().delete(npos);
@@ -93,10 +109,18 @@ const listed = (amounts: number[]): IRecord["reversals"] => ({
   has_more: false,
 });
 
-async function npo(acct: string | null = null) {
+async function npo(
+  acct: string | null = null,
+  extra: Partial<typeof npos.$inferInsert> = {}
+) {
   const row = await seed_npo(db(), {
     registration_number: "EIN-SENT",
+    // ready, so a linked account routes
+    stripe_charges_enabled: true,
+    stripe_payouts_enabled: true,
+    stripe_details_submitted: true,
     ...(acct && { stripe_account_id: acct }),
+    ...extra,
   });
   npo_id = row!.id;
 }
@@ -156,6 +180,33 @@ async function payout(amount: number) {
   });
 }
 
+/** a Savings withdrawal waiting for a bank payout. a gift payout needs its
+ * dist for a rail, and `payout` seeds none */
+async function withdrawal(amount: number) {
+  await db().insert(payouts).values({
+    id: "p-liq",
+    source_id: "liq-1",
+    npo_id,
+    source: "liq",
+    date: "2026-07-04T00:00:00.000Z",
+    amount,
+    type: "pending",
+  });
+}
+
+/** a default bank payout on file, or one still `under-review` */
+async function bank(status: "default" | "under-review" = "default") {
+  await db().insert(banking_apps).values({
+    id: "bapp-1",
+    npo_id,
+    status,
+    bank_summary: "USD account ending in 4821",
+    bank_statement_url: "https://example.com/stmt.pdf",
+    rejection_reason: "",
+    date_created: "2026-06-01T00:00:00.000Z",
+  });
+}
+
 async function render_page() {
   const Stub = createRoutesStub([
     {
@@ -180,6 +231,16 @@ async function render_page() {
 
 const sent_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
   screen.getByRole("region", { name: "Sent to your Stripe account" });
+const earlier_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
+  screen.getByRole("region", { name: "Sent to Stripe earlier" });
+const where_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
+  screen.getByRole("region", { name: "Where your money shows" });
+const BANK_SUBHEAD =
+  "Sent to your bank every 3 days once your balance reaches your payout minimum.";
+const held_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
+  screen.getByRole("region", { name: "On hold until you add a bank account" });
+const no_wise = (screen: Awaited<ReturnType<typeof render_page>>) =>
+  expect(screen.container.textContent).not.toMatch(/\bwise\b|money-transfer/i);
 
 describe("the payouts page", () => {
   test("a nonprofit not on Connect still has the empty payouts table", async () => {
@@ -205,11 +266,13 @@ describe("the payouts page", () => {
     await expect.element(screen.getByText("$12.50")).toBeVisible();
     await expect.element(screen.getByText("Pending")).toBeVisible();
     expect(sent_region(screen).query()).toBeNull();
+    expect(where_region(screen).query()).toBeNull();
     expect(
       screen
         .getByRole("heading", { level: 2, name: "Payouts", exact: true })
         .query()
     ).toBeNull();
+    expect(screen.container.textContent).not.toMatch(/stripe/i);
   });
 
   test("a connected nonprofit with nothing sent keeps an empty state", async () => {
@@ -226,6 +289,14 @@ describe("the payouts page", () => {
     await expect
       .element(region.getByText("No transfers yet", { exact: true }))
       .toBeVisible();
+    await expect
+      .element(
+        region.getByText(
+          "Each donation paid through Stripe is sent here as its own transfer, after fees. What Stripe has paid on to your bank is in your Stripe dashboard."
+        )
+      )
+      .toBeVisible();
+    expect(region.getByText(/showing the most recent/i).query()).toBeNull();
     expect(
       screen.getByText("No payouts yet", { exact: true }).query()
     ).toBeNull();
@@ -237,7 +308,7 @@ describe("the payouts page", () => {
     expect(screen.getByText("$90.00").query()).toBeNull();
   });
 
-  test("renders each routed transfer's amount, date and standing", async () => {
+  test("renders each routed transfer's amount, date and standing, explaining no list it leaves out", async () => {
     await npo("acct_sent");
     await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
     await transfer("tr_part", 40, "2026-07-02T00:00:00.000Z", listed([2_500]));
@@ -280,10 +351,12 @@ describe("the payouts page", () => {
         .getByRole("heading", { level: 2, name: "Payouts", exact: true })
         .query()
     ).toBeNull();
+    expect(where_region(screen).query()).toBeNull();
   });
 
   test("a bank payout still shows when nothing has been sent to Stripe", async () => {
     await npo("acct_sent");
+    await bank();
     await payout(12.5);
 
     const screen = await render_page();
@@ -333,21 +406,309 @@ describe("the payouts page", () => {
     ).toBeNull();
   });
 
-  test("bank payouts stay beside the stripe list", async () => {
+  test("bank payouts stay beside the stripe list, each explained", async () => {
     await npo("acct_sent");
+    await bank();
     await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
     await payout(12.5);
 
     const screen = await render_page();
 
+    const where = where_region(screen);
+    await expect
+      .element(
+        where.getByText(
+          "Donations paid through Stripe (cards, digital wallets and bank debits), each sent as its own transfer, after fees."
+        )
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        where.getByText(
+          "PayPal, DAF grants, crypto, stocks, cheques, and any Stripe donations from before you connected Stripe: the Grant share of each, sent to your bank."
+        )
+      )
+      .toBeVisible();
     await expect.element(sent_region(screen).getByText("$90.00")).toBeVisible();
     await expect
       .element(
         screen.getByRole("heading", { level: 2, name: "Payouts", exact: true })
       )
       .toBeVisible();
+    await expect.element(screen.getByText(BANK_SUBHEAD)).toBeVisible();
     await expect.element(screen.getByText("$12.50")).toBeVisible();
     await expect.element(screen.getByText("Pending")).toBeVisible();
+    expect(held_region(screen).query()).toBeNull();
+    no_wise(screen);
+  });
+
+  test("a stripe-only nonprofit sees what waits for a bank, above the stripe list", async () => {
+    await npo("acct_sent");
+    await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+    await withdrawal(12.5);
+
+    const screen = await render_page();
+
+    const held = held_region(screen);
+    await expect
+      .element(held.getByText("$12.50", { exact: true }).first())
+      .toBeVisible();
+    await expect.element(held.getByText("Jul 4, 2026")).toBeVisible();
+    await expect
+      .element(held.getByRole("link", { name: "Add bank account" }))
+      .toHaveAttribute("href", `/admin/${npo_id}/banking/new`);
+    await expect.element(sent_region(screen).getByText("$90.00")).toBeVisible();
+    const [h, s] = [held, sent_region(screen)].map((l) => l.element());
+    expect(
+      h.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    // the held card lists the pending payouts, with no bank to send them to
+    expect(
+      screen
+        .getByRole("heading", { level: 2, name: "Payouts", exact: true })
+        .query()
+    ).toBeNull();
+    expect(where_region(screen).query()).toBeNull();
+    no_wise(screen);
+  });
+
+  // the bank table holds what the card does not: paid history, past a first
+  // page that the newest pending payouts would fill
+  test("a stripe-only nonprofit's bank table keeps its paid history and leaves pending to the held card", async () => {
+    await npo("acct_sent");
+    await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+    for (const day of [5, 6, 7, 8, 9]) {
+      await db()
+        .insert(payouts)
+        .values({
+          id: `p-liq-${day}`,
+          source_id: `liq-${day}`,
+          npo_id,
+          source: "liq",
+          date: `2026-07-0${day}T00:00:00.000Z`,
+          amount: day,
+          type: "pending",
+        });
+    }
+    await db().insert(payouts).values({
+      id: "p-paid",
+      source_id: "liq-paid",
+      npo_id,
+      source: "liq",
+      date: "2026-06-01T00:00:00.000Z",
+      amount: 77,
+      type: "settled",
+      settled_date: "2026-06-04T00:00:00.000Z",
+    });
+
+    const screen = await render_page();
+
+    await expect
+      .element(held_region(screen).getByText("$35.00", { exact: true }).first())
+      .toBeVisible();
+    const table = screen.getByRole("region", { name: "Payouts", exact: true });
+    await expect.element(table.getByText("$77.00")).toBeVisible();
+    expect(table.getByText("Pending").query()).toBeNull();
+    expect(table.getByRole("row").elements()).toHaveLength(2);
+  });
+
+  test("a stripe-only nonprofit with nothing waiting has no held card", async () => {
+    await npo("acct_sent");
+    await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+
+    const screen = await render_page();
+
+    await expect.element(sent_region(screen).getByText("$90.00")).toBeVisible();
+    expect(held_region(screen).query()).toBeNull();
+    expect(screen.getByText("Held right now").query()).toBeNull();
+  });
+
+  test("a disconnected nonprofit with no bank is told everything is held", async () => {
+    await npo("acct_sent", {
+      stripe_deauthorized_at: "2026-08-01T00:00:00.000Z",
+    });
+    await withdrawal(12.5);
+
+    const screen = await render_page();
+
+    const held = screen.getByRole("region", {
+      name: "No way to get paid right now",
+    });
+    await expect
+      .element(held.getByText("$12.50", { exact: true }).first())
+      .toBeVisible();
+    await expect
+      .element(held.getByRole("link", { name: "Connect Stripe" }))
+      .toHaveAttribute(
+        "href",
+        `/api/stripe-connect/start?kind=npo&npo_id=${npo_id}`
+      );
+    no_wise(screen);
+  });
+
+  test.each([
+    [
+      "routing is off",
+      async () => {
+        routing.on = false;
+        await npo("acct_sent");
+        await bank();
+      },
+    ],
+    [
+      "the nonprofit is fiscally sponsored",
+      async () => {
+        await npo("acct_sent", { fiscal_sponsored: true });
+        await bank();
+      },
+    ],
+  ])(
+    "when %s, past transfers read as history and the bank list stays",
+    async (_, seed) => {
+      await seed();
+      await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+
+      const screen = await render_page();
+
+      expect(sent_region(screen).query()).toBeNull();
+      const earlier = earlier_region(screen);
+      await expect.element(earlier.getByText("$90.00")).toBeVisible();
+      await expect
+        .element(
+          earlier.getByText(
+            "Stripe donations sent to your Stripe account before. New Stripe donations pay out to your bank. What Stripe has paid on to your bank is in your Stripe dashboard."
+          )
+        )
+        .toBeVisible();
+      const where = where_region(screen);
+      await expect
+        .element(
+          where.getByText(
+            "Stripe donations sent to your Stripe account before. New ones are not sent there."
+          )
+        )
+        .toBeVisible();
+      await expect
+        .element(
+          where.getByText(
+            "Everything sent to your bank, new Stripe donations included."
+          )
+        )
+        .toBeVisible();
+      expect(where.getByText(/its own transfer/).query()).toBeNull();
+      expect(where.getByText(/before you connected/).query()).toBeNull();
+      await expect
+        .element(
+          screen.getByRole("heading", {
+            level: 2,
+            name: "Payouts",
+            exact: true,
+          })
+        )
+        .toBeVisible();
+      await expect
+        .element(screen.getByText("No payouts yet", { exact: true }))
+        .toBeVisible();
+    }
+  );
+
+  test("a stripe-only nonprofit whose bank is under review is told it pays out once approved", async () => {
+    await npo("acct_sent");
+    await bank("under-review");
+    await withdrawal(12.5);
+
+    const screen = await render_page();
+
+    const held = screen.getByRole("region", {
+      name: "On hold until your bank account is approved",
+    });
+    await expect
+      .element(held.getByText("$12.50", { exact: true }).first())
+      .toBeVisible();
+    expect(held_region(screen).query()).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Add bank account" }).query()
+    ).toBeNull();
+  });
+
+  // Banking and the dashboard hold stripe to the same eligibility
+  test("a fiscally sponsored nonprofit with no bank gets no stripe held card, and is told new donations wait", async () => {
+    await npo("acct_sent", { fiscal_sponsored: true });
+    await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+    await withdrawal(12.5);
+
+    const screen = await render_page();
+
+    expect(screen.getByText("Held right now").query()).toBeNull();
+    await expect
+      .element(
+        earlier_region(screen).getByText(
+          /New Stripe donations wait in your Better Giving balance until you add a bank account\./
+        )
+      )
+      .toBeVisible();
+  });
+
+  test("a stripe nonprofit whose bank is under review is told new donations wait for its approval", async () => {
+    await npo("acct_sent", { fiscal_sponsored: true });
+    await bank("under-review");
+    await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+
+    const screen = await render_page();
+
+    await expect
+      .element(
+        earlier_region(screen).getByText(
+          /New Stripe donations wait in your Better Giving balance until your bank account is approved\./
+        )
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        where_region(screen).getByText(
+          /New donations, Stripe donations included, wait in your Better Giving balance until your bank account is approved\./
+        )
+      )
+      .toBeVisible();
+    expect(screen.container.textContent).not.toMatch(/add a bank account/);
+  });
+
+  test("a disconnected nonprofit is told new Stripe donations pay out to its bank", async () => {
+    await npo("acct_sent", {
+      stripe_deauthorized_at: "2026-08-01T00:00:00.000Z",
+    });
+    await bank();
+    await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+    await payout(12.5);
+
+    const screen = await render_page();
+
+    const earlier = earlier_region(screen);
+    await expect.element(earlier.getByText("$90.00")).toBeVisible();
+    await expect
+      .element(
+        earlier.getByText(
+          "Your Stripe account is disconnected, so new Stripe donations pay out to your bank. These were sent to it while it was connected."
+        )
+      )
+      .toBeVisible();
+    const where = where_region(screen);
+    await expect
+      .element(
+        where.getByText(
+          "Stripe donations sent to your Stripe account while it was connected."
+        )
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        where.getByText(
+          "Everything sent to your bank. Your Stripe account is disconnected, so new Stripe donations are here too."
+        )
+      )
+      .toBeVisible();
+    expect(where.getByText(/before you connected/).query()).toBeNull();
+    await expect.element(screen.getByText("$12.50")).toBeVisible();
   });
 });
 
@@ -357,6 +718,8 @@ describe("SentToStripe", () => {
       <SentToStripe
         sent={{
           truncated: true,
+          on_stripe: true,
+          connected: true,
           items: [
             {
               id: "tr_x",
@@ -370,7 +733,11 @@ describe("SentToStripe", () => {
     );
 
     await expect
-      .element(screen.getByText(/Showing the most recent/))
+      .element(
+        screen.getByText(
+          /^Showing the most recent\. Each donation paid through Stripe is sent here/
+        )
+      )
       .toBeVisible();
     await expect
       .element(screen.getByText("Status unavailable", { exact: true }))

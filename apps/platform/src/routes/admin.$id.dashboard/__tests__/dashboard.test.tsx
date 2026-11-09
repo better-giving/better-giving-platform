@@ -779,3 +779,59 @@ describe("cross-page — platform admin rejects redemption", () => {
     await expect.element(screen.getByText(/\$1,000/)).toBeInTheDocument();
   });
 });
+
+describe("dashboard loader — where payouts go", () => {
+  const load = (npo_id: number) =>
+    dashboard_loader({
+      context: { get: (k: unknown) => (k === admin_ctx ? npo_id : undefined) },
+    } as any);
+  const file_bank = (
+    npo_id: number,
+    id: string,
+    status: "default" | "under-review",
+    bank_summary = ""
+  ) =>
+    test_db
+      .current!.db.insert(banking_apps)
+      .values({ id, npo_id, status, bank_summary });
+
+  it("names the default bank as where the money goes", async () => {
+    const npo = await seed_npo();
+    await file_bank(npo!.id, "bank-1", "default", "Chase ••1234");
+
+    const data = await load(npo!.id);
+
+    expect(data.payout_to).toEqual({ kind: "bank", summary: "Chase ••1234" });
+    expect(data.bank_pending).toBe(false);
+  });
+
+  it("a bank filed and not yet reviewed is pending, not on file", async () => {
+    const npo = await seed_npo();
+    await file_bank(npo!.id, "bank-1", "under-review");
+
+    const data = await load(npo!.id);
+
+    expect(data.payout_to).toEqual({ kind: "none" });
+    expect(data.bank_pending).toBe(true);
+  });
+
+  it("a second bank under review beside the default is not pending", async () => {
+    const npo = await seed_npo();
+    await file_bank(npo!.id, "bank-1", "default", "Chase ••1234");
+    await file_bank(npo!.id, "bank-2", "under-review");
+
+    const data = await load(npo!.id);
+
+    expect(data.payout_to.kind).toBe("bank");
+    expect(data.bank_pending).toBe(false);
+  });
+
+  it("with no bank filed, payouts go nowhere and nothing is pending", async () => {
+    const npo = await seed_npo();
+
+    const data = await load(npo!.id);
+
+    expect(data.payout_to).toEqual({ kind: "none" });
+    expect(data.bank_pending).toBe(false);
+  });
+});
