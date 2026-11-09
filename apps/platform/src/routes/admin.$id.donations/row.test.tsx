@@ -147,9 +147,9 @@ describe("where a donation's net went", () => {
   test("a transferred stripe-routed donation says it was paid out to stripe", async () => {
     const { flow } = await render_row({
       ...settled,
-      stripe_payout: "paid_out",
+      stripe_payout: "paid",
     });
-    expect(flow).toBe("$14.32- Paid out to Stripe");
+    expect(flow).toBe("$14.32- Paid out");
   });
 
   test("a stripe-routed donation with no transfer yet says it is sending", async () => {
@@ -167,9 +167,16 @@ describe("where a donation's net went", () => {
   });
 
   test("a refunded stripe-routed donation still strikes its net", async () => {
+    expect(await render_row({ ...refunded, stripe_payout: "paid" })).toEqual({
+      flow: "$14.32- Paid out",
+      struck: true,
+    });
+  });
+
+  test("a transferred stripe-routed donation that was refunded says it was fully reversed, as the payouts page does", async () => {
     expect(
-      await render_row({ ...refunded, stripe_payout: "paid_out" })
-    ).toEqual({ flow: "$14.32- Paid out to Stripe", struck: true });
+      await render_row({ ...refunded, stripe_payout: "reversed" })
+    ).toEqual({ flow: "$14.32- Fully reversed", struck: true });
   });
 
   test("a stripe-routed donation refunded before its transfer says it was not sent", async () => {

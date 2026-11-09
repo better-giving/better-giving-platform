@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { IAllocation } from "@/donations";
 import { humanize } from "@/helpers/decimal";
+import { routed_label } from "@/stripe-connect/sent";
 import type { TStripePayout } from "./helpers";
 
 interface Props {
@@ -42,12 +43,6 @@ const desc_map: DescMap = {
   },
 };
 
-const stripe_text: { [k in TStripePayout]: string } = {
-  paid_out: "Paid out to Stripe",
-  sending: "Sending to Stripe",
-  not_sent: "Not sent to Stripe",
-};
-
 export function AmountFlow({
   total,
   font_size = 14,
@@ -59,7 +54,7 @@ export function AmountFlow({
         {
           Icon: CreditCardIcon,
           class: "shrink-0",
-          text: stripe_text[stripe_payout],
+          text: routed_label(stripe_payout),
           amount: total,
         },
       ]

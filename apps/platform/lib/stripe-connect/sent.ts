@@ -46,3 +46,38 @@ export function transfer_standing(
   if (reversed >= amount) return { kind: "reversed" };
   return { kind: "partial", reversed: reversed / 100 };
 }
+
+/** where a routed donation stands, on either surface that shows it. `sending`
+ * and `not_sent` are the two a routed donation with no transfer is in */
+export type TRoutedKind = TSentStanding["kind"] | "sending" | "not_sent";
+
+/** the words for `kind`, the one place the donations list and the payouts
+ * page take them from */
+export const routed_label = (kind: TRoutedKind): string => {
+  switch (kind) {
+    case "paid":
+      return "Paid out";
+    case "partial":
+      return "Partly reversed";
+    case "reversed":
+      return "Fully reversed";
+    case "unknown":
+      return "Status unavailable";
+    case "sending":
+      return "Sending to Stripe";
+    case "not_sent":
+      return "Not sent to Stripe";
+  }
+};
+
+/** a routed dist's standing from what the dist row records. a refund that
+ * reversed the gift decides it either way: reversed after its transfer,
+ * never sent before one. `now` is a parameter for the test's sake */
+export function routed_kind(d: {
+  transfer_id: string | null;
+  /** the dist's status */
+  reversed: boolean;
+}): TRoutedKind {
+  if (d.transfer_id) return d.reversed ? "reversed" : "paid";
+  return d.reversed ? "not_sent" : "sending";
+}

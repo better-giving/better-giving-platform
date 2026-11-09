@@ -57,7 +57,11 @@ const dist: INpoDonation = {
 };
 
 describe("to_csv_row's stripe payout", () => {
-  const routed = { ...dist, stripe_routed_to: "acct_1" };
+  const routed = {
+    ...dist,
+    stripe_routed_to: "acct_1",
+    date_created: new Date().toISOString(),
+  };
 
   test("a pooled dist has none, so its allocation stands", () => {
     expect(to_csv_row(dist)).toMatchObject({
@@ -68,7 +72,7 @@ describe("to_csv_row's stripe payout", () => {
 
   test("a routed dist with its transfer was paid out", () => {
     const row = to_csv_row({ ...routed, stripe_transfer_id: "tr_1" });
-    expect(row.stripe_payout).toBe("paid_out");
+    expect(row.stripe_payout).toBe("paid");
   });
 
   test("a routed dist with no transfer yet is sending", () => {
@@ -82,12 +86,12 @@ describe("to_csv_row's stripe payout", () => {
     }
   );
 
-  test("a routed dist refunded after its transfer still reads paid out", () => {
+  test("a routed dist refunded after its transfer reads fully reversed", () => {
     const row = to_csv_row({
       ...routed,
       status: "refunded",
       stripe_transfer_id: "tr_1",
     });
-    expect(row.stripe_payout).toBe("paid_out");
+    expect(row.stripe_payout).toBe("reversed");
   });
 });

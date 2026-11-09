@@ -3,7 +3,12 @@ import { format } from "date-fns";
 import { SquareArrowOutUpRight } from "lucide-react";
 import { useId } from "react";
 import { humanize } from "@/helpers/decimal";
-import type { INpoSent, TSentStanding } from "@/stripe-connect/sent";
+import {
+  type INpoSent,
+  routed_label,
+  type TRoutedKind,
+  type TSentStanding,
+} from "@/stripe-connect/sent";
 
 /** where a card gift made now goes: the connected account (`on`), or the bank
  * while the account stays linked (`off`, or `waiting` when nothing was ever
@@ -80,24 +85,34 @@ interface ITone {
   dot: string;
 }
 
-const tones: Record<TSentStanding["kind"], ITone> = {
+const tones: Record<TRoutedKind, ITone> = {
+  sending: {
+    label: routed_label("sending"),
+    ink: "text-gray-11",
+    dot: "bg-gray-9",
+  },
+  not_sent: {
+    label: routed_label("not_sent"),
+    ink: "text-warning-subtle-fg",
+    dot: "bg-warning",
+  },
   paid: {
-    label: "Paid out",
+    label: routed_label("paid"),
     ink: "text-success-subtle-fg",
     dot: "bg-success",
   },
   partial: {
-    label: "Partly reversed",
+    label: routed_label("partial"),
     ink: "text-warning-subtle-fg",
     dot: "bg-warning",
   },
   reversed: {
-    label: "Fully reversed",
+    label: routed_label("reversed"),
     ink: "text-destructive-subtle-fg",
     dot: "bg-destructive",
   },
   unknown: {
-    label: "Status unavailable",
+    label: routed_label("unknown"),
     ink: "text-gray-11",
     dot: "bg-gray-9",
   },
