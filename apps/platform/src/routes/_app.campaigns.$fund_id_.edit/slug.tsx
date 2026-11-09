@@ -30,13 +30,6 @@ export function Slug({
         </div>
       )}
       <p className="text-xs sm:text-sm text-gray-11 italic mt-2">
-        Swap the ID at the end of your campaign's link for a name donors will
-        recognize. Letters, numbers, and - . _ ~ only: not all numbers, and no
-        dot at the start, at the end, or twice in a row. The ID link keeps
-        working.
-      </p>
-
-      <p className="text-xs sm:text-sm text-gray-11 italic mt-2">
         Example: {get_link(slug_new || "my-campaign", base_url)}
       </p>
     </div>

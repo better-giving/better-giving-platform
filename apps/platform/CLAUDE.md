@@ -41,6 +41,7 @@ Ships as **`@better-giving/ui`** (`packages/ui/`) — the components, the style 
 - **never put `outline-none` or `outline-hidden` on an element that also carries a `focus-visible:outline-*` replacement** — both set `--tw-outline-style: none`, and `outline-2` only sets `outline-style: var(--tw-outline-style)`, so the replacement computes to `outline-style: none` and paints nothing. Use `outline-0` (width 0, style preserved) to suppress a resting outline. Same trap with `focus:outline-hidden` beside `data-focus-visible:outline-*`, since the two states coincide.
 - suppressing a resting outline under a *variant* (`@container`, `data-selected`) also outranks a plain `focus-visible:` rule — variants sort after it, so `@xl/steps:outline-0` wins over `focus-visible:outline-2` and kills the ring. Scope the suppression to the non-focused state instead (`@xl/steps:not-focus-visible:outline-0`), which is mutually exclusive and order-proof.
 - a **selection** indicator is not a **focus** indicator: `data-selected:border-b-2`, `data-[state=checked]:bg-*` say which item is chosen, not which has keyboard focus. In a roving-tabindex group (radios, tabs) the two coincide, which is exactly why a `data-[state=checked]:outline-none` silently removes the focus ring.
+- **a nonprofit's public page is "your Better Giving page"**, never "profile" or "public profile", in every string a user reads (UI, emails, sidebar groups). "Profile" means only a person's own account (`dashboard.edit-profile`).
 
 ## Gotchas
 
