@@ -8,7 +8,6 @@ const run = (schema: typeof withdraw | typeof transfer, amount: string) =>
   v.safeParse(schema, { amount, source: "liq", bals });
 
 const BAD_FORMAT = "Enter a number, like 1250.50";
-const TOO_PRECISE = "Use at most 2 decimals";
 const NOT_POSITIVE = "amount must be greater than 0";
 
 describe.each([
@@ -29,7 +28,7 @@ describe.each([
   test.each([
     ["abc", BAD_FORMAT],
     ["1.2.3", BAD_FORMAT],
-    ["1.234", TOO_PRECISE],
+    ["1.234", BAD_FORMAT],
     ["0,500", BAD_FORMAT],
     ["12,50", BAD_FORMAT],
     ["1,5", BAD_FORMAT],

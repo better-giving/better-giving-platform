@@ -3,10 +3,14 @@ import * as v from "valibot";
 export const amount_format_err = (places = 2) =>
   places === 0 ? "Enter a number, like 1250" : "Enter a number, like 1250.50";
 
+/** two decimals is the dollar case: a third reads as a malformed amount, so it
+ * gets the same message and example as any other */
 export const amount_places_err = (places: number) =>
   places === 0
     ? "Enter a whole number, no cents"
-    : `Use at most ${places} decimal${places === 1 ? "" : "s"}`;
+    : places === 2
+      ? amount_format_err(2)
+      : `Use at most ${places} decimal${places === 1 ? "" : "s"}`;
 
 /** "$" and spaces go; commas stay for the shape check */
 const trim_amount = (raw: string) => raw.replace(/[$\s]/g, "");
