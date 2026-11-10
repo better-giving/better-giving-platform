@@ -285,3 +285,32 @@ describe("npo_sent_transfers — routed with no transfer", () => {
     expect((await npo_sent_transfers(id))?.unsent).toHaveLength(1);
   });
 });
+
+describe("npo_sent_transfers — a refunded gift", () => {
+  test("whose transfer stripe left unreversed reads kept, as the donations list does", async () => {
+    const id = await seed();
+    await sent_one(id);
+    await db().update(dists).set({ status: "refunded" });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "kept" }]);
+  });
+
+  test("whose transfer stripe reversed reads fully reversed", async () => {
+    const id = await seed();
+    await sent_one(id);
+    retrieve.mockResolvedValue({
+      id: "tr_past",
+      amount: 9_000,
+      amount_reversed: 9_000,
+      created: Date.parse("2026-07-01T00:00:00.000Z") / 1000,
+      reversals: { data: [{ amount: 9_000 }], has_more: false },
+    });
+    await db().update(dists).set({ status: "refunded" });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "reversed" }]);
+  });
+});

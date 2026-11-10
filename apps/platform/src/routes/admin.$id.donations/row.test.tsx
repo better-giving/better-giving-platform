@@ -179,6 +179,13 @@ describe("where a donation's net went", () => {
     ).toEqual({ flow: "$14.32- Fully reversed", struck: true });
   });
 
+  test("a refunded donation whose transfer stayed in the stripe account says so", async () => {
+    expect(await render_row({ ...refunded, stripe_payout: "kept" })).toEqual({
+      flow: "$14.32- Refunded, stayed in your Stripe account",
+      struck: true,
+    });
+  });
+
   test("a stripe-routed donation refunded before its transfer says it was not sent", async () => {
     expect(
       await render_row({ ...refunded, stripe_payout: "not_sent" })

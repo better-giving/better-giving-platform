@@ -5,6 +5,9 @@ export type TSentStanding =
   | { kind: "paid" }
   | { kind: "partial"; reversed: number }
   | { kind: "reversed" }
+  /** the gift was refunded and stripe refused to reverse the transfer, so the
+   * money stayed in the connected account */
+  | { kind: "kept" }
   | { kind: "unknown" };
 
 export interface ISentTransfer {
@@ -54,7 +57,7 @@ export interface INpoSent extends ISentTransfers {
 export function transfer_standing(
   amount: number,
   reversed: number
-): Exclude<TSentStanding, { kind: "unknown" }> {
+): Exclude<TSentStanding, { kind: "unknown" | "kept" }> {
   if (!(reversed > 0)) return { kind: "paid" };
   if (reversed >= amount) return { kind: "reversed" };
   return { kind: "partial", reversed: reversed / 100 };
@@ -82,6 +85,8 @@ export const routed_label = (kind: TRoutedKind): string => {
       return "Partly reversed";
     case "reversed":
       return "Fully reversed";
+    case "kept":
+      return "Refunded, stayed in your Stripe account";
     case "unknown":
       return "Status unavailable";
     case "sending":
@@ -99,11 +104,17 @@ export function routed_kind(
     transfer_id: string | null;
     /** the dist's status */
     reversed: boolean;
+    /** stripe refused to reverse part of its transfer, and the amount is
+     * recorded owed by the nonprofit */
+    kept?: boolean;
     routed_at: string;
   },
   now = Date.now()
 ): TRoutedKind {
-  if (d.transfer_id) return d.reversed ? "reversed" : "paid";
+  if (d.transfer_id) {
+    if (!d.reversed) return "paid";
+    return d.kept ? "kept" : "reversed";
+  }
   if (d.reversed) return "not_sent";
   return now - Date.parse(d.routed_at) > SENDING_WINDOW_MS
     ? "not_sent"

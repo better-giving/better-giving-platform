@@ -47,6 +47,7 @@ const dist: INpoDonation = {
   form_tag: null,
   program_id: null,
   program_name: null,
+  owed_back: false,
   from_email: "jane@example.com",
   from_name: "Jane Doe",
   from_company: null,
@@ -92,6 +93,16 @@ describe("to_csv_row's stripe payout", () => {
       date_created: "2026-01-01T00:00:00.000Z",
     });
     expect(row.stripe_payout).toBe("not_sent");
+  });
+
+  test("a routed dist refunded after its transfer that the npo owes back stayed in its stripe account", () => {
+    const row = to_csv_row({
+      ...routed,
+      status: "refunded",
+      stripe_transfer_id: "tr_1",
+      owed_back: true,
+    });
+    expect(row.stripe_payout).toBe("kept");
   });
 
   test("a routed dist refunded after its transfer reads fully reversed", () => {

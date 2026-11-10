@@ -8,6 +8,7 @@ import {
   type ISentTransfer,
   type IUnsentTransfer,
   routed_kind,
+  type TSentStanding,
   transfer_standing,
 } from "@/stripe-connect/sent";
 import { stripe as stripe_env } from "../env";
@@ -26,6 +27,8 @@ export const RETRIEVE_BATCH = 10;
 interface ITransferRow {
   id: string;
   net: number | null;
+  /** the dist was refunded */
+  reversed: boolean;
   date: string;
 }
 
@@ -58,6 +61,7 @@ export async function npo_sent_transfers(
       .select({
         id: dists.stripe_transfer_id,
         net: dists.net,
+        status: dists.status,
         transferred_at: dists.stripe_transfer_created_at,
         donated_at: dists.date_created,
       })
@@ -119,6 +123,7 @@ export async function npo_sent_transfers(
           {
             id: row.id,
             net: row.net,
+            reversed: is_reversed(row.status),
             date: row.transferred_at ?? row.donated_at,
           },
         ]
@@ -159,7 +164,10 @@ async function sent_of(
     const tr = (await stripe.transfers.retrieve(row.id, {
       expand: ["reversals"],
     })) as ITransferRecord;
-    const standing = transfer_standing(tr.amount, reversal_cents(tr));
+    const read = transfer_standing(tr.amount, reversal_cents(tr));
+    // refunded, yet stripe holds no reversal: it refused, and the money stayed
+    const standing: TSentStanding =
+      read.kind === "paid" && row.reversed ? { kind: "kept" } : read;
     return {
       id: tr.id,
       amount: tr.amount / 100,

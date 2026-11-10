@@ -112,6 +112,11 @@ const tones: Record<TRoutedKind, ITone> = {
     ink: "text-destructive-subtle-fg",
     dot: "bg-destructive",
   },
+  kept: {
+    label: routed_label("kept"),
+    ink: "text-warning-subtle-fg",
+    dot: "bg-warning",
+  },
   unknown: {
     label: routed_label("unknown"),
     ink: "text-gray-11",
