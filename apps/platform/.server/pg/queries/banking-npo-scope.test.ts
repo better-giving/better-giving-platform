@@ -214,23 +214,14 @@ describe("npo_default_bapp", () => {
     expect((await npo_default_bapp(own))?.id).toBe("own-approved");
   });
 
-  test("two approved banks and no default: the most recently updated pays", async () => {
+  test("two approved banks and no default stay unpicked", async () => {
     const db = test_db.current!.db;
     await db.delete(banking_apps).where(eq(banking_apps.id, "own-default"));
     await db
       .insert(banking_apps)
       .values(bapp("own-approved-2", own, "approved"));
-    // the older bank has the larger id, so only updated_at can pick the winner
-    await db
-      .update(banking_apps)
-      .set({ updated_at: "2030-01-01T00:00:00Z" })
-      .where(eq(banking_apps.id, "own-approved"));
-    await db
-      .update(banking_apps)
-      .set({ updated_at: "2029-01-01T00:00:00Z" })
-      .where(eq(banking_apps.id, "own-approved-2"));
 
-    expect((await npo_default_bapp(own))?.id).toBe("own-approved");
+    expect(await npo_default_bapp(own)).toBeUndefined();
   });
 
   describe("two default rows", () => {

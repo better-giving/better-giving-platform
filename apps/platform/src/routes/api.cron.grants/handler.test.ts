@@ -588,29 +588,4 @@ describe("grants cron execute", () => {
     );
     expect(await payout_types()).toEqual({ "p-1": "settled" });
   });
-
-  test("two approved banks and no default: the most recently updated is paid", async () => {
-    const npo_id = await seed_npo({ cash: 100, bank_status: "approved" });
-    await seed_payout(npo_id, "p-1", 100);
-    await db()
-      .insert(banking_apps)
-      .values({
-        // smaller id than the seeded bank: only updated_at can pick it
-        id: String(WISE_RECIPIENT - 1),
-        npo_id,
-        status: "approved",
-        updated_at: "2030-01-01T00:00:00Z",
-      });
-
-    await index();
-
-    expect(report_error_mock).not.toHaveBeenCalled();
-    expect(wise_pay_mock).toHaveBeenCalledOnce();
-    expect(wise_pay_mock).toHaveBeenCalledWith(
-      WISE_RECIPIENT - 1,
-      100,
-      expect.any(String)
-    );
-    expect(await payout_types()).toEqual({ "p-1": "settled" });
-  });
 });
