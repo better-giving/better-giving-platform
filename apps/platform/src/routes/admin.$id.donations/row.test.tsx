@@ -181,7 +181,7 @@ describe("where a donation's net went", () => {
 
   test("a refunded donation whose transfer stayed in the stripe account says so", async () => {
     expect(await render_row({ ...refunded, stripe_payout: "kept" })).toEqual({
-      flow: "$14.32- Refunded, stayed in your Stripe account",
+      flow: "$14.32- Refunded, owed to Better Giving",
       struck: true,
     });
   });

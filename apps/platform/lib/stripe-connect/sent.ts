@@ -86,7 +86,7 @@ export const routed_label = (kind: TRoutedKind): string => {
     case "reversed":
       return "Fully reversed";
     case "kept":
-      return "Refunded, stayed in your Stripe account";
+      return "Refunded, owed to Better Giving";
     case "unknown":
       return "Status unavailable";
     case "sending":

@@ -201,7 +201,11 @@ describe("routed donations with no transfer", () => {
       .element(screen.getByText("Sending to Stripe", { exact: true }))
       .toBeVisible();
     await expect
-      .element(screen.getByText("Not sent to Stripe", { exact: true }))
+      .element(
+        screen
+          .getByRole("table", { name: "Not sent to Stripe" })
+          .getByText("Not sent to Stripe", { exact: true })
+      )
       .toBeVisible();
   });
 
@@ -222,7 +226,7 @@ describe("routed donations with no transfer", () => {
       />
     );
     const waiting = screen.getByRole("table", {
-      name: "Waiting for a transfer",
+      name: "Not sent to Stripe",
     });
     await expect.element(waiting).toBeVisible();
     expect(waiting.element().textContent).toContain("Sending to Stripe");
@@ -258,7 +262,11 @@ describe("routed donations with no transfer", () => {
       .element(screen.getByRole("region", { name: "Sent to Stripe earlier" }))
       .toBeVisible();
     await expect
-      .element(screen.getByText("Not sent to Stripe", { exact: true }))
+      .element(
+        screen
+          .getByRole("table", { name: "Not sent to Stripe" })
+          .getByText("Not sent to Stripe", { exact: true })
+      )
       .toBeVisible();
     expect(screen.container.textContent).not.toMatch(
       /isn't receiving|Nothing has been sent/

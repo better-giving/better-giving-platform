@@ -213,7 +213,7 @@ export function SentToStripe({
       {sent.unsent.length > 0 && (
         <div className="grid gap-2">
           <h3 id={unsent_id} className="font-semibold">
-            Waiting for a transfer
+            Not sent to Stripe
           </h3>
           <div className="table-scroll">
             <table
