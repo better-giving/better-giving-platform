@@ -153,6 +153,7 @@ export function SentToStripe({
   classes = "",
 }: ISentToStripe) {
   const heading_id = useId();
+  const unsent_id = useId();
   const copy = list_copy(stripe_link(sent), { has_bank, bank_pending });
   return (
     <section aria-labelledby={heading_id} className={`${classes} grid gap-3`}>
@@ -183,10 +184,47 @@ export function SentToStripe({
             </tr>
           </thead>
           <tbody>
-            {sent.items.length === 0 && sent.unsent.length === 0 ? (
+            {sent.items.length === 0 ? (
               <EmptyRow col_span={3}>No transfers yet</EmptyRow>
             ) : (
-              <>
+              sent.items.map((t) => (
+                <tr key={t.id}>
+                  <td>
+                    <span
+                      className={
+                        t.standing.kind === "reversed"
+                          ? "line-through text-destructive-subtle-fg"
+                          : ""
+                      }
+                    >
+                      {usd(t.amount)}
+                    </span>
+                  </td>
+                  <td>{format(t.date, "PP")}</td>
+                  <td>
+                    <Standing standing={t.standing} />
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      {sent.unsent.length > 0 && (
+        <div className="grid gap-2">
+          <h3 id={unsent_id} className="font-semibold">
+            Waiting for a transfer
+          </h3>
+          <div className="table-scroll">
+            <table className="table" aria-labelledby={unsent_id}>
+              <thead>
+                <tr>
+                  <th>Amount</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
                 {sent.unsent.map((u) => (
                   <tr key={u.id}>
                     <td>{usd(u.amount)}</td>
@@ -196,30 +234,11 @@ export function SentToStripe({
                     </td>
                   </tr>
                 ))}
-                {sent.items.map((t) => (
-                  <tr key={t.id}>
-                    <td>
-                      <span
-                        className={
-                          t.standing.kind === "reversed"
-                            ? "line-through text-destructive-subtle-fg"
-                            : ""
-                        }
-                      >
-                        {usd(t.amount)}
-                      </span>
-                    </td>
-                    <td>{format(t.date, "PP")}</td>
-                    <td>
-                      <Standing standing={t.standing} />
-                    </td>
-                  </tr>
-                ))}
-              </>
-            )}
-          </tbody>
-        </table>
-      </div>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

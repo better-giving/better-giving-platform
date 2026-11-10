@@ -203,7 +203,33 @@ describe("routed donations with no transfer", () => {
     await expect
       .element(screen.getByText("Not sent to Stripe", { exact: true }))
       .toBeVisible();
-    expect(screen.getByText("No transfers yet").query()).toBeNull();
+  });
+
+  test("sit under their own heading, apart from the transfers sent", async () => {
+    const screen = await render(
+      <SentToStripe
+        sent={{
+          ...off(),
+          unsent: [
+            {
+              id: "d1",
+              amount: 40,
+              date: "2026-07-01T00:00:00.000Z",
+              kind: "sending",
+            },
+          ],
+        }}
+      />
+    );
+    const waiting = screen.getByRole("table", {
+      name: "Waiting for a transfer",
+    });
+    await expect.element(waiting).toBeVisible();
+    expect(waiting.element().textContent).toContain("Sending to Stripe");
+    expect(waiting.element().textContent).not.toContain("Paid out");
+    const sent_table = screen.getByRole("table").first().element();
+    expect(sent_table.textContent).toContain("Paid out");
+    expect(sent_table.textContent).not.toContain("Sending to Stripe");
   });
 
   test("off stripe with only unsent routed donations is not the waiting account", async () => {
