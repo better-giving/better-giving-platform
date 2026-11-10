@@ -15,6 +15,7 @@ export function Panel(props: Props) {
     setValue,
   } = useForm<Schema>({
     defaultValues: {
+      amount: "",
       source: props.from || "liq",
       bals: props.bals,
     },

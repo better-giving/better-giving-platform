@@ -21,6 +21,8 @@ export { ErrorModal as ErrorBoundary } from "#/components/error";
 export const action = endowUpdate({ redirect: ".." });
 
 export const amount = v.pipe(
+  v.string(),
+  v.nonEmpty("Please enter an amount"),
   amount_num(),
   v.minValue(min_payout_amount, (x) => `minimum is $${x.requirement}`),
   v.transform((x) => x.toString())

@@ -9,7 +9,7 @@ export const keep = /[\d.]/;
  * every comma here is grouping, because the field only ever holds the commas
  * it drew; text the user typed or pasted goes through `read` first. leading
  * zeros stay, so backspacing the "1" of "1,000" leaves "000" for the next
- * digit rather than collapsing to "0". A trailing dot survives, so "9627." is
+ * digit rather than collapsing to "0". a trailing dot survives, so "9627." is
  * still mid-typing. */
 export function format(raw: string, places = 2): string {
   const s = raw.replace(/[^\d.]/g, "");
@@ -46,7 +46,7 @@ function local_decimal(): string {
  *   apart.
  * - in pasted text the last comma is the decimal separator ("12,50",
  *   "1.234,56") unless exactly 3 digits follow it with a whole part that
- *   doesn't start with 0 ("1,234", "12,34,567"), which is grouping. A comma
+ *   doesn't start with 0 ("1,234", "12,34,567"), which is grouping. a comma
  *   followed by a dot is always grouping.
  * - more than one dot left after that ("1.234.567") is refused: it is either
  *   a typo or dot-grouped thousands, and reading it as "1.23" would be off by

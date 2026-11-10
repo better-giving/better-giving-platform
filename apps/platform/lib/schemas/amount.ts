@@ -40,7 +40,7 @@ export const amount_num = (places = 2) =>
 
 const plain = new Intl.NumberFormat("en-US", {
   useGrouping: false,
-  maximumFractionDigits: 100,
+  maximumFractionDigits: 20,
 });
 
 /** a number as the plain decimal a schema outputs: `String(1e-7)` is "1e-7",
