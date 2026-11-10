@@ -55,7 +55,10 @@ describe("decimal.unmask", () => {
 });
 
 type IMask = Parameters<typeof reformat>[0];
-const m = decimal.decimals(2);
+// a visitor whose locale writes a decimal point; `comma` is one whose locale
+// writes a decimal comma. only a typed comma tells them apart
+const m = decimal.decimals(2, ".");
+const comma = decimal.decimals(2, ",");
 const edit = (value: string, cursor: number, prev: string, type?: string) =>
   reformat(m, { value, cursor, prev, type });
 
@@ -105,7 +108,6 @@ describe("paste", () => {
     ["$1,000", "1,000"],
     ["abc", ""],
     ["12abc34", "1,234"],
-    ["1.2.3", "1.23"],
     ["9627.927", "9,627.92"],
     ["1,234,567.89", "1,234,567.89"],
     ["12,34,567", "1,234,567"],
@@ -138,12 +140,71 @@ describe("paste", () => {
     expect(paste("-5", "12")).toEqual({ value: "12", cursor: 2 });
     expect(type("12", 0, "-")).toEqual({ value: "12", cursor: 0 });
   });
+
+  test.each([
+    ["\u221250", "unicode minus"],
+    ["\u201350", "en dash"],
+    ["\u201450", "em dash"],
+    ["\uff0d50", "full-width hyphen"],
+    ["(50)", "accounting parentheses"],
+    ["$(1,234.56)", "accounting parentheses with a sign"],
+  ])("%j (%s) is refused like a minus", (text) => {
+    expect(paste(text)).toEqual({ value: "", cursor: 0 });
+    expect(paste(text, "12")).toEqual({ value: "12", cursor: 2 });
+  });
+
+  test.each(["1.234.567", "1.2.3", "1,234.56.7"])(
+    "%j, with more than one dot, is refused rather than cut to 1.23",
+    (text) => {
+      expect(paste(text)).toEqual({ value: "", cursor: 0 });
+      expect(paste(text, "5")).toEqual({ value: "5", cursor: 1 });
+    }
+  );
+
+  test("dots that are grouping before a decimal comma still read", () => {
+    expect(paste("1.234.567,89").value).toBe("1,234,567.89");
+  });
+
+  test("full-width digits from an IME read as digits", () => {
+    expect(paste("\uff11\uff12\uff13").value).toBe("123");
+    expect(paste("\uff11\uff0c\uff15\uff10\uff10").value).toBe("1,500");
+    expect(paste("\uff11\uff12\uff0e\uff15").value).toBe("12.5");
+  });
+
+  test("arabic-indic digits and decimal separator read as digits", () => {
+    expect(paste("\u0665\u0660").value).toBe("50");
+    expect(paste("\u0661\u0662\u066b\u0665\u0660").value).toBe("12.50");
+    expect(paste("\u06f1\u06f2").value).toBe("12");
+  });
+
+  test("a paste keeps the 3-digit rule whatever the locale", () => {
+    expect(paste("12,50", "", comma).value).toBe("12.50");
+    expect(paste("1,234", "", comma).value).toBe("1,234");
+  });
 });
 
 describe("typing", () => {
-  test("a typed comma is the decimal separator, as a comma keypad sends it", () => {
-    expect(typing("1,5")).toEqual({ value: "1.5", cursor: 3 });
-    expect(typing("12,50")).toEqual({ value: "12.50", cursor: 5 });
+  test("where the decimal is a point, a typed comma is thousands and changes nothing", () => {
+    expect(typing("1,000")).toEqual({ value: "1,000", cursor: 5 });
+    expect(typing("10,000")).toEqual({ value: "10,000", cursor: 6 });
+    expect(typing("1,500.50")).toEqual({ value: "1,500.50", cursor: 8 });
+    expect(type("1", 1, ",")).toEqual({ value: "1", cursor: 1 });
+  });
+
+  test("where the decimal is a comma, a typed comma is the decimal point, as its keypad sends it", () => {
+    expect(typing("1,5", comma)).toEqual({ value: "1.5", cursor: 3 });
+    expect(typing("12,50", comma)).toEqual({ value: "12.50", cursor: 5 });
+  });
+
+  test("full-width digits typed key by key", () => {
+    expect(typing("\uff11\uff10\uff10\uff10")).toEqual({
+      value: "1,000",
+      cursor: 5,
+    });
+  });
+
+  test("a typed unicode minus is refused", () => {
+    expect(type("12", 0, "\u2212")).toEqual({ value: "12", cursor: 0 });
   });
 
   test("a comma typed before a full group changes nothing", () => {
@@ -251,6 +312,30 @@ describe("caret", () => {
       value: "",
       cursor: 0,
     });
+  });
+});
+
+describe("dollar", () => {
+  test.each([
+    ["12.50", "$ 12"],
+    ["$1,500.00", "$ 1,500"],
+    ["1,234", "$ 1,234"],
+    ["12,50", "$ 12"],
+    ["$ 2,000", "$ 2,000"],
+  ])("a pasted %j drops the cents: %j", (text, out) => {
+    expect(paste(text, "", dollar).value).toBe(out);
+  });
+
+  test("a minus or several dots is refused", () => {
+    expect(paste("-50", "$ 5", dollar)).toEqual({ value: "$ 5", cursor: 3 });
+    expect(paste("1.234.567", "$ 5", dollar)).toEqual({
+      value: "$ 5",
+      cursor: 3,
+    });
+  });
+
+  test("a typed thousands comma changes nothing", () => {
+    expect(typing("1,000", dollar).value).toBe("$ 1,000");
   });
 });
 

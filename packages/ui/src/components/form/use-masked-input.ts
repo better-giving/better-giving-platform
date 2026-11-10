@@ -1,13 +1,26 @@
-import type { FormEvent, Ref, RefCallback } from "react";
-import { useCallback, useLayoutEffect, useReducer, useRef } from "react";
+import type {
+  CompositionEvent,
+  FormEvent,
+  Ref,
+  RefCallback,
+  SyntheticEvent,
+} from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import type { IMask } from "./mask-types";
 import { reformat } from "./reformat";
 
 type El = HTMLInputElement;
 
 /** the typing behaviour of a masked `<input>`, for a caller that owns the
- * markup: spread `ref`, `onInput` onto it and give it `value={display}`.
- * `display` is what the field shows; `on_display` receives the next one. */
+ * markup: spread what it returns (`ref`, `value`, `onInput`,
+ * `onCompositionEnd`) onto it. `display` is what the field shows;
+ * `on_display` receives the next one. */
 export function useMaskedInput(opts: {
   mask: IMask;
   display: string;
@@ -32,13 +45,18 @@ export function useMaskedInput(opts: {
     }
   });
 
-  const onInput = useCallback(
-    (e: FormEvent<El>) => {
+  // an open IME composition shows its raw text: reformatting it mid-way would
+  // write a value back into the input and end the session. the mask runs once
+  // on the finished text, read as typed
+  const [composing, set_composing] = useState<string | null>(null);
+
+  const apply = useCallback(
+    (e: SyntheticEvent<El>, type: string | undefined) => {
       const input = e.currentTarget;
       const out = reformat(mask, {
         value: input.value,
         cursor: input.selectionStart ?? 0,
-        type: (e.nativeEvent as InputEvent).inputType,
+        type,
         prev: display,
       });
       cursor_ref.current = out.cursor;
@@ -46,6 +64,23 @@ export function useMaskedInput(opts: {
       rerender();
     },
     [mask, display, on_display]
+  );
+
+  const onInput = useCallback(
+    (e: FormEvent<El>) => {
+      const native = e.nativeEvent as InputEvent;
+      if (native.isComposing) set_composing(e.currentTarget.value);
+      else apply(e, native.inputType);
+    },
+    [apply]
+  );
+
+  const onCompositionEnd = useCallback(
+    (e: CompositionEvent<El>) => {
+      set_composing(null);
+      apply(e, "insertText");
+    },
+    [apply]
   );
 
   const outer = opts.ref;
@@ -58,5 +93,5 @@ export function useMaskedInput(opts: {
     [outer]
   );
 
-  return { ref, onInput };
+  return { ref, value: composing ?? display, onInput, onCompositionEnd };
 }

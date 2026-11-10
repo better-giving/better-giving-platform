@@ -1,3 +1,5 @@
+import { read as read_decimal } from "./decimal";
+
 const fmt = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
   useGrouping: true,
@@ -19,4 +21,12 @@ export function format(digits: string): string {
 
 export function unmask(masked: string): string {
   return masked.replace(/[^0-9]/g, "");
+}
+
+/** typed or pasted text as whole-dollar digits: read as a decimal, then the
+ * cents dropped, so a pasted "12.50" is $12 and never $1,250. `null` refuses
+ * it (a minus, several dots). */
+export function read(text: string, typed: boolean): string | null {
+  const plain = read_decimal(text, typed);
+  return plain === null ? null : plain.split(".")[0];
 }

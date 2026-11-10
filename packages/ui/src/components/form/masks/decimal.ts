@@ -24,16 +24,50 @@ export function format(raw: string, places = 2): string {
   return `${grouped || "0"}.${frac}`;
 }
 
+/** the decimal separator of the visitor's locale: what a decimal keypad sends.
+ * read at the first keystroke, never at module load, so a server render
+ * never fixes it to the server's locale. */
+let local_sep: string | undefined;
+function local_decimal(): string {
+  local_sep ??=
+    new Intl.NumberFormat().formatToParts(1.1).find((p) => p.type === "decimal")
+      ?.value ?? ".";
+  return local_sep;
+}
+
 /** text the user typed or pasted, as digits and dots — `null` refuses it.
- * - a minus is refused whole: dropping it would turn -50 into 50.
- * - the last comma is the decimal separator ("12,50", "1.234,56", a comma
- *   keypad's "1,") unless exactly 3 digits follow it with a whole part that
+ * `text` arrives folded to ascii digits (see `reformat`).
+ * - a minus is refused whole: dropping it would turn -50 into 50. a unicode
+ *   minus, a dash and accounting parentheses "(50)" count as a minus.
+ * - a typed comma is the decimal point only where the locale's decimal
+ *   separator (`sep`) is a comma, as a comma keypad sends it; elsewhere it is
+ *   the thousands comma the mask draws anyway, and is dropped. a lone typed
+ *   comma has no digits after it yet, so the pasted rule can't tell the two
+ *   apart.
+ * - in pasted text the last comma is the decimal separator ("12,50",
+ *   "1.234,56") unless exactly 3 digits follow it with a whole part that
  *   doesn't start with 0 ("1,234", "12,34,567"), which is grouping. A comma
  *   followed by a dot is always grouping.
+ * - more than one dot left after that ("1.234.567") is refused: it is either
+ *   a typo or dot-grouped thousands, and reading it as "1.23" would be off by
+ *   a thousand.
  * - "$", spaces and letters are dropped. */
-export function read(text: string): string | null {
-  if (text.includes("-")) return null;
+export function read(
+  text: string,
+  typed = false,
+  sep = local_decimal()
+): string | null {
+  if (/[-\u2010-\u2015\u2212()]/.test(text)) return null;
   const s = text.replace(/[^\d.,]/g, "");
+  const out = typed ? read_typed(s, sep) : read_pasted(s);
+  return out.indexOf(".") === out.lastIndexOf(".") ? out : null;
+}
+
+function read_typed(s: string, sep: string): string {
+  return s.replace(/,/g, sep === "," ? "." : "");
+}
+
+function read_pasted(s: string): string {
   const comma = s.lastIndexOf(",");
   if (comma === -1 || comma < s.lastIndexOf(".")) return s.replace(/,/g, "");
   const whole = s.slice(0, comma).replace(/\D/g, "");
@@ -48,22 +82,23 @@ export function unmask(masked: string, places = 2): string {
 }
 
 /** the mask for `places` decimals — 2 for dollars, a currency's or token's own
- * precision elsewhere, `Number.POSITIVE_INFINITY` for no cap.
+ * precision elsewhere, `Number.POSITIVE_INFINITY` for no cap. `sep` is the
+ * locale's decimal separator, which decides a typed comma (see `read`).
  *
  * the cap is on what the user adds: a field already holding more decimals
  * (a currency or token switch to fewer) keeps them through an edit elsewhere
  * in it, so "1.2345" at 2 places takes a digit before the point and loses one
  * decimal per backspace; the form's schema reports the excess. */
-export function decimals(places = 2): IMask {
+export function decimals(places = 2, sep?: string): IMask {
   const mask: IMask = {
     format: (raw) => format(raw, places),
     unmask: (masked) => unmask(masked, places),
-    read,
+    read: (text, typed) => read(text, typed, sep),
     keep,
     fit: (own) => {
       const dot = own.indexOf(".");
       const held = dot === -1 ? 0 : own.length - dot - 1;
-      return held > places ? decimals(held) : mask;
+      return held > places ? decimals(held, sep) : mask;
     },
   };
   return mask;

@@ -8,9 +8,10 @@ export interface IMask {
    * inserts — a comma, a dash — never pull it. */
   keep?: RegExp;
   /** how text the user types or pastes is read before it joins the value —
-   * the field's own characters around it never go through this. `null`
-   * refuses the edit. default: as typed. */
-  read?: (typed: string) => string | null;
+   * the field's own characters around it never go through this. `typed` is
+   * true for a keystroke (or a finished IME composition), false for a paste,
+   * drop or autofill. `null` refuses the edit. default: as typed. */
+  read?: (text: string, typed: boolean) => string | null;
   /** the mask for an edit whose own text — the field's typed characters
    * either side of what the user put in — is `own`. default: this mask. */
   fit?: (own: string) => IMask;

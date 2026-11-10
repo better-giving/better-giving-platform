@@ -28,16 +28,9 @@ export function useMoneyInput({ value, onChange, places = 2, ref }: Opts) {
     (next: string) => onChange(decimal.unmask(next, Number.POSITIVE_INFINITY)),
     [onChange]
   );
-  const { ref: set_ref, onInput } = useMaskedInput({
-    mask,
-    display,
-    on_display,
-    ref,
-  });
+  const masked = useMaskedInput({ mask, display, on_display, ref });
   return {
-    ref: set_ref,
-    onInput,
-    value: display,
+    ...masked,
     // a no-op: React wants an onChange beside `value`, and typing is handled
     // by onInput
     onChange: () => {},

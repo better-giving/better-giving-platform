@@ -175,6 +175,51 @@ describe("MaskedInput", () => {
   });
 });
 
+/** what an IME hands the input: the open composition's text, with the input
+ * events flagged `isComposing`, then `compositionend` once it is committed */
+function compose(input: HTMLInputElement, steps: string[]) {
+  const set = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value"
+  )?.set;
+  input.dispatchEvent(
+    new CompositionEvent("compositionstart", { bubbles: true })
+  );
+  for (const text of steps) {
+    set?.call(input, text);
+    input.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        isComposing: true,
+        inputType: "insertCompositionText",
+        data: text,
+      })
+    );
+  }
+  return () =>
+    input.dispatchEvent(
+      new CompositionEvent("compositionend", { bubbles: true })
+    );
+}
+
+describe("MaskedInput: IME composition", () => {
+  it("leaves an open composition alone and masks the committed text", async () => {
+    const screen = await render(<Harness />);
+    const input = screen.getByLabelText("Amount");
+    const el = input.element() as HTMLInputElement;
+    el.focus();
+
+    const commit = compose(el, ["\uff11", "\uff11\uff12"]);
+    // reformatting mid-composition would write "$ 12" back and end the session
+    await expect.element(input).toHaveValue("\uff11\uff12");
+    await expect.element(screen.getByTestId("raw")).toMatchTextContent("0");
+
+    commit();
+    await expect.element(input).toHaveValue("$ 12");
+    await expect.element(screen.getByTestId("raw")).toMatchTextContent("12");
+  });
+});
+
 /** the ein field keeps the masked string in state — the schema strips the dash */
 function EinHarness({ initial = "" }: { initial?: string }) {
   const [val, set_val] = useState(initial);

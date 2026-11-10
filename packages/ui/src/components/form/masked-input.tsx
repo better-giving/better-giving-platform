@@ -55,7 +55,7 @@ export function MaskedInput({ sub, ...props }: Props) {
       .filter(Boolean)
       .join(" ") || undefined;
 
-  const { ref, onInput } = useMaskedInput({
+  const { ref, value, onInput, onCompositionEnd } = useMaskedInput({
     mask: props.mask,
     display: props.value,
     on_display: props.onChange,
@@ -91,7 +91,7 @@ export function MaskedInput({ sub, ...props }: Props) {
         name={props.name}
         inputMode={props.inputMode}
         placeholder={props.placeholder}
-        value={props.value}
+        value={value}
         aria-invalid={!!props.error}
         // native `required` is withheld (see `required` above), so this is the
         // only requiredness a screen reader hears — absent, never "false"
@@ -107,6 +107,7 @@ export function MaskedInput({ sub, ...props }: Props) {
         autoComplete="off"
         spellCheck={false}
         onInput={onInput}
+        onCompositionEnd={onCompositionEnd}
         onBlur={props.onBlur}
       />
 

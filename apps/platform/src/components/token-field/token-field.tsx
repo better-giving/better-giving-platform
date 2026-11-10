@@ -6,6 +6,8 @@ import type { ITokenField } from "./types";
 
 type El = HTMLInputElement;
 
+const ERROR_ID = "amount_error";
+
 export function TokenField({ ref, ...props }: ITokenField & { ref?: Ref<El> }) {
   const style = unpack(props.classes);
   const money = useMoneyInput({
@@ -32,6 +34,10 @@ export function TokenField({ ref, ...props }: ITokenField & { ref?: Ref<El> }) {
           <input
             {...money}
             aria-invalid={!!props.error}
+            // both, as on `Field`: errormessage is the right relationship,
+            // describedby the one every screen reader reads
+            aria-errormessage={props.error ? ERROR_ID : undefined}
+            aria-describedby={props.error ? ERROR_ID : undefined}
             disabled={props.disabled}
             autoComplete="off"
             id="amount"
@@ -51,6 +57,7 @@ export function TokenField({ ref, ...props }: ITokenField & { ref?: Ref<El> }) {
 
       {props.error && (
         <p
+          id={ERROR_ID}
           data-error
           className="peer text-destructive-subtle-fg text-xs text-left mt-0.5"
         >
