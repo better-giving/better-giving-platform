@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { amount } from "../amount";
 export const sources = ["liq", "lock"] as const;
 const source = v.picklist(sources, "Please select source");
 
@@ -9,16 +10,6 @@ const bals = v.object({
 interface Bals extends v.InferOutput<typeof bals> {}
 
 export type Source = v.InferOutput<typeof source>;
-
-export const amount = v.lazy((x) => {
-  if (!x) return v.pipe(v.string(), v.nonEmpty("Please enter an amount"));
-  return v.pipe(
-    v.string(),
-    v.transform((x) => +x),
-    v.gtValue(0, "amount must be greater than 0"),
-    v.transform((x) => x.toString())
-  );
-});
 
 const schema_raw = v.object({
   amount,

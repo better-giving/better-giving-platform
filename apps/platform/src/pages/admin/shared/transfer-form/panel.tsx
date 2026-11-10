@@ -124,7 +124,7 @@ export function Panel(props: Props) {
         required
         label="Amount"
         {...register("amount")}
-        placeholder="e.g. $ 100"
+        placeholder="e.g. 100"
         error={errors.amount?.message}
       />
 
