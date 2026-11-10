@@ -1,5 +1,6 @@
 //token selector
 import * as v from "valibot";
+import { to_text } from "#/components/rich-text/helpers";
 import { donate_method_id } from "@/npo/schema";
 
 //selector
@@ -30,21 +31,32 @@ interface RichTextContentOptions {
   maxChars?: number;
   required?: boolean;
 }
+/** the length cap on `{ value, length? }`. the count is the stored `length`, or
+ * the text's own when a story was saved without one — so a long story that
+ * arrives without a length can't slip past the cap. */
+export const richtext_max = (maxChars: number) =>
+  v.forward(
+    v.check(
+      (c: { value: string; length?: number | undefined }) =>
+        (c.length ?? to_text(c.value).length) <= maxChars,
+      `max length is ${maxChars} chars`
+    ),
+    ["length"]
+  );
+
 export const richtext_content = ({
   maxChars = Number.MAX_SAFE_INTEGER,
   required = false,
 }: RichTextContentOptions) => {
-  return v.object({
-    value: required
-      ? v.pipe(v.string("required"), v.nonEmpty("required"))
-      : v.string("dev:set default value to empty"),
-    length: v.optional(
-      v.pipe(
-        v.number(),
-        v.maxValue(maxChars, ({ requirement: r }) => `max length is ${r} chars`)
-      )
-    ),
-  });
+  return v.pipe(
+    v.object({
+      value: required
+        ? v.pipe(v.string("required"), v.nonEmpty("required"))
+        : v.string("dev:set default value to empty"),
+      length: v.optional(v.number()),
+    }),
+    richtext_max(maxChars)
+  );
 };
 
 /** the state of an in-flight fetch, as a hook returns it */
