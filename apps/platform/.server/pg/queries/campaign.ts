@@ -7,11 +7,13 @@ import {
   isNull,
   ne,
   notInArray,
+  notLike,
   or,
   type SQL,
   sql,
 } from "drizzle-orm";
 import { to_text } from "#/components/rich-text/helpers";
+import { rail_of } from "@/donations/rail";
 import type { DonateMethodId, IIncrement, TFrequency } from "@/schemas";
 import { db } from "../db";
 import { user } from "../schema/auth";
@@ -610,15 +612,21 @@ export async function campaign_end(
   return (await campaign_get(npo_id, id)) !== undefined;
 }
 
-/** statuses a donation can end in without ever being paid: the card step
- * writes a `created` row before anyone pays, and an abandoned checkout leaves
- * it there. `intent` stays out — a payment may still be in flight on it. */
-const UNSETTLED = ["created", "expired", "failed", "cancelled"] as const;
+/** statuses a donation ends in without ever being paid: a checkout that ran
+ * out, was refused, or was cancelled */
+const CLOSED = ["expired", "failed", "cancelled"] as const;
+
+/** a payment that was started and not yet settled. `created` is written by the
+ * card step before anyone pays, and the donor can still confirm it, so it is
+ * not abandoned until its payment is closed. */
+const OPEN = ["created", "intent"] as const;
 
 /** postgres: a row elsewhere still references the one being deleted */
 const FOREIGN_KEY_VIOLATION = "23503";
 
-/** gifts that keep a campaign: everything that was or may yet be paid */
+/** gifts that keep a campaign, for the page: everything that was or may yet be
+ * paid, except an open stripe payment, which a delete closes by cancelling its
+ * intent. any other provider's open payment can't be closed, so it counts. */
 export async function campaign_gift_count(
   id: string,
   conn: DbOrTx = db
@@ -629,20 +637,39 @@ export async function campaign_gift_count(
     .where(
       and(
         eq(donations.campaign_id, id),
-        notInArray(donations.status, [...UNSETTLED])
+        notInArray(donations.status, [...CLOSED]),
+        or(
+          notInArray(donations.status, [...OPEN]),
+          notLike(donations.via, "stripe%")
+        )
       )
     );
   return row?.n ?? 0;
 }
 
+/** closes the payments behind these open donations; the ids it closed, or
+ * `null` when any could not be closed */
+export type ClosePayments = (
+  rows: { id: string; created_at: string }[]
+) => Promise<string[] | null>;
+
 /** false when another nonprofit owns it, it has gifts, it was folded from a
- * fund, or it is missing. donations that never settled are detached from it
- * in the same transaction — `donations.campaign_id` is `ON DELETE no action`,
- * so the delete would otherwise fail on them; detaching keeps the rows
- * (nothing cascades through the donor and payment rows hanging off them). */
+ * fund, or it is missing.
+ *
+ * donations that can no longer collect money are detached from it:
+ * `donations.campaign_id` is `ON DELETE no action`, so the delete would
+ * otherwise fail on them, and detaching keeps the rows (nothing cascades
+ * through the donor and payment rows hanging off them). a closed checkout
+ * (`expired`, `failed`, `cancelled`) is one. an open stripe payment is made one
+ * first, by `close_payments` — run before the transaction, because it calls
+ * stripe — and then marked `cancelled`. an open payment of any other provider
+ * can't be closed from here, so it keeps the campaign, as does any payment
+ * `close_payments` couldn't close. the transaction re-reads the statuses, so a
+ * payment that settles in between still blocks the delete. */
 export async function campaign_delete(
   npo_id: number,
-  id: string
+  id: string,
+  close_payments?: ClosePayments
 ): Promise<boolean> {
   const current = await campaign_get(npo_id, id);
   if (!current) return false;
@@ -650,11 +677,58 @@ export async function campaign_delete(
   // legacy_fund_id) that campaign_gift_count never sees; deleting it would
   // orphan that revenue, so it is undeletable like one with its own gifts
   if (current.legacy_fund_id) return false;
+
+  const open = await db
+    .select({
+      id: donations.id,
+      via: donations.via,
+      created_at: donations.created_at,
+    })
+    .from(donations)
+    .where(
+      and(eq(donations.campaign_id, id), inArray(donations.status, [...OPEN]))
+    );
+  let closed: string[] = [];
+  if (open.length > 0) {
+    if (open.some((r) => rail_of(r.via) !== "stripe") || !close_payments)
+      return false;
+    const done = await close_payments(
+      open.map((r) => ({ id: r.id, created_at: String(r.created_at) }))
+    );
+    if (!done) return false;
+    closed = done;
+  }
+
   try {
     return await db.transaction(async (tx) => {
-      // a gift paid between the page and this click still blocks the delete
-      if ((await campaign_gift_count(id, tx)) > 0) return false;
-      // only the unsettled rows: one that settles after the count above is left
+      // what keeps the campaign now: anything not closed, other than the open
+      // rows just closed. a gift that settled since still counts
+      const [still] = await tx
+        .select({ n: count() })
+        .from(donations)
+        .where(
+          and(
+            eq(donations.campaign_id, id),
+            notInArray(donations.status, [...CLOSED]),
+            or(
+              notInArray(donations.status, [...OPEN]),
+              closed.length === 0 ? sql`true` : notInArray(donations.id, closed)
+            )
+          )
+        );
+      if ((still?.n ?? 0) > 0) return false;
+      if (closed.length > 0) {
+        await tx
+          .update(donations)
+          .set({ status: "cancelled" })
+          .where(
+            and(
+              inArray(donations.id, closed),
+              inArray(donations.status, [...OPEN])
+            )
+          );
+      }
+      // only closed rows: one that settles after the count above is left
       // attached, and the foreign key then refuses the delete below
       await tx
         .update(donations)
@@ -662,7 +736,7 @@ export async function campaign_delete(
         .where(
           and(
             eq(donations.campaign_id, id),
-            inArray(donations.status, [...UNSETTLED])
+            inArray(donations.status, [...CLOSED])
           )
         );
       await tx
@@ -673,7 +747,7 @@ export async function campaign_delete(
   } catch (err) {
     // something still points at it (a subscription from a monthly checkout, a
     // gift that settled mid-delete): the campaign stays, as with any gift, and
-    // the rolled-back transaction leaves the abandoned rows attached
+    // the rolled-back transaction leaves the rows as they were
     const e = err as { code?: string; cause?: { code?: string } };
     if ((e.code ?? e.cause?.code) === FOREIGN_KEY_VIOLATION) return false;
     throw err;

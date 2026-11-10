@@ -24,6 +24,7 @@ import {
 } from "$/pg/queries/campaign";
 import { npo_get } from "$/pg/queries/npo";
 import { npo_programs } from "$/pg/queries/program";
+import { close_stripe_payments } from "$/stripe-close";
 import type { Route } from "./+types/route";
 
 async function owned(npo_id: number, campaign_id: string) {
@@ -75,7 +76,7 @@ export const action = async ({
   });
 
   if ("op" in read && read.op === "delete") {
-    const ok = await campaign_delete(id, campaign_id);
+    const ok = await campaign_delete(id, campaign_id, close_stripe_payments);
     if (!ok) {
       const note = current.legacy_fund_id
         ? "A campaign with past gifts cannot be deleted."

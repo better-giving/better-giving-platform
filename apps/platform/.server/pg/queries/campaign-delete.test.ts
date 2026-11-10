@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { TestDb } from "../test-utils/pglite";
 
@@ -27,16 +27,10 @@ import { create_test_db } from "../test-utils/pglite";
 import { campaign_delete, campaign_gift_count } from "./campaign";
 
 /** statuses a checkout can be left in without ever paying */
-const ABANDONED = ["created", "expired", "failed", "cancelled"] as const;
+const ABANDONED = ["expired", "failed", "cancelled"] as const;
 
 /** every status that was, or may yet be, paid */
-const BLOCKING = [
-  "intent",
-  "confirmed",
-  "settled",
-  "refunded",
-  "refunded_loss",
-] as const;
+const BLOCKING = ["confirmed", "settled", "refunded", "refunded_loss"] as const;
 
 /** owner of every campaign under test */
 let acme: number;
@@ -112,12 +106,18 @@ beforeAll(async () => {
       campaign("abandoned"),
       campaign("abandoned-monthly"),
       campaign("mixed"),
+      campaign("open-created"),
+      campaign("open-intent"),
+      campaign("open-unclosable"),
+      campaign("open-paypal"),
+      campaign("open-races"),
       ...BLOCKING.map((st) => campaign(`gift-${st}`)),
     ]);
   const donation = (
     id: string,
     campaign_id: string,
-    status: string
+    status: string,
+    via = "stripe"
   ): typeof donations.$inferInsert => ({
     id,
     campaign_id,
@@ -129,7 +129,7 @@ beforeAll(async () => {
     currency: "USD",
     frequency: "one-time",
     source: "bg-marketplace",
-    via: "stripe:card",
+    via,
   });
   // one checkout abandoned per status that never settled
   await db
@@ -160,8 +160,13 @@ beforeAll(async () => {
     .insert(donations)
     .values([
       donation("don-monthly-created", "abandoned-monthly", "created"),
-      donation("don-mixed-created", "mixed", "created"),
+      donation("don-mixed-expired", "mixed", "expired"),
       donation("don-mixed-settled", "mixed", "settled"),
+      donation("don-open-created", "open-created", "created"),
+      donation("don-open-intent", "open-intent", "intent"),
+      donation("don-open-unclosable", "open-unclosable", "created"),
+      donation("don-open-paypal", "open-paypal", "created", "paypal"),
+      donation("don-open-races", "open-races", "created"),
     ]);
   await db
     .insert(donations)
@@ -186,6 +191,22 @@ afterAll(async () => {
   await test_db.current?.client.close();
 });
 
+async function row_of(donation_id: string) {
+  const [row] = await test_db
+    .current!.db.select({
+      campaign_id: donations.campaign_id,
+      status: donations.status,
+    })
+    .from(donations)
+    .where(eq(donations.id, donation_id));
+  return row;
+}
+
+/** stands in for stripe: reports every id closed */
+const closes_all = vi.fn(async (rows: { id: string }[]) =>
+  rows.map((r) => r.id)
+);
+
 describe("campaign_delete", () => {
   it("deletes a campaign with no gifts and no legacy fund", async () => {
     expect(await campaign_delete(acme, "plain")).toBe(true);
@@ -207,53 +228,108 @@ describe("campaign_delete", () => {
     expect(await present("owned-elsewhere")).toBe(true);
   });
 
-  it("deletes a campaign whose only donations are abandoned checkouts", async () => {
+  it("deletes a campaign whose only donations are closed checkouts, detaching them", async () => {
     expect(await campaign_gift_count("abandoned")).toBe(0);
     expect(await campaign_delete(acme, "abandoned")).toBe(true);
     expect(await present("abandoned")).toBe(false);
+    for (const st of ABANDONED) {
+      expect(await row_of(`don-abandoned-${st}`)).toEqual({
+        campaign_id: null,
+        status: st,
+      });
+    }
   });
 
-  it("keeps every abandoned row, detached from the deleted campaign", async () => {
-    const rows = await test_db
-      .current!.db.select({
-        id: donations.id,
-        campaign_id: donations.campaign_id,
-      })
-      .from(donations)
-      .where(
-        inArray(
-          donations.id,
-          ABANDONED.map((st) => `don-abandoned-${st}`)
-        )
-      );
-    expect(rows).toHaveLength(ABANDONED.length);
-    expect(rows.every((r) => r.campaign_id === null)).toBe(true);
-  });
-
-  async function campaign_of(donation_id: string) {
-    const [row] = await test_db
-      .current!.db.select({ campaign_id: donations.campaign_id })
-      .from(donations)
-      .where(eq(donations.id, donation_id));
-    return row?.campaign_id;
-  }
-
-  it("refuses when an abandoned row sits beside a settled gift, detaching nothing", async () => {
-    expect(await campaign_delete(acme, "mixed")).toBe(false);
+  it("refuses when a closed row sits beside a settled gift, detaching nothing", async () => {
+    expect(await campaign_delete(acme, "mixed", closes_all)).toBe(false);
     expect(await present("mixed")).toBe(true);
-    expect(await campaign_of("don-mixed-created")).toBe("mixed");
-  });
-
-  it("refuses, not throws, when a subscription still points at it, detaching nothing", async () => {
-    expect(await campaign_gift_count("abandoned-monthly")).toBe(0);
-    expect(await campaign_delete(acme, "abandoned-monthly")).toBe(false);
-    expect(await present("abandoned-monthly")).toBe(true);
-    expect(await campaign_of("don-monthly-created")).toBe("abandoned-monthly");
+    expect((await row_of("don-mixed-expired"))?.campaign_id).toBe("mixed");
   });
 
   it.each(BLOCKING)("refuses a campaign with a %s gift", async (st) => {
     expect(await campaign_gift_count(`gift-${st}`)).toBe(1);
-    expect(await campaign_delete(acme, `gift-${st}`)).toBe(false);
+    expect(await campaign_delete(acme, `gift-${st}`, closes_all)).toBe(false);
     expect(await present(`gift-${st}`)).toBe(true);
+  });
+});
+
+describe("campaign_delete with open payments", () => {
+  it.each([
+    ["created", "open-created", "don-open-created"],
+    ["intent", "open-intent", "don-open-intent"],
+  ])(
+    "closes an open stripe %s payment, then deletes and detaches it",
+    async (_, campaign, donation) => {
+      closes_all.mockClear();
+      // an open stripe payment does not hide the delete from the page
+      expect(await campaign_gift_count(campaign)).toBe(0);
+
+      expect(await campaign_delete(acme, campaign, closes_all)).toBe(true);
+
+      expect(closes_all).toHaveBeenCalledTimes(1);
+      expect(await present(campaign)).toBe(false);
+      // closed for good: cancelled, and no longer pointing at the campaign
+      expect(await row_of(donation)).toEqual({
+        campaign_id: null,
+        status: "cancelled",
+      });
+    }
+  );
+
+  it("refuses, changing nothing, when stripe can't close the payment", async () => {
+    const refuses = vi.fn(async () => null);
+    expect(await campaign_delete(acme, "open-unclosable", refuses)).toBe(false);
+    expect(refuses).toHaveBeenCalledTimes(1);
+    expect(await present("open-unclosable")).toBe(true);
+    expect(await row_of("don-open-unclosable")).toEqual({
+      campaign_id: "open-unclosable",
+      status: "created",
+    });
+  });
+
+  it("refuses when nothing is there to close payments", async () => {
+    expect(await campaign_delete(acme, "open-unclosable")).toBe(false);
+    expect(await present("open-unclosable")).toBe(true);
+  });
+
+  it("keeps a campaign whose open payment is another provider's, without asking stripe", async () => {
+    const never = vi.fn(async () => []);
+    expect(await campaign_gift_count("open-paypal")).toBe(1);
+    expect(await campaign_delete(acme, "open-paypal", never)).toBe(false);
+    expect(never).not.toHaveBeenCalled();
+    expect(await present("open-paypal")).toBe(true);
+    expect(await row_of("don-open-paypal")).toEqual({
+      campaign_id: "open-paypal",
+      status: "created",
+    });
+  });
+
+  it("refuses a payment that settles after it was closed, and keeps it attached", async () => {
+    const settles_meanwhile = vi.fn(async (rows: { id: string }[]) => {
+      await test_db
+        .current!.db.update(donations)
+        .set({ status: "settled" })
+        .where(eq(donations.id, "don-open-races"));
+      return rows.map((r) => r.id);
+    });
+    expect(await campaign_delete(acme, "open-races", settles_meanwhile)).toBe(
+      false
+    );
+    expect(await present("open-races")).toBe(true);
+    expect(await row_of("don-open-races")).toEqual({
+      campaign_id: "open-races",
+      status: "settled",
+    });
+  });
+
+  it("refuses, not throws, when a subscription still points at it, undoing the cancel", async () => {
+    expect(await campaign_delete(acme, "abandoned-monthly", closes_all)).toBe(
+      false
+    );
+    expect(await present("abandoned-monthly")).toBe(true);
+    expect(await row_of("don-monthly-created")).toEqual({
+      campaign_id: "abandoned-monthly",
+      status: "created",
+    });
   });
 });
