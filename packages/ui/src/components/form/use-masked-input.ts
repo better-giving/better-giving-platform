@@ -45,6 +45,22 @@ export function useMaskedInput(opts: {
     }
   });
 
+  // the range a keystroke or paste is about to replace: read at `beforeinput`,
+  // while the input still holds it
+  const selection_ref = useRef<{ start: number; end: number } | null>(null);
+  useLayoutEffect(() => {
+    const node = input_ref.current;
+    if (!node) return;
+    const remember = () => {
+      selection_ref.current = {
+        start: node.selectionStart ?? 0,
+        end: node.selectionEnd ?? 0,
+      };
+    };
+    node.addEventListener("beforeinput", remember);
+    return () => node.removeEventListener("beforeinput", remember);
+  }, []);
+
   // an open IME composition shows its raw text: reformatting it mid-way would
   // write a value back into the input and end the session. the mask runs once
   // on the finished text, read as typed
@@ -58,7 +74,9 @@ export function useMaskedInput(opts: {
         cursor: input.selectionStart ?? 0,
         type,
         prev: display,
+        selection: selection_ref.current ?? undefined,
       });
+      selection_ref.current = null;
       cursor_ref.current = out.cursor;
       on_display(out.value);
       rerender();
@@ -78,6 +96,8 @@ export function useMaskedInput(opts: {
   const onCompositionEnd = useCallback(
     (e: CompositionEvent<El>) => {
       set_composing(null);
+      // the range captured mid-composition is the composition's own
+      selection_ref.current = null;
       apply(e, "insertText");
     },
     [apply]

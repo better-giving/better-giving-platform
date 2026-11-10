@@ -20,32 +20,61 @@ export interface Edit {
   type?: string;
   /** what the input held before the keystroke */
   prev: string;
+  /** the range the keystroke replaced, read before it landed (`beforeinput`).
+   * a collapsed range, or none, leaves the edit to be found by comparing
+   * `prev` with `value`. */
+  selection?: { start: number; end: number };
 }
 
 /** the masked value after an edit, and where the caret goes.
  *
  * the edit is split against `prev` into the field's own text before it, the
- * text the user put in, and the field's own text after it. only the inserted
+ * text the user put in, and the field's own text after it: by the replaced
+ * range when there was one, else by comparing the two. only the inserted
  * text is read as typed (`mask.read`); the field's own text keeps just its
  * typed characters, so a comma the mask drew is never mistaken for one the
  * user typed. */
 export function reformat(mask: IMask, edit: Edit) {
   const keep = mask.keep ?? digit;
   const typed = (s: string) => [...s].filter((c) => keep.test(c)).join("");
-  const { prev, value, cursor } = edit;
+  const { prev, value, cursor, selection } = edit;
+
+  // a replaced range is exact: what is left of it, what went in, what is left
+  // after it. comparing `prev` with `value` cannot tell a pasted "1.234,56"
+  // over "1.2" from "34,56" typed after it
+  const sel =
+    selection &&
+    selection.end > selection.start &&
+    !edit.type?.startsWith("history") &&
+    value.startsWith(prev.slice(0, selection.start)) &&
+    value.endsWith(prev.slice(selection.end)) &&
+    value.length >= selection.start + prev.length - selection.end
+      ? selection
+      : undefined;
 
   // everything after the caret is untouched tail of `prev` for any single
   // caret edit; anything else (an undo restoring older text) is read whole as
   // the field's own text
   const tail = value.slice(cursor);
-  const split = prev.endsWith(tail);
-  const tail_at = split ? prev.length - tail.length : prev.length;
+  const split = sel != null || prev.endsWith(tail);
+  const tail_at = sel
+    ? sel.end
+    : split
+      ? prev.length - tail.length
+      : prev.length;
   let p = 0;
-  const head_max = split ? Math.min(cursor, tail_at) : 0;
-  while (p < head_max && prev[p] === value[p]) p++;
+  if (sel) p = sel.start;
+  else {
+    const head_max = split ? Math.min(cursor, tail_at) : 0;
+    while (p < head_max && prev[p] === value[p]) p++;
+  }
   let before = split ? prev.slice(0, p) : "";
-  let after = split ? tail : "";
-  const inserted = split ? value.slice(p, cursor) : value;
+  let after = split ? (sel ? prev.slice(sel.end) : tail) : "";
+  const inserted = sel
+    ? value.slice(p, value.length - after.length)
+    : split
+      ? value.slice(p, cursor)
+      : value;
   const removed = split ? prev.slice(p, tail_at) : "";
 
   // deleting a character the mask inserted (a comma) changes nothing once the

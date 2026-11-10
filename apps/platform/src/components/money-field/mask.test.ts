@@ -533,3 +533,66 @@ describe("an edit that is not a change at the caret", () => {
     ).toEqual({ value: "1,234.56", cursor: 8 });
   });
 });
+
+describe("a replaced selection", () => {
+  /** `prev` with `[start, end)` selected and `pasted` put over it, as the
+   * input holds it after the event */
+  const replace = (
+    prev: string,
+    [start, end]: [number, number],
+    pasted: string,
+    type = "insertFromPaste"
+  ) =>
+    reformat(m, {
+      value: prev.slice(0, start) + pasted + prev.slice(end),
+      cursor: start + pasted.length,
+      prev,
+      type,
+      selection: { start, end },
+    });
+
+  test.each([
+    ["1.2", "1.234,56", "1,234.56"],
+    ["1.2", "1,234.56", "1,234.56"],
+    ["100", "$1,000", "1,000"],
+    ["12,345", "12,50", "12.50"],
+    ["12,345", "$9,627.92", "9,627.92"],
+  ])(
+    "a whole-field paste over %j of %j reads as one amount: %j",
+    (prev, pasted, out) => {
+      expect(replace(prev, [0, prev.length], pasted).value).toBe(out);
+    }
+  );
+
+  test("part of the value replaced keeps the rest", () => {
+    // "12,345.60" with the "345" selected, "7" typed over it
+    expect(replace("12,345.60", [3, 6], "7", "insertText").value).toBe(
+      "127.60"
+    );
+    // the tail of "1,000" selected and pasted over
+    expect(replace("1,000", [1, 5], "$2,500").value).toBe("12,500");
+  });
+
+  test("the caret lands after what went in", () => {
+    expect(replace("1.2", [0, 3], "1.234,56").cursor).toBe(8);
+  });
+
+  test("typing over a whole selection", () => {
+    expect(replace("1,000", [0, 5], "5", "insertText")).toEqual({
+      value: "5",
+      cursor: 1,
+    });
+  });
+
+  test("a collapsed range falls back to comparing the values", () => {
+    expect(
+      reformat(m, {
+        value: "9627",
+        cursor: 4,
+        prev: "962",
+        type: "insertText",
+        selection: { start: 3, end: 3 },
+      })
+    ).toEqual({ value: "9,627", cursor: 5 });
+  });
+});
