@@ -21,7 +21,6 @@ import { href, Outlet } from "react-router";
 import { CountryCombo } from "#/components/country-combo";
 import { ImgEditor } from "#/components/img-editor";
 import { RichText } from "#/components/rich-text";
-import { SLUG_HELP } from "#/routes/admin.$id.campaigns/copy";
 import { PublicLinkField } from "#/routes/admin.$id.campaigns/link-field";
 import { emails } from "@/constants/common";
 import { country_names } from "@/constants/countries";
@@ -46,9 +45,6 @@ const endow_designations: EndowDesignation[] = [
   "Hospital",
   "Other",
 ];
-
-const set_once_note =
-  "Can't change once set, so links you've shared keep working.";
 
 type SetPrompt = (p: IPrompt) => void;
 
@@ -205,15 +201,7 @@ export function Form({ init, profile, id, base_url, videos }: IProps) {
           </ExtLink>
         </h2>
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 text-sm">
-          <div className="grid gap-0.5 min-w-0">
-            <CopyLink
-              url={`${base_url}${profile_url}`}
-              label="Copy page link"
-            />
-            {init.slug && (
-              <p className="text-xs text-gray-11">{set_once_note}</p>
-            )}
-          </div>
+          <CopyLink url={`${base_url}${profile_url}`} label="Copy page link" />
           <div className="flex items-center justify-between gap-4 max-sm:w-full">
             {published ? (
               <Confirmed>Visible in the marketplace</Confirmed>
@@ -257,7 +245,6 @@ export function Form({ init, profile, id, base_url, videos }: IProps) {
               page.resetField("image");
             }}
             spec={bannerSpec}
-            hint="Shown at 4:1 — wider images crop to fit."
             classes={{ container: "mb-4", dropzone: "w-full aspect-4/1" }}
             error={page.errors.image?.message}
           />
@@ -327,7 +314,6 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
   const uploading = form.logo.value === "loading";
   const profile_base = `${base_url}/org/`;
   const id_url = `${base_url}${href("/org/:org", { org: String(id) })}`;
-  const slug_tip = `The short name in your Better Giving links, as in ${profile_base.replace(/^https?:\/\//, "")}your-slug. Your campaign links use it too. ${SLUG_HELP}. You can set it once; it can't be changed after you save.`;
   const setting_slug = !form.locked && form.slug !== "";
 
   return (
@@ -339,8 +325,10 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
         classes="grid gap-4 bg-popover p-6"
         initialFocusEl={() => cancel_ref.current}
       >
-        <h2 className="text-xl font-bold">Lock your profile link?</h2>
-        <p>Your profile link can't be changed later.</p>
+        <h2 className="text-xl font-bold">
+          Lock your Better Giving page link?
+        </h2>
+        <p>Your Better Giving page link can't be changed later.</p>
         <div className="flex justify-end gap-2">
           <button
             ref={cancel_ref}
@@ -425,23 +413,18 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
             error={form.errors.hq_country?.message}
             ref={form.hq_country.ref}
           />
-          {/* once set, the link is read-only text atop the Better Giving
-              Page section */}
-          {!form.locked && (
-            <PublicLinkField
-              reg={form.register("slug")}
-              value={form.slug}
-              base={profile_base}
-              locked={false}
-              label="Organization slug"
-              tip={slug_tip}
-              subject="your profile"
-              placeholder={suggest_slug(form.name)}
-              empty_url={id_url}
-              empty_suffix=" until you set a link"
-              error={form.errors.slug?.message}
-            />
-          )}
+          <PublicLinkField
+            reg={form.register("slug")}
+            value={form.slug}
+            base={profile_base}
+            locked={form.locked}
+            label="Organization slug"
+            subject="your Better Giving page"
+            placeholder={suggest_slug(form.name)}
+            empty_url={id_url}
+            empty_suffix=" until you set a link"
+            error={form.errors.slug?.message}
+          />
           <UrlInput
             {...form.register("url")}
             label="Website of your organization"

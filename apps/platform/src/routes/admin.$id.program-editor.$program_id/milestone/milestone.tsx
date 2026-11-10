@@ -89,7 +89,6 @@ export function Milestone(props: Props) {
               resetField("media");
             }}
             spec={img_spec([4, 1])}
-            hint="Shown at 4:1 — wider images crop to fit."
             classes={{
               container: "mb-4",
               dropzone: "w-full @md:aspect-4/1 h-36 @md:h-auto",

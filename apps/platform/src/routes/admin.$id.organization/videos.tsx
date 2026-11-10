@@ -184,14 +184,7 @@ export function VideosGroup({ npo_id, videos }: IVideosGroup) {
 
       <div className="mt-6 grid gap-2">
         {!empty && <h4 className="text-sm font-semibold">All videos</h4>}
-        <AddVideo
-          npo_id={npo_id}
-          help={
-            empty
-              ? `Add a YouTube link. You can show up to ${max} on your page.`
-              : undefined
-          }
-        />
+        <AddVideo npo_id={npo_id} />
         {!empty && (
           <ul className="mt-2 divide-y divide-hairline rounded border border-hairline">
             {items.map((v) => {
@@ -286,17 +279,13 @@ function OpenSpot() {
 
 interface IAddVideo {
   npo_id: number;
-  help?: string;
 }
 
-function AddVideo({ npo_id, help }: IAddVideo) {
+function AddVideo({ npo_id }: IAddVideo) {
   const add = use_add_video(npo_id);
   const id = useId();
   const err_id = useId();
-  const help_id = useId();
-  const described =
-    [add.error && err_id, help && help_id].filter(Boolean).join(" ") ||
-    undefined;
+  const described = add.error ? err_id : undefined;
   return (
     <div className="grid gap-1">
       {/* the placeholder and the button say it */}
@@ -340,11 +329,6 @@ function AddVideo({ npo_id, help }: IAddVideo) {
           </span>
         </button>
       </div>
-      {help && (
-        <p id={help_id} className="text-sm text-gray-11">
-          {help}
-        </p>
-      )}
     </div>
   );
 }

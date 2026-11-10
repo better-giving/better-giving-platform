@@ -145,9 +145,6 @@ describe("campaign edit — per-section save", () => {
     await expect.element(name).toHaveDisplayValue("Original");
 
     await expect.element(screen.getByLabelText("Campaign link")).toBeVisible();
-    await expect
-      .element(screen.getByText(/Letters, numbers, and - \. _ ~ only/))
-      .toBeVisible();
     const general = screen.getByRole("button", { name: "Save general" });
     const media = screen.getByRole("button", { name: "Save media" });
     const goal = screen.getByRole("button", { name: "Save goal and amounts" });

@@ -138,7 +138,6 @@ export function Sections({ fund, init_slug = "", base_url }: Props) {
                   media.resetField("banner");
                 }}
                 spec={img_spec([4, 1])}
-                hint="Shown at 4:1 — wider images crop to fit."
                 classes={{ dropzone: "w-full aspect-4/1" }}
                 error={media.errors.banner?.message}
               />

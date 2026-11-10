@@ -32,20 +32,20 @@ function Jsx({ org_name, registrant_first_name, endow_id, base_url }: IData) {
           <Text>
             You can see{" "}
             {org_name
-              ? `the profile for ${org_name}`
-              : "your organization's profile"}{" "}
+              ? `the Better Giving page for ${org_name}`
+              : "your organization's Better Giving page"}{" "}
             here: <Link href={profile_link}>{profile_link}</Link> and start
             receiving donations from visitors.
           </Text>
           <Text>
-            Once you've logged in with your email, your profile page is where
-            you can access your account's Admin area and edit your profile.
+            Once you've logged in with your email, your Better Giving page is
+            where you can access your account's Admin area and edit it.
           </Text>
         </>
       ) : (
         <Text>
           Log in with your email at <Link href={login_link}>{login_link}</Link>{" "}
-          to access your account's Admin area and edit your profile.
+          to access your account's Admin area and edit your Better Giving page.
         </Text>
       )}
       <Text>

@@ -91,7 +91,9 @@ describe("registration status mails", () => {
       "Good news: your organization's account has been created"
     );
     expect(text).toMatch(/approved\. Your organization's account is now live/);
-    expect(text).toMatch(/You can see your organization's profile here/);
+    expect(text).toMatch(
+      /You can see your organization's Better Giving page here/
+    );
     // a sentence opening lowercase after terminal punctuation
     expect(`${subject}\n${text}`).not.toMatch(/[.!?]\s+your organization/);
   });
@@ -110,7 +112,9 @@ describe("registration status mails", () => {
       "Good news: the account for Rainforest Fund has been created"
     );
     expect(text).toMatch(/The account for Rainforest Fund is now live\./);
-    expect(text).toMatch(/You can see the profile for Rainforest Fund here/);
+    expect(text).toMatch(
+      /You can see the Better Giving page for Rainforest Fund here/
+    );
   });
 
   test("an approval with no nonprofit id carries no profile link and is reported", async () => {
@@ -119,7 +123,7 @@ describe("registration status mails", () => {
     const { text } = await sent();
     expect(text).toMatch(/Hi Ada,/);
     expect(text).not.toMatch(/\/profile\//);
-    expect(text).not.toMatch(/your profile page/);
+    expect(text).not.toMatch(/your Better Giving page is where/);
     expect(text).toMatch(/Log in with your email at \S+\/login/);
     expect(report_error).toHaveBeenCalledOnce();
   });

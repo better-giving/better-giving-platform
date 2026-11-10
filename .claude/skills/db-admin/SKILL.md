@@ -87,7 +87,8 @@ Schema files: `.server/pg/schema/` (drizzle). Read the relevant file for column 
 
 Every run goes through `pnpm --filter platform migrate` (`.server/pg/migrate.ts`): the migration guard, then drizzle-orm's migrator in-process under a postgres advisory lock held on the same session, so concurrent runs against one database apply one at a time and a killed run frees the lock and rolls back together. It refuses a `-pooler` or unparseable `DATABASE_URL_UNPOOLED`. A run waits at most 10min for another run's lock, then exits 1 naming the holder's pid (`pg_stat_activity` / `pg_terminate_backend` it if that session is dead). Each DDL statement waits at most 5s for its table lock — the previous deployment is serving — and the whole run rolls back and retries, 4 tries in all; a table still locked after that fails the run with `lock timeout` in the log: find the long transaction on that table, not a migration bug.
 
-- push to `staging` / preview → the Vercel build's `postbuild` migrates whatever `DATABASE_URL_UNPOOLED` that environment holds (the dev/staging branch)
+- push to `staging` → the `staging` custom environment's Vercel build `postbuild` migrates whatever `DATABASE_URL_UNPOOLED` that environment holds (the dev/staging branch)
+- Platform previews → the same `postbuild`, but on the Neon branch `test-e2e-better-giving` (endpoint `ep-cold-paper`), not `staging`; `staging` is only the name of the staging custom environment
 - land on `main` → the production **build does not migrate** (its `postbuild` only runs the guard); `.github/workflows/smoke.yml`'s `migrate` job migrates prod once `checks`/`test` pass for that commit, and `smoke (production)` reports only after it
 
 Locally, `drizzle-kit generate` produces the committed artifact; `drizzle-kit push` is for fast dev iteration only. Always `generate` so the journal and the artifact CI applies stay in sync.

@@ -150,10 +150,10 @@ export const top_level_route_segments = [
 export function segment_block(value: string): string | undefined {
   const v = value.toLowerCase();
   if ((reserved_words as readonly string[]).includes(v)) {
-    return `${value} is reserved`;
+    return `Pick a different slug: ${value} is reserved`;
   }
   if ((top_level_route_segments as readonly string[]).includes(v)) {
-    return `${value} matches a top-level route`;
+    return `Pick a different slug: ${value} is already used by Better Giving`;
   }
   return undefined;
 }

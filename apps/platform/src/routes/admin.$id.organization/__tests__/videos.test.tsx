@@ -45,7 +45,6 @@ import * as org_route from "../route";
 const db = () => test_db.current!.db;
 const CAP = "Your page shows up to 4 videos. Take one off first.";
 const FULL = "All 4 spots are in use. Take a video off to show another.";
-const HELP = "Add a YouTube link. You can show up to 4 on your page.";
 
 beforeAll(async () => {
   test_db.current = await create_test_db();
@@ -199,8 +198,8 @@ describe("organization — videos", () => {
       save.compareDocumentPosition(group.element()) &
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    // nothing to choose yet: no open spots, no count, one line of help
-    await expect.element(screen.getByText(HELP)).toBeVisible();
+    // nothing to choose yet: no open spots, no count, no help line
+    expect(screen.getByText(/Add a YouTube link/).query()).toBeNull();
     expect(screen.getByText("Open spot").query()).toBeNull();
     expect(screen.getByText("spots used").query()).toBeNull();
     expect(
@@ -235,7 +234,6 @@ describe("organization — videos", () => {
       .element(screen.getByRole("heading", { name: "All videos", level: 4 }))
       .toBeVisible();
     expect(screen.getByText("Open spot").elements()).toHaveLength(3);
-    await expect.element(screen.getByText(HELP)).not.toBeInTheDocument();
     await expect.element(field).toHaveValue("");
     await expect.element(field).not.toHaveAttribute("aria-invalid", "true");
   });
@@ -493,7 +491,6 @@ describe("organization — videos", () => {
     await vi.waitFor(() => expect(hold.reads).toBeGreaterThan(0));
     await new Promise((r) => setTimeout(r, 50));
     expect(undo.query()).not.toBeNull();
-    expect(screen.getByText(HELP).query()).toBeNull();
 
     hold.open();
     await expect.element(link).toHaveFocus();

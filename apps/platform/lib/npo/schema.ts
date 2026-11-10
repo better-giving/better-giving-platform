@@ -53,7 +53,7 @@ const csv_strs = v.pipe(
 
 // v.message, not union's message argument: a union answers with the issues
 // of the one option whose type matched, so "0" would report the slug's
-// "should not be an id"
+// "Don't use only numbers"
 /** a nonprofit's numeric id or its slug, as `/api/npos/{id}` reads it */
 export const npo_ref = v.message(
   v.union([

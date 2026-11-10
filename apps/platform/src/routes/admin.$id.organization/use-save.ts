@@ -20,7 +20,7 @@ interface Flight {
  * undefined to call the save off; `on_saved` runs only on a confirmed write */
 export function use_save(
   set_prompt: (p: IPrompt) => void,
-  context = "applying profile changes"
+  context = "applying Better Giving page changes"
 ) {
   const fetcher = useFetcher<Result>();
   const flight = useRef<Flight>(undefined);
