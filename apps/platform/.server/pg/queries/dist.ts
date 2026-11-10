@@ -29,7 +29,7 @@ import { referrer_commissions } from "../schema/referrer";
 import { rev_logs } from "../schema/revenue";
 import type { DbOrTx, IPage, Tx } from "./helpers";
 import { decode_date_cursor, encode_date_cursor } from "./helpers";
-import { owed_on_gift } from "./owed";
+import { owed_on_gift, owed_open_on_gift } from "./owed";
 
 export type DistRow = typeof dists.$inferSelect;
 type DistInsert = typeof dists.$inferInsert;
@@ -47,6 +47,8 @@ export interface INpoDonation extends DistRow {
   program_name: string | null;
   /** an `owed_amounts` row records this npo owing on the gift */
   owed_back: boolean;
+  /** and some of it is still outstanding */
+  owed_open: boolean;
   // from donation_donors
   from_email: string;
   from_name: string | null;
@@ -70,6 +72,7 @@ const dist_joined = {
     program_name: donations.program_name,
     // stripe refused to reverse part of a routed transfer: the nonprofit owes it
     owed_back: owed_on_gift(dists.donation_id, dists.to_id),
+    owed_open: owed_open_on_gift(dists.donation_id, dists.to_id),
   },
   donor: {
     email: donation_donors.email,
@@ -98,6 +101,7 @@ type JoinedRow = {
     program_id: string | null;
     program_name: string | null;
     owed_back: boolean;
+    owed_open: boolean;
   };
   donor: {
     email: string;
@@ -128,6 +132,7 @@ function to_npo_donation(r: JoinedRow): INpoDonation {
     program_id: r.don.program_id,
     program_name: r.don.program_name,
     owed_back: r.don.owed_back,
+    owed_open: r.don.owed_open,
     from_email: r.donor?.email ?? "",
     from_name: r.donor?.name ?? null,
     from_company: r.donor?.company_name ?? null,

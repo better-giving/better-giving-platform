@@ -48,6 +48,7 @@ const dist: INpoDonation = {
   program_id: null,
   program_name: null,
   owed_back: false,
+  owed_open: false,
   from_email: "jane@example.com",
   from_name: "Jane Doe",
   from_company: null,
@@ -101,8 +102,20 @@ describe("to_csv_row's stripe payout", () => {
       status: "refunded",
       stripe_transfer_id: "tr_1",
       owed_back: true,
+      owed_open: true,
     });
     expect(row.stripe_payout).toBe("kept");
+  });
+
+  test("a kept routed dist whose owed row is settled reads repaid", () => {
+    const row = to_csv_row({
+      ...routed,
+      status: "refunded",
+      stripe_transfer_id: "tr_1",
+      owed_back: true,
+      owed_open: false,
+    });
+    expect(row.stripe_payout).toBe("repaid");
   });
 
   test("a routed dist refunded after its transfer reads fully reversed", () => {

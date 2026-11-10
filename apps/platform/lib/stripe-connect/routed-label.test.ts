@@ -35,6 +35,33 @@ describe("routed_kind", () => {
       },
       "not_sent",
     ],
+    [
+      "refunded, kept and still owed",
+      { transfer_id: "tr_1", reversed: true, kept: true, routed_at: ago(0) },
+      "kept",
+    ],
+    [
+      "refunded, kept and owing",
+      {
+        transfer_id: "tr_1",
+        reversed: true,
+        kept: true,
+        owing: true,
+        routed_at: ago(0),
+      },
+      "kept",
+    ],
+    [
+      "refunded, kept and since repaid",
+      {
+        transfer_id: "tr_1",
+        reversed: true,
+        kept: true,
+        owing: false,
+        routed_at: ago(0),
+      },
+      "repaid",
+    ],
   ] as const)("%s", (_, d, kind) => {
     expect(routed_kind(d, NOW)).toBe(kind);
   });
@@ -45,5 +72,6 @@ describe("routed_label", () => {
     expect(routed_label("reversed")).toBe("Fully reversed");
     expect(routed_label("not_sent")).toBe("Not sent to Stripe");
     expect(routed_label("kept")).toBe("Refunded, owed to Better Giving");
+    expect(routed_label("repaid")).toBe("Refunded, repaid to Better Giving");
   });
 });

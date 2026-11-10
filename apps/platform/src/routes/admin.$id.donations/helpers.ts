@@ -25,6 +25,7 @@ const stripe_payout_of = (x: INpoDonation): TStripePayout | undefined => {
     transfer_id: x.stripe_transfer_id,
     reversed: is_reversed(x.status),
     kept: x.owed_back,
+    owing: x.owed_open,
     routed_at: x.date_created,
   });
 };

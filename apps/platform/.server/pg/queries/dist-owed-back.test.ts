@@ -16,7 +16,8 @@ vi.mock("../db", () => ({
   ),
 }));
 
-import { seed_npo } from "#/__tests__/fixtures/funds";
+import { eq } from "drizzle-orm";
+import { seed_npo, seed_user } from "#/__tests__/fixtures/funds";
 import { seed_owed } from "#/__tests__/fixtures/owed";
 import { dists } from "../schema/dist";
 import { donations } from "../schema/donation";
@@ -89,4 +90,52 @@ test("a dist reads owed back only when its gift has an owed row for its npo", as
   expect((await npo_donation_get("d-other"))?.owed_back).toBe(false);
   // a dispute fee alone is not money the npo kept
   expect((await npo_donation_get("d-fee"))?.owed_back).toBe(false);
+});
+
+test("a dist whose owed row is settled stays owed back but is no longer open", async () => {
+  const { db } = test_db.current!;
+  const npo = (await seed_npo(db, { registration_number: "EIN-SETTLED" }))!;
+  const admin = (await seed_user(db, "settled@example.com"))!;
+  await seed_owed(db, npo.id, 40);
+  await seed_owed(db, npo.id, 40);
+  await seed_owed(db, npo.id, 40);
+  const rows = await db
+    .select({ id: owed_amounts.id, donation_id: owed_amounts.donation_id })
+    .from(owed_amounts)
+    .where(eq(owed_amounts.npo_id, npo.id))
+    .orderBy(owed_amounts.id);
+  const [open, recovered, written_off] = rows;
+  const at = "2026-10-01T00:00:00.000Z";
+  await db
+    .update(owed_amounts)
+    .set({ recovered_usd: 40, recovered_at: at })
+    .where(eq(owed_amounts.id, recovered!.id));
+  await db
+    .update(owed_amounts)
+    .set({
+      written_off_usd: 40,
+      written_off_at: at,
+      write_off_reason: "uncollectable",
+      written_off_by: admin.id,
+    })
+    .where(eq(owed_amounts.id, written_off!.id));
+  await db.insert(dists).values(
+    [open!, recovered!, written_off!].map((o, i) => ({
+      id: `d-settle-${i}`,
+      donation_id: o.donation_id,
+      to_id: npo.id,
+      status: "refunded" as const,
+      date_created: "2026-07-01T00:00:00.000Z",
+      amount_denom: "USD",
+      net: 40,
+    }))
+  );
+
+  const read = async (id: string) => {
+    const d = await npo_donation_get(id);
+    return [d?.owed_back, d?.owed_open];
+  };
+  expect(await read("d-settle-0")).toEqual([true, true]);
+  expect(await read("d-settle-1")).toEqual([true, false]);
+  expect(await read("d-settle-2")).toEqual([true, false]);
 });

@@ -8,6 +8,8 @@ export type TSentStanding =
   /** the gift was refunded and the npo owes back money stripe refused to
    * reverse from the transfer: it stayed in the connected account */
   | { kind: "kept" }
+  /** `kept`, and nothing is owed any more: recovered, credited or written off */
+  | { kind: "repaid" }
   | { kind: "unknown" };
 
 export interface ISentTransfer {
@@ -87,6 +89,8 @@ export const routed_label = (kind: TRoutedKind): string => {
       return "Fully reversed";
     case "kept":
       return "Refunded, owed to Better Giving";
+    case "repaid":
+      return "Refunded, repaid to Better Giving";
     case "unknown":
       return "Status unavailable";
     case "sending":
@@ -107,13 +111,16 @@ export function routed_kind(
     /** stripe refused to reverse part of its transfer, and the amount is
      * recorded owed by the nonprofit */
     kept?: boolean;
+    /** with `kept`, the amount is still outstanding. unset reads as owing */
+    owing?: boolean;
     routed_at: string;
   },
   now = Date.now()
 ): TRoutedKind {
   if (d.transfer_id) {
     if (!d.reversed) return "paid";
-    return d.kept ? "kept" : "reversed";
+    if (!d.kept) return "reversed";
+    return d.owing === false ? "repaid" : "kept";
   }
   if (d.reversed) return "not_sent";
   return now - Date.parse(d.routed_at) > SENDING_WINDOW_MS

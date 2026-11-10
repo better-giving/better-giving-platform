@@ -43,6 +43,7 @@ vi.mock("../env", async (importOriginal) => {
   };
 });
 
+import { user } from "../pg/schema/auth";
 import { dists } from "../pg/schema/dist";
 import { donations } from "../pg/schema/donation";
 import { owed_amounts } from "../pg/schema/owed";
@@ -112,6 +113,7 @@ beforeEach(async () => {
   flags.routing = true;
   retrieve.mockReset();
   await db().delete(owed_amounts);
+  await db().delete(user).where(eq(user.id, "admin-wo"));
   await db().delete(dists);
   await db().delete(donations);
   await db().delete(npos);
@@ -291,7 +293,7 @@ describe("npo_sent_transfers — routed with no transfer", () => {
 describe("npo_sent_transfers — a refunded gift", () => {
   const owe = (
     npo_id: number,
-    o: { received_usd: number; fee_dispute_usd?: number }
+    o: Partial<typeof owed_amounts.$inferInsert> & { received_usd: number }
   ) =>
     db()
       .insert(owed_amounts)
@@ -321,6 +323,51 @@ describe("npo_sent_transfers — a refunded gift", () => {
     const sent = await npo_sent_transfers(id);
 
     expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "kept" }]);
+  });
+
+  test("whose owed row is fully recovered reads repaid", async () => {
+    const id = await seed();
+    await sent_one(id);
+    await db().update(dists).set({ status: "refunded" });
+    await owe(id, {
+      received_usd: 90,
+      recovered_usd: 90,
+      recovered_at: "2026-10-01T00:00:00.000Z",
+    });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "repaid" }]);
+  });
+
+  test("whose owed row is written off reads repaid", async () => {
+    const id = await seed();
+    await sent_one(id);
+    await db().update(dists).set({ status: "refunded" });
+    const [admin] = await db()
+      .insert(user)
+      .values({
+        id: "admin-wo",
+        name: "Admin",
+        email: "wo@example.com",
+        emailVerified: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        first_name: "A",
+        last_name: "B",
+      })
+      .returning();
+    await owe(id, {
+      received_usd: 90,
+      written_off_usd: 90,
+      written_off_at: "2026-10-01T00:00:00.000Z",
+      write_off_reason: "uncollectable",
+      written_off_by: admin!.id,
+    });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "repaid" }]);
   });
 
   test("whose reversal stripe refused in part reads kept too, not partly reversed", async () => {

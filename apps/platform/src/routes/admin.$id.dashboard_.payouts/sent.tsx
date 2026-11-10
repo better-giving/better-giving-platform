@@ -117,6 +117,11 @@ const tones: Record<TRoutedKind, ITone> = {
     ink: "text-warning-subtle-fg",
     dot: "bg-warning",
   },
+  repaid: {
+    label: routed_label("repaid"),
+    ink: "text-gray-11",
+    dot: "bg-gray-9",
+  },
   unknown: {
     label: routed_label("unknown"),
     ink: "text-gray-11",
