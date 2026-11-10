@@ -222,6 +222,20 @@ describe("stripe checkout", () => {
     expect(reported[0]).toBeInstanceOf(TypeError);
   });
 
+  test("the error sits a summary row's padding below the total's rule", async () => {
+    mswWorker.use(don_intents_error_handler);
+    const screen = await render(fresh_swr(<Checkout {...fv} />));
+    const msg = screen.getByText(generic_msg);
+    await expect.element(msg).toBeVisible();
+    const status = msg.element().parentElement!;
+    const summary = status.previousElementSibling!;
+    const gap =
+      status.getBoundingClientRect().top -
+      summary.getBoundingClientRect().bottom;
+    // py-3 is what every other row in the summary has
+    expect(gap).toBeGreaterThanOrEqual(12);
+  });
+
   test("a failed intent is not retried", async () => {
     // each request creates a donation row and a stripe intent
     let calls = 0;

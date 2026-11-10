@@ -121,7 +121,8 @@ export function StripeCheckout(props: IStripeCheckoutProps) {
         {isLoading ? (
           <Loader msg="Loading payment form.." />
         ) : error || !data ? (
-          <ErrorStatus>
+          // the summary's rows are py-3; the line under its last rule gets the same
+          <ErrorStatus classes="mt-3">
             {error instanceof HttpError && error.refused
               ? error.message
               : "We couldn't start the payment. Please try again or choose a different payment method."}
