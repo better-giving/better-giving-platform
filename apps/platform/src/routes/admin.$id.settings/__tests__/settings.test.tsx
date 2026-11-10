@@ -456,9 +456,9 @@ describe("donation form tab — pre-filled", () => {
     // increment present
     await vi.waitFor(() => {
       const panel = screen.getByRole("tabpanel").element();
-      const num_input = panel.querySelector(
-        "input[type='number']"
-      ) as HTMLInputElement;
+      const num_input = screen
+        .getByLabelText(/increment 1 amount/i)
+        .element() as HTMLInputElement;
       expect(num_input.value).toBe("25");
       const textarea = panel.querySelector("textarea") as HTMLTextAreaElement;
       expect(textarea.value).toBe("Feed a child");
@@ -587,14 +587,10 @@ describe("donation form tab — add increment", () => {
       await page.elementLocator(plus_btn).click();
     });
 
-    // fill value + label — increment inputs lack accessible labels,
-    // query by input type within the form
+    // fill value + label — the amount is named "Increment 1 amount"
     await vi.waitFor(async () => {
       const panel = screen.getByRole("tabpanel").element();
-      const value_input = panel.querySelector(
-        "input[type='number']"
-      ) as HTMLInputElement;
-      await page.elementLocator(value_input).fill("100");
+      await screen.getByLabelText(/increment 1 amount/i).fill("100");
 
       const label_textarea = panel.querySelector(
         "textarea"
@@ -611,9 +607,9 @@ describe("donation form tab — add increment", () => {
     // revalidated: increment persists
     await vi.waitFor(() => {
       const panel = screen.getByRole("tabpanel").element();
-      const num_input = panel.querySelector(
-        "input[type='number']"
-      ) as HTMLInputElement;
+      const num_input = screen
+        .getByLabelText(/increment 1 amount/i)
+        .element() as HTMLInputElement;
       expect(num_input.value).toBe("100");
       const textarea = panel.querySelector("textarea") as HTMLTextAreaElement;
       expect(textarea.value).toBe("Feed a family");
