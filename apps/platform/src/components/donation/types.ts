@@ -9,7 +9,7 @@ import {
   type IIncrement,
   type TFrequency,
 } from "@/schemas";
-import { amount_num } from "@/schemas/amount";
+import { amount_num, decimal_str } from "@/schemas/amount";
 
 export type { IDonorFv, ITribute } from "@/donations/schema";
 
@@ -58,7 +58,7 @@ export const amount = ({ required = false } = {}) =>
       // check that follows, with its own message
       amount_num(Number.POSITIVE_INFINITY),
       v.gtValue(0, "amount must be greater than 0"),
-      v.transform((x) => x.toString())
+      v.transform(decimal_str)
     );
   });
 

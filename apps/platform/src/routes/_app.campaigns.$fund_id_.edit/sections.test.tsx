@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { createRoutesStub } from "react-router";
 import {
   afterAll,
@@ -263,6 +264,41 @@ describe("campaign edit — per-section save", () => {
     );
     expect(sent).toEqual([{ target: "0" }]);
     expect((await fund_get_or_slug(FUND_ID))?.name).toBe("Original");
+  });
+
+  it("a stored goal with extra decimals does not block saving a new preset", async () => {
+    // rows from before the 2-decimal mask
+    await db()
+      .update(funds)
+      .set({
+        target_smart: null,
+        target_number: 1234.567,
+        increments: [{ value: "10.125", label: "Legacy" }],
+      })
+      .where(eq(funds.id, FUND_ID));
+    const screen = await render_edit();
+    const goal_value = screen.getByLabelText(/how much money/i);
+    await expect.element(goal_value).toHaveDisplayValue("1,234.567");
+
+    await screen
+      .getByRole("button", { name: "Add donation increment" })
+      .click();
+    const preset = screen.getByLabelText("Increment 2 amount");
+    await preset.fill("2500");
+    await expect.element(preset).toHaveDisplayValue("2,500");
+    await screen.getByRole("button", { name: "Save goal and amounts" }).click();
+
+    await vi.waitFor(async () =>
+      expect((await fund_get_or_slug(FUND_ID))?.increments).toHaveLength(2)
+    );
+    expect(sent).toEqual([
+      {
+        increments: [
+          { value: "10.125", label: "Legacy" },
+          { value: "2500", label: "" },
+        ],
+      },
+    ]);
   });
 
   it("keeps the media card inside a 375px screen", async () => {

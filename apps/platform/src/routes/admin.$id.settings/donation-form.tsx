@@ -1,12 +1,12 @@
 import { Field as BaseField } from "@ark-ui/react/field";
 import { Actions, Form as F, Increments } from "@better-giving/ui";
 import { valibotResolver } from "@hookform/resolvers/valibot";
-import { DollarSign } from "lucide-react";
 import { useController, useFieldArray, useForm } from "react-hook-form";
 import { useFetcher } from "react-router";
 import * as v from "valibot";
 import { DonateFrequencies } from "#/components/donate-frequencies";
 import { DonateMethods, fill } from "#/components/donate-methods";
+import { MoneyField } from "#/components/money-field";
 import { donate_method } from "#/types/components";
 import { to_freq_bools, to_freqs } from "@/helpers/donation";
 import type { DonateMethodId, INpoUpdate } from "@/npo";
@@ -139,20 +139,20 @@ export function DonationFormTab(p: Props) {
         countError={errors.increments?.root?.message}
         field={(idx) => (
           <>
-            <BaseField.Root className="grid grid-rows-subgrid row-span-2">
-              <div className="relative w-full">
-                <DollarSign className="text-gray-11 absolute top-1/2 left-2 transform -translate-y-1/2 icon-md" />
-                <input
-                  type="number"
-                  {...register(`increments.${idx}.value`)}
-                  className="w-full h-full outline-ring rounded text-sm font-medium bg-surface pl-8 pr-4 py-3.5 placeholder:text-gray-11 border border-input enabled:hover:border-input-hover disabled:pointer-events-none disabled:bg-gray-3 disabled:text-gray-11"
-                />
-              </div>
-
-              <p className="mt-1 empty:hidden text-left text-xs text-destructive-subtle-fg">
-                {errors.increments?.[idx]?.value?.message}
-              </p>
-            </BaseField.Root>
+            <MoneyField
+              control={control}
+              name={`increments.${idx}.value`}
+              label={`Increment ${idx + 1} amount`}
+              placeholder="$"
+              classes={{
+                // a cell of the Increments subgrid: the "Amount" column header is
+                // the visible label
+                container: "grid grid-rows-subgrid row-span-2",
+                label: "sr-only",
+                input: "h-full font-medium",
+              }}
+              error={errors.increments?.[idx]?.value?.message}
+            />
             <BaseField.Root className="grid grid-rows-subgrid row-span-2">
               <textarea
                 {...register(`increments.${idx}.label`)}

@@ -1,28 +1,44 @@
 import * as v from "valibot";
 
-export const amount_format_err = "Enter a number, like 1250.50";
+export const amount_format_err = (places = 2) =>
+  places === 0 ? "Enter a number, like 1250" : "Enter a number, like 1250.50";
 
-/** "$" and spaces go; commas stay for the shape check, which only lets them
- * sit between three-digit groups so "12,50" is rejected, not read as 1250 */
+export const amount_places_err = (places: number) =>
+  places === 0
+    ? "Enter a whole number, no cents"
+    : `Use at most ${places} decimal${places === 1 ? "" : "s"}`;
+
+/** "$" and spaces go; commas stay for the shape check */
 const trim_amount = (raw: string) => raw.replace(/[$\s]/g, "");
 
-const shape = (places: number) =>
-  new RegExp(
-    `^-?(\\d{1,3}(,\\d{3})+|\\d+)?(\\.\\d${places === Number.POSITIVE_INFINITY ? "*" : `{0,${places}}`})?$`
-  );
+/** commas only sit between three-digit groups, so "12,50" is rejected, not
+ * read as 1250. a first group starting with 0 is refused too: the mask reads
+ * "0,500" as the decimal 0.5, and this must not read it as 500 */
+const shape = /^-?([1-9]\d{0,2}(,\d{3})+|\d+)?(\.\d*)?$/;
+
+const decimals = (x: string) => x.split(".")[1]?.length ?? 0;
 
 /** free text a person typed or pasted → the number it reads as: a plain decimal
  * of at most `places` decimals, with "$", spaces and thousands commas allowed.
- * Anything else fails with {@link amount_format_err}; the caller chains its own
- * range checks (greater than 0, a minimum) after it. The masked inputs hand
+ * anything else fails with {@link amount_format_err}, and too many decimals with
+ * {@link amount_places_err}; the caller chains its own range checks (greater
+ * than 0, a minimum) after it. the masked inputs hand
  * this the plain decimal already — this is the backstop for a paste or a
  * submit that never went through one. */
-export const amount_num = (places = 2) => {
-  const re = shape(places);
-  return v.pipe(
+export const amount_num = (places = 2) =>
+  v.pipe(
     v.string(),
     v.transform(trim_amount),
-    v.check((x) => /\d/.test(x) && re.test(x), amount_format_err),
+    v.check((x) => /\d/.test(x) && shape.test(x), amount_format_err(places)),
+    v.check((x) => decimals(x) <= places, amount_places_err(places)),
     v.transform((x) => +x.replace(/,/g, ""))
   );
-};
+
+const plain = new Intl.NumberFormat("en-US", {
+  useGrouping: false,
+  maximumFractionDigits: 100,
+});
+
+/** a number as the plain decimal a schema outputs: `String(1e-7)` is "1e-7",
+ * which the mask and `amount_num` read as something else */
+export const decimal_str = (n: number) => plain.format(n);

@@ -6,7 +6,6 @@ import {
   Group,
   Increments,
 } from "@better-giving/ui";
-import { DollarSign } from "lucide-react";
 import { useFetcher } from "react-router";
 import { GoalSelector } from "#/components/goal-selector";
 import { ImgEditor } from "#/components/img-editor";
@@ -208,20 +207,20 @@ export function Sections({ fund, init_slug = "", base_url }: Props) {
               countError={goal.errors.increments?.root?.message}
               field={(idx) => (
                 <>
-                  <BaseField.Root className="grid grid-rows-subgrid row-span-2">
-                    <div className="relative w-full">
-                      <DollarSign className="text-gray-11 absolute top-1/2 left-2 transform -translate-y-1/2 icon-md" />
-                      <input
-                        type="number"
-                        {...goal.register(`increments.${idx}.value`)}
-                        className="field-input h-full pl-8 font-medium"
-                      />
-                    </div>
-
-                    <p className="mt-1 empty:hidden text-left text-xs text-destructive-subtle-fg">
-                      {goal.errors.increments?.[idx]?.value?.message}
-                    </p>
-                  </BaseField.Root>
+                  <MoneyField
+                    control={goal.control}
+                    name={`increments.${idx}.value`}
+                    label={`Increment ${idx + 1} amount`}
+                    placeholder="$"
+                    classes={{
+                      // a cell of the Increments subgrid: the "Amount" column header is
+                      // the visible label
+                      container: "grid grid-rows-subgrid row-span-2",
+                      label: "sr-only",
+                      input: "h-full font-medium",
+                    }}
+                    error={goal.errors.increments?.[idx]?.value?.message}
+                  />
                   <BaseField.Root className="grid grid-rows-subgrid row-span-2">
                     <textarea
                       {...goal.register(`increments.${idx}.label`)}

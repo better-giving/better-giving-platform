@@ -1,7 +1,7 @@
 import * as v from "valibot";
 import { img_output } from "#/components/img-editor";
 import { $req } from "@/schemas";
-import { amount_num } from "@/schemas/amount";
+import { amount_num, decimal_str } from "@/schemas/amount";
 import { MAX_CHARS } from "../common";
 
 export const schema = v.object({
@@ -19,9 +19,11 @@ export const schema = v.object({
   target_raise: v.lazy((val) => {
     if (val === "") return v.string();
     return v.pipe(
-      amount_num(),
+      // any decimals: a stored target from before the 2-decimal mask must not
+      // block a save of the fields beside it
+      amount_num(Number.POSITIVE_INFINITY),
       v.check((x) => x > 0, "must be greater than 0"),
-      v.transform((x) => x.toString())
+      v.transform(decimal_str)
     );
   }),
 });
