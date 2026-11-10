@@ -211,7 +211,7 @@ describe("program editor -- renders pre-filled", () => {
 
     await expect
       .element(screen.getByLabelText(/target amount/i))
-      .toHaveDisplayValue("50000");
+      .toHaveDisplayValue("50,000");
 
     // save button disabled when not dirty
     const save_btns = screen.getByRole("button", { name: /save changes/i });
@@ -283,7 +283,7 @@ describe("program editor -- edit program info", () => {
     // revalidation completes — form resets dirty (isDirty resets async after values sync)
     await expect
       .element(screen.getByLabelText(/target amount/i))
-      .toHaveDisplayValue("75000");
+      .toHaveDisplayValue("75,000");
     await expect.element(save_btns.nth(0)).toBeDisabled();
   });
 

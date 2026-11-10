@@ -1,16 +1,10 @@
 import type { InputHTMLAttributes, ReactElement, ReactNode } from "react";
-import { useCallback, useLayoutEffect, useRef } from "react";
 import { unpack } from "../../helpers/unpack";
+import type { IMask } from "./mask-types";
 import type { Classes } from "./types";
+import { useMaskedInput } from "./use-masked-input";
 
 type El = HTMLInputElement;
-
-interface IMask {
-  /** raw digits → display string */
-  format: (digits: string) => string;
-  /** display string → raw digits */
-  unmask: (masked: string) => string;
-}
 
 interface Base
   extends Pick<
@@ -61,65 +55,12 @@ export function MaskedInput({ sub, ...props }: Props) {
       .filter(Boolean)
       .join(" ") || undefined;
 
-  const input_ref = useRef<El>(null);
-  const cursor_ref = useRef<number | null>(null);
-
-  // restore cursor after react re-renders the controlled value
-  useLayoutEffect(() => {
-    if (cursor_ref.current != null && input_ref.current) {
-      input_ref.current.setSelectionRange(
-        cursor_ref.current,
-        cursor_ref.current
-      );
-      cursor_ref.current = null;
-    }
+  const { ref, onInput } = useMaskedInput({
+    mask: props.mask,
+    display: props.value,
+    on_display: props.onChange,
+    ref: props.ref,
   });
-
-  const on_input = useCallback(
-    (e: React.FormEvent<El>) => {
-      const input = e.currentTarget;
-      const cursor = input.selectionStart ?? 0;
-
-      // count digits before cursor in the raw (pre-format) value
-      const digits_before = input.value
-        .slice(0, cursor)
-        .replace(/\D/g, "").length;
-
-      const digits = props.mask.unmask(input.value);
-      const formatted = props.mask.format(digits);
-
-      // find cursor position after same number of digits in formatted value
-      let pos = 0;
-      let count = 0;
-      for (const ch of formatted) {
-        pos++;
-        if (/\d/.test(ch)) count++;
-        if (count === digits_before) break;
-      }
-      // no digits before the cursor means it belongs in front of the first
-      // one — sending it to the end makes a delete-from-the-front loop chew
-      // the value from the wrong side
-      if (digits_before === 0) {
-        const first = formatted.search(/\d/);
-        pos = first === -1 ? formatted.length : first;
-      }
-
-      cursor_ref.current = pos;
-      props.onChange(formatted);
-    },
-    [props.onChange, props.mask]
-  );
-
-  const set_ref = useCallback(
-    (node: El | null) => {
-      (input_ref as React.MutableRefObject<El | null>).current = node;
-      if (typeof props.ref === "function") props.ref(node);
-      else if (props.ref) {
-        (props.ref as React.MutableRefObject<El | null>).current = node;
-      }
-    },
-    [props.ref]
-  );
 
   return (
     <div className={`${style.container} `}>
@@ -145,7 +86,7 @@ export function MaskedInput({ sub, ...props }: Props) {
 
       <input
         type={props.type ?? "text"}
-        ref={set_ref}
+        ref={ref}
         id={props.id}
         name={props.name}
         inputMode={props.inputMode}
@@ -165,7 +106,7 @@ export function MaskedInput({ sub, ...props }: Props) {
         className={`${style.input} field-input`}
         autoComplete="off"
         spellCheck={false}
-        onInput={on_input}
+        onInput={onInput}
         onBlur={props.onBlur}
       />
 

@@ -6,6 +6,7 @@ import { useController, useFieldArray, useForm } from "react-hook-form";
 import { DonateFrequencies } from "#/components/donate-frequencies";
 import { DonateMethods } from "#/components/donate-methods";
 import { GoalSelector } from "#/components/goal-selector";
+import { MoneyField } from "#/components/money-field";
 import { bg_accent_primary, bg_accent_secondary } from "#/styles/colors";
 import { increment_label_max_chars } from "@/schemas";
 import { type FVBasic, schema_basic } from "./types";
@@ -151,8 +152,10 @@ export function SettingsBasic({
         <p className="label mb-3">Donation goal</p>
         <GoalSelector value={target.value} onChange={target.onChange} />
         {target.value === "fixed" && (
-          <Field
-            {...register("target.value", { shouldUnregister: true })}
+          <MoneyField
+            control={control}
+            name="target.value"
+            unregister
             label="How much money do you want to raise?"
             required
             classes="mt-4 mb-6"

@@ -25,6 +25,7 @@ import {
   union,
   url,
 } from "valibot";
+import { amount_num } from "./amount";
 import { segment_block } from "./route-segments";
 
 export const file_obj = object({
@@ -170,9 +171,7 @@ export const target = union([
   literal("smart"),
   // "0" - none, `${number}` - fixed
   pipe(
-    string(),
-    transform((v) => +v),
-    number(),
+    amount_num(),
     minValue(0),
     transform((v) => v.toString())
   ),

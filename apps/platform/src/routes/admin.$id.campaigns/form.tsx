@@ -26,6 +26,7 @@ import {
   to_target,
 } from "#/components/goal-selector";
 import { ImgEditor } from "#/components/img-editor";
+import { MoneyField } from "#/components/money-field";
 import { RichText, to_content } from "#/components/rich-text";
 import { img_spec } from "#/pages/funds/common";
 import { Videos } from "#/pages/funds/common/videos";
@@ -495,8 +496,10 @@ export function CampaignForm({
           onChange={target_type.onChange}
         />
         {target_type.value === "fixed" && (
-          <Field
-            {...register("target.value", { shouldUnregister: true })}
+          <MoneyField
+            control={control}
+            name="target.value"
+            unregister
             label="Amount to raise"
             classes="mt-2"
             placeholder="$"

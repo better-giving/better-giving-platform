@@ -51,6 +51,7 @@ export function use_rhf(init: FV | undefined) {
     handleSubmit,
     isSubmitting,
     register,
+    control,
     errors,
     setValue,
     getValues,

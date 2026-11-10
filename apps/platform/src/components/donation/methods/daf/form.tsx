@@ -1,4 +1,5 @@
-import { Field, Form as FormContainer } from "@better-giving/ui";
+import { Form as FormContainer } from "@better-giving/ui";
+import { MoneyField } from "#/components/money-field";
 import { ru_vdec } from "@/helpers/decimal";
 import { usd_option } from "../../common/constants";
 import { CpfToggle } from "../../common/cpf-toggle";
@@ -29,10 +30,10 @@ export function Form(props: TMethodState<"daf">) {
 
   const fields = (
     <>
-      <Field
+      <MoneyField
         required
-        {...rhf.register("amount")}
-        inputMode="decimal"
+        control={rhf.control}
+        name="amount"
         label="Donation amount"
         classes={{ label: "" }}
         placeholder="Enter amount (USD)"

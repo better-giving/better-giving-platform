@@ -1,6 +1,7 @@
 import * as v from "valibot";
 import { img_output } from "#/components/img-editor";
 import { $req } from "@/schemas";
+import { amount_num } from "@/schemas/amount";
 import { MAX_CHARS } from "../common";
 
 export const schema = v.object({
@@ -18,8 +19,7 @@ export const schema = v.object({
   target_raise: v.lazy((val) => {
     if (val === "") return v.string();
     return v.pipe(
-      v.string(),
-      v.transform((x) => +x),
+      amount_num(),
       v.check((x) => x > 0, "must be greater than 0"),
       v.transform((x) => x.toString())
     );

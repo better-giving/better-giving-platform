@@ -10,6 +10,7 @@ import { DollarSign } from "lucide-react";
 import { useFetcher } from "react-router";
 import { GoalSelector } from "#/components/goal-selector";
 import { ImgEditor } from "#/components/img-editor";
+import { MoneyField } from "#/components/money-field";
 import { RichText } from "#/components/rich-text";
 import { img_spec } from "#/pages/funds/common";
 import { Videos } from "#/pages/funds/common/videos";
@@ -186,8 +187,10 @@ export function Sections({ fund, init_slug = "", base_url }: Props) {
               />
             </div>
             {goal.target_type.value === "fixed" && (
-              <Field
-                {...goal.register("target.value", { shouldUnregister: true })}
+              <MoneyField
+                control={goal.control}
+                name="target.value"
+                unregister
                 label="How much money do you want to raise?"
                 placeholder="$"
                 error={goal.errors?.target?.value?.message}

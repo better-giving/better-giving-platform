@@ -1,6 +1,7 @@
 import { Field, Form as FormContainer } from "@better-giving/ui";
 import { valibotResolver } from "@hookform/resolvers/valibot";
 import { useController, useForm } from "react-hook-form";
+import { MoneyField } from "#/components/money-field";
 import { ru_vdec } from "@/helpers/decimal";
 import { usd_option } from "../../common/constants";
 import type { OnIncrement } from "../../common/incrementers";
@@ -67,10 +68,10 @@ export function Form(props: TMethodState<"ira_qcd">) {
 
   const fields = (
     <>
-      <Field
+      <MoneyField
         required
-        {...register("amount")}
-        inputMode="decimal"
+        control={control}
+        name="amount"
         label="Donation amount"
         classes={{ label: "" }}
         placeholder="Enter amount (USD)"

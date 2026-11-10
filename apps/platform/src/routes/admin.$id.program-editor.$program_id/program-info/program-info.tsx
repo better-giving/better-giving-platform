@@ -2,6 +2,7 @@ import { Field, Form, Group, Label } from "@better-giving/ui";
 import { valibotResolver } from "@hookform/resolvers/valibot";
 import { useController, useForm } from "react-hook-form";
 import { ImgEditor } from "#/components/img-editor";
+import { MoneyField } from "#/components/money-field";
 import { RichText } from "#/components/rich-text";
 import type { IProgram } from "@/npo";
 import { img_spec, MAX_CHARS } from "../common";
@@ -87,8 +88,9 @@ export function ProgramInfo(props: IProgram) {
             errors.description?.length?.message
           }
         />
-        <Field
-          {...register("target_raise")}
+        <MoneyField
+          control={control}
+          name="target_raise"
           classes="mb-4"
           label="Target amount to raise (USD)"
           placeholder="e.g. $1000"

@@ -1,12 +1,12 @@
 import * as v from "valibot";
+import { amount_num } from "@/schemas/amount";
 export const target = v.variant("type", [
   v.object({
     type: v.literal("fixed"),
     value: v.pipe(
       v.string("required"),
       v.nonEmpty("required"),
-      v.transform((x) => +x),
-      v.number("invalid number"),
+      amount_num(),
       v.minValue(0, "must be greater than 0"),
       /** so that the inferred type is string */
       v.transform((x) => x.toString())

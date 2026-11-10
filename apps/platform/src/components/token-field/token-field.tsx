@@ -1,12 +1,19 @@
 import { unpack } from "@better-giving/ui/helpers";
 import type { Ref } from "react";
 import { humanize } from "@/helpers/decimal";
+import { useMoneyInput } from "../money-field";
 import type { ITokenField } from "./types";
 
 type El = HTMLInputElement;
 
 export function TokenField({ ref, ...props }: ITokenField & { ref?: Ref<El> }) {
   const style = unpack(props.classes);
+  const money = useMoneyInput({
+    value: props.amount,
+    onChange: props.on_change,
+    places: props.places,
+    ref,
+  });
 
   return (
     <div className={`grid ${style.container}`}>
@@ -23,21 +30,17 @@ export function TokenField({ ref, ...props }: ITokenField & { ref?: Ref<El> }) {
         {/** match input text, and append $ value */}
         <div className="relative h-full w-full">
           <input
-            ref={ref}
-            value={props.amount}
-            onChange={(e) => props.on_change(e.target.value)}
+            {...money}
             aria-invalid={!!props.error}
             disabled={props.disabled}
             autoComplete="off"
             id="amount"
-            inputMode="decimal"
-            step="any"
             placeholder="Enter amount"
             className={`outline-none w-full h-full ${style.input} bg-transparent placeholder:font-medium pl-2 py-3.5 font-semibold`}
           />
           {props.amount_usd ? (
             <div className="pointer-events-none absolute top-1/2 -translate-y-1/2 left-2">
-              <span className="invisible mr-1">{props.amount}</span>{" "}
+              <span className="invisible mr-1">{money.value}</span>{" "}
               <span className="text-gray-11 text-sm">
                 ~${humanize(props.amount_usd)}
               </span>
