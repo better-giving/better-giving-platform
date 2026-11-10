@@ -126,6 +126,7 @@ describe("npo_sent_transfers — on stripe", () => {
       items: [],
       truncated: false,
       unsent: [],
+      unsent_truncated: false,
       on_stripe: true,
       connected: true,
     });
@@ -162,6 +163,7 @@ describe("npo_sent_transfers — on stripe", () => {
       expect(await npo_sent_transfers(id)).toEqual({
         items: [],
         unsent: [],
+        unsent_truncated: false,
         truncated: false,
         on_stripe: false,
         connected: true,
@@ -282,6 +284,25 @@ describe("npo_sent_transfers — routed with no transfer", () => {
     await db().update(dists).set({ stripe_routed_to: null });
     expect((await npo_sent_transfers(id))?.unsent).toEqual([]);
   });
+
+  test("past 100 unsent donations the newest 100 are listed and the list says it is cut", async () => {
+    const id = await seed();
+    const day = (n: number) =>
+      new Date(Date.UTC(2026, 0, 1) + n * 86_400_000).toISOString();
+    for (let n = 0; n < 100; n++) {
+      await unsent(id, `d-${String(n).padStart(3, "0")}`, { date: day(n) });
+    }
+    const full = await npo_sent_transfers(id);
+    expect(full?.unsent).toHaveLength(100);
+    expect(full?.unsent_truncated).toBe(false);
+
+    await unsent(id, "d-100", { date: day(100) });
+    const cut = await npo_sent_transfers(id);
+    expect(cut?.unsent).toHaveLength(100);
+    expect(cut?.unsent_truncated).toBe(true);
+    expect(cut?.unsent[0]?.id).toBe("d-100");
+    expect(cut?.unsent.map((u) => u.id)).not.toContain("d-000");
+  }, 60_000);
 
   test("an npo off stripe with only an unsent routed donation still gets the section", async () => {
     const id = await seed({ stripe_account_id: null });

@@ -6,6 +6,7 @@ import { SentToStripe, stripe_link, WhereMoneyShows } from "./sent";
 const sent = (p: Pick<INpoSent, "on_stripe" | "connected">): INpoSent => ({
   items: [],
   unsent: [],
+  unsent_truncated: false,
   truncated: false,
   ...p,
 });
@@ -175,6 +176,30 @@ test("a bank on file: new Stripe donations pay out to it", async () => {
 });
 
 describe("routed donations with no transfer", () => {
+  test("a cut list says it shows the most recent", async () => {
+    const base = sent({ on_stripe: true, connected: true });
+    const unsent = [
+      {
+        id: "d1",
+        amount: 40,
+        date: "2026-07-01T00:00:00.000Z",
+        kind: "sending" as const,
+      },
+    ];
+    const screen = await render(
+      <SentToStripe sent={{ ...base, unsent, unsent_truncated: true }} />
+    );
+    await expect
+      .element(screen.getByText("Showing the most recent."))
+      .toBeVisible();
+    await screen.unmount();
+
+    const whole = await render(<SentToStripe sent={{ ...base, unsent }} />);
+    expect(whole.container.textContent).not.toContain(
+      "Showing the most recent"
+    );
+  });
+
   test("are listed, worded as the donations list words them", async () => {
     const screen = await render(
       <SentToStripe

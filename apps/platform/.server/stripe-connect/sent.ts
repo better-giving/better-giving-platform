@@ -97,19 +97,22 @@ export async function npo_sent_transfers(
         )
       )
       .orderBy(desc(dists.date_created), desc(dists.id))
-      .limit(SENT_LIMIT),
+      .limit(SENT_LIMIT + 1),
   ]);
-  const unsent: IUnsentTransfer[] = unsent_rows.map((r) => ({
-    id: r.id,
-    // usd the transfer will send, so it sits to the cent beside the sent rows
-    amount: payout_total([r.net ?? 0]),
-    date: r.routed_at,
-    kind: routed_kind({
-      transfer_id: null,
-      reversed: is_reversed(r.status),
-      routed_at: r.routed_at,
-    }) as IUnsentTransfer["kind"],
-  }));
+  const unsent_truncated = unsent_rows.length > SENT_LIMIT;
+  const unsent: IUnsentTransfer[] = unsent_rows
+    .slice(0, SENT_LIMIT)
+    .map((r) => ({
+      id: r.id,
+      // usd the transfer will send, so it sits to the cent beside the sent rows
+      amount: payout_total([r.net ?? 0]),
+      date: r.routed_at,
+      kind: routed_kind({
+        transfer_id: null,
+        reversed: is_reversed(r.status),
+        routed_at: r.routed_at,
+      }) as IUnsentTransfer["kind"],
+    }));
 
   const on_stripe =
     !!npo && is_routable(routing_npo(npo), stripe_env.connect_routing);
@@ -136,7 +139,7 @@ export async function npo_sent_transfers(
   );
   const items = await in_batches(listed, (row) => sent_of(npo_id, row));
   items.sort((a, b) => b.date.localeCompare(a.date));
-  return { items, unsent, truncated, on_stripe, connected };
+  return { items, unsent, unsent_truncated, truncated, on_stripe, connected };
 }
 
 /** `run` over `items`, RETRIEVE_BATCH at a time, in that order. a rejection

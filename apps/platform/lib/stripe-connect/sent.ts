@@ -43,6 +43,8 @@ export interface ISentTransfers {
 export interface INpoSent extends ISentTransfers {
   /** routed donations with no transfer yet: on their way, or never going */
   unsent: IUnsentTransfer[];
+  /** older routed donations with no transfer exist than `unsent` holds */
+  unsent_truncated: boolean;
   /** a card gift made now settles to the connected account: routing's own
    * answer (`is_routable`), so false whenever banking says not available */
   on_stripe: boolean;

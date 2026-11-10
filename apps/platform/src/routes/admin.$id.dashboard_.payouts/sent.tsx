@@ -245,6 +245,9 @@ export function SentToStripe({
               </tbody>
             </table>
           </div>
+          {sent.unsent_truncated && (
+            <p className="text-sm text-gray-11">Showing the most recent.</p>
+          )}
         </div>
       )}
     </section>

@@ -201,6 +201,7 @@ describe("payouts loader — routed transfer standing", () => {
     expect("sent" in data && data.sent).toEqual({
       truncated: false,
       unsent: [],
+      unsent_truncated: false,
       on_stripe: true,
       connected: true,
       items: [
@@ -230,6 +231,7 @@ describe("payouts loader — routed transfer standing", () => {
     expect(await sent()).toEqual({
       truncated: false,
       unsent: [],
+      unsent_truncated: false,
       on_stripe: true,
       connected: true,
       items: [
@@ -255,6 +257,7 @@ describe("payouts loader — routed transfer standing", () => {
     expect(await sent()).toEqual({
       truncated: false,
       unsent: [],
+      unsent_truncated: false,
       on_stripe: true,
       connected: true,
       items: [
@@ -310,6 +313,7 @@ describe("payouts loader — routed transfer standing", () => {
       items: [],
       truncated: false,
       unsent: [],
+      unsent_truncated: false,
       on_stripe: true,
       connected: true,
     });
@@ -358,6 +362,7 @@ describe("payouts loader — routed transfer standing", () => {
     expect(await sent()).toEqual({
       truncated: false,
       unsent: [],
+      unsent_truncated: false,
       on_stripe: true,
       connected: true,
       items: [

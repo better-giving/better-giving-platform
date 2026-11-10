@@ -750,6 +750,7 @@ describe("SentToStripe", () => {
         sent={{
           truncated: true,
           unsent: [],
+          unsent_truncated: false,
           on_stripe: true,
           connected: true,
           items: [
