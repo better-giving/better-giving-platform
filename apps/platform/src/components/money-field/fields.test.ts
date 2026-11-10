@@ -13,8 +13,10 @@ import { amount_format_err } from "@/schemas/amount";
  * what a valid entry parses to, and how the entry is refused */
 const fields: {
   name: string;
-  /** parses `x`, returning the parsed value or the first issue message */
   union?: boolean;
+  /** whole dollars only: no cents in what it reads */
+  whole?: boolean;
+  /** parses `x`, returning the parsed value or the first issue message */
   read: (
     x: string
   ) => { ok: true; value: unknown } | { ok: false; msg: string };
@@ -38,6 +40,7 @@ const fields: {
   {
     name: "referrer payout minimum",
     read: (x) => wrap(v.safeParse(referrer.entries.amount, x)),
+    whole: true,
   },
   {
     name: "donation calculator amount",
@@ -59,14 +62,29 @@ function wrap(
   return { ok: true, value: pick ? (r.output as any)[pick] : r.output };
 }
 
-describe.each(fields)("$name", ({ read, union }) => {
+describe("referrer payout minimum", () => {
+  // the threshold is stored in an integer column
+  test("refuses cents", () => {
+    expect(wrap(v.safeParse(referrer.entries.amount, "100.50"))).toEqual({
+      ok: false,
+      msg: amount_format_err,
+    });
+  });
+});
+
+describe.each(fields)("$name", ({ read, union, whole }) => {
   test("reads the plain decimal the mask stores", () => {
-    const r = read("9627.92");
-    expect(r.ok && Number(r.value)).toBe(9627.92);
+    const r = read(whole ? "9627" : "9627.92");
+    expect(r.ok && Number(r.value)).toBe(whole ? 9627 : 9627.92);
   });
 
-  test.each(["$1,000", " 100 ", "9,627.92"])("reads a paste of %j", (x) => {
-    expect(read(x).ok).toBe(true);
+  test.each([
+    ["$1,000", 1000],
+    [" 100 ", 100],
+    ["9,627.92", 9627.92],
+  ])("reads a paste of %j", (x, out) => {
+    const r = read(whole ? x.replace(/\.\d+$/, "") : x);
+    expect(r.ok && Number(r.value)).toBe(whole ? Math.trunc(out) : out);
   });
 
   test.each(["12,50", "abc", "1.2.3"])("refuses %j", (x) => {

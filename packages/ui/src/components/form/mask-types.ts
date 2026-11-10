@@ -11,4 +11,7 @@ export interface IMask {
    * the field's own characters around it never go through this. `null`
    * refuses the edit. default: as typed. */
   read?: (typed: string) => string | null;
+  /** the mask for an edit whose own text — the field's typed characters
+   * either side of what the user put in — is `own`. default: this mask. */
+  fit?: (own: string) => IMask;
 }

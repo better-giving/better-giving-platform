@@ -20,12 +20,13 @@ export function useMoneyInput({ value, onChange, places = 2, ref }: Opts) {
   const mask = useMemo(() => decimal.decimals(places), [places]);
   // what the form holds is shown whole: when the allowed decimals shrink (a
   // currency or token switch), "1.2345" stays visible beside the schema's
-  // "can't be more than 2 decimals" instead of the box showing a trimmed value
-  // the form doesn't hold
+  // message naming the cap instead of the box showing a trimmed value the form
+  // doesn't hold. the mask caps only what the user adds, so the next display
+  // is stored whole too
   const display = decimal.format(value, Number.POSITIVE_INFINITY);
   const on_display = useCallback(
-    (next: string) => onChange(mask.unmask(next)),
-    [mask, onChange]
+    (next: string) => onChange(decimal.unmask(next, Number.POSITIVE_INFINITY)),
+    [onChange]
   );
   const { ref: set_ref, onInput } = useMaskedInput({
     mask,

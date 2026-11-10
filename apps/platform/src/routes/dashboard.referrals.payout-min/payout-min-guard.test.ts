@@ -70,6 +70,14 @@ describe("payout threshold", () => {
     expect(user_update).not.toHaveBeenCalled();
   });
 
+  it("refuses cents, which the integer column can't hold", async () => {
+    await expect(call(`${config.pay_min}.50`)).rejects.toMatchObject({
+      status: 400,
+    });
+
+    expect(user_update).not.toHaveBeenCalled();
+  });
+
   it("refuses Infinity", async () => {
     await expect(call("Infinity")).rejects.toMatchObject({ status: 400 });
 

@@ -63,33 +63,31 @@ export function reformat(mask: IMask, edit: Edit) {
   const refused = { value: prev, cursor: p };
   if (read === null) return refused;
 
-  const formatted = mask.format(
-    mask.unmask(typed(before) + read + typed(after))
+  const around = mask.fit?.(typed(before) + typed(after)) ?? mask;
+  const formatted = around.format(
+    around.unmask(typed(before) + read + typed(after))
   );
   const kept = [...formatted].filter((c) => keep.test(c));
   const tail_typed = typed(after);
+  const tail_kept =
+    kept.slice(kept.length - tail_typed.length).join("") === tail_typed;
   // an insertion never costs the field a character it already had: a dot
   // that would push "1,2|34"'s digits past the cap, or a digit typed between
   // decimals at the cap, is refused rather than dropping the last digit
-  if (
-    inserted &&
-    kept.slice(kept.length - tail_typed.length).join("") !== tail_typed
-  )
-    return refused;
+  if (inserted && !tail_kept) return refused;
 
-  // the caret goes just after the last typed character before the tail; with
-  // none, in front of the tail's first one
-  let n = 0;
-  let pos = formatted.length;
-  while (n < tail_typed.length) {
-    pos--;
-    if (keep.test(formatted[pos])) n++;
-  }
-  let caret = pos;
-  while (caret > 0 && !keep.test(formatted[caret - 1])) caret--;
-  if (caret === 0) {
+  // the caret goes just after the typed characters in front of the tail; with
+  // none, in front of the first one. a delete can lose some of the tail too
+  // (the dollar mask's "$ ,000" is "$ 0"), and then it goes after as many as
+  // the edit left in front of it
+  const lead = tail_kept
+    ? kept.length - tail_typed.length
+    : Math.min(kept.length, typed(before).length + read.length);
+  let caret = 0;
+  for (let n = 0; n < lead; caret++) if (keep.test(formatted[caret])) n++;
+  if (lead === 0) {
     const first = [...formatted].findIndex((c) => keep.test(c));
-    caret = first === -1 ? formatted.length : Math.min(first, pos);
+    caret = first === -1 ? formatted.length : first;
   }
   return { value: formatted, cursor: caret };
 }

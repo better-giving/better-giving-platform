@@ -35,7 +35,8 @@ export const schema = v.object({
     if (!x) return $req;
     return v.pipe(
       $req,
-      amount_num(),
+      // whole dollars: the `pay_min` column is an integer
+      amount_num(0),
       v.minValue(config.pay_min, `pay_minimum of $${config.pay_min}`),
       v.transform((x) => x.toString())
     );
@@ -58,6 +59,7 @@ function Content(props: IContent) {
   const money = useMoneyInput({
     value: field.value,
     onChange: field.onChange,
+    places: 0,
     ref: field.ref,
   });
 

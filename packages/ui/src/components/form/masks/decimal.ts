@@ -48,12 +48,23 @@ export function unmask(masked: string, places = 2): string {
 }
 
 /** the mask for `places` decimals — 2 for dollars, a currency's or token's own
- * precision elsewhere, `Number.POSITIVE_INFINITY` for no cap. */
+ * precision elsewhere, `Number.POSITIVE_INFINITY` for no cap.
+ *
+ * the cap is on what the user adds: a field already holding more decimals
+ * (a currency or token switch to fewer) keeps them through an edit elsewhere
+ * in it, so "1.2345" at 2 places takes a digit before the point and loses one
+ * decimal per backspace; the form's schema reports the excess. */
 export function decimals(places = 2): IMask {
-  return {
+  const mask: IMask = {
     format: (raw) => format(raw, places),
     unmask: (masked) => unmask(masked, places),
     read,
     keep,
+    fit: (own) => {
+      const dot = own.indexOf(".");
+      const held = dot === -1 ? 0 : own.length - dot - 1;
+      return held > places ? decimals(held) : mask;
+    },
   };
+  return mask;
 }

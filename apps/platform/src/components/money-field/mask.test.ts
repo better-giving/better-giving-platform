@@ -1,4 +1,5 @@
-import { decimal } from "@better-giving/ui/masks";
+import { runInNewContext } from "node:vm";
+import { decimal, dollar } from "@better-giving/ui/masks";
 import { reformat } from "@better-giving/ui/reformat";
 import { describe, expect, test } from "vitest";
 
@@ -53,6 +54,7 @@ describe("decimal.unmask", () => {
   });
 });
 
+type IMask = Parameters<typeof reformat>[0];
 const m = decimal.decimals(2);
 const edit = (value: string, cursor: number, prev: string, type?: string) =>
   reformat(m, { value, cursor, prev, type });
@@ -72,20 +74,24 @@ const paste = (text: string, disp = "", mask = m) =>
     prev: disp,
     type: "insertFromPaste",
   });
-const back = (disp: string, caret: number) =>
-  reformat(m, {
+const back = (disp: string, caret: number, mask: IMask = m) =>
+  reformat(mask, {
     value: disp.slice(0, caret - 1) + disp.slice(caret),
     cursor: caret - 1,
     prev: disp,
     type: "deleteContentBackward",
   });
-const del = (disp: string, caret: number) =>
-  reformat(m, {
+const del = (disp: string, caret: number, mask: IMask = m) =>
+  reformat(mask, {
     value: disp.slice(0, caret) + disp.slice(caret + 1),
     cursor: caret,
     prev: disp,
     type: "deleteContentForward",
   });
+// a caret loop that never ends blocks the thread, so no test timeout can fire;
+// vm's watchdog terminates it and the test fails instead of hanging the run
+const bounded = <T>(f: () => T): T =>
+  runInNewContext("f()", { f }, { timeout: 1000 });
 const typing = (keys: string, mask = m) =>
   [...keys].reduce((s, k) => type(s.value, s.cursor, k, mask), {
     value: "",
@@ -245,5 +251,200 @@ describe("caret", () => {
       value: "",
       cursor: 0,
     });
+  });
+});
+
+describe("a delete that formatting shortens", () => {
+  test("backspacing the leading digit of a dollar amount", () => {
+    expect(bounded(() => back("$ 1,000", 3, dollar))).toEqual({
+      value: "$ 0",
+      cursor: 2,
+    });
+    expect(bounded(() => back("$ 100", 3, dollar))).toEqual({
+      value: "$ 0",
+      cursor: 2,
+    });
+  });
+
+  test("deleting the whole digit of a field holding more decimals than its cap", () => {
+    expect(bounded(() => back("1.2345", 1))).toEqual({
+      value: "0.2345",
+      cursor: 1,
+    });
+    expect(bounded(() => del("1.2345", 0))).toEqual({
+      value: "0.2345",
+      cursor: 1,
+    });
+  });
+});
+
+describe("a field holding more decimals than its cap", () => {
+  test("takes a digit typed before the point", () => {
+    expect(type("1.2345", 1, "0")).toEqual({ value: "10.2345", cursor: 2 });
+  });
+
+  test("backspace at the end removes one decimal", () => {
+    expect(back("1.2345", 6)).toEqual({ value: "1.234", cursor: 5 });
+  });
+
+  test("still takes no new decimal", () => {
+    expect(type("1.2345", 6, "9")).toEqual({ value: "1.2345", cursor: 6 });
+    expect(type("1.2345", 3, "9")).toEqual({ value: "1.2345", cursor: 3 });
+  });
+
+  test("a paste over all of it is cut to the cap", () => {
+    expect(
+      reformat(m, {
+        value: "12.345",
+        cursor: 6,
+        prev: "1.2345",
+        type: "insertFromPaste",
+      })
+    ).toEqual({ value: "12.34", cursor: 5 });
+  });
+});
+
+// what the browser hands `onInput` once a range [from, to) of `prev` is
+// replaced by `text` (typed, pasted, or "" for a cut)
+const replace = (
+  prev: string,
+  from: number,
+  to: number,
+  text: string,
+  type: string
+) =>
+  reformat(m, {
+    value: prev.slice(0, from) + text + prev.slice(to),
+    cursor: from + text.length,
+    prev,
+    type,
+  });
+
+describe("a selection replaced", () => {
+  test("typing over part of a group regroups and puts the caret after the digit", () => {
+    // "1,|2|34" + "5"
+    expect(replace("1,234", 2, 3, "5", "insertText")).toEqual({
+      value: "1,534",
+      cursor: 3,
+    });
+  });
+
+  test("typing over a range that includes a comma", () => {
+    // "|1,2|34" + "5"
+    expect(replace("1,234", 0, 3, "5", "insertText")).toEqual({
+      value: "534",
+      cursor: 1,
+    });
+  });
+
+  test("typing over everything starts the field again", () => {
+    expect(replace("1,234.50", 0, 8, "7", "insertText")).toEqual({
+      value: "7",
+      cursor: 1,
+    });
+  });
+
+  test("a paste over a selection replaces it", () => {
+    // "1,|234|" + "99"
+    expect(replace("1,234", 2, 5, "99", "insertFromPaste")).toEqual({
+      value: "199",
+      cursor: 3,
+    });
+  });
+
+  test("a paste over everything is read afresh", () => {
+    expect(replace("1,234", 0, 5, "$9,627.92", "insertFromPaste")).toEqual({
+      value: "9,627.92",
+      cursor: 8,
+    });
+  });
+});
+
+describe("a cut", () => {
+  test("cutting digits regroups what is left", () => {
+    // "1,2|34|.50"
+    expect(replace("1,234.50", 3, 5, "", "deleteByCut")).toEqual({
+      value: "12.50",
+      cursor: 2,
+    });
+  });
+
+  test("cutting a range that includes a comma", () => {
+    // "|1,|234"
+    expect(replace("1,234", 0, 2, "", "deleteByCut")).toEqual({
+      value: "234",
+      cursor: 0,
+    });
+  });
+
+  test("cutting everything empties the field", () => {
+    expect(replace("1,234", 0, 5, "", "deleteByCut")).toEqual({
+      value: "",
+      cursor: 0,
+    });
+  });
+});
+
+describe("a paste in the middle", () => {
+  test("lands between the digits and regroups the whole", () => {
+    // "1,|234" + "56"
+    expect(replace("1,234", 2, 2, "56", "insertFromPaste")).toEqual({
+      value: "156,234",
+      cursor: 3,
+    });
+  });
+
+  test("past the cap is refused, the field keeps what it had", () => {
+    // "12.|34" + "99": a third decimal would cost the last digit
+    expect(replace("12.34", 3, 3, "99", "insertFromPaste")).toEqual({
+      value: "12.34",
+      cursor: 3,
+    });
+  });
+});
+
+describe("an edit that is not a change at the caret", () => {
+  test("undo restores older text, read whole as the field's own", () => {
+    expect(
+      reformat(m, {
+        value: "1,000",
+        cursor: 0,
+        prev: "12.5",
+        type: "historyUndo",
+      })
+    ).toEqual({ value: "1,000", cursor: 5 });
+  });
+
+  test("undo keeps a comma the field drew rather than reading it as a decimal comma", () => {
+    expect(
+      reformat(m, {
+        value: "0,000",
+        cursor: 0,
+        prev: "5",
+        type: "historyUndo",
+      })
+    ).toEqual({ value: "0,000", cursor: 5 });
+  });
+
+  test("redo likewise, and cuts the decimals to the cap", () => {
+    expect(
+      reformat(m, {
+        value: "12,345.678",
+        cursor: 0,
+        prev: "1,000",
+        type: "historyRedo",
+      })
+    ).toEqual({ value: "12,345.67", cursor: 9 });
+  });
+
+  test("an autofill that replaces the text wholesale is read as a paste", () => {
+    expect(
+      reformat(m, {
+        value: "1,234.56",
+        cursor: 8,
+        prev: "5",
+        type: "insertReplacementText",
+      })
+    ).toEqual({ value: "1,234.56", cursor: 8 });
   });
 });
