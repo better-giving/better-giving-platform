@@ -4,15 +4,17 @@ import type { IMask } from "../mask-types";
  * inserted by the mask, never typed, so the caret skips over it. */
 export const keep = /[\d.]/;
 
-/** a plain decimal with grouping commas, as typed: digits, one dot, at most
- * `places` decimals. anything else in `raw` — letters, "$", spaces, commas, a
- * second dot — is dropped, so a paste lands as the nearest valid number and the
- * field never shows a value the schema rejects. A trailing dot survives, so
- * "9627." is still mid-typing. */
+/** the field's own value — a plain decimal, or the grouped display read back —
+ * as a display: digits, one dot, at most `places` decimals, grouping commas.
+ * every comma here is grouping, because the field only ever holds the commas
+ * it drew; text the user typed or pasted goes through `read` first. leading
+ * zeros stay, so backspacing the "1" of "1,000" leaves "000" for the next
+ * digit rather than collapsing to "0". A trailing dot survives, so "9627." is
+ * still mid-typing. */
 export function format(raw: string, places = 2): string {
   const s = raw.replace(/[^\d.]/g, "");
   const dot = s.indexOf(".");
-  const whole = (dot === -1 ? s : s.slice(0, dot)).replace(/^0+(?=\d)/, "");
+  const whole = dot === -1 ? s : s.slice(0, dot);
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   if (dot === -1) return grouped;
   const frac = s
@@ -20,6 +22,24 @@ export function format(raw: string, places = 2): string {
     .replace(/\./g, "")
     .slice(0, places);
   return `${grouped || "0"}.${frac}`;
+}
+
+/** text the user typed or pasted, as digits and dots — `null` refuses it.
+ * - a minus is refused whole: dropping it would turn -50 into 50.
+ * - the last comma is the decimal separator ("12,50", "1.234,56", a comma
+ *   keypad's "1,") unless exactly 3 digits follow it with a whole part that
+ *   doesn't start with 0 ("1,234", "12,34,567"), which is grouping. A comma
+ *   followed by a dot is always grouping.
+ * - "$", spaces and letters are dropped. */
+export function read(text: string): string | null {
+  if (text.includes("-")) return null;
+  const s = text.replace(/[^\d.,]/g, "");
+  const comma = s.lastIndexOf(",");
+  if (comma === -1 || comma < s.lastIndexOf(".")) return s.replace(/,/g, "");
+  const whole = s.slice(0, comma).replace(/\D/g, "");
+  const after = s.slice(comma + 1);
+  const grouping = /^\d{3}$/.test(after) && /^[1-9]/.test(whole);
+  return grouping ? whole + after : `${whole}.${after}`;
 }
 
 /** display → the plain decimal a form stores ("9,627.92" → "9627.92") */
@@ -33,6 +53,7 @@ export function decimals(places = 2): IMask {
   return {
     format: (raw) => format(raw, places),
     unmask: (masked) => unmask(masked, places),
+    read,
     keep,
   };
 }

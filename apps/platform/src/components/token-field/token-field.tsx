@@ -11,7 +11,7 @@ export function TokenField({ ref, ...props }: ITokenField & { ref?: Ref<El> }) {
   const money = useMoneyInput({
     value: props.amount,
     onChange: props.on_change,
-    places: props.places,
+    places: props.places ?? Number.POSITIVE_INFINITY,
     ref,
   });
 

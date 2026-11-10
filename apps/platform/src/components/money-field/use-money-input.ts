@@ -18,20 +18,25 @@ interface Opts {
  * downstream of the field ever sees a comma. */
 export function useMoneyInput({ value, onChange, places = 2, ref }: Opts) {
   const mask = useMemo(() => decimal.decimals(places), [places]);
+  // what the form holds is shown whole: when the allowed decimals shrink (a
+  // currency or token switch), "1.2345" stays visible beside the schema's
+  // "can't be more than 2 decimals" instead of the box showing a trimmed value
+  // the form doesn't hold
+  const display = decimal.format(value, Number.POSITIVE_INFINITY);
   const on_display = useCallback(
     (next: string) => onChange(mask.unmask(next)),
     [mask, onChange]
   );
   const { ref: set_ref, onInput } = useMaskedInput({
     mask,
-    display: mask.format(value),
+    display,
     on_display,
     ref,
   });
   return {
     ref: set_ref,
     onInput,
-    value: mask.format(value),
+    value: display,
     // a no-op: React wants an onChange beside `value`, and typing is handled
     // by onInput
     onChange: () => {},
