@@ -118,7 +118,7 @@ export function HeldMoneyCard(props: IHeldMoneyCard) {
         };
   return (
     <HeldShell {...props} {...copy}>
-      <table className="table">
+      <table className="table plain-zero-table">
         <thead>
           <tr>
             <th>What's waiting</th>
@@ -164,7 +164,7 @@ export function PayoutsHeldCard(props: IHeldMoneyCard) {
         };
   return (
     <HeldShell {...props} {...copy}>
-      <table className="table">
+      <table className="table plain-zero-table">
         <thead>
           <tr>
             <th>From</th>

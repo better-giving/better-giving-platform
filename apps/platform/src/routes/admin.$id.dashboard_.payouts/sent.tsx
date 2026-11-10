@@ -3,7 +3,13 @@ import { format } from "date-fns";
 import { SquareArrowOutUpRight } from "lucide-react";
 import { useId } from "react";
 import { humanize } from "@/helpers/decimal";
-import type { INpoSent, TSentStanding } from "@/stripe-connect/sent";
+import {
+  type INpoSent,
+  routed_label,
+  type TRoutedKind,
+  type TSentStanding,
+  type TUnsentKind,
+} from "@/stripe-connect/sent";
 
 /** where a card gift made now goes: the connected account (`on`), or the bank
  * while the account stays linked (`off`, or `waiting` when nothing was ever
@@ -13,7 +19,7 @@ export type TStripeLink = "on" | "off" | "waiting" | "disconnected";
 export const stripe_link = (sent: INpoSent): TStripeLink => {
   if (sent.on_stripe) return "on";
   if (!sent.connected) return "disconnected";
-  return sent.items.length > 0 ? "off" : "waiting";
+  return sent.items.length > 0 || sent.unsent.length > 0 ? "off" : "waiting";
 };
 
 interface ICopy {
@@ -80,31 +86,51 @@ interface ITone {
   dot: string;
 }
 
-const tones: Record<TSentStanding["kind"], ITone> = {
+const tones: Record<TRoutedKind, ITone> = {
+  sending: {
+    label: routed_label("sending"),
+    ink: "text-gray-11",
+    dot: "bg-gray-9",
+  },
+  not_sent: {
+    label: routed_label("not_sent"),
+    ink: "text-warning-subtle-fg",
+    dot: "bg-warning",
+  },
   paid: {
-    label: "Paid out",
+    label: routed_label("paid"),
     ink: "text-success-subtle-fg",
     dot: "bg-success",
   },
   partial: {
-    label: "Partly reversed",
+    label: routed_label("partial"),
     ink: "text-warning-subtle-fg",
     dot: "bg-warning",
   },
   reversed: {
-    label: "Fully reversed",
+    label: routed_label("reversed"),
     ink: "text-destructive-subtle-fg",
     dot: "bg-destructive",
   },
+  kept: {
+    label: routed_label("kept"),
+    ink: "text-warning-subtle-fg",
+    dot: "bg-warning",
+  },
+  repaid: {
+    label: routed_label("repaid"),
+    ink: "text-gray-11",
+    dot: "bg-gray-9",
+  },
   unknown: {
-    label: "Status unavailable",
+    label: routed_label("unknown"),
     ink: "text-gray-11",
     dot: "bg-gray-9",
   },
 };
 
 interface IStanding {
-  standing: TSentStanding;
+  standing: TSentStanding | { kind: TUnsentKind };
 }
 
 function Standing({ standing }: IStanding) {
@@ -132,6 +158,7 @@ export function SentToStripe({
   classes = "",
 }: ISentToStripe) {
   const heading_id = useId();
+  const unsent_id = useId();
   const copy = list_copy(stripe_link(sent), { has_bank, bank_pending });
   return (
     <section aria-labelledby={heading_id} className={`${classes} grid gap-3`}>
@@ -153,7 +180,7 @@ export function SentToStripe({
         </p>
       </div>
       <div className="table-scroll">
-        <table className="table">
+        <table className="table plain-zero-table" aria-labelledby={heading_id}>
           <thead>
             <tr>
               <th>Amount</th>
@@ -188,6 +215,41 @@ export function SentToStripe({
           </tbody>
         </table>
       </div>
+      {sent.unsent.length > 0 && (
+        <div className="grid gap-2">
+          <h3 id={unsent_id} className="font-semibold">
+            Not sent to Stripe
+          </h3>
+          <div className="table-scroll">
+            <table
+              className="table plain-zero-table"
+              aria-labelledby={unsent_id}
+            >
+              <thead>
+                <tr>
+                  <th>Amount</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sent.unsent.map((u) => (
+                  <tr key={u.id}>
+                    <td>{usd(u.amount)}</td>
+                    <td>{format(u.date, "PP")}</td>
+                    <td>
+                      <Standing standing={{ kind: u.kind }} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {sent.unsent_truncated && (
+            <p className="text-sm text-gray-11">Showing the most recent.</p>
+          )}
+        </div>
+      )}
     </section>
   );
 }

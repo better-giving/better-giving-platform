@@ -47,6 +47,8 @@ const dist: INpoDonation = {
   form_tag: null,
   program_id: null,
   program_name: null,
+  owed_back: false,
+  owed_open: false,
   from_email: "jane@example.com",
   from_name: "Jane Doe",
   from_company: null,
@@ -57,7 +59,11 @@ const dist: INpoDonation = {
 };
 
 describe("to_csv_row's stripe payout", () => {
-  const routed = { ...dist, stripe_routed_to: "acct_1" };
+  const routed = {
+    ...dist,
+    stripe_routed_to: "acct_1",
+    date_created: new Date().toISOString(),
+  };
 
   test("a pooled dist has none, so its allocation stands", () => {
     expect(to_csv_row(dist)).toMatchObject({
@@ -68,7 +74,7 @@ describe("to_csv_row's stripe payout", () => {
 
   test("a routed dist with its transfer was paid out", () => {
     const row = to_csv_row({ ...routed, stripe_transfer_id: "tr_1" });
-    expect(row.stripe_payout).toBe("paid_out");
+    expect(row.stripe_payout).toBe("paid");
   });
 
   test("a routed dist with no transfer yet is sending", () => {
@@ -82,12 +88,42 @@ describe("to_csv_row's stripe payout", () => {
     }
   );
 
-  test("a routed dist refunded after its transfer still reads paid out", () => {
+  test("a routed dist with no transfer a day on was never sent", () => {
+    const row = to_csv_row({
+      ...routed,
+      date_created: "2026-01-01T00:00:00.000Z",
+    });
+    expect(row.stripe_payout).toBe("not_sent");
+  });
+
+  test("a routed dist refunded after its transfer that the npo owes back stayed in its stripe account", () => {
+    const row = to_csv_row({
+      ...routed,
+      status: "refunded",
+      stripe_transfer_id: "tr_1",
+      owed_back: true,
+      owed_open: true,
+    });
+    expect(row.stripe_payout).toBe("kept");
+  });
+
+  test("a kept routed dist whose owed row is settled reads repaid", () => {
+    const row = to_csv_row({
+      ...routed,
+      status: "refunded",
+      stripe_transfer_id: "tr_1",
+      owed_back: true,
+      owed_open: false,
+    });
+    expect(row.stripe_payout).toBe("repaid");
+  });
+
+  test("a routed dist refunded after its transfer reads fully reversed", () => {
     const row = to_csv_row({
       ...routed,
       status: "refunded",
       stripe_transfer_id: "tr_1",
     });
-    expect(row.stripe_payout).toBe("paid_out");
+    expect(row.stripe_payout).toBe("reversed");
   });
 });

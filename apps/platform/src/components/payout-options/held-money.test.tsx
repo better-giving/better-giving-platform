@@ -547,3 +547,19 @@ describe("BankPayoutSection: Banking", () => {
       .toBeVisible();
   });
 });
+
+describe("held-money figures", () => {
+  test.each([
+    ["Banking", HeldMoneyCard],
+    ["Payouts", PayoutsHeldCard],
+  ])("%s: stay tabular and carry no slashed zero", async (_, Card) => {
+    const screen = await in_router(<Card {...base} />);
+    const tables = [...screen.container.querySelectorAll("table")];
+    expect(tables.length).toBeGreaterThan(0);
+    for (const table of tables) {
+      const features = getComputedStyle(table).fontFeatureSettings;
+      expect(features).toContain("tnum");
+      expect(features).not.toContain("zero");
+    }
+  });
+});

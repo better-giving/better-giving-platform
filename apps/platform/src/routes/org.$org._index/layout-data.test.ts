@@ -137,6 +137,15 @@ describe("org credential", () => {
     ).toEqual({ label: "EIN", value: "12-3456789" });
   });
 
+  it.each(["USA", "U.S.", "US"])(
+    "labels an org stored with its country as %s as a US org",
+    (hq_country) => {
+      expect(
+        org_credential({ registration_number: "12-3456789", hq_country })
+      ).toEqual({ label: "EIN", value: "12-3456789" });
+    }
+  );
+
   it("labels any other org's as its registration number", () => {
     expect(
       org_credential({ registration_number: "CH-77", hq_country: "Kenya" })

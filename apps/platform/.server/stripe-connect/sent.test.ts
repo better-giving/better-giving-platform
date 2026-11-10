@@ -1,3 +1,5 @@
+import { eq } from "drizzle-orm";
+import Stripe from "stripe";
 import {
   afterAll,
   beforeAll,
@@ -42,8 +44,10 @@ vi.mock("../env", async (importOriginal) => {
   };
 });
 
+import { user } from "../pg/schema/auth";
 import { dists } from "../pg/schema/dist";
 import { donations } from "../pg/schema/donation";
+import { owed_amounts } from "../pg/schema/owed";
 import { create_test_db } from "../pg/test-utils/pglite";
 import { npo_sent_transfers } from "./sent";
 
@@ -109,6 +113,8 @@ afterAll(async () => {
 beforeEach(async () => {
   flags.routing = true;
   retrieve.mockReset();
+  await db().delete(owed_amounts);
+  await db().delete(user).where(eq(user.id, "admin-wo"));
   await db().delete(dists);
   await db().delete(donations);
   await db().delete(npos);
@@ -120,6 +126,8 @@ describe("npo_sent_transfers — on stripe", () => {
     expect(await npo_sent_transfers(id)).toEqual({
       items: [],
       truncated: false,
+      unsent: [],
+      unsent_truncated: false,
       on_stripe: true,
       connected: true,
     });
@@ -155,6 +163,8 @@ describe("npo_sent_transfers — on stripe", () => {
       const id = await seed(not_ready);
       expect(await npo_sent_transfers(id)).toEqual({
         items: [],
+        unsent: [],
+        unsent_truncated: false,
         truncated: false,
         on_stripe: false,
         connected: true,
@@ -192,5 +202,303 @@ describe("npo_sent_transfers — on stripe", () => {
     const sent = await npo_sent_transfers(id);
     expect(sent?.items.map((t) => t.id)).toEqual(["tr_past"]);
     expect(sent).toMatchObject({ on_stripe: false, connected: false });
+  });
+});
+
+describe("npo_sent_transfers — routed with no transfer", () => {
+  const unsent = async (
+    npo_id: number,
+    id: string,
+    o: { status?: "settled" | "refunded"; date: string }
+  ) => {
+    await db()
+      .insert(donations)
+      .values({
+        id: `don-${id}`,
+        upusd: 1,
+        status: "settled",
+        amount_base: 40,
+        amount_tip: 0,
+        amount_fee_allowance: 0,
+        currency: "USD",
+        frequency: "one-time",
+        source: "bg-marketplace",
+        via: "stripe:card",
+      });
+    await db()
+      .insert(dists)
+      .values({
+        id,
+        donation_id: `don-${id}`,
+        status: o.status ?? "settled",
+        date_created: o.date,
+        to_id: npo_id,
+        amount_denom: "USD",
+        net: 40,
+        stripe_routed_to: "acct_on",
+      });
+  };
+
+  test("lists routed donations no transfer paid, by how they stand", async () => {
+    const id = await seed();
+    const recent = new Date(Date.now() - 60_000).toISOString();
+    const old = "2026-01-01T00:00:00.000Z";
+    await unsent(id, "d-recent", { date: recent });
+    await unsent(id, "d-old", { date: old });
+    await unsent(id, "d-refunded", { date: recent, status: "refunded" });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items).toEqual([]);
+    expect(Object.fromEntries(sent!.unsent.map((u) => [u.id, u.kind]))).toEqual(
+      {
+        "d-recent": "sending",
+        "d-old": "not_sent",
+        "d-refunded": "not_sent",
+      }
+    );
+    expect(sent!.unsent.every((u) => u.amount === 40)).toBe(true);
+  });
+
+  // `net` is stored to 18 places; the transfer sends payout_cents([net])
+  test("an unsent amount is the usd its transfer would send, rounded half down", async () => {
+    const id = await seed();
+    const recent = new Date(Date.now() - 60_000).toISOString();
+    await unsent(id, "d-half", { date: recent });
+    await unsent(id, "d-over-half", { date: recent });
+    await db().update(dists).set({ net: 12.345 }).where(eq(dists.id, "d-half"));
+    await db()
+      .update(dists)
+      .set({ net: 12.3451 })
+      .where(eq(dists.id, "d-over-half"));
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(
+      Object.fromEntries(sent!.unsent.map((u) => [u.id, u.amount]))
+    ).toEqual({ "d-half": 12.34, "d-over-half": 12.35 });
+  });
+
+  test("a pooled dist is not listed", async () => {
+    const id = await seed();
+    await unsent(id, "d-pooled", { date: "2026-01-01T00:00:00.000Z" });
+    await db().update(dists).set({ stripe_routed_to: null });
+    expect((await npo_sent_transfers(id))?.unsent).toEqual([]);
+  });
+
+  test("past 100 unsent donations the newest 100 are listed and the list says it is cut", async () => {
+    const id = await seed();
+    const day = (n: number) =>
+      new Date(Date.UTC(2026, 0, 1) + n * 86_400_000).toISOString();
+    for (let n = 0; n < 100; n++) {
+      await unsent(id, `d-${String(n).padStart(3, "0")}`, { date: day(n) });
+    }
+    const full = await npo_sent_transfers(id);
+    expect(full?.unsent).toHaveLength(100);
+    expect(full?.unsent_truncated).toBe(false);
+
+    await unsent(id, "d-100", { date: day(100) });
+    const cut = await npo_sent_transfers(id);
+    expect(cut?.unsent).toHaveLength(100);
+    expect(cut?.unsent_truncated).toBe(true);
+    expect(cut?.unsent[0]?.id).toBe("d-100");
+    expect(cut?.unsent.map((u) => u.id)).not.toContain("d-000");
+  }, 60_000);
+
+  test("an npo off stripe with only an unsent routed donation still gets the section", async () => {
+    const id = await seed({ stripe_account_id: null });
+    await unsent(id, "d-old", { date: "2026-01-01T00:00:00.000Z" });
+    expect((await npo_sent_transfers(id))?.unsent).toHaveLength(1);
+  });
+});
+
+describe("npo_sent_transfers — a refunded gift", () => {
+  const owe = (
+    npo_id: number,
+    o: Partial<typeof owed_amounts.$inferInsert> & { received_usd: number }
+  ) =>
+    db()
+      .insert(owed_amounts)
+      .values({
+        donation_id: "don-past",
+        npo_id,
+        source: "refund",
+        source_ref: "re_1",
+        recorded_at: "2026-09-15T00:00:00.000Z",
+        ...o,
+      });
+  const reversed_all = () =>
+    retrieve.mockResolvedValue({
+      id: "tr_past",
+      amount: 9_000,
+      amount_reversed: 9_000,
+      created: Date.parse("2026-07-01T00:00:00.000Z") / 1000,
+      reversals: { data: [{ amount: 9_000 }], has_more: false },
+    });
+
+  test("whose reversal stripe refused reads kept, as the donations list does", async () => {
+    const id = await seed();
+    await sent_one(id);
+    await db().update(dists).set({ status: "refunded" });
+    await owe(id, { received_usd: 90 });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "kept" }]);
+  });
+
+  test("whose owed row is fully recovered reads repaid", async () => {
+    const id = await seed();
+    await sent_one(id);
+    await db().update(dists).set({ status: "refunded" });
+    await owe(id, {
+      received_usd: 90,
+      recovered_usd: 90,
+      recovered_at: "2026-10-01T00:00:00.000Z",
+    });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "repaid" }]);
+  });
+
+  test("whose owed row is written off reads repaid", async () => {
+    const id = await seed();
+    await sent_one(id);
+    await db().update(dists).set({ status: "refunded" });
+    const [admin] = await db()
+      .insert(user)
+      .values({
+        id: "admin-wo",
+        name: "Admin",
+        email: "wo@example.com",
+        emailVerified: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        first_name: "A",
+        last_name: "B",
+      })
+      .returning();
+    await owe(id, {
+      received_usd: 90,
+      written_off_usd: 90,
+      written_off_at: "2026-10-01T00:00:00.000Z",
+      write_off_reason: "uncollectable",
+      written_off_by: admin!.id,
+    });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "repaid" }]);
+  });
+
+  test.each([
+    [
+      "credited back reads repaid",
+      {
+        credited_back_usd: 90,
+        credited_back_at: "2026-10-01T00:00:00.000Z",
+      },
+      "repaid",
+    ],
+    [
+      "recovered in part reads kept",
+      { recovered_usd: 10, recovered_at: "2026-10-01T00:00:00.000Z" },
+      "kept",
+    ],
+    [
+      "recovered to a cent short reads kept",
+      { recovered_usd: 89.99, recovered_at: "2026-10-01T00:00:00.000Z" },
+      "kept",
+    ],
+    [
+      "recovered to under a cent short reads repaid",
+      { recovered_usd: 89.995, recovered_at: "2026-10-01T00:00:00.000Z" },
+      "repaid",
+    ],
+  ] as const)("whose owed row is %s", async (_, settled, kind) => {
+    const id = await seed();
+    await sent_one(id);
+    await db().update(dists).set({ status: "refunded" });
+    await owe(id, { received_usd: 90, ...settled });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items.map((i) => i.standing)).toEqual([{ kind }]);
+  });
+
+  test("whose reversal stripe refused in part reads kept too, not partly reversed", async () => {
+    const id = await seed();
+    await sent_one(id);
+    retrieve.mockResolvedValue({
+      id: "tr_past",
+      amount: 9_000,
+      amount_reversed: 4_000,
+      created: Date.parse("2026-07-01T00:00:00.000Z") / 1000,
+      reversals: { data: [{ amount: 4_000 }], has_more: false },
+    });
+    await db().update(dists).set({ status: "refunded" });
+    await owe(id, { received_usd: 50 });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "kept" }]);
+  });
+
+  test.each([
+    ["kept", { received_usd: 90 }],
+    [
+      "repaid",
+      {
+        received_usd: 90,
+        recovered_usd: 90,
+        recovered_at: "2026-10-01T00:00:00.000Z",
+      },
+    ],
+  ] as const)(
+    "whose transfer stripe cannot read still reads %s, as the donations list does",
+    async (kind, owed) => {
+      const id = await seed();
+      await sent_one(id);
+      retrieve.mockRejectedValue(
+        new Stripe.errors.StripeConnectionError({ message: "socket hang up" })
+      );
+      await db().update(dists).set({ status: "refunded" });
+      await owe(id, owed);
+
+      const sent = await npo_sent_transfers(id);
+
+      expect(sent?.items).toEqual([
+        {
+          id: "tr_past",
+          amount: 90,
+          date: "2026-07-01T00:00:00.000Z",
+          standing: { kind },
+        },
+      ]);
+    }
+  );
+
+  test("whose transfer stripe reversed reads fully reversed", async () => {
+    const id = await seed();
+    await sent_one(id);
+    reversed_all();
+    await db().update(dists).set({ status: "refunded" });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "reversed" }]);
+  });
+
+  test("whose transfer stripe reversed, with only a dispute fee owed, reads fully reversed", async () => {
+    const id = await seed();
+    await sent_one(id);
+    reversed_all();
+    await db().update(dists).set({ status: "refunded" });
+    await owe(id, { received_usd: 0, fee_dispute_usd: 15 });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "reversed" }]);
   });
 });

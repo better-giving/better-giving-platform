@@ -141,6 +141,12 @@ describe("org_jsonld", () => {
       tax: { taxID: "EIN-ACME" },
     },
     {
+      case: "a us org stored as USA shows its registration number",
+      ein: null,
+      country: "USA",
+      tax: { taxID: "EIN-ACME" },
+    },
+    {
       case: "an international org's registration number is not a tax id",
       ein: null,
       country: "Canada",

@@ -8,6 +8,7 @@ import {
   isNull,
   or,
   type SQL,
+  type SQLWrapper,
   sql,
 } from "drizzle-orm";
 import { alias, type PgUpdateSetSource } from "drizzle-orm/pg-core";
@@ -22,6 +23,38 @@ import { loss_logs } from "../schema/revenue";
 import type { DbOrTx, IPage } from "./helpers";
 
 export type IOwed = typeof owed_amounts.$inferSelect;
+
+/** the gift's owed row, for a select that already joins the gift and the npo,
+ * with `extra` required of it. a fee-only row (nothing received on the gift)
+ * is never one */
+const owed_row_on_gift = (
+  donation_id: SQLWrapper,
+  npo_id: SQLWrapper,
+  extra: SQL
+): SQL<boolean> =>
+  sql<boolean>`exists (select 1 from ${owed_amounts} where ${owed_amounts.donation_id} = ${donation_id} and ${owed_amounts.npo_id} = ${npo_id} and ${owed_amounts.received_usd} > 0 and ${extra})`;
+
+/** whether an owed row records the npo owing money it received on this gift,
+ * whether or not it has since been settled. with `owed_open_on_gift`, the
+ * tests the donations list and the payouts page share for a refunded transfer
+ * Stripe left in place */
+export const owed_on_gift = (
+  donation_id: SQLWrapper,
+  npo_id: SQLWrapper
+): SQL<boolean> => owed_row_on_gift(donation_id, npo_id, sql`true`);
+
+/** `owed_on_gift` with a cent or more still outstanding, the rule the payout
+ * runs net against. recovered, credited back and written off all take a row
+ * out of it */
+export const owed_open_on_gift = (
+  donation_id: SQLWrapper,
+  npo_id: SQLWrapper
+): SQL<boolean> =>
+  owed_row_on_gift(
+    donation_id,
+    npo_id,
+    sql`${owed_amounts.outstanding_usd} >= 0.01`
+  );
 
 /** what a row records as owed, before anything settles it */
 export const owed_total = (

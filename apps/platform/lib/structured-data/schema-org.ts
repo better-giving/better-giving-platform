@@ -1,3 +1,5 @@
+import { hq_country_code } from "../stripe-connect/eligibility";
+
 type TNode = Record<string, unknown>;
 
 export interface INgo {
@@ -101,7 +103,9 @@ function tax_fields(o: INgo) {
   const ein = o.ein?.trim();
   if (ein) return { taxID: ein, nonprofitStatus: "Nonprofit501c3" };
   const reg = o.registration_number?.trim();
-  if (reg && o.country === "United States") return { taxID: reg };
+  if (reg && o.country && hq_country_code(o.country) === "US") {
+    return { taxID: reg };
+  }
   return {};
 }
 

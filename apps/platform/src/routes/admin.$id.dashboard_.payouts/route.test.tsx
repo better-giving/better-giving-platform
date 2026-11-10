@@ -275,6 +275,19 @@ describe("the payouts page", () => {
     expect(screen.container.textContent).not.toMatch(/stripe/i);
   });
 
+  test("the breadcrumb ends on Payouts", async () => {
+    await npo("acct_sent");
+
+    const screen = await render_page();
+
+    await expect
+      .element(
+        screen.getByRole("heading", { level: 1, name: "Payouts", exact: true })
+      )
+      .toBeVisible();
+    expect(screen.getByText("Grant items").query()).toBeNull();
+  });
+
   test("a connected nonprofit with nothing sent keeps an empty state", async () => {
     await npo("acct_sent");
 
@@ -440,6 +453,24 @@ describe("the payouts page", () => {
     await expect.element(screen.getByText("Pending")).toBeVisible();
     expect(held_region(screen).query()).toBeNull();
     no_wise(screen);
+  });
+
+  test("every money table on the page sets its figures the same: tabular, no slashed zero", async () => {
+    await npo("acct_sent");
+    await bank();
+    await transfer("tr_none", 90, "2026-07-01T00:00:00.000Z", listed([]));
+    await payout(12.5);
+
+    const screen = await render_page();
+
+    await expect.element(screen.getByText("$12.50")).toBeVisible();
+    const tables = [...screen.container.querySelectorAll("table")];
+    expect(tables.length).toBeGreaterThanOrEqual(2);
+    for (const table of tables) {
+      const features = getComputedStyle(table).fontFeatureSettings;
+      expect(features).toContain("tnum");
+      expect(features).not.toContain("zero");
+    }
   });
 
   test("a stripe-only nonprofit sees what waits for a bank, above the stripe list", async () => {
@@ -718,6 +749,8 @@ describe("SentToStripe", () => {
       <SentToStripe
         sent={{
           truncated: true,
+          unsent: [],
+          unsent_truncated: false,
           on_stripe: true,
           connected: true,
           items: [

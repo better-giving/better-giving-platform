@@ -5,6 +5,8 @@ import { SentToStripe, stripe_link, WhereMoneyShows } from "./sent";
 
 const sent = (p: Pick<INpoSent, "on_stripe" | "connected">): INpoSent => ({
   items: [],
+  unsent: [],
+  unsent_truncated: false,
   truncated: false,
   ...p,
 });
@@ -171,4 +173,128 @@ test("a bank on file: new Stripe donations pay out to it", async () => {
       )
     )
     .toBeVisible();
+});
+
+describe("routed donations with no transfer", () => {
+  test("a cut list says it shows the most recent", async () => {
+    const base = sent({ on_stripe: true, connected: true });
+    const unsent = [
+      {
+        id: "d1",
+        amount: 40,
+        date: "2026-07-01T00:00:00.000Z",
+        kind: "sending" as const,
+      },
+    ];
+    const screen = await render(
+      <SentToStripe sent={{ ...base, unsent, unsent_truncated: true }} />
+    );
+    await expect
+      .element(screen.getByText("Showing the most recent."))
+      .toBeVisible();
+    await screen.unmount();
+
+    const whole = await render(<SentToStripe sent={{ ...base, unsent }} />);
+    expect(whole.container.textContent).not.toContain(
+      "Showing the most recent"
+    );
+  });
+
+  test("are listed, worded as the donations list words them", async () => {
+    const screen = await render(
+      <SentToStripe
+        sent={{
+          ...sent({ on_stripe: true, connected: true }),
+          unsent: [
+            {
+              id: "d1",
+              amount: 40,
+              date: "2026-07-01T00:00:00.000Z",
+              kind: "sending",
+            },
+            {
+              id: "d2",
+              amount: 25,
+              date: "2026-06-01T00:00:00.000Z",
+              kind: "not_sent",
+            },
+          ],
+        }}
+      />
+    );
+    await expect
+      .element(screen.getByText("Sending to Stripe", { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(
+        screen
+          .getByRole("table", { name: "Not sent to Stripe" })
+          .getByText("Not sent to Stripe", { exact: true })
+      )
+      .toBeVisible();
+  });
+
+  test("sit under their own heading, apart from the transfers sent", async () => {
+    const screen = await render(
+      <SentToStripe
+        sent={{
+          ...off(),
+          unsent: [
+            {
+              id: "d1",
+              amount: 40,
+              date: "2026-07-01T00:00:00.000Z",
+              kind: "sending",
+            },
+          ],
+        }}
+      />
+    );
+    const waiting = screen.getByRole("table", {
+      name: "Not sent to Stripe",
+    });
+    await expect.element(waiting).toBeVisible();
+    expect(waiting.element().textContent).toContain("Sending to Stripe");
+    expect(waiting.element().textContent).not.toContain("Paid out");
+    const sent_table = screen
+      .getByRole("table", { name: "Sent to Stripe earlier" })
+      .element();
+    expect(sent_table.textContent).toContain("Paid out");
+    expect(sent_table.textContent).not.toContain("Sending to Stripe");
+  });
+
+  test("off stripe with only unsent routed donations is not the waiting account", async () => {
+    const only_unsent: INpoSent = {
+      ...sent({ on_stripe: false, connected: true }),
+      unsent: [
+        {
+          id: "d1",
+          amount: 40,
+          date: "2026-07-01T00:00:00.000Z",
+          kind: "not_sent",
+        },
+      ],
+    };
+    expect(stripe_link(only_unsent)).toBe("off");
+
+    const screen = await render(
+      <>
+        <SentToStripe sent={only_unsent} />
+        <WhereMoneyShows link={stripe_link(only_unsent)} />
+      </>
+    );
+    await expect
+      .element(screen.getByRole("region", { name: "Sent to Stripe earlier" }))
+      .toBeVisible();
+    await expect
+      .element(
+        screen
+          .getByRole("table", { name: "Not sent to Stripe" })
+          .getByText("Not sent to Stripe", { exact: true })
+      )
+      .toBeVisible();
+    expect(screen.container.textContent).not.toMatch(
+      /isn't receiving|Nothing has been sent/
+    );
+  });
 });

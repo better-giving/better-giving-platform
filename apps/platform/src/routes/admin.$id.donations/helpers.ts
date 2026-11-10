@@ -1,5 +1,6 @@
 import { type IAllocation, is_reversed } from "@/donations";
 import { via_name } from "@/donations/helpers";
+import { routed_kind, type TRoutedKind } from "@/stripe-connect/sent";
 import type { INpoDonation } from "$/pg/queries/dist";
 
 export function origin_text(source: string): string {
@@ -16,13 +17,17 @@ export interface IFees {
 
 /** where a stripe-routed dist's net went; a routed dist stores `ALL_CASH`,
  * so its allocation would read as a grant to the bank */
-export type TStripePayout = "paid_out" | "sending" | "not_sent";
+export type TStripePayout = TRoutedKind;
 
 const stripe_payout_of = (x: INpoDonation): TStripePayout | undefined => {
   if (!x.stripe_routed_to) return undefined;
-  if (x.stripe_transfer_id) return "paid_out";
-  // a refund before the transfer cancels it
-  return is_reversed(x.status) ? "not_sent" : "sending";
+  return routed_kind({
+    transfer_id: x.stripe_transfer_id,
+    reversed: is_reversed(x.status),
+    kept: x.owed_back,
+    owing: x.owed_open,
+    routed_at: x.date_created,
+  });
 };
 
 export interface IRow {

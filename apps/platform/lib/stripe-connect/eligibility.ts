@@ -1,4 +1,4 @@
-import { country_code } from "../constants/countries";
+import { country_code, country_names } from "../constants/countries";
 import {
   connect_status,
   type IAccountMirror,
@@ -87,8 +87,49 @@ const is_ready = (npo: IRoutingNpo) =>
   npo.stripe_account_id !== null &&
   connect_status(npo.mirror, npo.deauthorized_at) === "ready";
 
+/** an hq country as letters only, lowercased, so "United-States" and
+ * "united  states" meet the list's spelling and "U.S." its alias */
+const squash = (country: string) =>
+  country.toLowerCase().replace(/[^\p{L}]/gu, "");
+
+const CODE_BY_SQUASHED_NAME: ReadonlyMap<string, string | undefined> = new Map(
+  country_names.map((name) => [squash(name), country_code(name)])
+);
+
+/** spellings an npo's stored `hq_country` takes besides the name `countries`
+ * uses, keyed by `squash` */
+const COUNTRY_ALIASES: Readonly<Record<string, string>> = {
+  us: "US",
+  usa: "US",
+  unitedstatesofamerica: "US",
+  uk: "GB",
+  gb: "GB",
+  britain: "GB",
+  greatbritain: "GB",
+  unitedkingdomofgreatbritainandnorthernireland: "GB",
+  england: "GB",
+  scotland: "GB",
+  wales: "GB",
+  northernireland: "GB",
+  czechrepublic: "CZ",
+  thenetherlands: "NL",
+  holland: "NL",
+  republicofireland: "IE",
+};
+
+/** ISO 3166-1 alpha-2 for an hq country as an npo stored it: the list's name,
+ * an alias, or the code itself; undefined when it names none */
+export const hq_country_code = (country: string): string | undefined => {
+  const squashed = squash(country);
+  return (
+    COUNTRY_ALIASES[squashed] ??
+    CODE_BY_SQUASHED_NAME.get(squashed) ??
+    (squashed.length === 2 ? squashed.toUpperCase() : undefined)
+  );
+};
+
 const in_transfer_set = (country: string) => {
-  const code = country_code(country);
+  const code = hq_country_code(country);
   return !!code && TRANSFER_COUNTRIES.has(code);
 };
 
