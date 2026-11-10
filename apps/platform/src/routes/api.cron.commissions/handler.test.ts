@@ -1002,14 +1002,15 @@ describe("commissions cron", () => {
             npo_id,
             status: "approved",
             bank_summary: "USD account ending in 0778",
-            updated_at: "2029-01-01T00:00:00Z",
+            updated_at: "2030-01-01T00:00:00Z",
           },
           {
+            // larger id, older stamp: only updated_at can pick 778
             id: "779",
             npo_id,
             status: "approved",
             bank_summary: "USD account ending in 0779",
-            updated_at: "2030-01-01T00:00:00Z",
+            updated_at: "2029-01-01T00:00:00Z",
           },
         ]);
       await seed("d-1", 120);
@@ -1017,7 +1018,7 @@ describe("commissions cron", () => {
       await index();
 
       expect(wise.transfer).toHaveBeenCalledOnce();
-      expect(wise.transfer.mock.calls[0]![0].targetAccount).toBe("779");
+      expect(wise.transfer.mock.calls[0]![0].targetAccount).toBe("778");
       expect(await statuses()).toEqual({ "d-1": "paid" });
     });
 

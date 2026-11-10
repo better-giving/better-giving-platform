@@ -1,4 +1,4 @@
-import { country_code } from "../constants/countries";
+import { country_code, country_names } from "../constants/countries";
 import {
   connect_status,
   type IAccountMirror,
@@ -87,23 +87,41 @@ const is_ready = (npo: IRoutingNpo) =>
   npo.stripe_account_id !== null &&
   connect_status(npo.mirror, npo.deauthorized_at) === "ready";
 
+/** an hq country as letters only, lowercased, so "United-States" and
+ * "united  states" meet the list's spelling and "U.S." its alias */
+const squash = (country: string) =>
+  country.toLowerCase().replace(/[^\p{L}]/gu, "");
+
+const CODE_BY_SQUASHED_NAME: ReadonlyMap<string, string | undefined> = new Map(
+  country_names.map((name) => [squash(name), country_code(name)])
+);
+
 /** spellings an npo's stored `hq_country` takes besides the name `countries`
- * uses, keyed by lowercase with dots and spaces stripped */
+ * uses, keyed by `squash` */
 const COUNTRY_ALIASES: Readonly<Record<string, string>> = {
   us: "US",
   usa: "US",
   unitedstatesofamerica: "US",
   uk: "GB",
   gb: "GB",
+  britain: "GB",
   greatbritain: "GB",
+  unitedkingdomofgreatbritainandnorthernireland: "GB",
   england: "GB",
+  scotland: "GB",
+  wales: "GB",
+  northernireland: "GB",
+  czechrepublic: "CZ",
+  thenetherlands: "NL",
+  holland: "NL",
+  republicofireland: "IE",
 };
 
 const in_transfer_set = (country: string) => {
-  const squashed = country.toLowerCase().replace(/[.\s]/g, "");
+  const squashed = squash(country);
   const code =
     COUNTRY_ALIASES[squashed] ??
-    country_code(country) ??
+    CODE_BY_SQUASHED_NAME.get(squashed) ??
     (squashed.length === 2 ? squashed.toUpperCase() : undefined);
   return !!code && TRANSFER_COUNTRIES.has(code);
 };

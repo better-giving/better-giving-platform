@@ -220,12 +220,17 @@ describe("npo_default_bapp", () => {
     await db
       .insert(banking_apps)
       .values(bapp("own-approved-2", own, "approved"));
+    // the older bank has the larger id, so only updated_at can pick the winner
     await db
       .update(banking_apps)
       .set({ updated_at: "2030-01-01T00:00:00Z" })
+      .where(eq(banking_apps.id, "own-approved"));
+    await db
+      .update(banking_apps)
+      .set({ updated_at: "2029-01-01T00:00:00Z" })
       .where(eq(banking_apps.id, "own-approved-2"));
 
-    expect((await npo_default_bapp(own))?.id).toBe("own-approved-2");
+    expect((await npo_default_bapp(own))?.id).toBe("own-approved");
   });
 
   describe("two default rows", () => {

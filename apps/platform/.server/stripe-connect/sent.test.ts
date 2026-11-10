@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import {
   afterAll,
   beforeAll,
@@ -250,6 +251,25 @@ describe("npo_sent_transfers — routed with no transfer", () => {
       }
     );
     expect(sent!.unsent.every((u) => u.amount === 40)).toBe(true);
+  });
+
+  // `net` is stored to 18 places; the transfer sends payout_cents([net])
+  test("an unsent amount is the usd its transfer would send, rounded half down", async () => {
+    const id = await seed();
+    const recent = new Date(Date.now() - 60_000).toISOString();
+    await unsent(id, "d-half", { date: recent });
+    await unsent(id, "d-over-half", { date: recent });
+    await db().update(dists).set({ net: 12.345 }).where(eq(dists.id, "d-half"));
+    await db()
+      .update(dists)
+      .set({ net: 12.3451 })
+      .where(eq(dists.id, "d-over-half"));
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(
+      Object.fromEntries(sent!.unsent.map((u) => [u.id, u.amount]))
+    ).toEqual({ "d-half": 12.34, "d-over-half": 12.35 });
   });
 
   test("a pooled dist is not listed", async () => {

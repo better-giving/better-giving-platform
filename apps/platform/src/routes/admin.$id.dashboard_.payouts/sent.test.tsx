@@ -205,4 +205,35 @@ describe("routed donations with no transfer", () => {
       .toBeVisible();
     expect(screen.getByText("No transfers yet").query()).toBeNull();
   });
+
+  test("off stripe with only unsent routed donations is not the waiting account", async () => {
+    const only_unsent: INpoSent = {
+      ...sent({ on_stripe: false, connected: true }),
+      unsent: [
+        {
+          id: "d1",
+          amount: 40,
+          date: "2026-07-01T00:00:00.000Z",
+          kind: "not_sent",
+        },
+      ],
+    };
+    expect(stripe_link(only_unsent)).toBe("off");
+
+    const screen = await render(
+      <>
+        <SentToStripe sent={only_unsent} />
+        <WhereMoneyShows link={stripe_link(only_unsent)} />
+      </>
+    );
+    await expect
+      .element(screen.getByRole("region", { name: "Sent to Stripe earlier" }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText("Not sent to Stripe", { exact: true }))
+      .toBeVisible();
+    expect(screen.container.textContent).not.toMatch(
+      /isn't receiving|Nothing has been sent/
+    );
+  });
 });

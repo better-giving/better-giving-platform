@@ -2,7 +2,6 @@ import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import Stripe from "stripe";
 import { report_degraded } from "#/errors/report";
 import { is_reversed } from "@/donations/settle";
-import { to_units } from "@/helpers/decimal";
 import { is_routable, routing_npo } from "@/stripe-connect/eligibility";
 import {
   type INpoSent,
@@ -13,6 +12,7 @@ import {
 } from "@/stripe-connect/sent";
 import { stripe as stripe_env } from "../env";
 import { stripe } from "../kit/stripe";
+import { payout_total } from "../payouts/amount";
 import { db } from "../pg/db";
 import { npo_get } from "../pg/queries/npo";
 import { dists } from "../pg/schema/dist";
@@ -92,7 +92,8 @@ export async function npo_sent_transfers(
   ]);
   const unsent: IUnsentTransfer[] = unsent_rows.map((r) => ({
     id: r.id,
-    amount: r.net ?? 0,
+    // usd the transfer will send, so it sits to the cent beside the sent rows
+    amount: payout_total([r.net ?? 0]),
     date: r.routed_at,
     kind: routed_kind({
       transfer_id: null,
@@ -173,7 +174,7 @@ async function sent_of(
     return {
       id: row.id,
       // usd the transfer sent: the same cents a payout of this net would, as usd
-      amount: to_units(row.net ?? 0, 2, "half_down") / 100,
+      amount: payout_total([row.net ?? 0]),
       date: row.date,
       standing: { kind: "unknown" },
     };

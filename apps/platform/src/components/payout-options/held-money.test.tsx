@@ -549,8 +549,11 @@ describe("BankPayoutSection: Banking", () => {
 });
 
 describe("held-money figures", () => {
-  test("stay tabular and carry no slashed zero", async () => {
-    const screen = await in_router(<PayoutsHeldCard {...base} />);
+  test.each([
+    ["Banking", HeldMoneyCard],
+    ["Payouts", PayoutsHeldCard],
+  ])("%s: stay tabular and carry no slashed zero", async (_, Card) => {
+    const screen = await in_router(<Card {...base} />);
     const table = screen.getByRole("table").first().element();
     const features = getComputedStyle(table).fontFeatureSettings;
     expect(features).toContain("tnum");

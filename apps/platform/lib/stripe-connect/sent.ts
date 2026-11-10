@@ -66,8 +66,10 @@ export type TRoutedKind = TSentStanding["kind"] | "sending" | "not_sent";
 export type TUnsentKind = Extract<TRoutedKind, "sending" | "not_sent">;
 
 /** how long a routed donation may wait for its transfer before it reads as
- * never sent: the transfer job retries within stripe's 24h idempotency
- * window, so one older than that is refused, or held and dropped */
+ * not sent: the transfer job retries within stripe's 24h idempotency window,
+ * so one older than that was refused, went unanswered, or is held by an open
+ * dispute, whose close sends it unless the gift is reversed by then
+ * (`held_transfers` in .server/stripe-connect/release.ts) */
 export const SENDING_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /** the words for `kind`, the one place the donations list and the payouts

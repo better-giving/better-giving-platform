@@ -595,7 +595,8 @@ describe("grants cron execute", () => {
     await db()
       .insert(banking_apps)
       .values({
-        id: String(WISE_RECIPIENT + 1),
+        // smaller id than the seeded bank: only updated_at can pick it
+        id: String(WISE_RECIPIENT - 1),
         npo_id,
         status: "approved",
         updated_at: "2030-01-01T00:00:00Z",
@@ -606,7 +607,7 @@ describe("grants cron execute", () => {
     expect(report_error_mock).not.toHaveBeenCalled();
     expect(wise_pay_mock).toHaveBeenCalledOnce();
     expect(wise_pay_mock).toHaveBeenCalledWith(
-      WISE_RECIPIENT + 1,
+      WISE_RECIPIENT - 1,
       100,
       expect.any(String)
     );

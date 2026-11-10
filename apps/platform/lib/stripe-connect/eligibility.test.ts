@@ -82,12 +82,43 @@ describe("hq country aliases", () => {
     "United States of America",
     "UK",
     "GB",
+    "England",
+    "Great Britain",
+    // no country name is two letters, so these reach the two-letter fallback
     "DE",
+    "ie",
   ])("an hq country of %s routes", (hq_country) => {
     expect(routable({ hq_country })).toBe(true);
   });
 
-  test.each(["PH", "IS", "Philippines"])(
+  // legacy spellings older npo rows hold, each mapping into the transfer set
+  test.each([
+    "Scotland",
+    "Wales",
+    "Northern Ireland",
+    "Britain",
+    "United Kingdom of Great Britain and Northern Ireland",
+    "Czech Republic",
+    "The Netherlands",
+    "Holland",
+    "Republic of Ireland",
+  ])("an hq country of %s routes", (hq_country) => {
+    expect(routable({ hq_country })).toBe(true);
+  });
+
+  test.each([
+    "United-States",
+    "United  States",
+    "United States,",
+    "united-kingdom",
+    "Czech-Republic",
+    "Republic  of  Ireland",
+  ])("separators in %s don't change the country", (hq_country) => {
+    expect(routable({ hq_country })).toBe(true);
+  });
+
+  // "IS" is a real code outside the set; "XX" is no code at all
+  test.each(["PH", "IS", "XX", "Philippines"])(
     "an hq country of %s stays pooled",
     (hq_country) => {
       expect(routable({ hq_country })).toBe(false);
