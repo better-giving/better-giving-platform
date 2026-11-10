@@ -117,12 +117,19 @@ const COUNTRY_ALIASES: Readonly<Record<string, string>> = {
   republicofireland: "IE",
 };
 
-const in_transfer_set = (country: string) => {
+/** ISO 3166-1 alpha-2 for an hq country as an npo stored it: the list's name,
+ * an alias, or the code itself; undefined when it names none */
+export const hq_country_code = (country: string): string | undefined => {
   const squashed = squash(country);
-  const code =
+  return (
     COUNTRY_ALIASES[squashed] ??
     CODE_BY_SQUASHED_NAME.get(squashed) ??
-    (squashed.length === 2 ? squashed.toUpperCase() : undefined);
+    (squashed.length === 2 ? squashed.toUpperCase() : undefined)
+  );
+};
+
+const in_transfer_set = (country: string) => {
+  const code = hq_country_code(country);
   return !!code && TRANSFER_COUNTRIES.has(code);
 };
 

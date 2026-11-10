@@ -1120,6 +1120,32 @@ describe("find_nonprofit IRS fallback", () => {
     expect(JSON.stringify(result)).not.toContain("999999999");
   });
 
+  test("a listed org stored with its country as USA still counts as listed", async () => {
+    const on_page = {
+      ...local_hits[0],
+      registration_number: "88-8888888",
+      hq_country: "USA",
+    };
+    mocks.npo_name_search.mockResolvedValue([on_page]);
+    mocks.npos_by_regnums.mockResolvedValue([]);
+    stub_fetch(() =>
+      http(200, {
+        query: "charity",
+        limit: 10,
+        results: [
+          search_org({ ein: "111111111", name: "Eligible" }),
+          search_org({ ein: "888888888", name: "On page" }),
+        ],
+      })
+    );
+
+    const result = await find_nonprofit({ query: "charity" }, caller());
+
+    expect(result.not_on_better_giving.map((entry) => entry.name)).toEqual([
+      "Eligible",
+    ]);
+  });
+
   test("a named org that isn't listed returns no listed items, only the IRS match", async () => {
     mocks.npo_name_search.mockResolvedValue([]);
     stub_fetch(() =>

@@ -23,6 +23,7 @@ import { snap, to_units } from "@/helpers/decimal";
 import type { IIncrement } from "@/schemas";
 import { is_funded_member } from "@/settlement/funded-members";
 import { npo_share, settled_parts, shared_parts } from "@/settlement/plan";
+import { hq_country_code } from "@/stripe-connect/eligibility";
 import { app, base_url } from "$/env";
 import {
   type INonprofitOrg,
@@ -404,7 +405,7 @@ function listed_eins(
 ): Set<string> {
   const eins = new Set<string>();
   for (const item of items) {
-    if (item.hq_country !== "United States") continue;
+    if (!item.hq_country || hq_country_code(item.hq_country) !== "US") continue;
     const ein = ein_digits(item.registration_number ?? "");
     if (ein.length === EIN_DIGITS) eins.add(ein);
   }

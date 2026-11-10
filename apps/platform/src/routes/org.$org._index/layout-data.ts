@@ -15,6 +15,7 @@ import { fund_closes_at, fund_item_is_open } from "@/campaign/is-open";
 import { MAX_EXPIRATION_ISO } from "@/campaign/schema";
 import type { IMedia, IProgramDb } from "@/npo";
 import type { IOrgShape } from "@/org-shape";
+import { hq_country_code } from "@/stripe-connect/eligibility";
 
 /** the list read's `expiration` for a fund that never closes */
 const NO_EXPIRY_UNIX = Math.floor(Date.parse(MAX_EXPIRATION_ISO) / 1000);
@@ -81,7 +82,10 @@ export function org_credential({
 }: IRegistration): IOrgLayout["credential"] {
   const value = registration_number?.trim();
   if (!value) return null;
-  const label = hq_country === "United States" ? "EIN" : "Registration no.";
+  const label =
+    hq_country && hq_country_code(hq_country) === "US"
+      ? "EIN"
+      : "Registration no.";
   return { label, value };
 }
 
