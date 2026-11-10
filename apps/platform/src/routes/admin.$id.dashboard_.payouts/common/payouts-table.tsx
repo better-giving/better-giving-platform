@@ -17,7 +17,7 @@ export function PayoutsTable({
 }: IPayoutsTable) {
   return (
     <div className={`${classes} table-scroll`}>
-      <table className="table">
+      <table className="table plain-zero-table">
         <thead>
           <tr>
             {/* icon: no header, and no width when there are no rows */}

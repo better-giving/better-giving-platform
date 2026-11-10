@@ -554,9 +554,12 @@ describe("held-money figures", () => {
     ["Payouts", PayoutsHeldCard],
   ])("%s: stay tabular and carry no slashed zero", async (_, Card) => {
     const screen = await in_router(<Card {...base} />);
-    const table = screen.getByRole("table").first().element();
-    const features = getComputedStyle(table).fontFeatureSettings;
-    expect(features).toContain("tnum");
-    expect(features).not.toContain("zero");
+    const tables = [...screen.container.querySelectorAll("table")];
+    expect(tables.length).toBeGreaterThan(0);
+    for (const table of tables) {
+      const features = getComputedStyle(table).fontFeatureSettings;
+      expect(features).toContain("tnum");
+      expect(features).not.toContain("zero");
+    }
   });
 });

@@ -175,7 +175,7 @@ export function SentToStripe({
         </p>
       </div>
       <div className="table-scroll">
-        <table className="table">
+        <table className="table plain-zero-table">
           <thead>
             <tr>
               <th>Amount</th>
@@ -216,7 +216,10 @@ export function SentToStripe({
             Waiting for a transfer
           </h3>
           <div className="table-scroll">
-            <table className="table" aria-labelledby={unsent_id}>
+            <table
+              className="table plain-zero-table"
+              aria-labelledby={unsent_id}
+            >
               <thead>
                 <tr>
                   <th>Amount</th>

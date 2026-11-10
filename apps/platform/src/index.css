@@ -38,10 +38,12 @@
   --color-sky: #edf2fe;
 }
 
-/* the held-money tables keep tabular figures and drop the slashed zero the
-   design system's `.table` adds: a held $500.00 and a date like "Oct 30, 2026"
-   read as plain digits. unlayered, so it outranks `.table` without a specificity race */
-.table.held-table {
+/* REGISTRY GAP (for the design-system PM): the registry's `.table`
+   (packages/ui/src/styles/components.css) sets `"tnum", "zero"`, which slashes
+   every zero. the Payouts page keeps the tabular figures and drops the slash on
+   all its money tables, so $500.00 and 2026 read as plain digits and no table
+   shows the other kind. this override goes when the registry's `.table` does. */
+.table.plain-zero-table {
   font-feature-settings: "tnum";
 }
 
