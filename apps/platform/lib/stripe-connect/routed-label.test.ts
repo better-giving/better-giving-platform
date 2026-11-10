@@ -44,5 +44,6 @@ describe("routed_label", () => {
   test("a refunded routed donation reads the same wherever it is shown", () => {
     expect(routed_label("reversed")).toBe("Fully reversed");
     expect(routed_label("not_sent")).toBe("Not sent to Stripe");
+    expect(routed_label("kept")).toBe("Refunded, owed to Better Giving");
   });
 });
