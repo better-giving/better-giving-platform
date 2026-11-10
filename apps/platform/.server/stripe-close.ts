@@ -3,12 +3,8 @@ import { stripe } from "./kit/stripe";
 export interface IOpenPayment {
   /** the donation id: the intent carries it as `metadata.order_id` */
   id: string;
-  created_at: string;
+  frequency: string;
 }
-
-/** an intent with no row of its own after this long was never created: the
- * search index lags by a minute or so, never hours */
-const SEARCH_LAG_MS = 2 * 60 * 60 * 1000;
 
 /** intents that can still be confirmed by the donor, so cancelling them is what
  * closes the payment for good */
@@ -20,24 +16,23 @@ const CANCELLABLE = new Set([
 
 /** closes the stripe payment behind each donation so none of them can collect
  * money any more. returns the ids it closed, or `null` when any payment can't
- * be shown closed (processing, succeeded or awaiting capture, a cancel stripe
- * refused, or an intent the search can't find yet) — the caller then keeps the
- * campaign, because money may still land on it. */
+ * be shown closed — the caller then keeps the campaign, because money may
+ * still land on it. what counts as closed is a PaymentIntent found by its
+ * `order_id` and cancelled (or already canceled). refused, never inferred
+ * closed: a recurring gift (its setup intent can start a subscription later),
+ * an intent that is processing, succeeded or awaiting capture, a cancel stripe
+ * refused, and a row with no intent found — the search lags, and a checkout
+ * session's payment isn't found by it at all. */
 export async function close_stripe_payments(
-  rows: IOpenPayment[],
-  now = Date.now()
+  rows: IOpenPayment[]
 ): Promise<string[] | null> {
   for (const row of rows) {
+    if (row.frequency !== "one-time") return null;
     const found = await stripe.paymentIntents.search({
       query: `metadata['order_id']:'${row.id.replaceAll("'", "")}'`,
       limit: 10,
     });
-    if (found.data.length === 0) {
-      // no intent to cancel: either the checkout never got that far, or the
-      // search hasn't indexed it yet — only an old row is the first
-      if (now - new Date(row.created_at).getTime() < SEARCH_LAG_MS) return null;
-      continue;
-    }
+    if (found.data.length === 0) return null;
     for (const intent of found.data) {
       if (intent.status === "canceled") continue;
       if (!CANCELLABLE.has(intent.status)) return null;

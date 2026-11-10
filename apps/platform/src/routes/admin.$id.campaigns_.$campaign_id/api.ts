@@ -80,7 +80,7 @@ export const action = async ({
     if (!ok) {
       const note = current.legacy_fund_id
         ? "A campaign with past gifts cannot be deleted."
-        : "A campaign with gifts cannot be deleted.";
+        : "A campaign with gifts, or a payment still in progress, cannot be deleted.";
       return data(refusal(note), { status: 400 });
     }
     return redirectWithSuccess(

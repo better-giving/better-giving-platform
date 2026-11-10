@@ -111,6 +111,10 @@ beforeAll(async () => {
       campaign("open-unclosable"),
       campaign("open-paypal"),
       campaign("open-races"),
+      campaign("open-monthly"),
+      campaign("open-late"),
+      campaign("crypto-expired"),
+      campaign("paypal-expired"),
       ...BLOCKING.map((st) => campaign(`gift-${st}`)),
     ]);
   const donation = (
@@ -156,18 +160,23 @@ beforeAll(async () => {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
-  await db
-    .insert(donations)
-    .values([
-      donation("don-monthly-created", "abandoned-monthly", "created"),
-      donation("don-mixed-expired", "mixed", "expired"),
-      donation("don-mixed-settled", "mixed", "settled"),
-      donation("don-open-created", "open-created", "created"),
-      donation("don-open-intent", "open-intent", "intent"),
-      donation("don-open-unclosable", "open-unclosable", "created"),
-      donation("don-open-paypal", "open-paypal", "created", "paypal"),
-      donation("don-open-races", "open-races", "created"),
-    ]);
+  await db.insert(donations).values([
+    donation("don-monthly-created", "abandoned-monthly", "created"),
+    donation("don-mixed-expired", "mixed", "expired"),
+    donation("don-mixed-settled", "mixed", "settled"),
+    donation("don-open-created", "open-created", "created"),
+    donation("don-open-intent", "open-intent", "intent"),
+    donation("don-open-unclosable", "open-unclosable", "created"),
+    donation("don-open-paypal", "open-paypal", "created", "paypal"),
+    donation("don-open-races", "open-races", "created"),
+    donation("don-open-late-1", "open-late", "created"),
+    {
+      ...donation("don-open-monthly", "open-monthly", "created"),
+      frequency: "monthly",
+    },
+    donation("don-crypto-expired", "crypto-expired", "expired", "crypto:eth"),
+    donation("don-paypal-expired", "paypal-expired", "expired", "paypal"),
+  ]);
   await db
     .insert(donations)
     .values(BLOCKING.map((st) => donation(`don-${st}`, `gift-${st}`, st)));
@@ -241,7 +250,9 @@ describe("campaign_delete", () => {
   });
 
   it("refuses when a closed row sits beside a settled gift, detaching nothing", async () => {
+    closes_all.mockClear();
     expect(await campaign_delete(acme, "mixed", closes_all)).toBe(false);
+    expect(closes_all).not.toHaveBeenCalled();
     expect(await present("mixed")).toBe(true);
     expect((await row_of("don-mixed-expired"))?.campaign_id).toBe("mixed");
   });
@@ -322,14 +333,76 @@ describe("campaign_delete with open payments", () => {
     });
   });
 
-  it("refuses, not throws, when a subscription still points at it, undoing the cancel", async () => {
+  it("refuses a checkout that opens while the others are being closed, closing none of it for good", async () => {
+    const opens_another = vi.fn(async (rows: { id: string }[]) => {
+      await test_db.current!.db.insert(donations).values({
+        id: "don-open-late-2",
+        campaign_id: "open-late",
+        upusd: 1,
+        status: "created",
+        amount_base: 10,
+        amount_tip: 0,
+        amount_fee_allowance: 0,
+        currency: "USD",
+        frequency: "one-time",
+        source: "bg-marketplace",
+        via: "stripe",
+      });
+      return rows.map((r) => r.id);
+    });
+    expect(await campaign_delete(acme, "open-late", opens_another)).toBe(false);
+    expect(await present("open-late")).toBe(true);
+    expect(await row_of("don-open-late-1")).toEqual({
+      campaign_id: "open-late",
+      status: "created",
+    });
+    expect(await row_of("don-open-late-2")).toEqual({
+      campaign_id: "open-late",
+      status: "created",
+    });
+  });
+
+  it("refuses before touching stripe when a subscription still points at it", async () => {
+    closes_all.mockClear();
     expect(await campaign_delete(acme, "abandoned-monthly", closes_all)).toBe(
       false
     );
+    expect(closes_all).not.toHaveBeenCalled();
     expect(await present("abandoned-monthly")).toBe(true);
     expect(await row_of("don-monthly-created")).toEqual({
       campaign_id: "abandoned-monthly",
       status: "created",
+    });
+  });
+
+  it("hands a recurring open payment to the closer with its frequency, and keeps the campaign when refused", async () => {
+    const asked = vi.fn(async () => null);
+    expect(await campaign_delete(acme, "open-monthly", asked)).toBe(false);
+    expect(asked).toHaveBeenCalledWith([
+      { id: "don-open-monthly", frequency: "monthly" },
+    ]);
+    expect(await row_of("don-open-monthly")).toEqual({
+      campaign_id: "open-monthly",
+      status: "created",
+    });
+  });
+
+  it("keeps a campaign whose crypto deposit expired: it can still be paid and settle", async () => {
+    expect(await campaign_gift_count("crypto-expired")).toBe(1);
+    expect(await campaign_delete(acme, "crypto-expired", closes_all)).toBe(
+      false
+    );
+    expect(await row_of("don-crypto-expired")).toEqual({
+      campaign_id: "crypto-expired",
+      status: "expired",
+    });
+  });
+
+  it("detaches an expired paypal checkout", async () => {
+    expect(await campaign_delete(acme, "paypal-expired")).toBe(true);
+    expect(await row_of("don-paypal-expired")).toEqual({
+      campaign_id: null,
+      status: "expired",
     });
   });
 });

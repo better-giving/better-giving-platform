@@ -5,15 +5,14 @@ import {
   eq,
   inArray,
   isNull,
+  like,
   ne,
-  notInArray,
-  notLike,
+  not,
   or,
   type SQL,
   sql,
 } from "drizzle-orm";
 import { to_text } from "#/components/rich-text/helpers";
-import { rail_of } from "@/donations/rail";
 import type { DonateMethodId, IIncrement, TFrequency } from "@/schemas";
 import { db } from "../db";
 import { user } from "../schema/auth";
@@ -27,6 +26,7 @@ import { dists } from "../schema/dist";
 import { donation_donors, donations } from "../schema/donation";
 import { fund_members } from "../schema/fund";
 import { npos } from "../schema/npo";
+import { subscriptions } from "../schema/subscription";
 import { v_campaign_total_usd } from "../schema/views";
 import { from_target, to_target } from "./fmt";
 import type { DbOrTx } from "./helpers";
@@ -624,9 +624,24 @@ const OPEN = ["created", "intent"] as const;
 /** postgres: a row elsewhere still references the one being deleted */
 const FOREIGN_KEY_VIOLATION = "23503";
 
+/** a closed checkout whose provider will not accept money on it again. a
+ * crypto deposit address can still be paid after `expired` or `failed`, and
+ * settles then, so those keep the campaign */
+const closed_for_good = and(
+  inArray(donations.status, [...CLOSED]),
+  or(like(donations.via, "stripe%"), like(donations.via, "paypal%"))
+);
+
+/** an open stripe payment: closable by cancelling its intent */
+const open_stripe = and(
+  inArray(donations.status, [...OPEN]),
+  like(donations.via, "stripe%")
+);
+
 /** gifts that keep a campaign, for the page: everything that was or may yet be
- * paid, except an open stripe payment, which a delete closes by cancelling its
- * intent. any other provider's open payment can't be closed, so it counts. */
+ * paid, except what a delete can close — an open stripe payment, whose intent
+ * it cancels. any other provider's open payment can't be closed, so it
+ * counts. */
 export async function campaign_gift_count(
   id: string,
   conn: DbOrTx = db
@@ -637,11 +652,8 @@ export async function campaign_gift_count(
     .where(
       and(
         eq(donations.campaign_id, id),
-        notInArray(donations.status, [...CLOSED]),
-        or(
-          notInArray(donations.status, [...OPEN]),
-          notLike(donations.via, "stripe%")
-        )
+        not(closed_for_good as SQL),
+        not(open_stripe as SQL)
       )
     );
   return row?.n ?? 0;
@@ -650,7 +662,7 @@ export async function campaign_gift_count(
 /** closes the payments behind these open donations; the ids it closed, or
  * `null` when any could not be closed */
 export type ClosePayments = (
-  rows: { id: string; created_at: string }[]
+  rows: { id: string; frequency: string }[]
 ) => Promise<string[] | null>;
 
 /** false when another nonprofit owns it, it has gifts, it was folded from a
@@ -678,22 +690,30 @@ export async function campaign_delete(
   // orphan that revenue, so it is undeletable like one with its own gifts
   if (current.legacy_fund_id) return false;
 
+  // everything that can refuse the delete without touching stripe comes first:
+  // cancelling a donor's live checkout and then refusing anyway would kill a
+  // payment for nothing
+  if ((await campaign_gift_count(id)) > 0) return false;
+  const [subscribed] = await db
+    .select({ id: subscriptions.id })
+    .from(subscriptions)
+    .where(eq(subscriptions.campaign_id, id))
+    .limit(1);
+  if (subscribed) return false;
+
   const open = await db
     .select({
       id: donations.id,
       via: donations.via,
-      created_at: donations.created_at,
+      frequency: donations.frequency,
     })
     .from(donations)
-    .where(
-      and(eq(donations.campaign_id, id), inArray(donations.status, [...OPEN]))
-    );
+    .where(and(eq(donations.campaign_id, id), open_stripe));
   let closed: string[] = [];
   if (open.length > 0) {
-    if (open.some((r) => rail_of(r.via) !== "stripe") || !close_payments)
-      return false;
+    if (!close_payments) return false;
     const done = await close_payments(
-      open.map((r) => ({ id: r.id, created_at: String(r.created_at) }))
+      open.map((r) => ({ id: r.id, frequency: r.frequency }))
     );
     if (!done) return false;
     closed = done;
@@ -709,10 +729,11 @@ export async function campaign_delete(
         .where(
           and(
             eq(donations.campaign_id, id),
-            notInArray(donations.status, [...CLOSED]),
-            or(
-              notInArray(donations.status, [...OPEN]),
-              closed.length === 0 ? sql`true` : notInArray(donations.id, closed)
+            not(closed_for_good as SQL),
+            not(
+              (closed.length === 0
+                ? sql`false`
+                : and(open_stripe, inArray(donations.id, closed))) as SQL
             )
           )
         );
@@ -721,24 +742,14 @@ export async function campaign_delete(
         await tx
           .update(donations)
           .set({ status: "cancelled" })
-          .where(
-            and(
-              inArray(donations.id, closed),
-              inArray(donations.status, [...OPEN])
-            )
-          );
+          .where(and(inArray(donations.id, closed), open_stripe));
       }
       // only closed rows: one that settles after the count above is left
       // attached, and the foreign key then refuses the delete below
       await tx
         .update(donations)
         .set({ campaign_id: null })
-        .where(
-          and(
-            eq(donations.campaign_id, id),
-            inArray(donations.status, [...CLOSED])
-          )
-        );
+        .where(and(eq(donations.campaign_id, id), closed_for_good));
       await tx
         .delete(campaigns)
         .where(and(eq(campaigns.id, id), eq(campaigns.owner_npo_id, npo_id)));
