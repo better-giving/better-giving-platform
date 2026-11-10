@@ -6,6 +6,7 @@ import {
   inArray,
   isNull,
   ne,
+  notInArray,
   or,
   type SQL,
   sql,
@@ -609,6 +610,12 @@ export async function campaign_end(
   return (await campaign_get(npo_id, id)) !== undefined;
 }
 
+/** statuses a donation can end in without ever being paid: the card step
+ * writes a `created` row before anyone pays, and an abandoned checkout leaves
+ * it there. `intent` stays out — a payment may still be in flight on it. */
+const UNSETTLED = ["created", "expired", "failed", "cancelled"] as const;
+
+/** gifts that keep a campaign: everything that was or may yet be paid */
 export async function campaign_gift_count(
   id: string,
   conn: DbOrTx = db
@@ -616,25 +623,40 @@ export async function campaign_gift_count(
   const [row] = await conn
     .select({ n: count() })
     .from(donations)
-    .where(eq(donations.campaign_id, id));
+    .where(
+      and(
+        eq(donations.campaign_id, id),
+        notInArray(donations.status, [...UNSETTLED])
+      )
+    );
   return row?.n ?? 0;
 }
 
 /** false when another nonprofit owns it, it has gifts, it was folded from a
- * fund, or it is missing */
+ * fund, or it is missing. donations that never settled are detached from it
+ * in the same transaction — `donations.campaign_id` is `ON DELETE no action`,
+ * so the delete would otherwise fail on them; detaching keeps the rows
+ * (nothing cascades through the donor and payment rows hanging off them). */
 export async function campaign_delete(
   npo_id: number,
   id: string
 ): Promise<boolean> {
   const current = await campaign_get(npo_id, id);
   if (!current) return false;
-  if ((await campaign_gift_count(id)) > 0) return false;
   // a folded campaign carries historic legacy gifts (settled dists keyed on its
   // legacy_fund_id) that campaign_gift_count never sees; deleting it would
   // orphan that revenue, so it is undeletable like one with its own gifts
   if (current.legacy_fund_id) return false;
-  await db
-    .delete(campaigns)
-    .where(and(eq(campaigns.id, id), eq(campaigns.owner_npo_id, npo_id)));
-  return true;
+  return db.transaction(async (tx) => {
+    // a gift paid between the page and this click still blocks the delete
+    if ((await campaign_gift_count(id, tx)) > 0) return false;
+    await tx
+      .update(donations)
+      .set({ campaign_id: null })
+      .where(eq(donations.campaign_id, id));
+    await tx
+      .delete(campaigns)
+      .where(and(eq(campaigns.id, id), eq(campaigns.owner_npo_id, npo_id)));
+    return true;
+  });
 }

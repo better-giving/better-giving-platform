@@ -23,7 +23,16 @@ import { donations } from "../schema/donation";
 import { funds } from "../schema/fund";
 import { npos } from "../schema/npo";
 import { create_test_db } from "../test-utils/pglite";
-import { campaign_delete } from "./campaign";
+import { campaign_delete, campaign_gift_count } from "./campaign";
+
+/** every status that was, or may yet be, paid */
+const BLOCKING = [
+  "intent",
+  "confirmed",
+  "settled",
+  "refunded",
+  "refunded_loss",
+] as const;
 
 /** owner of every campaign under test */
 let acme: number;
@@ -96,7 +105,37 @@ beforeAll(async () => {
       campaign("folded", "fund-legacy"),
       campaign("with-gift"),
       campaign("owned-elsewhere"),
+      campaign("abandoned"),
+      ...BLOCKING.map((st) => campaign(`gift-${st}`)),
     ]);
+  const donation = (
+    id: string,
+    campaign_id: string,
+    status: string
+  ): typeof donations.$inferInsert => ({
+    id,
+    campaign_id,
+    upusd: 1,
+    status,
+    amount_base: 10,
+    amount_tip: 0,
+    amount_fee_allowance: 0,
+    currency: "USD",
+    frequency: "one-time",
+    source: "bg-marketplace",
+    via: "stripe:card",
+  });
+  // one checkout abandoned per status that never settled
+  await db
+    .insert(donations)
+    .values(
+      ["created", "expired", "failed", "cancelled"].map((st) =>
+        donation(`don-abandoned-${st}`, "abandoned", st)
+      )
+    );
+  await db
+    .insert(donations)
+    .values(BLOCKING.map((st) => donation(`don-${st}`, `gift-${st}`, st)));
   // a gift of its own keeps "with-gift" undeletable
   await db.insert(donations).values({
     id: "don-1",
@@ -136,5 +175,28 @@ describe("campaign_delete", () => {
   it("refuses when another nonprofit owns it", async () => {
     expect(await campaign_delete(other, "owned-elsewhere")).toBe(false);
     expect(await present("owned-elsewhere")).toBe(true);
+  });
+
+  it("deletes a campaign whose only donations are abandoned checkouts", async () => {
+    expect(await campaign_gift_count("abandoned")).toBe(0);
+    expect(await campaign_delete(acme, "abandoned")).toBe(true);
+    expect(await present("abandoned")).toBe(false);
+  });
+
+  it("keeps the abandoned rows, detached from the deleted campaign", async () => {
+    const rows = await test_db
+      .current!.db.select({
+        id: donations.id,
+        campaign_id: donations.campaign_id,
+      })
+      .from(donations)
+      .where(eq(donations.id, "don-abandoned-created"));
+    expect(rows).toEqual([{ id: "don-abandoned-created", campaign_id: null }]);
+  });
+
+  it.each(BLOCKING)("refuses a campaign with a %s gift", async (st) => {
+    expect(await campaign_gift_count(`gift-${st}`)).toBe(1);
+    expect(await campaign_delete(acme, `gift-${st}`)).toBe(false);
+    expect(await present(`gift-${st}`)).toBe(true);
   });
 });
