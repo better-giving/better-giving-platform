@@ -29,11 +29,11 @@ describe("a story saved without a length", () => {
     expect(r.issues?.[0].path?.map((p) => p.key)).toEqual(["length"]);
   });
 
-  test("a stored length is the count when there is one", () => {
-    expect(v.safeParse(field, { value: story(10), length: 8001 }).success).toBe(
+  test("a length the client sends does not change the count", () => {
+    expect(v.safeParse(field, { value: story(8001), length: 5 }).success).toBe(
       false
     );
-    expect(v.safeParse(field, { value: story(10), length: 10 }).success).toBe(
+    expect(v.safeParse(field, { value: story(10), length: 8001 }).success).toBe(
       true
     );
   });

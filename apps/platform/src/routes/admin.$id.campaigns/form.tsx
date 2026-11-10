@@ -37,6 +37,7 @@ import { publish_lock_body } from "./copy";
 import { type FV, form_schema } from "./form-schema";
 import { link_from_name } from "./link";
 import { LinkField } from "./link-field";
+import { STORY_MAX_CHARS } from "./schema";
 
 const TYPE_LABEL: Record<(typeof CAMPAIGN_TYPES)[number], string> = {
   year_end: "Year-end",
@@ -428,7 +429,7 @@ export function CampaignForm({
           content={desc.value}
           onChange={desc.onChange}
           placeHolder="The story of this campaign"
-          charLimit={8000}
+          charLimit={STORY_MAX_CHARS}
           classes={{
             container: "min-w-0",
             field:

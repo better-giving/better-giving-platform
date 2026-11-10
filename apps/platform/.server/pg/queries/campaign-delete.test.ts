@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { TestDb } from "../test-utils/pglite";
 
@@ -22,8 +22,12 @@ import { campaigns } from "../schema/campaign";
 import { donations } from "../schema/donation";
 import { funds } from "../schema/fund";
 import { npos } from "../schema/npo";
+import { subscriptions } from "../schema/subscription";
 import { create_test_db } from "../test-utils/pglite";
 import { campaign_delete, campaign_gift_count } from "./campaign";
+
+/** statuses a checkout can be left in without ever paying */
+const ABANDONED = ["created", "expired", "failed", "cancelled"] as const;
 
 /** every status that was, or may yet be, paid */
 const BLOCKING = [
@@ -106,6 +110,8 @@ beforeAll(async () => {
       campaign("with-gift"),
       campaign("owned-elsewhere"),
       campaign("abandoned"),
+      campaign("abandoned-monthly"),
+      campaign("mixed"),
       ...BLOCKING.map((st) => campaign(`gift-${st}`)),
     ]);
   const donation = (
@@ -129,10 +135,34 @@ beforeAll(async () => {
   await db
     .insert(donations)
     .values(
-      ["created", "expired", "failed", "cancelled"].map((st) =>
-        donation(`don-abandoned-${st}`, "abandoned", st)
-      )
+      ABANDONED.map((st) => donation(`don-abandoned-${st}`, "abandoned", st))
     );
+  // an abandoned monthly checkout leaves its subscription row behind
+  await db.insert(subscriptions).values({
+    id: "sub-abandoned",
+    interval: "month",
+    interval_count: 1,
+    next_billing: new Date().toISOString(),
+    amount: 10,
+    amount_usd: 10,
+    currency: "USD",
+    product_id: "prod-1",
+    to_npo_id: acme,
+    campaign_id: "abandoned-monthly",
+    to_name: "acme",
+    platform: "stripe",
+    status: "active",
+    from_id: "donor@test.com",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+  await db
+    .insert(donations)
+    .values([
+      donation("don-monthly-created", "abandoned-monthly", "created"),
+      donation("don-mixed-created", "mixed", "created"),
+      donation("don-mixed-settled", "mixed", "settled"),
+    ]);
   await db
     .insert(donations)
     .values(BLOCKING.map((st) => donation(`don-${st}`, `gift-${st}`, st)));
@@ -183,15 +213,42 @@ describe("campaign_delete", () => {
     expect(await present("abandoned")).toBe(false);
   });
 
-  it("keeps the abandoned rows, detached from the deleted campaign", async () => {
+  it("keeps every abandoned row, detached from the deleted campaign", async () => {
     const rows = await test_db
       .current!.db.select({
         id: donations.id,
         campaign_id: donations.campaign_id,
       })
       .from(donations)
-      .where(eq(donations.id, "don-abandoned-created"));
-    expect(rows).toEqual([{ id: "don-abandoned-created", campaign_id: null }]);
+      .where(
+        inArray(
+          donations.id,
+          ABANDONED.map((st) => `don-abandoned-${st}`)
+        )
+      );
+    expect(rows).toHaveLength(ABANDONED.length);
+    expect(rows.every((r) => r.campaign_id === null)).toBe(true);
+  });
+
+  async function campaign_of(donation_id: string) {
+    const [row] = await test_db
+      .current!.db.select({ campaign_id: donations.campaign_id })
+      .from(donations)
+      .where(eq(donations.id, donation_id));
+    return row?.campaign_id;
+  }
+
+  it("refuses when an abandoned row sits beside a settled gift, detaching nothing", async () => {
+    expect(await campaign_delete(acme, "mixed")).toBe(false);
+    expect(await present("mixed")).toBe(true);
+    expect(await campaign_of("don-mixed-created")).toBe("mixed");
+  });
+
+  it("refuses, not throws, when a subscription still points at it, detaching nothing", async () => {
+    expect(await campaign_gift_count("abandoned-monthly")).toBe(0);
+    expect(await campaign_delete(acme, "abandoned-monthly")).toBe(false);
+    expect(await present("abandoned-monthly")).toBe(true);
+    expect(await campaign_of("don-monthly-created")).toBe("abandoned-monthly");
   });
 
   it.each(BLOCKING)("refuses a campaign with a %s gift", async (st) => {

@@ -615,6 +615,9 @@ export async function campaign_end(
  * it there. `intent` stays out — a payment may still be in flight on it. */
 const UNSETTLED = ["created", "expired", "failed", "cancelled"] as const;
 
+/** postgres: a row elsewhere still references the one being deleted */
+const FOREIGN_KEY_VIOLATION = "23503";
+
 /** gifts that keep a campaign: everything that was or may yet be paid */
 export async function campaign_gift_count(
   id: string,
@@ -647,16 +650,32 @@ export async function campaign_delete(
   // legacy_fund_id) that campaign_gift_count never sees; deleting it would
   // orphan that revenue, so it is undeletable like one with its own gifts
   if (current.legacy_fund_id) return false;
-  return db.transaction(async (tx) => {
-    // a gift paid between the page and this click still blocks the delete
-    if ((await campaign_gift_count(id, tx)) > 0) return false;
-    await tx
-      .update(donations)
-      .set({ campaign_id: null })
-      .where(eq(donations.campaign_id, id));
-    await tx
-      .delete(campaigns)
-      .where(and(eq(campaigns.id, id), eq(campaigns.owner_npo_id, npo_id)));
-    return true;
-  });
+  try {
+    return await db.transaction(async (tx) => {
+      // a gift paid between the page and this click still blocks the delete
+      if ((await campaign_gift_count(id, tx)) > 0) return false;
+      // only the unsettled rows: one that settles after the count above is left
+      // attached, and the foreign key then refuses the delete below
+      await tx
+        .update(donations)
+        .set({ campaign_id: null })
+        .where(
+          and(
+            eq(donations.campaign_id, id),
+            inArray(donations.status, [...UNSETTLED])
+          )
+        );
+      await tx
+        .delete(campaigns)
+        .where(and(eq(campaigns.id, id), eq(campaigns.owner_npo_id, npo_id)));
+      return true;
+    });
+  } catch (err) {
+    // something still points at it (a subscription from a monthly checkout, a
+    // gift that settled mid-delete): the campaign stays, as with any gift, and
+    // the rolled-back transaction leaves the abandoned rows attached
+    const e = err as { code?: string; cause?: { code?: string } };
+    if ((e.code ?? e.cause?.code) === FOREIGN_KEY_VIOLATION) return false;
+    throw err;
+  }
 }

@@ -26,9 +26,9 @@ const decimals = (x: string) => x.split(".")[1]?.length ?? 0;
  * of at most `places` decimals, with "$", spaces and thousands commas allowed.
  * anything else fails with {@link amount_format_err}, and too many decimals with
  * {@link amount_places_err}; the caller chains its own range checks (greater
- * than 0, a minimum) after it. the masked inputs hand
- * this the plain decimal already — this is the backstop for a paste or a
- * submit that never went through one. */
+ * than 0, a minimum) after it. the masked inputs hand this the plain decimal
+ * already — this is the backstop for a paste or a submit that never went
+ * through one. */
 export const amount_num = (places = 2) =>
   v.pipe(
     v.string(),

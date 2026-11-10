@@ -31,14 +31,14 @@ interface RichTextContentOptions {
   maxChars?: number;
   required?: boolean;
 }
-/** the length cap on `{ value, length? }`. the count is the stored `length`, or
- * the text's own when a story was saved without one — so a long story that
- * arrives without a length can't slip past the cap. */
+/** the length cap on `{ value, length? }`. the count is the text's own: a
+ * `length` the client sends is a hint for the counter, never what the cap
+ * trusts, so a story saved without one, or with a wrong one, can't slip past. */
 export const richtext_max = (maxChars: number) =>
   v.forward(
     v.check(
       (c: { value: string; length?: number | undefined }) =>
-        (c.length ?? to_text(c.value).length) <= maxChars,
+        to_text(c.value).length <= maxChars,
       `max length is ${maxChars} chars`
     ),
     ["length"]

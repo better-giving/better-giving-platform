@@ -10,6 +10,7 @@ import {
   MAX_NUM_INCREMENTS,
   segment_shape,
 } from "@/schemas";
+import { STORY_MAX_CHARS } from "./schema";
 
 const day = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/, "invalid date"));
 
@@ -27,7 +28,7 @@ export const form_schema = v.object({
       value: v.pipe(v.string(story), v.nonEmpty(story)),
       length: v.optional(v.number()),
     }),
-    richtext_max(8000)
+    richtext_max(STORY_MAX_CHARS)
   ),
   banner: img_output(),
   logo: img_output(),
