@@ -61,7 +61,7 @@ export interface INpoSent extends ISentTransfers {
 export function transfer_standing(
   amount: number,
   reversed: number
-): Exclude<TSentStanding, { kind: "unknown" | "kept" }> {
+): Exclude<TSentStanding, { kind: "unknown" | "kept" | "repaid" }> {
   if (!(reversed > 0)) return { kind: "paid" };
   if (reversed >= amount) return { kind: "reversed" };
   return { kind: "partial", reversed: reversed / 100 };

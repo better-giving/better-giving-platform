@@ -28,9 +28,10 @@ export const RETRIEVE_BATCH = 10;
 interface ITransferRow {
   id: string;
   net: number | null;
-  /** the dist was refunded and the npo owes back what it kept */
+  /** the dist was refunded and stripe refused to reverse what the npo kept:
+   * recorded owed, whether still owed or since repaid */
   kept: boolean;
-  /** what it kept is still outstanding */
+  /** with `kept`, the amount is still owed */
   owing: boolean;
   date: string;
 }
@@ -173,17 +174,13 @@ async function sent_of(
     const tr = (await stripe.transfers.retrieve(row.id, {
       expand: ["reversals"],
     })) as ITransferRecord;
-    const read = transfer_standing(tr.amount, reversal_cents(tr));
-    // refunded and recorded owed: stripe refused to reverse, the money stayed.
-    // the donations list reads the same ledger, so the two pages agree
-    const standing: TSentStanding = row.kept
-      ? { kind: row.owing ? "kept" : "repaid" }
-      : read;
     return {
       id: tr.id,
       amount: tr.amount / 100,
       date: new Date(tr.created * 1000).toISOString(),
-      standing,
+      standing:
+        ledger_standing(row) ??
+        transfer_standing(tr.amount, reversal_cents(tr)),
     };
   } catch (err) {
     // a miss here is stripe, not this page: the amount we sent is on the
@@ -195,7 +192,15 @@ async function sent_of(
       // usd the transfer sent: the same cents a payout of this net would, as usd
       amount: payout_total([row.net ?? 0]),
       date: row.date,
-      standing: { kind: "unknown" },
+      standing: ledger_standing(row) ?? { kind: "unknown" },
     };
   }
+}
+
+/** refunded and recorded owed: stripe refused to reverse, the money stayed.
+ * the owed ledger decides it, with or without stripe, and the donations list
+ * reads the same ledger, so the two pages agree */
+function ledger_standing(row: ITransferRow): TSentStanding | null {
+  if (!row.kept) return null;
+  return { kind: row.owing ? "kept" : "repaid" };
 }

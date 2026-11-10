@@ -43,9 +43,9 @@ export const owed_on_gift = (
   npo_id: SQLWrapper
 ): SQL<boolean> => owed_row_on_gift(donation_id, npo_id, sql`true`);
 
-/** `owed_on_gift` and still outstanding: the ledger's own rule, under a cent
- * settled, that the payout runs net against. recovered, credited back and
- * written off all take a row out of it */
+/** `owed_on_gift` with a cent or more still outstanding, the rule the payout
+ * runs net against. recovered, credited back and written off all take a row
+ * out of it */
 export const owed_open_on_gift = (
   donation_id: SQLWrapper,
   npo_id: SQLWrapper

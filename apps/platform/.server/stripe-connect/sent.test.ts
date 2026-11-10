@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import Stripe from "stripe";
 import {
   afterAll,
   beforeAll,
@@ -391,6 +392,41 @@ describe("npo_sent_transfers — a refunded gift", () => {
     expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "repaid" }]);
   });
 
+  test.each([
+    [
+      "credited back reads repaid",
+      {
+        credited_back_usd: 90,
+        credited_back_at: "2026-10-01T00:00:00.000Z",
+      },
+      "repaid",
+    ],
+    [
+      "recovered in part reads kept",
+      { recovered_usd: 10, recovered_at: "2026-10-01T00:00:00.000Z" },
+      "kept",
+    ],
+    [
+      "recovered to a cent short reads kept",
+      { recovered_usd: 89.99, recovered_at: "2026-10-01T00:00:00.000Z" },
+      "kept",
+    ],
+    [
+      "recovered to under a cent short reads repaid",
+      { recovered_usd: 89.995, recovered_at: "2026-10-01T00:00:00.000Z" },
+      "repaid",
+    ],
+  ] as const)("whose owed row is %s", async (_, settled, kind) => {
+    const id = await seed();
+    await sent_one(id);
+    await db().update(dists).set({ status: "refunded" });
+    await owe(id, { received_usd: 90, ...settled });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items.map((i) => i.standing)).toEqual([{ kind }]);
+  });
+
   test("whose reversal stripe refused in part reads kept too, not partly reversed", async () => {
     const id = await seed();
     await sent_one(id);
@@ -408,6 +444,40 @@ describe("npo_sent_transfers — a refunded gift", () => {
 
     expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "kept" }]);
   });
+
+  test.each([
+    ["kept", { received_usd: 90 }],
+    [
+      "repaid",
+      {
+        received_usd: 90,
+        recovered_usd: 90,
+        recovered_at: "2026-10-01T00:00:00.000Z",
+      },
+    ],
+  ] as const)(
+    "whose transfer stripe cannot read still reads %s, as the donations list does",
+    async (kind, owed) => {
+      const id = await seed();
+      await sent_one(id);
+      retrieve.mockRejectedValue(
+        new Stripe.errors.StripeConnectionError({ message: "socket hang up" })
+      );
+      await db().update(dists).set({ status: "refunded" });
+      await owe(id, owed);
+
+      const sent = await npo_sent_transfers(id);
+
+      expect(sent?.items).toEqual([
+        {
+          id: "tr_past",
+          amount: 90,
+          date: "2026-07-01T00:00:00.000Z",
+          standing: { kind },
+        },
+      ]);
+    }
+  );
 
   test("whose transfer stripe reversed reads fully reversed", async () => {
     const id = await seed();
