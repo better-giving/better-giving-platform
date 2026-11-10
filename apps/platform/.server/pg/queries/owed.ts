@@ -8,6 +8,7 @@ import {
   isNull,
   or,
   type SQL,
+  type SQLWrapper,
   sql,
 } from "drizzle-orm";
 import { alias, type PgUpdateSetSource } from "drizzle-orm/pg-core";
@@ -22,6 +23,14 @@ import { loss_logs } from "../schema/revenue";
 import type { DbOrTx, IPage } from "./helpers";
 
 export type IOwed = typeof owed_amounts.$inferSelect;
+
+/** whether an owed row records this party owing on this gift, for a select
+ * that already joins the gift and the party */
+export const owed_on_gift = (
+  donation_id: SQLWrapper,
+  npo_id: SQLWrapper
+): SQL<boolean> =>
+  sql<boolean>`exists (select 1 from ${owed_amounts} where ${owed_amounts.donation_id} = ${donation_id} and ${owed_amounts.npo_id} = ${npo_id})`;
 
 /** what a row records as owed, before anything settles it */
 export const owed_total = (

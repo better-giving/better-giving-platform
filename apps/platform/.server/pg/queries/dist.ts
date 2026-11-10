@@ -24,12 +24,12 @@ import {
 } from "../schema/donation";
 import { forms } from "../schema/form";
 import { npos } from "../schema/npo";
-import { owed_amounts } from "../schema/owed";
 import { payouts } from "../schema/payout";
 import { referrer_commissions } from "../schema/referrer";
 import { rev_logs } from "../schema/revenue";
 import type { DbOrTx, IPage, Tx } from "./helpers";
 import { decode_date_cursor, encode_date_cursor } from "./helpers";
+import { owed_on_gift } from "./owed";
 
 export type DistRow = typeof dists.$inferSelect;
 type DistInsert = typeof dists.$inferInsert;
@@ -69,7 +69,7 @@ const dist_joined = {
     program_id: donations.program_id,
     program_name: donations.program_name,
     // stripe refused to reverse part of a routed transfer: the nonprofit owes it
-    owed_back: sql<boolean>`exists (select 1 from ${owed_amounts} where ${owed_amounts.donation_id} = ${dists.donation_id} and ${owed_amounts.npo_id} = ${dists.to_id})`,
+    owed_back: owed_on_gift(dists.donation_id, dists.to_id),
   },
   donor: {
     email: donation_donors.email,
