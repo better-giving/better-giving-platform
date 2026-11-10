@@ -69,8 +69,14 @@ export const loader = async ({ params, request, url }: Route.LoaderArgs) => {
     org_slug &&
     (params.org !== org_slug || params.campaign !== campaign.slug)
   ) {
+    // a slug edited to change only its case would turn a long-cached
+    // redirect into a loop, so a case-only variant is cached for a minute
+    const case_only =
+      params.org.toLowerCase() === org_slug.toLowerCase() &&
+      params.campaign.toLowerCase() === campaign.slug.toLowerCase();
     throw moved(
-      `${href("/org/:org/:campaign", { org: org_slug, campaign: campaign.slug })}${url.search}`
+      `${href("/org/:org/:campaign", { org: org_slug, campaign: campaign.slug })}${url.search}`,
+      case_only ? "public, max-age=60, s-maxage=60" : undefined
     );
   }
   // the campaign page follows its owner: an unpublished owner's pages show only

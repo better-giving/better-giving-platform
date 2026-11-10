@@ -275,6 +275,34 @@ describe("public campaign page", () => {
       expect((res as Response).headers.get("location")).toBe(to);
     });
 
+    it("caches a case-only 301 for a minute, so a case-only rename can't loop", async () => {
+      const npo = await org();
+      await publish(npo.id);
+      await campaign(npo.id);
+
+      const res = (await load("https://x/org/Acme/winter").catch(
+        (e: unknown) => e
+      )) as Response;
+
+      expect(res.headers.get("cache-control")).toBe(
+        "public, max-age=60, s-maxage=60"
+      );
+    });
+
+    it("keeps the long cache on the id alias, which no rename reverses", async () => {
+      const npo = await org();
+      await publish(npo.id);
+      await campaign(npo.id);
+
+      const res = (await load(`https://x/org/${npo.id}/winter`).catch(
+        (e: unknown) => e
+      )) as Response;
+
+      expect(res.headers.get("cache-control")).toBe(
+        "public, max-age=3600, s-maxage=86400"
+      );
+    });
+
     it("serves the exact stored slugs, with them as the canonical url", async () => {
       const npo = await org();
       await publish(npo.id);
