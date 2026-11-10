@@ -29,6 +29,10 @@ describe.each([
     ["abc", BAD_FORMAT],
     ["1.2.3", BAD_FORMAT],
     ["1.234", BAD_FORMAT],
+    ["12,50", BAD_FORMAT],
+    ["1,5", BAD_FORMAT],
+    ["1,0,0,0", BAD_FORMAT],
+    ["$", BAD_FORMAT],
     ["0", NOT_POSITIVE],
     ["-5", NOT_POSITIVE],
   ])("rejects %j", (input, msg) => {
