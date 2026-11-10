@@ -20,6 +20,7 @@ import { seed_npo } from "#/__tests__/fixtures/funds";
 import { seed_owed } from "#/__tests__/fixtures/owed";
 import { dists } from "../schema/dist";
 import { donations } from "../schema/donation";
+import { owed_amounts } from "../schema/owed";
 import { create_test_db } from "../test-utils/pglite";
 import { npo_donation_get } from "./dist";
 
@@ -49,6 +50,27 @@ test("a dist reads owed back only when its gift has an owed row for its npo", as
     source: "bg-marketplace",
     via: "stripe:card",
   });
+  await db.insert(donations).values({
+    id: "don-fee",
+    upusd: 1,
+    status: "refunded_loss",
+    amount_base: 40,
+    amount_tip: 0,
+    amount_fee_allowance: 0,
+    currency: "USD",
+    frequency: "one-time",
+    source: "bg-marketplace",
+    via: "stripe:card",
+  });
+  await db.insert(owed_amounts).values({
+    donation_id: "don-fee",
+    npo_id: npo.id,
+    source: "dispute",
+    source_ref: "dp_1",
+    recorded_at: "2026-09-15T00:00:00.000Z",
+    received_usd: 0,
+    fee_dispute_usd: 15,
+  });
   const base = {
     status: "refunded" as const,
     date_created: "2026-07-01T00:00:00.000Z",
@@ -58,10 +80,13 @@ test("a dist reads owed back only when its gift has an owed row for its npo", as
   await db.insert(dists).values([
     { ...base, id: "d-owed", donation_id: owed_gift!.id, to_id: npo.id },
     { ...base, id: "d-clean", donation_id: "don-clean", to_id: npo.id },
+    { ...base, id: "d-fee", donation_id: "don-fee", to_id: npo.id },
     { ...base, id: "d-other", donation_id: owed_gift!.id, to_id: other.id },
   ]);
 
   expect((await npo_donation_get("d-owed"))?.owed_back).toBe(true);
   expect((await npo_donation_get("d-clean"))?.owed_back).toBe(false);
   expect((await npo_donation_get("d-other"))?.owed_back).toBe(false);
+  // a dispute fee alone is not money the npo kept
+  expect((await npo_donation_get("d-fee"))?.owed_back).toBe(false);
 });

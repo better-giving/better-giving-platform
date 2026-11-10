@@ -227,7 +227,9 @@ describe("routed donations with no transfer", () => {
     await expect.element(waiting).toBeVisible();
     expect(waiting.element().textContent).toContain("Sending to Stripe");
     expect(waiting.element().textContent).not.toContain("Paid out");
-    const sent_table = screen.getByRole("table").first().element();
+    const sent_table = screen
+      .getByRole("table", { name: "Sent to Stripe earlier" })
+      .element();
     expect(sent_table.textContent).toContain("Paid out");
     expect(sent_table.textContent).not.toContain("Sending to Stripe");
   });

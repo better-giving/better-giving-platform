@@ -16,6 +16,7 @@ import { stripe } from "../kit/stripe";
 import { payout_total } from "../payouts/amount";
 import { db } from "../pg/db";
 import { npo_get } from "../pg/queries/npo";
+import { owed_on_gift } from "../pg/queries/owed";
 import { dists } from "../pg/schema/dist";
 
 /** one retrieve per transfer; past this the page names that it stopped */
@@ -27,8 +28,8 @@ export const RETRIEVE_BATCH = 10;
 interface ITransferRow {
   id: string;
   net: number | null;
-  /** the dist was refunded */
-  reversed: boolean;
+  /** the dist was refunded and the npo owes back what it kept */
+  kept: boolean;
   date: string;
 }
 
@@ -62,6 +63,7 @@ export async function npo_sent_transfers(
         id: dists.stripe_transfer_id,
         net: dists.net,
         status: dists.status,
+        owed_back: owed_on_gift(dists.donation_id, dists.to_id),
         transferred_at: dists.stripe_transfer_created_at,
         donated_at: dists.date_created,
       })
@@ -123,7 +125,7 @@ export async function npo_sent_transfers(
           {
             id: row.id,
             net: row.net,
-            reversed: is_reversed(row.status),
+            kept: is_reversed(row.status) && row.owed_back,
             date: row.transferred_at ?? row.donated_at,
           },
         ]
@@ -165,9 +167,9 @@ async function sent_of(
       expand: ["reversals"],
     })) as ITransferRecord;
     const read = transfer_standing(tr.amount, reversal_cents(tr));
-    // refunded, yet stripe holds no reversal: it refused, and the money stayed
-    const standing: TSentStanding =
-      read.kind === "paid" && row.reversed ? { kind: "kept" } : read;
+    // refunded and recorded owed: stripe refused to reverse, the money stayed.
+    // the donations list reads the same ledger, so the two pages agree
+    const standing: TSentStanding = row.kept ? { kind: "kept" } : read;
     return {
       id: tr.id,
       amount: tr.amount / 100,

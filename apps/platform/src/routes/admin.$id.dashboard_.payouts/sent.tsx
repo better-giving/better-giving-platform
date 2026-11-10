@@ -175,7 +175,7 @@ export function SentToStripe({
         </p>
       </div>
       <div className="table-scroll">
-        <table className="table plain-zero-table">
+        <table className="table plain-zero-table" aria-labelledby={heading_id}>
           <thead>
             <tr>
               <th>Amount</th>

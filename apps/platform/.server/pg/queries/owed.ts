@@ -24,13 +24,15 @@ import type { DbOrTx, IPage } from "./helpers";
 
 export type IOwed = typeof owed_amounts.$inferSelect;
 
-/** whether an owed row records this party owing on this gift, for a select
- * that already joins the gift and the party */
+/** whether an owed row records the npo owing money it received on this gift
+ * (a fee-only row is not that), for a select that already joins the gift and
+ * the npo. the one test the donations list and the payouts page share for a
+ * refunded transfer Stripe left in place */
 export const owed_on_gift = (
   donation_id: SQLWrapper,
   npo_id: SQLWrapper
 ): SQL<boolean> =>
-  sql<boolean>`exists (select 1 from ${owed_amounts} where ${owed_amounts.donation_id} = ${donation_id} and ${owed_amounts.npo_id} = ${npo_id})`;
+  sql<boolean>`exists (select 1 from ${owed_amounts} where ${owed_amounts.donation_id} = ${donation_id} and ${owed_amounts.npo_id} = ${npo_id} and ${owed_amounts.received_usd} > 0)`;
 
 /** what a row records as owed, before anything settles it */
 export const owed_total = (

@@ -5,8 +5,8 @@ export type TSentStanding =
   | { kind: "paid" }
   | { kind: "partial"; reversed: number }
   | { kind: "reversed" }
-  /** the gift was refunded and stripe refused to reverse the transfer, so the
-   * money stayed in the connected account */
+  /** the gift was refunded and the npo owes back money stripe refused to
+   * reverse from the transfer: it stayed in the connected account */
   | { kind: "kept" }
   | { kind: "unknown" };
 

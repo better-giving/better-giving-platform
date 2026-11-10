@@ -45,6 +45,7 @@ vi.mock("../env", async (importOriginal) => {
 
 import { dists } from "../pg/schema/dist";
 import { donations } from "../pg/schema/donation";
+import { owed_amounts } from "../pg/schema/owed";
 import { create_test_db } from "../pg/test-utils/pglite";
 import { npo_sent_transfers } from "./sent";
 
@@ -110,6 +111,7 @@ afterAll(async () => {
 beforeEach(async () => {
   flags.routing = true;
   retrieve.mockReset();
+  await db().delete(owed_amounts);
   await db().delete(dists);
   await db().delete(donations);
   await db().delete(npos);
@@ -287,10 +289,52 @@ describe("npo_sent_transfers — routed with no transfer", () => {
 });
 
 describe("npo_sent_transfers — a refunded gift", () => {
-  test("whose transfer stripe left unreversed reads kept, as the donations list does", async () => {
+  const owe = (
+    npo_id: number,
+    o: { received_usd: number; fee_dispute_usd?: number }
+  ) =>
+    db()
+      .insert(owed_amounts)
+      .values({
+        donation_id: "don-past",
+        npo_id,
+        source: "refund",
+        source_ref: "re_1",
+        recorded_at: "2026-09-15T00:00:00.000Z",
+        ...o,
+      });
+  const reversed_all = () =>
+    retrieve.mockResolvedValue({
+      id: "tr_past",
+      amount: 9_000,
+      amount_reversed: 9_000,
+      created: Date.parse("2026-07-01T00:00:00.000Z") / 1000,
+      reversals: { data: [{ amount: 9_000 }], has_more: false },
+    });
+
+  test("whose reversal stripe refused reads kept, as the donations list does", async () => {
     const id = await seed();
     await sent_one(id);
     await db().update(dists).set({ status: "refunded" });
+    await owe(id, { received_usd: 90 });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "kept" }]);
+  });
+
+  test("whose reversal stripe refused in part reads kept too, not partly reversed", async () => {
+    const id = await seed();
+    await sent_one(id);
+    retrieve.mockResolvedValue({
+      id: "tr_past",
+      amount: 9_000,
+      amount_reversed: 4_000,
+      created: Date.parse("2026-07-01T00:00:00.000Z") / 1000,
+      reversals: { data: [{ amount: 4_000 }], has_more: false },
+    });
+    await db().update(dists).set({ status: "refunded" });
+    await owe(id, { received_usd: 50 });
 
     const sent = await npo_sent_transfers(id);
 
@@ -300,14 +344,20 @@ describe("npo_sent_transfers — a refunded gift", () => {
   test("whose transfer stripe reversed reads fully reversed", async () => {
     const id = await seed();
     await sent_one(id);
-    retrieve.mockResolvedValue({
-      id: "tr_past",
-      amount: 9_000,
-      amount_reversed: 9_000,
-      created: Date.parse("2026-07-01T00:00:00.000Z") / 1000,
-      reversals: { data: [{ amount: 9_000 }], has_more: false },
-    });
+    reversed_all();
     await db().update(dists).set({ status: "refunded" });
+
+    const sent = await npo_sent_transfers(id);
+
+    expect(sent?.items.map((i) => i.standing)).toEqual([{ kind: "reversed" }]);
+  });
+
+  test("whose transfer stripe reversed, with only a dispute fee owed, reads fully reversed", async () => {
+    const id = await seed();
+    await sent_one(id);
+    reversed_all();
+    await db().update(dists).set({ status: "refunded" });
+    await owe(id, { received_usd: 0, fee_dispute_usd: 15 });
 
     const sent = await npo_sent_transfers(id);
 
