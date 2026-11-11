@@ -677,7 +677,7 @@ describe("the payouts page", () => {
     await expect
       .element(
         earlier_region(screen).getByText(
-          /New ones wait in your Better Giving balance until you add a bank account\./
+          /new ones wait in your Better Giving balance until you add a bank account\./
         )
       )
       .toBeVisible();
@@ -693,7 +693,7 @@ describe("the payouts page", () => {
     await expect
       .element(
         earlier_region(screen).getByText(
-          /New ones wait in your Better Giving balance until your bank account is approved\./
+          /new ones wait in your Better Giving balance until your bank account is approved\./
         )
       )
       .toBeVisible();
