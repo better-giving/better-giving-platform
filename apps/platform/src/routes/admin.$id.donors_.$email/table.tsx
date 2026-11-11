@@ -101,7 +101,6 @@ export function GiftsTable({ dists, subs }: IProps) {
           // the donor's own list marks a refunded gift the same way
           const refunded =
             d.status === "refunded" || d.status === "refunded_loss";
-          // a reversed duplicate: its dist reads refunded, but no refund was made
           const cancelled = is_cancelled_duplicate(d.donation_status, d.status);
           const strike = refunded
             ? "line-through text-destructive-subtle-fg"
