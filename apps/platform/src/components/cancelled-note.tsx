@@ -2,8 +2,7 @@ const copy = {
   npo: "Recorded twice. This duplicate was cancelled, so it doesn't count toward your totals. No refund was made.",
   donor:
     "Recorded twice. This duplicate was cancelled. No refund was made, and your gift is recorded once.",
-  referrer:
-    "Recorded twice. This duplicate was cancelled, so it earns no referral commission. No refund was made.",
+  referrer: "Recorded twice. This duplicate was cancelled. No refund was made.",
 };
 
 /** what a cancelled duplicate's tooltip says, to whoever is reading. a

@@ -38,7 +38,7 @@ describe.each([
     await expect
       .element(tip)
       .toHaveAccessibleDescription(
-        "Cancelled Recorded twice. This duplicate was cancelled, so it earns no referral commission. No refund was made."
+        "Cancelled Recorded twice. This duplicate was cancelled. No refund was made."
       );
   });
 
