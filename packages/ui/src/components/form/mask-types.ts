@@ -7,6 +7,10 @@ export interface IMask {
    * the caret is kept after the same count of them, so characters the mask
    * inserts — a comma, a dash — never pull it. */
   keep?: RegExp;
+  /** an edit that would cost the value a typed character it was given is
+   * refused, not cut (a money amount: a cut is a different number). a mask that
+   * stops at a length on purpose, like an ein, leaves this off. */
+  lossless?: boolean;
   /** how text the user types or pastes is read before it joins the value —
    * the field's own characters around it never go through this. `typed` is
    * true for a keystroke (or a finished IME composition), false for a paste,

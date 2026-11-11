@@ -105,6 +105,7 @@ export function decimals(places = 2, sep?: string): IMask {
       return frac !== undefined && frac.length > places ? null : out;
     },
     keep,
+    lossless: true,
     fit: (own) => {
       const dot = own.indexOf(".");
       const held = dot === -1 ? 0 : own.length - dot - 1;

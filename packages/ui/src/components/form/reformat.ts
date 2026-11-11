@@ -5,11 +5,15 @@ const digit = /\d/;
 /** full-width digits and punctuation (an IME's default mode) to ascii by NFKC;
  * arabic-indic digits, which NFKC leaves alone, by hand */
 function fold(text: string): string {
-  return text
-    .normalize("NFKC")
-    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[\u06f0-\u06f9]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
-    .replace(/\u066b/g, ".");
+  return (
+    text
+      .normalize("NFKC")
+      .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+      .replace(/[\u06f0-\u06f9]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+      .replace(/\u066b/g, ".")
+      // an ideographic full stop, an IME's decimal point
+      .replace(/\u3002/g, ".")
+  );
 }
 
 export interface Edit {
@@ -118,6 +122,16 @@ export function reformat(mask: IMask, edit: Edit) {
   // that would push "1,2|34"'s digits past the cap, or a digit typed between
   // decimals at the cap, is refused rather than dropping the last digit
   if (inserted && !tail_kept) return refused;
+  // nor, for a mask that says so, does it cost the combined value a character
+  // it was given: "345" put after "1.2" would be cut to "1.23", and the cap
+  // is on the whole field, not on the text that went in
+  if (
+    mask.lossless &&
+    inserted &&
+    !own &&
+    kept.length < typed(before).length + read.length + tail_typed.length
+  )
+    return refused;
 
   // the caret goes just after the typed characters in front of the tail; with
   // none, in front of the first one. a delete can lose some of the tail too

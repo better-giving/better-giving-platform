@@ -757,3 +757,27 @@ describe("a paste with more decimals than the field allows", () => {
     expect(paste("12.5", "", decimal.decimals(0)).value).toBe("");
   });
 });
+
+describe("an insertion that would cost the field a digit", () => {
+  test.each([
+    ["1.2", "345"],
+    ["0.", "1234"],
+    ["12.3", "456"],
+  ])("pasting %j after %j is refused, not cut", (disp, text) => {
+    expect(paste(text, disp).value).toBe(disp);
+  });
+
+  test("adding the digits that fit still works", () => {
+    expect(paste("5", "1.2").value).toBe("1.25");
+    expect(paste("56", "1.").value).toBe("1.56");
+  });
+});
+
+describe("an IME's full stop", () => {
+  test.each([
+    ["１２。５０", "12.50"],
+    ["９６２７。９２", "9,627.92"],
+  ])("reads %j as a decimal point", (text, out) => {
+    expect(paste(text).value).toBe(out);
+  });
+});
