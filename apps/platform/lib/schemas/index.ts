@@ -77,7 +77,7 @@ export const $int_gte1 = pipe(
   int_gte1
 );
 
-const num_gt0 = pipe(number(), gtValue(0, "must be > 0"));
+const num_gt0 = pipe(number(), minValue(0, "must be > 0"));
 
 const $req_num_gt0 = pipe(
   $req,
