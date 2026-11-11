@@ -18,9 +18,10 @@ vi.mock("../db", () => ({
 
 import { seed_npo } from "#/__tests__/fixtures/funds";
 import { dists } from "../schema/dist";
-import { donations } from "../schema/donation";
+import { donation_donors, donations } from "../schema/donation";
 import { create_test_db } from "../test-utils/pglite";
 import { npo_donations } from "./dist";
+import { donor_detail } from "./subscription";
 
 beforeAll(async () => {
   test_db.current = await create_test_db();
@@ -85,5 +86,52 @@ test("the npo's donations carry each donation's status, so a cancelled duplicate
     "d-refunded_loss": ["refunded_loss", "refunded_loss"],
     "d-cancelled": ["refunded", "cancelled"],
     "d-cancelled_loss": ["refunded_loss", "cancelled"],
+  });
+});
+
+test("a donor's detail carries each dist's donation status", async () => {
+  const { db } = test_db.current!;
+  const npo = (await seed_npo(db, { registration_number: "EIN-DONOR" }))!;
+  const statuses = ["settled", "cancelled"] as const;
+  await db.insert(donations).values(
+    statuses.map((status) => ({
+      id: `dd-${status}`,
+      upusd: 1,
+      status,
+      amount_base: 40,
+      amount_tip: 0,
+      amount_fee_allowance: 0,
+      currency: "USD",
+      frequency: "one-time",
+      source: "bg-marketplace",
+      via: "stripe:card",
+    }))
+  );
+  await db.insert(donation_donors).values(
+    statuses.map((status) => ({
+      donation_id: `dd-${status}`,
+      email: "donor@example.com",
+    }))
+  );
+  await db.insert(dists).values(
+    statuses.map((status, i) => ({
+      id: `dd-d-${status}`,
+      donation_id: `dd-${status}`,
+      to_id: npo.id,
+      status:
+        status === "settled" ? ("settled" as const) : ("refunded" as const),
+      date_created: `2026-07-0${i + 1}T00:00:00.000Z`,
+      amount_denom: "USD",
+      net: 40,
+    }))
+  );
+
+  const detail = await donor_detail(npo.id, "donor@example.com");
+  const by_dist = Object.fromEntries(
+    detail!.dists.map((x) => [x.id, [x.status, x.donation_status]])
+  );
+  expect(by_dist).toEqual({
+    "dd-d-settled": ["settled", "settled"],
+    "dd-d-cancelled": ["refunded", "cancelled"],
   });
 });

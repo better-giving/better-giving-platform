@@ -1,6 +1,8 @@
 import { Button, EmptyRow, ExtLink, LoadMoreRow } from "@better-giving/ui";
-import { ArrowDownToLine } from "lucide-react";
+import { Arrow, Content, Tooltip } from "@better-giving/ui/tooltip";
+import { ArrowDownToLine, InfoIcon } from "lucide-react";
 import { href, Link } from "react-router";
+import { CancelledNote } from "#/components/cancelled-note";
 import { Money } from "#/components/money";
 import { PaymentResumer } from "#/pages/user-dashboard/donations/payment-resumer";
 import type { IPaginator } from "#/types/components";
@@ -100,7 +102,7 @@ export function Table({
                   <td>
                     <Money
                       classes={
-                        is_reversed(row.status)
+                        is_reversed(row.status) || row.status === "cancelled"
                           ? "line-through text-destructive-subtle-fg"
                           : ""
                       }
@@ -119,6 +121,18 @@ export function Table({
                     >
                       {status_label(row.status)}
                     </span>
+                    {row.status === "cancelled" && (
+                      <Tooltip
+                        tip={
+                          <Content className="max-w-xs text-xs">
+                            <Arrow />
+                            <CancelledNote donor />
+                          </Content>
+                        }
+                      >
+                        <InfoIcon className="inline ml-1 text-gray-11 icon-sm" />
+                      </Tooltip>
+                    )}
                   </td>
                   <td>
                     <RowAction row={row} />

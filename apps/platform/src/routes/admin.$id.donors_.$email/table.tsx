@@ -2,6 +2,7 @@ import { EmptyRow } from "@better-giving/ui";
 import { Arrow, Content, Tooltip } from "@better-giving/ui/tooltip";
 import { InfoIcon, RefreshCw, SparklesIcon } from "lucide-react";
 import { useMemo } from "react";
+import { CancelledNote } from "#/components/cancelled-note";
 import { Money } from "#/components/money";
 import { app_name } from "#/constants/env";
 import { toPP } from "@/helpers/date";
@@ -99,6 +100,9 @@ export function GiftsTable({ dists, subs }: IProps) {
           // the donor's own list marks a refunded gift the same way
           const refunded =
             d.status === "refunded" || d.status === "refunded_loss";
+          // a reversed duplicate: its dist reads refunded, but no refund was made
+          const cancelled =
+            d.status === "refunded" && d.donation_status === "cancelled";
           const strike = refunded
             ? "line-through text-destructive-subtle-fg"
             : "";
@@ -196,7 +200,21 @@ export function GiftsTable({ dists, subs }: IProps) {
               </td>
               <td>
                 {d.net != null ? (
-                  <span className={strike}>${humanize(d.net, 2)}</span>
+                  <>
+                    <span className={strike}>${humanize(d.net, 2)}</span>
+                    {cancelled && (
+                      <Tooltip
+                        tip={
+                          <Content className="max-w-xs text-xs">
+                            <Arrow />
+                            <CancelledNote />
+                          </Content>
+                        }
+                      >
+                        <InfoIcon className="inline ml-1 text-destructive icon-sm" />
+                      </Tooltip>
+                    )}
+                  </>
                 ) : (
                   "—"
                 )}

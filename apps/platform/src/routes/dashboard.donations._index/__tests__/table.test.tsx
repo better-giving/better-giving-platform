@@ -109,3 +109,29 @@ describe("my donations — a refunded gift's amount", () => {
     expect(struck(amount.element())).toBe(false);
   });
 });
+
+describe("my donations — a cancelled duplicate", () => {
+  test("strikes its amount and tells the donor no refund was made", async () => {
+    const screen = await render_table([row({ status: "cancelled" })]);
+    const cells = screen.getByRole("row").nth(1).getByRole("cell");
+    await expect.element(cells.nth(3)).toHaveTextContent("Cancelled");
+    const figure = cells.nth(2).element().querySelector("*") as Element;
+    const struck = [figure, ...figure.querySelectorAll("*")].some((el) =>
+      getComputedStyle(el).textDecorationLine.includes("line-through")
+    );
+    expect(struck).toBe(true);
+    const tip = cells.nth(3).getByRole("button", { name: "More info" });
+    await expect
+      .element(tip)
+      .toHaveAccessibleDescription(
+        "CancelledRecorded twice. This duplicate was cancelled. No refund was made, and your gift is recorded once."
+      );
+  });
+
+  test("a refunded row still says Refunded, with no cancelled note", async () => {
+    const screen = await render_table([row({ status: "refunded" })]);
+    const status = screen.getByRole("row").nth(1).getByRole("cell").nth(3);
+    await expect.element(status).toHaveTextContent("Refunded");
+    expect(status.element().querySelector("svg")).toBeNull();
+  });
+});
