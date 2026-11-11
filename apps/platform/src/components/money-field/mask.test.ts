@@ -108,7 +108,6 @@ describe("paste", () => {
     ["$1,000", "1,000"],
     ["abc", ""],
     ["12abc34", "1,234"],
-    ["9627.927", "9,627.92"],
     ["1,234,567.89", "1,234,567.89"],
     ["12,34,567", "1,234,567"],
   ])("cleans %j to %j", (text, out) => {
@@ -377,7 +376,7 @@ describe("a field holding more decimals than its cap", () => {
     expect(type("1.2345", 3, "9")).toEqual({ value: "1.2345", cursor: 3 });
   });
 
-  test("a paste over all of it is cut to the cap", () => {
+  test("a paste with more decimals than the cap is refused, field unchanged", () => {
     expect(
       reformat(m, {
         value: "12.345",
@@ -385,7 +384,147 @@ describe("a field holding more decimals than its cap", () => {
         prev: "1.2345",
         type: "insertFromPaste",
       })
-    ).toEqual({ value: "12.34", cursor: 5 });
+    ).toEqual({ value: "1.2345", cursor: 1 });
+  });
+});
+
+describe("caret", () => {
+  test("typing the digit that adds a comma keeps the caret after it", () => {
+    // "962" + "7" at the end
+    expect(edit("9627", 4, "962")).toEqual({ value: "9,627", cursor: 5 });
+  });
+
+  test("typing in the middle stays in place", () => {
+    // "9,627" with a "1" typed after the 9
+    expect(edit("91,627", 2, "9,627")).toEqual({ value: "91,627", cursor: 2 });
+    // "1,000" with a "5" typed after the 1 regroups the rest
+    expect(edit("15,000", 2, "1,000")).toEqual({ value: "15,000", cursor: 2 });
+  });
+
+  test("a dot typed at the end lands after the digits, not before the dot", () => {
+    expect(edit("9,627.", 6, "9,627")).toEqual({ value: "9,627.", cursor: 6 });
+  });
+
+  test("a refused letter leaves the value and the caret where they were", () => {
+    expect(edit("9,6a27", 4, "9,627")).toEqual({ value: "9,627", cursor: 3 });
+  });
+
+  test("backspace over a comma removes the digit before it", () => {
+    // "9,627" caret after the comma, backspace removes the comma
+    expect(edit("9627", 1, "9,627", "deleteContentBackward")).toEqual({
+      value: "627",
+      cursor: 0,
+    });
+    // "1,234,567" caret after the 2nd comma
+    expect(edit("1,234567", 5, "1,234,567", "deleteContentBackward")).toEqual({
+      value: "123,567",
+      cursor: 3,
+    });
+  });
+
+  test("delete forward over a comma removes the digit after it", () => {
+    expect(edit("9627", 1, "9,627", "deleteContentForward")).toEqual({
+      value: "927",
+      cursor: 1,
+    });
+  });
+
+  test("an ordinary backspace over a digit just regroups", () => {
+    expect(edit("1,00", 4, "1,000", "deleteContentBackward")).toEqual({
+      value: "100",
+      cursor: 3,
+    });
+    // the last digit of a group: the comma it leaves is not a decimal comma
+    expect(back("1,234", 5)).toEqual({ value: "123", cursor: 3 });
+  });
+
+  test("backspacing the first digit keeps the zeros for a retyped one", () => {
+    const gone = back("1,000", 1);
+    expect(gone).toEqual({ value: "000", cursor: 0 });
+    expect(type(gone.value, gone.cursor, "2")).toEqual({
+      value: "2,000",
+      cursor: 1,
+    });
+
+    const hundred = back("100", 1);
+    expect(hundred).toEqual({ value: "00", cursor: 0 });
+    expect(type(hundred.value, hundred.cursor, "2").value).toBe("200");
+  });
+
+  test("deleting the leading 0 of a decimal keeps the dot", () => {
+    expect(del("0.5", 0)).toEqual({ value: "0.5", cursor: 1 });
+    expect(del("0.50", 0).value).toBe("0.50");
+    expect(back("0.5", 1).value).toBe("0.5");
+  });
+
+  test("emptying the field", () => {
+    expect(edit("", 0, "5", "deleteContentBackward")).toEqual({
+      value: "",
+      cursor: 0,
+    });
+  });
+});
+
+describe("dollar", () => {
+  test.each([
+    ["12.50", "$ 12"],
+    ["$1,500.00", "$ 1,500"],
+    ["1,234", "$ 1,234"],
+    ["12,50", "$ 12"],
+    ["$ 2,000", "$ 2,000"],
+  ])("a pasted %j drops the cents: %j", (text, out) => {
+    expect(paste(text, "", dollar).value).toBe(out);
+  });
+
+  test("a minus or several dots is refused", () => {
+    expect(paste("-50", "$ 5", dollar)).toEqual({ value: "$ 5", cursor: 3 });
+    expect(paste("1.234.567", "$ 5", dollar)).toEqual({
+      value: "$ 5",
+      cursor: 3,
+    });
+  });
+
+  test("a typed thousands comma changes nothing", () => {
+    expect(typing("1,000", dollar).value).toBe("$ 1,000");
+  });
+});
+
+describe("a delete that formatting shortens", () => {
+  test("backspacing the leading digit of a dollar amount", () => {
+    expect(bounded(() => back("$ 1,000", 3, dollar))).toEqual({
+      value: "$ 0",
+      cursor: 2,
+    });
+    expect(bounded(() => back("$ 100", 3, dollar))).toEqual({
+      value: "$ 0",
+      cursor: 2,
+    });
+  });
+
+  test("deleting the whole digit of a field holding more decimals than its cap", () => {
+    expect(bounded(() => back("1.2345", 1))).toEqual({
+      value: "0.2345",
+      cursor: 1,
+    });
+    expect(bounded(() => del("1.2345", 0))).toEqual({
+      value: "0.2345",
+      cursor: 1,
+    });
+  });
+});
+
+describe("a field holding more decimals than its cap", () => {
+  test("takes a digit typed before the point", () => {
+    expect(type("1.2345", 1, "0")).toEqual({ value: "10.2345", cursor: 2 });
+  });
+
+  test("backspace at the end removes one decimal", () => {
+    expect(back("1.2345", 6)).toEqual({ value: "1.234", cursor: 5 });
+  });
+
+  test("still takes no new decimal", () => {
+    expect(type("1.2345", 6, "9")).toEqual({ value: "1.2345", cursor: 6 });
+    expect(type("1.2345", 3, "9")).toEqual({ value: "1.2345", cursor: 3 });
   });
 });
 
@@ -594,5 +733,27 @@ describe("a replaced selection", () => {
         selection: { start: 3, end: 3 },
       })
     ).toEqual({ value: "9,627", cursor: 5 });
+  });
+});
+
+describe("a paste with more decimals than the field allows", () => {
+  test.each([
+    ["1.000", "$ "],
+    ["12.345", ""],
+    ["19.999", ""],
+    ["9627.927", ""],
+  ])("refuses %j instead of cutting it", (text) => {
+    expect(paste(text)).toEqual({ value: "", cursor: 0 });
+  });
+
+  test("the cap is the field's own: no cap takes them all", () => {
+    expect(paste("0.123456789", "", decimal.decimals(Infinity)).value).toBe(
+      "0.123456789"
+    );
+    expect(paste("1.2345", "", decimal.decimals(4)).value).toBe("1.2345");
+  });
+
+  test("a whole-number field refuses any fraction", () => {
+    expect(paste("12.5", "", decimal.decimals(0)).value).toBe("");
   });
 });

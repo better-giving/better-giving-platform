@@ -51,7 +51,10 @@ function local_decimal(): string {
  * - more than one dot left after that ("1.234.567") is refused: it is either
  *   a typo or dot-grouped thousands, and reading it as "1.23" would be off by
  *   a thousand.
- * - "$", spaces and letters are dropped. */
+ * - "$", spaces and letters are dropped.
+ *
+ * the mask's own `read` (see `decimals`) also refuses text with more decimals
+ * than the field allows. */
 export function read(
   text: string,
   typed = false,
@@ -93,7 +96,14 @@ export function decimals(places = 2, sep?: string): IMask {
   const mask: IMask = {
     format: (raw) => format(raw, places),
     unmask: (masked) => unmask(masked, places),
-    read: (text, typed) => read(text, typed, sep),
+    read: (text, typed) => {
+      const out = read(text, typed, sep);
+      // text that carries more decimals than the field allows is refused whole:
+      // cutting it would turn a pasted "1.000" (a thousand, to a German
+      // reader) into 1.00 with nothing said
+      const frac = out?.split(".")[1];
+      return frac !== undefined && frac.length > places ? null : out;
+    },
     keep,
     fit: (own) => {
       const dot = own.indexOf(".");
