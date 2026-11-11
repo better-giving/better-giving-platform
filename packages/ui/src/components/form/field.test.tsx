@@ -308,9 +308,10 @@ describe("Field: action", () => {
       const r = (
         document.getElementById(id) as HTMLElement
       ).getBoundingClientRect();
-      // under the control, in its column: below its box, left of the action
+      // under the control, in its column: below its box, wholly left of the
+      // action (a message spanning the row would run past the button's left edge)
       expect(r.top).toBeGreaterThanOrEqual(a.bottom);
-      expect(r.left).toBeLessThan(b.left);
+      expect(r.right).toBeLessThanOrEqual(b.left);
     }
   });
 
@@ -337,7 +338,7 @@ describe("Field: action", () => {
     ).getBoundingClientRect();
 
     expect(r.top).toBeGreaterThanOrEqual(a.bottom);
-    expect(r.left).toBeLessThan(b.left);
+    expect(r.right).toBeLessThanOrEqual(b.left);
   });
 
   it("still describes the control by ids that exist, with an action present", async () => {

@@ -771,13 +771,9 @@ describe("the pairings the ledger records under their threshold still are", () =
 // covered above. the recipe is read out of the css the way colors.test.ts reads
 // :root — a hardcoded percentage here would keep passing against a stale one —
 // while the ingredients still come from the guarded mirror.
-// the roles live in colors.css and the scales (and per-appearance values, light
-// first) in themes/default.css, so the recipe is looked up in both.
-const css = ["colors.css", "themes/default.css"]
-  .map((f) => strip_comments(read_css(f)))
-  .join("\n");
-
-// the light appearance of each file, as colors.test.ts reads it
+// the roles live in colors.css and the scales in themes/default.css, so the
+// light appearance of each is searched, as colors.test.ts reads it. a dark
+// block redeclaring a token must not be what gets measured.
 const light_css = ["colors.css", "themes/default.css"]
   .map((f) => light_block(strip_comments(read_css(f)), f))
   .join("\n");
@@ -785,7 +781,7 @@ const light_css = ["colors.css", "themes/default.css"]
 type Recipe = { first: string; pct: number; second: string };
 
 function recipe(token: string): Recipe {
-  const value = [...css.matchAll(decl_re(token))][0]?.[2];
+  const value = [...light_css.matchAll(decl_re(token))][0]?.[2];
   const m = value?.match(
     /^color-mix\(\s*in oklch,\s*var\(--([a-z0-9-]+)\)\s*([\d.]+%|var\(--[a-z0-9-]+\)),\s*(transparent|var\(--[a-z0-9-]+\))\s*\)$/
   );
