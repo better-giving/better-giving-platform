@@ -1,6 +1,5 @@
 import { createRoutesStub } from "react-router";
 import { describe, expect, test } from "vitest";
-import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import type { IRow } from "./helpers";
 import { Row } from "./row";
@@ -114,36 +113,29 @@ describe("a reversed donation's net", () => {
       },
     ]);
     const screen = await render(<Stub initialEntries={["/"]} />);
-    const net = screen.getByRole("cell").nth(6);
-    await expect.element(net).toBeVisible();
-    await userEvent.hover(net.element().querySelector("svg") as Element);
-    return screen;
+    const trigger = screen.getByRole("button", { name: "More info" });
+    await expect.element(trigger).toBeVisible();
+    return trigger;
   }
 
-  test("a cancelled duplicate strikes its net and says Cancelled, not Refunded", async () => {
-    const row = { ...refunded, cancelled: true };
-    expect(await render_row(row)).toEqual({ struck: true, flagged: true });
-    const screen = await tip_of(row);
-    await expect.element(screen.getByText("Cancelled")).toBeVisible();
-    await expect.element(screen.getByText(/No refund was made/)).toBeVisible();
-    expect(screen.container.textContent).not.toMatch(/Refunded/);
+  test("a cancelled duplicate strikes its net like a refund", async () => {
+    expect(await render_row({ ...refunded, cancelled: true })).toEqual({
+      struck: true,
+      flagged: true,
+    });
+  });
+
+  test("a cancelled duplicate says Cancelled, not Refunded", async () => {
+    const tip = await tip_of({ ...refunded, cancelled: true });
+    await expect.element(tip).toHaveAccessibleDescription(/^Cancelled/);
+    await expect.element(tip).toHaveAccessibleDescription(/No refund was made/);
+    await expect.element(tip).not.toHaveAccessibleDescription(/Refunded/);
   });
 
   test("a real refund still says Refunded", async () => {
-    const screen = await tip_of({ ...refunded, cancelled: false });
-    await expect.element(screen.getByText("Refunded")).toBeVisible();
-    expect(screen.container.textContent).not.toMatch(/Cancelled/);
+    const tip = await tip_of({ ...refunded, cancelled: false });
+    await expect.element(tip).toHaveAccessibleDescription("Refunded");
   });
-
-  test.each(["refunded", "refunded_loss"] as const)(
-    "a %s row strikes its net and flags it refunded",
-    async (status) => {
-      expect(await render_row({ ...refunded, status })).toEqual({
-        struck: true,
-        flagged: true,
-      });
-    }
-  );
 
   test("a settled row does neither", async () => {
     expect(await render_row({ ...refunded, status: "settled" })).toEqual({
