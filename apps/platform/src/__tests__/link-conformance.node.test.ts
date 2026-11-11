@@ -166,8 +166,8 @@ describe("the link recipe", () => {
       (m) => `${m[1]}: ${m[2]}`
     );
     expect(decls).toEqual([
-      "color: var(--primary)",
-      "color: var(--primary-hover)",
+      "color: var(--link)",
+      "color: var(--link-hover)",
       "outline: 2px solid var(--ring)",
       "outline-offset: 2px",
     ]);
@@ -178,10 +178,27 @@ describe("the link recipe", () => {
   });
 
   test("both rungs are the ramp's own tokens", () => {
-    // step 9 at rest, step 10 hovered — the state ladder's filled row. a
-    // color-mix or an alpha of --primary here would be a value nobody
-    // generated and nobody re-measures when the ramp moves.
+    // --link and --link-hover are step aliases the theme generator picks per
+    // appearance (accent 9/10 in light, 11/12 in dark). a color-mix or an
+    // alpha here would be a value nobody generated and nobody re-measures
+    // when the ramp moves.
     expect(recipe).not.toMatch(/color-mix|oklch\(|#[0-9a-f]{3}/i);
+  });
+
+  test("the theme defines both rungs in light and in dark", () => {
+    // the recipe reads var(--link): an undefined one paints nothing and
+    // inherits, with no error anywhere.
+    const theme = sources.find(
+      (x) => x.file === "packages/ui/src/styles/themes/default.css"
+    )?.text;
+    const defs = (name: string) =>
+      [
+        ...(theme ?? "").matchAll(
+          new RegExp(`^\\s*--${name}:\\s*var\\(--accent-\\d+\\);`, "gm")
+        ),
+      ].length;
+    expect(defs("link")).toBe(2);
+    expect(defs("link-hover")).toBe(2);
   });
 });
 

@@ -19,7 +19,7 @@ export function PostCta({ cta }: IPostCta) {
   return (
     <div className="@container mt-12">
       <div
-        className={`grid ${img_url ? "@5xl:grid-cols-2" : ""} surface-primary rounded ring-8 @md:ring-[1rem] ring-blue-6 px-10 py-12 @5xl:px-16 @5xl:py-20`}
+        className={`grid ${img_url ? "@5xl:grid-cols-2" : ""} surface-primary rounded ring-8 @md:ring-[1rem] ring-accent-6 px-10 py-12 @5xl:px-16 @5xl:py-20`}
       >
         <div className="grid order-2 @5xl:order-1">
           {cta.eyebrow && (

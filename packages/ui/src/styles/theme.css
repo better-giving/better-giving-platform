@@ -103,125 +103,93 @@
   --tracking-label: 0.12em;
   --tracking-badge: 0.08em;
 
-  /* two roles, two faces of one family: red hat round display for headings
-     and figures, red hat round text for everything else. faces load in
-     ./fonts.css. the split is the seam: h1-h6 and body are bound to these in
-     ./base.css, so no call site ever names a face, and swapping either one is
-     a one-line edit here rather than a forty-file sweep.
-     display: every heading h1-h6, marketing and dashboard alike, plus every
-       numeric figure — see the `figures` utility in ./utilities.css.
-     body: everything else — copy, buttons, forms, tables, labels.
-     named by ROLE — the mirror of the decorative color layer, which is named
-     by hue precisely because a role name would imply the semantic set can
-     reach for it. display-vs-body is a role, so the semantic faces take role
-     names and the decorative one keeps its face name (--font-gochi below).
-     ledger entry in packages/brand/design-system.md. */
-  --font-display: "Red Hat Round Display", "Red Hat Round Text", sans-serif;
-  --font-body: "Red Hat Round Text", sans-serif;
-
-  /* the handwritten aside. named by face, not by role: it is the decorative
-     one-off, so a role name would put it in the semantic set. */
-  --font-gochi: Gochi Hand, cursive;
-
-  /* the --font-* namespace is NOT closed the way --text-*, --font-weight-*,
-     --leading-* and --tracking-* above are: clearing it would take the
-     faces down with it and leave nothing to name. so `font-mono` is pinned
-     here rather than left on whatever stack tailwind ships. it carries ids,
-     hashes and wallet addresses: red hat round mono first, so it matches the
-     product's rounded type, then the system mono stack. */
-  --font-mono:
-    "Red Hat Round Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
-    Consolas, "Liberation Mono", monospace;
-
   /* the --breakpoint-* namespace stays OPEN: tailwind's sm–2xl ladder is
-     inherited, and this one is added to it, sorted in by value. ledger
-     entry in packages/brand/design-system.md.
+     inherited, and this one is added to it, sorted in by value.
      nav: the marketing header's desktop nav, which needs more room than lg. */
   --breakpoint-nav: 75rem;
 
   /* the --container-* namespace stays OPEN too, and unlike the one above it
      cannot be closed: max-w-* reads the same keys across every step, so a reset
      written for the nine container-query rungs would take those widths with it.
-     the sweep is the gate instead —
-     apps/platform/src/__tests__/container-query-conformance.node.test.ts, ledger
-     entry beside the breakpoints in packages/brand/design-system.md. */
+     the sweep is the gate instead: a consuming app's own conformance test over
+     its container-query names. */
+
+  /* a busy spinner: a continuous loop, so linear and off the speed ladder.
+     0.8s rather than animate-spin's 1s: a faster turn reads as a faster load.
+     `spin` is tailwind's own keyframes. it sits here, not with the other
+     --animate-* keys in the inline block below, so the utility reads the
+     variable and the reduced-motion guard at the foot of this file reaches
+     it; an inline value would be baked into the utility. */
+  --animate-spinner: spin 0.8s linear infinite;
 }
 
-/* the embed's two accent slots. this package references them — btn-form-primary,
-   the form-* color utilities, LoaderRing's to-(--form-primary) — so it ships the
-   defaults rather than borrowing them from a consumer: any host that isn't
-   platform would otherwise paint those surfaces with an unset var. a host
-   overrides them per embed (platform drives them from don.config.accent_primary
-   and additionally remaps --ring onto --form-primary inside #donation-container).
-   declared after the brand palette import in ./index.css, so --primary and
-   --secondary already resolve. */
-:root {
-  --form-primary: var(--primary);
-  --form-secondary: var(--secondary);
+/* the dark: variant follows the same switch the themes do: the .dark class on an
+   ancestor, not the system setting. a .light area inside a dark page is light
+   again, so it is excluded, and everything under it: a .dark area nested inside
+   that .light area does not switch the variant back on (a selector list cannot
+   say "nearest marker"). */
+@custom-variant dark (
+  &:where(.dark, .dark *):not(:where(.dark .light, .dark .light *))
+);
+
+/* the faces are named once, in ./variables.css, and read from there: two roles,
+   two faces of one family (display for headings and figures, body for everything
+   else), the handwritten aside, and mono for ids, hashes and addresses. inline,
+   so `font-display`, `font-body`, `font-gochi` and `font-mono` compile to
+   `font-family: var(--font-…)` and follow whatever the variable holds at the
+   element: the `data-font` switch in ./fonts-red-hat.css changes the variable,
+   and every utility and component under it follows. h1-h6 and body are bound to
+   the same variables in ./base.css, so no call site names a face.
+   the --font-* namespace is NOT closed the way --text-*, --font-weight-*,
+   --leading-* and --tracking-* above are: clearing it would take the faces down
+   with it and leave nothing to name. so `font-mono` is pinned here rather than
+   left on whatever stack tailwind ships. */
+@theme inline {
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-gochi: var(--font-gochi);
+  --font-mono: var(--font-mono);
 }
 
 @theme inline {
-  /* the 60 ramp steps, so a step can be named at a call site: bg-gray-3,
-     text-gray-11, border-gray-6. steps for surfaces, names for meaning — the
-     semantic tokens below are aliases onto these same steps, and both layers
-     stay spendable.
+  /* the semantic scales, so a step can be named at a call site: bg-gray-3,
+     text-accent-11, border-gray-6. steps for surfaces, names for meaning — the
+     role tokens below are aliases onto these same steps, and both layers stay
+     spendable.
 
-     the scale names collide with tailwind's own (blue, gray, green, red,
-     amber) and the collision is harmless because the step numbers do not:
-     ours run 1-12, tailwind's 50-950. `blue-600` still fails to compile
-     against the --color-*: initial reset above, and `blue-9` is ours. a
-     mistyped `gray-950` is therefore a build error, not a stray hue. */
-  --color-blue-1: var(--blue-1);
-  --color-blue-2: var(--blue-2);
-  --color-blue-3: var(--blue-3);
-  --color-blue-4: var(--blue-4);
-  --color-blue-5: var(--blue-5);
-  --color-blue-6: var(--blue-6);
-  --color-blue-7: var(--blue-7);
-  --color-blue-8: var(--blue-8);
-  --color-blue-9: var(--blue-9);
-  --color-blue-10: var(--blue-10);
-  --color-blue-11: var(--blue-11);
-  --color-blue-12: var(--blue-12);
-
-  --color-red-1: var(--red-1);
-  --color-red-2: var(--red-2);
-  --color-red-3: var(--red-3);
-  --color-red-4: var(--red-4);
-  --color-red-5: var(--red-5);
-  --color-red-6: var(--red-6);
-  --color-red-7: var(--red-7);
-  --color-red-8: var(--red-8);
-  --color-red-9: var(--red-9);
-  --color-red-10: var(--red-10);
-  --color-red-11: var(--red-11);
-  --color-red-12: var(--red-12);
-
-  --color-green-1: var(--green-1);
-  --color-green-2: var(--green-2);
-  --color-green-3: var(--green-3);
-  --color-green-4: var(--green-4);
-  --color-green-5: var(--green-5);
-  --color-green-6: var(--green-6);
-  --color-green-7: var(--green-7);
-  --color-green-8: var(--green-8);
-  --color-green-9: var(--green-9);
-  --color-green-10: var(--green-10);
-  --color-green-11: var(--green-11);
-  --color-green-12: var(--green-12);
-
-  --color-amber-1: var(--amber-1);
-  --color-amber-2: var(--amber-2);
-  --color-amber-3: var(--amber-3);
-  --color-amber-4: var(--amber-4);
-  --color-amber-5: var(--amber-5);
-  --color-amber-6: var(--amber-6);
-  --color-amber-7: var(--amber-7);
-  --color-amber-8: var(--amber-8);
-  --color-amber-9: var(--amber-9);
-  --color-amber-10: var(--amber-10);
-  --color-amber-11: var(--amber-11);
-  --color-amber-12: var(--amber-12);
+     the scales are named by what they are for, never by hue: accent is the
+     theme's brand color, gray its neutral, and success, warning and
+     destructive the status colors. a theme redefines the variables behind them
+     (themes/*.css) and every utility follows; no class names a hue, so none
+     breaks when a theme changes it. tailwind's own hue names (blue-600) still
+     fail to compile against the --color-*: initial reset above, and a step
+     number outside 1-12 is a build error, not a stray color. */
+  --color-accent-1: var(--accent-1);
+  --color-accent-2: var(--accent-2);
+  --color-accent-3: var(--accent-3);
+  --color-accent-4: var(--accent-4);
+  --color-accent-5: var(--accent-5);
+  --color-accent-6: var(--accent-6);
+  --color-accent-7: var(--accent-7);
+  --color-accent-8: var(--accent-8);
+  --color-accent-9: var(--accent-9);
+  --color-accent-10: var(--accent-10);
+  --color-accent-11: var(--accent-11);
+  --color-accent-12: var(--accent-12);
+  --color-accent-a1: var(--accent-a1);
+  --color-accent-a2: var(--accent-a2);
+  --color-accent-a3: var(--accent-a3);
+  --color-accent-a4: var(--accent-a4);
+  --color-accent-a5: var(--accent-a5);
+  --color-accent-a6: var(--accent-a6);
+  --color-accent-a7: var(--accent-a7);
+  --color-accent-a8: var(--accent-a8);
+  --color-accent-a9: var(--accent-a9);
+  --color-accent-a10: var(--accent-a10);
+  --color-accent-a11: var(--accent-a11);
+  --color-accent-a12: var(--accent-a12);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-accent-surface: var(--accent-surface);
 
   --color-gray-1: var(--gray-1);
   --color-gray-2: var(--gray-2);
@@ -235,6 +203,61 @@
   --color-gray-10: var(--gray-10);
   --color-gray-11: var(--gray-11);
   --color-gray-12: var(--gray-12);
+  --color-gray-a1: var(--gray-a1);
+  --color-gray-a2: var(--gray-a2);
+  --color-gray-a3: var(--gray-a3);
+  --color-gray-a4: var(--gray-a4);
+  --color-gray-a5: var(--gray-a5);
+  --color-gray-a6: var(--gray-a6);
+  --color-gray-a7: var(--gray-a7);
+  --color-gray-a8: var(--gray-a8);
+  --color-gray-a9: var(--gray-a9);
+  --color-gray-a10: var(--gray-a10);
+  --color-gray-a11: var(--gray-a11);
+  --color-gray-a12: var(--gray-a12);
+  --color-gray-surface: var(--gray-surface);
+
+  --color-success-1: var(--success-1);
+  --color-success-2: var(--success-2);
+  --color-success-3: var(--success-3);
+  --color-success-4: var(--success-4);
+  --color-success-5: var(--success-5);
+  --color-success-6: var(--success-6);
+  --color-success-7: var(--success-7);
+  --color-success-8: var(--success-8);
+  --color-success-9: var(--success-9);
+  --color-success-10: var(--success-10);
+  --color-success-11: var(--success-11);
+  --color-success-12: var(--success-12);
+  --color-success-contrast: var(--success-contrast);
+
+  --color-warning-1: var(--warning-1);
+  --color-warning-2: var(--warning-2);
+  --color-warning-3: var(--warning-3);
+  --color-warning-4: var(--warning-4);
+  --color-warning-5: var(--warning-5);
+  --color-warning-6: var(--warning-6);
+  --color-warning-7: var(--warning-7);
+  --color-warning-8: var(--warning-8);
+  --color-warning-9: var(--warning-9);
+  --color-warning-10: var(--warning-10);
+  --color-warning-11: var(--warning-11);
+  --color-warning-12: var(--warning-12);
+  --color-warning-contrast: var(--warning-contrast);
+
+  --color-destructive-1: var(--destructive-1);
+  --color-destructive-2: var(--destructive-2);
+  --color-destructive-3: var(--destructive-3);
+  --color-destructive-4: var(--destructive-4);
+  --color-destructive-5: var(--destructive-5);
+  --color-destructive-6: var(--destructive-6);
+  --color-destructive-7: var(--destructive-7);
+  --color-destructive-8: var(--destructive-8);
+  --color-destructive-9: var(--destructive-9);
+  --color-destructive-10: var(--destructive-10);
+  --color-destructive-11: var(--destructive-11);
+  --color-destructive-12: var(--destructive-12);
+  --color-destructive-contrast: var(--destructive-contrast);
 
   /* neutral ink and neutral lines have no token and no utility: a name like
      --fg or --muted-fg spells a rung on the grey scale and nothing else, so
@@ -266,6 +289,7 @@
   --color-primary: var(--primary);
   --color-primary-fg: var(--primary-fg);
   --color-primary-deep: var(--primary-deep);
+  --color-primary-deep-fg: var(--primary-deep-fg);
   --color-band: var(--band);
   --color-secondary: var(--secondary);
   --color-secondary-hover: var(--secondary-hover);
@@ -288,7 +312,23 @@
   --color-overlay: var(--overlay);
   --color-primary-ring: var(--primary-ring);
   --color-primary-border: var(--primary-border);
+  /* the form slots. they are declared once, in ./variables.css, all
+     mapped onto the accent scale; this only names them for utilities. */
   --color-form-primary: var(--form-primary);
+  --color-form-primary-hover: var(
+    --form-primary-hover,
+    color-mix(in oklch, var(--form-primary) 90%, black)
+  );
+  --color-form-primary-active: var(
+    --form-primary-active,
+    color-mix(in oklch, var(--form-primary) 90%, black)
+  );
+  --color-form-primary-fg: var(--form-primary-fg);
+  --color-form-subtle: var(--form-subtle);
+  --color-form-subtle-hover: var(--form-subtle-hover);
+  --color-form-subtle-fg: var(--form-subtle-fg);
+  --color-form-border: var(--form-border);
+  --color-form-ring: var(--form-ring);
   --color-form-secondary: var(--form-secondary);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -323,11 +363,10 @@
 
      it does NOT reach `shadow-[…]`. an arbitrary value is compiled straight
      from the bracket and never consults the theme, so the bracket half of this
-     gate is a filesystem sweep, not the compiler —
-     apps/platform/src/__tests__/elevation-conformance.node.test.ts.
+     gate is a filesystem sweep in the consuming app, not the compiler.
 
      --drop-shadow-* is a sibling namespace and stays OPEN on purpose: two sites
-     lay white copy over a photograph (routes/unlock-us-donations/hero.tsx), and
+     lay white copy over a photograph (a marketing hero), and
      a filter follows the glyph outlines where a box-shadow cannot. that is text
      legibility, not a level, so it has no token here to converge on. */
   --shadow-*: initial;
@@ -347,7 +386,7 @@
        namespace closed there is nothing left for it to switch off but a named
        level, and a level that has to be cancelled at the call site is the wrong
        level there. the rule is the half of a level that goes missing, so it is
-       written here and in the ledger rather than left implied by an absent
+       written here rather than left implied by an absent
        name.
        the in-flow card carries no shadow: radix finds it by its step-6 edge,
        and the elevation sweep fails a `shadow-card` written anywhere.
@@ -362,33 +401,36 @@
        order. there is deliberately no --shadow-modal: the floating rung is
        the one shadow a layer over the page carries, and modal_box
        (helpers/modal-box.ts) spends it.
-     the recessed pair — a track a control sits IN (slider, progress bar, switch)
-       and the fill that rides raised inside it. inward depth, the mirror of
-       floating: --inset-shadow-track and --shadow-track-fill.
+     the recessed pair — a track a control sits IN (progress bar, switch)
+       and the fill that rides raised inside it (the progress bar's). inward
+       depth, the mirror of floating: --inset-shadow-track and
+       --shadow-track-fill. a switch's thumb is a handle, not a fill: it takes
+       --shadow-handle below.
 
      the values are the dominant spelling already in the tree, transcribed from
      tailwind's own defaults rather than retuned — --shadow-floating is
      `shadow-lg`, --inset-shadow-track is `shadow-inner`, --shadow-track-fill is
      `shadow-xs`. codifying the majority is what keeps the migration onto these
      names a pixel change at the outliers only.
-     the shadow COLOR is the ramp's darkest rung at those same alphas. no rung
-     of the ramp is an alpha black, so the alpha is made rather than picked —
-     the construction --overlay (packages/brand/src/colors.css) already uses to
-     reach a translucent value off a solid step. this ramp's grey carries a blue
-     cast, so every floating layer, track and handle reads faintly blue rather
-     than neutral: deliberate, not a tint to correct.
+     the shadow COLOR is --shadow-ink at those same alphas: the ramp's darkest
+     rung in a light theme, black in a dark one (the theme file sets it). no
+     rung of the ramp is an alpha black, so the alpha is made rather than
+     picked — the construction --overlay (packages/brand/src/colors.css)
+     already uses to reach a translucent value. the gray scale carries its
+     theme's tint, so every floating layer, track and handle reads faintly
+     tinted rather than neutral: deliberate, not a tint to correct.
 
      --inset-shadow-track sits in the --inset-shadow-* namespace rather than
      --shadow-*, and that is not cosmetic: the two are separate box-shadow slots
      that compose, while `shadow-inner` is a DEPRECATED alias v4 still carries in
      the --shadow-* namespace. same paint today, and it outlives the alias. */
   --shadow-floating:
-    0 10px 15px -3px color-mix(in oklch, var(--gray-12) 10%, transparent),
-    0 4px 6px -4px color-mix(in oklch, var(--gray-12) 10%, transparent);
+    0 10px 15px -3px color-mix(in oklch, var(--shadow-ink) 10%, transparent),
+    0 4px 6px -4px color-mix(in oklch, var(--shadow-ink) 10%, transparent);
   --inset-shadow-track: inset 0 2px 4px 0
-    color-mix(in oklch, var(--gray-12) 5%, transparent);
+    color-mix(in oklch, var(--shadow-ink) 5%, transparent);
   --shadow-track-fill: 0 1px 2px 0
-    color-mix(in oklch, var(--gray-12) 5%, transparent);
+    color-mix(in oklch, var(--shadow-ink) 5%, transparent);
 
   /* the marketing lift — a treatment, not a rung, and named apart precisely so
      the app cannot pick it up by reaching for a level. one surface on the
@@ -405,22 +447,20 @@
   --shadow-lift-media: 0 25px 50px -12px
     color-mix(in oklab, var(--color-black) 10%, transparent);
 
-  /* an affordance, NOT a rung — do not reach for it to raise something. the
-     one consumer is the img-editor's 8px white crop handle
-     (components/img-editor/cropper.tsx), drawn over a donor's own uploaded
-     photograph, where the ground is arbitrary and a white dot on pale imagery
-     has no edge at all. the shadow is there to give it one; depth is a side
-     effect. the same legibility problem is recorded for the selection edge in
-     that file's own comment.
-     it exists as a name because the call site spelled a bare `shadow`, which
-     reads the DEFAULT --shadow key — deprecated in v4, and stripped along with
-     the rest of the namespace by the reset, silently and with no build error.
-     the geometry and the alphas are exactly what that key resolved to at the
-     pinned version, so naming it moved nothing; the hue is the ramp's, with the
-     rest of the elevation set above. */
+  /* an affordance, NOT a rung — do not reach for it to raise something. it is
+     for a small white handle drawn over a user's own image (a crop handle, say),
+     where the ground is arbitrary and a white dot on pale imagery has no edge
+     at all. the shadow is there to give it one; depth is a side effect. a
+     switch's thumb (the `switch` utility) is the same white handle, on its
+     track.
+     it is a name rather than a bare `shadow` because that utility reads the
+     DEFAULT --shadow key — deprecated in v4, and stripped along with the rest
+     of the namespace by the reset, silently and with no build error. the
+     geometry and the alphas are what that key resolves to at the pinned
+     version; the hue is the ramp's, with the rest of the elevation set above. */
   --shadow-handle:
-    0 1px 3px 0 color-mix(in oklch, var(--gray-12) 10%, transparent),
-    0 1px 2px -1px color-mix(in oklch, var(--gray-12) 10%, transparent);
+    0 1px 3px 0 color-mix(in oklch, var(--shadow-ink) 10%, transparent),
+    0 1px 2px -1px color-mix(in oklch, var(--shadow-ink) 10%, transparent);
 
   /* the stacking ladder. each elevation level binds its own step, ordered so a
      popup opened INSIDE a dialog clears it without a hand-picked value — which
@@ -575,8 +615,7 @@
    transition and every --animate-* above spends one of the three named speeds,
    so collapsing the three here reaches all of them and none of them needs a
    `motion-reduce:` variant of its own. it covers the ladder and only the
-   ladder: motion that never reads a named speed is untouched (see
-   packages/brand/design-system.md → motion → what is still open). it sits
+   ladder: motion that never reads a named speed is untouched. it sits
    outside @theme because a media query cannot live inside one, and unlayered,
    so it wins over the `@layer theme` :root tailwind emits the ladder into.
 
@@ -589,14 +628,15 @@
    machine's var rather than this ladder, and it is a continuous loop rather
    than a state change.
 
-   tailwind's own spin and pulse are that same continuous loop, and they stop
-   here rather than shorten. they never touch the ladder — 1s and 2s out of
-   tailwind's default theme, and no named speed reads as a revolution — and a
-   collapsed duration only stills a loop that ends: an infinite one at 0.01ms
-   cycles faster than a frame, so every paint samples an arbitrary angle and
-   the spinner jitters instead of stopping. `none` is what the marquee spells
-   at its call site; these two are theme keys, so one line each reaches every
-   `animate-spin` and `animate-pulse` in the tree. tailwind emits them into
+   tailwind's own spin and pulse, and the spinner above, are that same
+   continuous loop, and they stop here rather than shorten. they never touch
+   the ladder — 1s and 2s out of tailwind's default theme, and the spinner's
+   0.8s, and no named speed reads as a revolution — and a collapsed duration
+   only stills a loop that ends: an infinite one at 0.01ms cycles faster than
+   a frame, so every paint samples an arbitrary angle and the spinner jitters
+   instead of stopping. `none` is what the marquee spells at its call site;
+   these three are theme keys, so one line each reaches every `animate-spin`,
+   `animate-pulse` and `animate-spinner` in the tree. tailwind emits them into
    `@layer theme`, which is what this unlayered :root already outranks. */
 @media (prefers-reduced-motion: reduce) {
   :root {
@@ -606,5 +646,6 @@
 
     --animate-spin: none;
     --animate-pulse: none;
+    --animate-spinner: none;
   }
 }

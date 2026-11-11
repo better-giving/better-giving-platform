@@ -16,7 +16,14 @@
      @utility so they are variant-capable (`xl:btn-lg`) and win this layer.
      radius is var(--radius) (6px), the control corner of the two (a
      container's is --radius-card); an integer step, since a fractional corner
-     shows against .btn-secondary's 1px edge. */
+     shows against .btn-secondary's 1px edge.
+     every variant has an edge, transparent where none shows, and the tiers
+     take its width, --btn-edge, back out of padding-block, so every variant
+     of a tier is the tier's height (36px here) whatever its edge: buttons side
+     by side line up, and with the btn-icon square. in forced colors the
+     transparent edge is drawn, so a filled button keeps its boundary.
+     hover and press colors move at the control speed; the reduced-motion
+     guard on the speed ladder collapses it. */
   .btn {
     display: flex;
     justify-content: center;
@@ -25,12 +32,17 @@
     /* published for btn-icon, which squares a button on its tier's own height.
        bare .btn carries no tier class, so the md value has to live here too. */
     --btn-size: calc(var(--spacing) * 9) /* 36px */;
-    padding-block: calc(var(--spacing) * 2);
+    --btn-edge: 1px;
+    border: var(--btn-edge) solid transparent;
+    padding-block: calc(var(--spacing) * 2 - var(--btn-edge));
     padding-inline: calc(var(--spacing) * 6);
     font-size: var(--text-sm) /* 0.875rem = 14px */;
     line-height: var(--tw-leading, var(--text-sm--line-height));
     min-block-size: var(--btn-size);
     border-radius: var(--radius);
+    transition-property: color, background-color, border-color;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-in-out);
   }
 
   /* the neutral control on radix's roles: steps 3 / 4 / 5 are its fill at
@@ -99,6 +111,26 @@
     }
   }
 
+  /* the destructive action that opens a confirm step, beside secondary
+     buttons; the solid .btn-destructive stays for the confirm itself. it has no
+     solid fill, so no press nudge: the press is a third rung,
+     --destructive-subtle-active. the edge goes to --gray-7 off and in flight,
+     below the shared disabled blocks, so a dead control doesn't read as live. */
+  .btn-destructive-outline {
+    background-color: transparent;
+    color: var(--destructive-subtle-fg);
+    border: 1px solid var(--destructive);
+    /* a tap opens the confirm and leaves `:hover` on the button under it */
+    @media (hover: hover) {
+      &:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: var(--destructive-subtle);
+      }
+    }
+    &:active:not(:disabled):not([aria-disabled="true"]) {
+      background-color: var(--destructive-subtle-active);
+    }
+  }
+
   .btn-success {
     background-color: var(--success);
     color: var(--success-fg);
@@ -123,14 +155,24 @@
     }
   }
 
-  /* the filled button on a brand fill: --primary on --primary (or on
-     --primary-deep) is no button at all, so it inverts to the fill's own ink.
-     no hover rung — the --primary-fg alpha ladder is unmeasured
-     (design-system.md, "--primary-fg alpha steps") — so it keeps only the
-     filled variants' press. its ring is below the shared one. */
+  /* the filled button on a --primary fill: --primary on --primary is no
+     button at all, so it inverts to the fill's own ink. the --primary-deep
+     ground takes .btn-inverse-deep below, not this one.
+     no hover rung — the --primary-fg alpha ladder is unmeasured,
+     so it keeps only the filled variants' press. its ring is below the shared one. */
   .btn-inverse {
     background-color: var(--primary-fg);
     color: var(--primary);
+    &:active {
+      transform: translateY(1px);
+    }
+  }
+
+  /* the same inversion on the deep ground: --primary-deep-fg (step 1) fills it
+     and --primary-deep (step 12) is the label, in light and in dark. */
+  .btn-inverse-deep {
+    background-color: var(--primary-deep-fg);
+    color: var(--primary-deep);
     &:active {
       transform: translateY(1px);
     }
@@ -152,23 +194,26 @@
   .btn-outline {
     background-color: transparent;
     color: inherit;
-    border: 2px solid color-mix(in oklab, currentColor 40%, transparent);
+    --btn-edge: 2px;
+    border: var(--btn-edge) solid
+      color-mix(in oklab, currentColor 40%, transparent);
     &:hover:not(:disabled):not([aria-disabled="true"]) {
       background-color: color-mix(in oklab, currentColor 10%, transparent);
     }
-    &:active {
+    /* the hover's specificity and after it, so a mouse press reads over it */
+    &:active:not(:disabled):not([aria-disabled="true"]) {
       background-color: color-mix(in oklab, currentColor 15%, transparent);
     }
   }
 
-  /* one focus indicator for every variant. the per-variant outline colors this
-     replaces were tints of the button's own fill and were invisible against it;
-     one ring for every variant is the fix, and the offset is what makes it
-     work rather than the color. --ring is the ramp's step 8, Lc 44.6 against
-     the page — clear of the Lc 30 a focus indicator needs, taken as radix
-     assigns it. on a .btn-primary fill it measures Lc 30.0, on that line and
-     not over it, which is why the offset stays and why a
-     --primary-filled panel still scopes with `surface-primary`. */
+  /* one focus indicator for every variant: a ring tinted from the button's own
+     fill would vanish against it, so the offset does the work, not the color.
+     --ring is the ramp's step 8 in light and dark, taken as radix assigns it:
+     Lc 44.6 against the light page, clear of the Lc 30 a focus indicator
+     needs, and under it in dark (a named miss in the brand ledger). on a light
+     .btn-primary fill it measures Lc 30.0, on that line and not over it, which
+     is why the offset stays and why a --primary-filled panel still scopes with
+     `surface-primary`. */
   .btn,
   .btn-sm,
   .btn-md,
@@ -179,7 +224,8 @@
   .btn-success,
   .btn-primary,
   .btn-warning,
-  .btn-destructive {
+  .btn-destructive,
+  .btn-destructive-outline {
     &:focus-visible {
       outline: 2px solid var(--ring);
       outline-offset: 2px;
@@ -187,10 +233,14 @@
   }
 
   /* the inverse button's ring is --primary-ring whatever scope it sits in: the
-     offset puts the ring on the brand fill around it, where --ring (blue-8)
-     does not read. after the shared ring, so it wins at equal specificity. */
+     offset puts the ring on the brand fill around it, where --ring (accent-8)
+     does not read. after the shared ring, so it wins at equal
+     specificity. */
   .btn-inverse:focus-visible {
     outline-color: var(--primary-ring);
+  }
+  .btn-inverse-deep:focus-visible {
+    outline-color: var(--primary-deep-fg);
   }
 
   .btn-outline,
@@ -198,7 +248,10 @@
   .btn-success,
   .btn-primary,
   .btn-warning,
-  .btn-destructive {
+  .btn-destructive,
+  .btn-destructive-outline,
+  .btn-inverse,
+  .btn-inverse-deep {
     &:disabled {
       background-color: var(--gray-3);
       color: var(--gray-11);
@@ -220,8 +273,11 @@
   .btn-ghost,
   .btn-outline,
   .btn-destructive,
+  .btn-destructive-outline,
   .btn-success,
-  .btn-warning {
+  .btn-warning,
+  .btn-inverse,
+  .btn-inverse-deep {
     &.pending {
       background-color: var(--gray-3);
       color: var(--gray-11);
@@ -235,10 +291,21 @@
   a.btn-primary,
   a.btn-ghost,
   a.btn-outline,
-  a.btn-destructive {
+  a.btn-destructive,
+  a.btn-destructive-outline,
+  a.btn-inverse,
+  a.btn-inverse-deep {
     &[aria-disabled="true"] {
       background-color: var(--gray-3);
       color: var(--gray-11);
+    }
+  }
+
+  .btn-destructive-outline {
+    &:disabled,
+    &.pending,
+    &:is(a)[aria-disabled="true"] {
+      border-color: var(--gray-7);
     }
   }
 
@@ -253,8 +320,9 @@
     background-color: var(--surface);
     padding: calc(var(--spacing) * 3.5) calc(var(--spacing) * 4);
     min-block-size: var(--field-size);
-    /* --input, radix's interactive-border step 7 (under 1.4.11's 3:1 by PM
-       decision, packages/brand/src/colors.css). the hover leaves an invalid
+    /* --input, radix's interactive-border step 7 (under the APCA ledger's Lc 30
+       for a non-text part, an accepted miss recorded in
+       packages/brand/src/colors.css). the hover leaves an invalid
        field's destructive edge alone. */
     border: 1px solid var(--input);
     outline-color: var(--ring);
@@ -264,7 +332,7 @@
         :disabled,
         [readonly],
         [aria-disabled="true"],
-        :user-invalid,
+        :user-invalid:not([data-manual-invalid]),
         [aria-invalid="true"]
       ) {
       border-color: var(--input-hover);
@@ -275,16 +343,26 @@
     }
     /* biome-ignore lint/style/noDescendingSpecificity: unrelated to a.btn-* selectors */
     &[aria-disabled="true"],
-    &[readonly],
     &:disabled {
       pointer-events: none;
+    }
+    /* read-only is muted like disabled but stays selectable and copyable: it
+       takes pointer events, text selection and focus, and keeps the text
+       cursor. only the hover edge is withheld, above. */
+    /* biome-ignore lint/style/noDescendingSpecificity: unrelated to a.btn-* selectors */
+    &[aria-disabled="true"],
+    &[readonly],
+    &:disabled {
       background-color: var(--gray-3);
       color: var(--gray-11);
     }
 
     /* :user-invalid, never :invalid — :invalid paints every required-but-empty
-       field destructive on first paint, before the field has been touched. */
-    &:user-invalid,
+       field destructive on first paint, before the field has been touched.
+       data-manual-invalid opts a field out of :user-invalid: the browser's
+       constraint is not its rule (a money value it rounds), so it says
+       aria-invalid itself. */
+    &:user-invalid:not([data-manual-invalid]),
     &[aria-invalid="true"] {
       @apply border-destructive;
     }
@@ -307,7 +385,7 @@
           input:disabled,
           input[readonly],
           input[aria-disabled="true"],
-          input:user-invalid,
+          input:user-invalid:not([data-manual-invalid]),
           input[aria-invalid="true"]
         )
       ) {
@@ -320,27 +398,58 @@
       outline-color: var(--ring);
     }
 
-    &:has(input::placeholder) {
-      color: var(--gray-11);
+    &:has(input[aria-disabled="true"]),
+    &:has(input:disabled) {
+      pointer-events: none;
     }
+    /* read-only: muted, but the input inside stays selectable and copyable */
     &:has(input[aria-disabled="true"]),
     &:has(input[readonly]),
     &:has(input:disabled) {
-      pointer-events: none;
       background-color: var(--gray-3);
       color: var(--gray-11);
     }
 
-    &:has(input:user-invalid),
+    &:has(input:user-invalid:not([data-manual-invalid])),
     &:has(input[aria-invalid="true"]) {
       @apply border-destructive;
     }
   }
 
   .field-err {
-    text-align: right;
+    text-align: start;
     font-size: var(--text-xs);
-    color: var(--destructive);
+    color: var(--destructive-subtle-fg);
+  }
+
+  /* a field whose control has buttons beside it: [control column][action]. the
+     error and the tooltip are inside the control column, so they sit under the
+     input and never under the row. the action keeps the control's height with
+     `btn-field`. when the row itself is under 384px — a phone-width column,
+     or any container that narrow, whatever the viewport — the action wraps
+     under the control, and the column takes the whole row so the message stays
+     under the control. the row is an inline-size container, so it takes its
+     width from its parent and never from its content: inside a shrink-to-fit
+     parent (an auto-width flex item, say) give the field a width. */
+  .field-row {
+    container-type: inline-size;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: calc(var(--spacing) * 2);
+  }
+  .field-control {
+    flex: 1 1 0%;
+    min-inline-size: 0;
+    @container (width < 24rem) {
+      flex-basis: 100%;
+    }
+  }
+  .field-action {
+    display: flex;
+    flex-shrink: 0;
+    align-items: flex-start;
+    gap: calc(var(--spacing) * 2);
   }
 
   .selector-btn {
@@ -364,6 +473,19 @@
     &:hover {
       background-color: var(--secondary-hover);
     }
+    /* the checked row keeps step 5 under the keyboard or the pointer; zag
+       highlights the checked row on open */
+    &[data-state="checked"]:is([data-highlighted], :hover) {
+      background-color: var(--secondary-active);
+    }
+    /* forced colors repaint both tints to Canvas, and focus stays on the
+       listbox, so the highlighted row needs a mark the palette keeps */
+    @media (forced-colors: active) {
+      &[data-highlighted] {
+        outline: 2px solid CanvasText;
+        outline-offset: -2px;
+      }
+    }
   }
 
   .label {
@@ -372,7 +494,7 @@
     font-weight: var(--font-weight-medium);
     &[data-required="true"]::after {
       content: " *";
-      color: var(--destructive);
+      color: var(--destructive-subtle-fg);
     }
     &[data-required="false"]::after {
       content: " (optional)";
@@ -385,7 +507,9 @@
   .label-floating {
     position: absolute;
     left: 0;
-    color: var(--ring);
+    /* the raised label is text, so it takes the text step 11, not --ring:
+       the light ring is the border step 8. */
+    color: var(--accent-11);
     transition: transform var(--duration-base) var(--ease-out);
     /* the field's own fill: the raised label straddles the field's top edge,
        and its lower half sits on the field. */
@@ -397,7 +521,7 @@
 
     &[data-required="true"]::after {
       content: " *";
-      color: var(--destructive);
+      color: var(--destructive-subtle-fg);
     }
     &[data-required="false"]::after {
       content: " (optional)";
@@ -441,7 +565,7 @@
   .table {
     --table-fill: var(--card);
     /* the control corner, not the card's: a 12px curve clips the header
-       row's first and last labels (PM, 2026-11-02). */
+       row's first and last labels. */
     --table-corner: var(--radius);
     min-width: 100%;
     border-collapse: separate;
@@ -459,7 +583,7 @@
     }
 
     /* the header row is a well on the table's fill: step 3 on step 2, so
-       the labels read apart from the rows under them (PM, 2026-11-02). */
+       the labels read apart from the rows under them. */
     /* biome-ignore lint/style/noDescendingSpecificity: unrelated to the shell selectors above */
     & thead th {
       background-color: var(--panel);
@@ -476,8 +600,20 @@
     }
 
     & :is(th, td) {
-      padding: calc(var(--spacing) * 2);
+      padding: calc(var(--spacing) * 3) calc(var(--spacing) * 4);
       text-align: left;
+    }
+
+    /* a row tints on hover, in its cells' boxes; the corner cells below keep
+       the fill inside the shell's corner. only where a pointer can hover: a
+       tap on a touch screen leaves `:hover` on the row it hit. */
+    & tbody > tr > * {
+      transition: background-color var(--duration-fast);
+    }
+    @media (hover: hover) {
+      & tbody > tr:hover > * {
+        background-color: var(--gray-4);
+      }
     }
 
     /* a filled row (a hovered or tinted one) paints in its cells' boxes, which
@@ -526,9 +662,11 @@
       align-items: center;
       justify-content: center;
       gap: calc(var(--spacing) * 2);
-      /* biome-ignore lint/style/noDescendingSpecificity: unrelated to .btn-* selectors */
-      &:hover:not(:disabled):not([aria-disabled="true"]) {
-        background-color: var(--gray-4);
+      /* gated as the row's tint is */
+      @media (hover: hover) {
+        &:hover:not(:disabled):not([aria-disabled="true"]) {
+          background-color: var(--gray-4);
+        }
       }
       /* biome-ignore lint/style/noDescendingSpecificity: unrelated to .btn-* selectors */
       &:active {

@@ -67,7 +67,7 @@
 }
 
 @utility field-error {
-  @apply absolute -bottom-5 right-0 text-xs text-right text-destructive;
+  @apply absolute -bottom-5 start-0 text-xs text-start text-destructive-subtle-fg;
 }
 
 /* focus-visible, never focus — the house trigger, the same one `.btn` and every
@@ -79,36 +79,146 @@
    the text controls keep `:focus` and are not a hole in that rule: a pointer
    press on an <input> DOES match :focus-visible, so `.field-input-container`'s
    `:has(input:focus)` in styles/components.css is the same set of moments under
-   another name. ledger entry in packages/brand/design-system.md →
-   "Which states each control carries". */
+   another name. */
 @utility radio {
-  @apply flex items-center gap-4 data-[required=true]:after:ml-1 data-[required=true]:after:content-['*'] data-[required=true]:after:text-destructive;
+  @apply flex items-center gap-4 data-[required=true]:after:ml-1 data-[required=true]:after:content-['*'] data-[required=true]:after:text-destructive-subtle-fg;
   & > input {
-    @apply appearance-none h-4 relative aspect-square border border-input hover:border-input-hover bg-surface rounded-full before:content-[''] before:h-2.5 before:aspect-square before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full checked:before:bg-primary disabled:checked:before:bg-gray-3 focus-visible:outline-2 focus-visible:outline-ring;
+    @apply appearance-none h-4 relative aspect-square border border-input not-disabled:not-aria-invalid:hover:border-input-hover bg-surface rounded-full before:content-[''] before:h-2.5 before:aspect-square before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full checked:before:bg-primary disabled:bg-gray-3 disabled:border-hairline disabled:checked:before:bg-gray-11 aria-invalid:border-destructive focus-visible:outline-2 focus-visible:outline-ring;
+  }
+  /* forced colors repaint every background, which would erase a dot drawn as
+     one: the dot opts out and takes the system ink */
+  @media (forced-colors: active) {
+    & > input:checked::before {
+      forced-color-adjust: none;
+      background-color: CanvasText;
+    }
+    & > input:disabled:checked::before {
+      background-color: GrayText;
+    }
   }
 }
 /* drawn, not `accent-*`: the UA box carries its own edge and ignores --input,
    so it sat beside every field on the page in a different grey. the check is
    two borders of a rotated box, so it takes --primary-fg like any other ink on
-   the fill and needs no image. */
+   the fill and needs no image; indeterminate (set from script) unrotates that
+   box into a flat bar, its bottom border alone. */
 @utility checkbox {
-  @apply appearance-none relative size-4 shrink-0 rounded border border-input bg-surface not-disabled:hover:border-input-hover checked:bg-primary checked:border-primary before:hidden checked:before:block before:absolute before:top-1/2 before:left-1/2 before:-mt-0.5 before:w-1.5 before:h-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:rotate-45 before:border-r-2 before:border-b-2 before:border-primary-fg disabled:bg-gray-3 disabled:border-hairline disabled:before:border-gray-11 focus-visible:outline-2 focus-visible:outline-ring;
-  &:checked:not(:disabled):hover {
-    background-color: var(--primary-hover);
-    border-color: var(--primary-hover);
+  @apply appearance-none relative size-4 shrink-0 rounded border border-input bg-surface not-disabled:not-aria-invalid:hover:border-input-hover checked:bg-primary checked:border-primary before:hidden checked:before:block before:absolute before:top-1/2 before:left-1/2 before:-mt-0.5 before:w-1.5 before:h-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:rotate-45 before:border-r-2 before:border-b-2 before:border-primary-fg indeterminate:bg-primary indeterminate:border-primary indeterminate:before:block indeterminate:before:mt-0 indeterminate:before:w-2 indeterminate:before:h-0 indeterminate:before:border-r-0 indeterminate:before:rotate-0 disabled:bg-gray-3 disabled:border-hairline disabled:before:border-gray-11 aria-invalid:border-destructive focus-visible:outline-2 focus-visible:outline-ring;
+  /* the hover edge above out-specifies the checked and indeterminate edges, so
+     each filled state restates its own, gated as `hover:` is */
+  @media (hover: hover) {
+    &:checked:not(:disabled):hover,
+    &:indeterminate:not(:disabled):hover {
+      background-color: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
   }
 }
 
 @utility check-field {
   @apply grid grid-cols-[auto_1fr] justify-items-start gap-x-3 items-center;
   & > label {
-    @apply data-[required=true]:after:ml-1 data-[required=true]:after:content-['*'] data-[required=true]:after:text-destructive;
+    @apply data-[required=true]:after:ml-1 data-[required=true]:after:content-['*'] data-[required=true]:after:text-destructive-subtle-fg;
   }
   & > input {
     @apply checkbox;
   }
   & > [data-error] {
-    @apply col-span-full text-xs text-destructive;
+    @apply col-span-full text-xs text-destructive-subtle-fg;
+  }
+}
+
+/* a native checkbox with role="switch", drawn as a track (the input) and a
+   thumb (its ::before) that slides at --duration-fast, so the reduced-motion
+   guard in theme.css stills it. medium is 44x24 with a 20px thumb; `switch-sm`
+   is 36x20 with 16px, and sets the size through `&.switch` so it outranks this
+   whatever order tailwind sorts the two in. the thumb sits 2px in from either
+   end. */
+@utility switch {
+  --switch-w: calc(var(--spacing) * 11);
+  --switch-h: calc(var(--spacing) * 6);
+  --switch-thumb: calc(var(--spacing) * 5);
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  margin: 0;
+  cursor: pointer;
+  inline-size: var(--switch-w);
+  block-size: var(--switch-h);
+  border-radius: calc(infinity * 1px);
+  background-color: var(--gray-9);
+  box-shadow: var(--inset-shadow-track);
+  transition-property: background-color;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-in-out);
+  &::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: calc(var(--spacing) * 0.5);
+    inline-size: var(--switch-thumb);
+    block-size: var(--switch-thumb);
+    margin-top: calc(var(--switch-thumb) / -2);
+    border-radius: calc(infinity * 1px);
+    background-color: var(--primary-fg);
+    box-shadow: var(--shadow-handle);
+    transition-property: translate;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-in-out);
+  }
+  &:checked {
+    background-color: var(--primary);
+  }
+  &:checked::before {
+    translate: calc(var(--switch-w) - var(--switch-thumb) - var(--spacing));
+  }
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      background-color: var(--gray-10);
+    }
+    &:checked:hover:not(:disabled) {
+      background-color: var(--primary-hover);
+    }
+  }
+  &:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  &:disabled {
+    cursor: not-allowed;
+    background-color: var(--gray-3);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+  }
+  &:disabled::before {
+    background-color: var(--gray-7);
+    box-shadow: none;
+  }
+  &:disabled:checked::before {
+    background-color: var(--gray-11);
+  }
+  /* forced colors repaint both fills to Canvas and drop the shadows, which
+     would leave no track and no thumb: the track draws its extent as an
+     outline, and the thumb opts out to take the system ink, Highlight when on */
+  @media (forced-colors: active) {
+    outline: 1px solid CanvasText;
+    &::before {
+      forced-color-adjust: none;
+      background-color: CanvasText;
+    }
+    &:checked::before {
+      background-color: Highlight;
+    }
+    &:disabled::before,
+    &:disabled:checked::before {
+      background-color: GrayText;
+    }
+  }
+}
+@utility switch-sm {
+  &.switch {
+    --switch-w: calc(var(--spacing) * 9);
+    --switch-h: calc(var(--spacing) * 5);
+    --switch-thumb: calc(var(--spacing) * 4);
   }
 }
 
@@ -122,21 +232,21 @@
 
 @utility btn-sm {
   --btn-size: calc(var(--spacing) * 6) /* 24px */;
-  padding-block: calc(var(--spacing) * 1) /* 4px */;
+  padding-block: calc(var(--spacing) * 1 - var(--btn-edge)) /* 4px - edge */;
   padding-inline: calc(var(--spacing) * 3) /* 12px */;
   font-size: var(--text-xs) /* 0.75rem = 12px */;
   line-height: var(--tw-leading, var(--text-xs--line-height) /* 1rem = 16px */);
-  /* 4 + 16 + 4 = exactly 24px, zero natural headroom — the pin, not the
-     arithmetic, is what holds WCAG 2.2 SC 2.5.8 Target Size (Minimum), AA,
-     24x24 css px. px-3 alone clears the width floor; pinned anyway for the
-     icon-only case. */
+  /* 3 + 16 + 3 + the 1px edge twice = exactly 24px (a 2px edge leaves 2px of
+     padding), zero natural headroom — the pin, not the arithmetic, is what
+     holds the 24x24 css px minimum target. px-3 alone clears the width floor;
+     pinned anyway for the icon-only case. */
   min-block-size: var(--btn-size);
   min-inline-size: var(--btn-size);
 }
 
 @utility btn-md {
   --btn-size: calc(var(--spacing) * 9) /* 36px */;
-  padding-block: calc(var(--spacing) * 2) /* 8px */;
+  padding-block: calc(var(--spacing) * 2 - var(--btn-edge)) /* 8px - edge */;
   padding-inline: calc(var(--spacing) * 6) /* 24px */;
   font-size: var(--text-sm) /* 0.875rem = 14px */;
   line-height: var(--tw-leading, var(--text-sm--line-height) /* 20px */);
@@ -145,7 +255,7 @@
 
 @utility btn-lg {
   --btn-size: calc(var(--spacing) * 13) /* 52px */;
-  padding-block: calc(var(--spacing) * 3) /* 12px */;
+  padding-block: calc(var(--spacing) * 3 - var(--btn-edge)) /* 12px - edge */;
   padding-inline: calc(var(--spacing) * 8) /* 32px */;
   font-size: var(--text-lg) /* 1.125rem = 18px */;
   line-height: var(--tw-leading, var(--text-lg--line-height) /* 28px */);
@@ -159,7 +269,7 @@
    rather than by a copied number. everything else mirrors btn-md. */
 @utility btn-field {
   --btn-size: var(--field-size);
-  padding-block: calc(var(--spacing) * 2) /* 8px */;
+  padding-block: calc(var(--spacing) * 2 - var(--btn-edge)) /* 8px - edge */;
   padding-inline: calc(var(--spacing) * 6) /* 24px */;
   font-size: var(--text-sm) /* 0.875rem = 14px */;
   line-height: var(--tw-leading, var(--text-sm--line-height) /* 20px */);
@@ -198,10 +308,9 @@
    pins the smallest possible target at 36px when the floor is 24. this tier
    contributes hit area and nothing else, so color, hover and focus classes
    stay the call site's.
-   24px is WCAG 2.2 SC 2.5.8 Target Size (Minimum), AA — the same floor btn-sm
-   pins itself to, reached here by the min alone since the glyph is always
-   smaller than the box. mins rather than definite sizes so a larger glyph
-   still grows its own target.
+   24px is the minimum target — the same floor btn-sm pins itself to, reached
+   here by the min alone since the glyph is always smaller than the box. mins
+   rather than definite sizes so a larger glyph still grows its own target.
    flex-shrink is baked in: these sit in flex rows beside text that would
    otherwise squeeze the target back under the floor.
    the button has no text node, so every call site MUST carry an aria-label
@@ -220,7 +329,7 @@
 /* icon size ladder, for lucide glyphs. css inline-/block-size beat the svg's
    own width/height attributes, so the class alone sets the box. flex-shrink is baked in for the reason glyph-btn bakes it:
    an svg is overflow:hidden, so its flex min-size is 0 and a row of text beside
-   it squeezes the glyph. ledger entry in packages/brand/design-system.md. */
+   it squeezes the glyph. */
 @utility icon-xs {
   inline-size: calc(var(--spacing) * 3) /* 12px */;
   block-size: calc(var(--spacing) * 3) /* 12px */;
@@ -261,7 +370,7 @@
    sized against the text beside it; a pictogram is sized against the surface it
    heads — a feature mark atop a marketing card, or the outcome check or alert
    that IS a panel's or page's message. neither ladder reaches the other's job,
-   which is why there are two. ledger entry in packages/brand/design-system.md. */
+   which is why there are two. */
 @utility pictogram-sm {
   inline-size: calc(var(--spacing) * 7.5) /* 30px */;
   block-size: calc(var(--spacing) * 7.5) /* 30px */;
@@ -280,6 +389,15 @@
   flex-shrink: 0;
 }
 
+/* a button label in sentence case on the control corner: the corner is the
+   same one a bare .btn has, and no uppercase transform is applied. */
+@utility btn-sentence {
+  border-radius: var(--radius);
+  text-transform: none;
+}
+
+/* @deprecated the same rule as btn-sentence; use btn-sentence. kept so copied
+   call sites keep compiling. */
 @utility btn-donate {
   border-radius: var(--radius);
   text-transform: none;
@@ -287,30 +405,42 @@
 
 @utility btn-form-primary {
   background-color: var(--form-primary);
-  color: var(--primary-fg);
-  /* --ring, not --secondary: --secondary is a near-white tint at Lc 0.0
-     against the page, under what apca can measure. --ring is remapped to
-     --form-primary inside #donation-container, so the ring follows
-     the host org's brand rather than pinning a value that may collide with an
-     unknown host page. */
+  color: var(--form-primary-fg);
+  /* --form-ring, not --secondary: --secondary is a near-white tint at Lc 0.0
+     against the page, under what apca can measure. --form-ring is --ring as
+     resolved on :root or the nearest [data-theme] (styles/variables.css), so
+     the ring follows the container's theme and the appearance rather than
+     pinning a value that may collide with an unknown host page. a --ring set
+     on any other element, surface-primary's included, does not reach it; set
+     --form-ring there instead.
+     hover and press mix --form-primary toward black unless the app sets
+     --form-primary-hover or -active: see styles/variables.css. */
   &:focus-visible {
-    outline: 2px solid var(--ring);
+    outline: 2px solid var(--form-ring);
     outline-offset: 2px;
   }
   &:hover:not(:disabled):not([aria-disabled="true"]) {
-    background-color: color-mix(in oklch, var(--form-primary) 90%, black);
+    background-color: var(
+      --form-primary-hover,
+      color-mix(in oklch, var(--form-primary) 90%, black)
+    );
   }
-  &:active {
-    background-color: color-mix(in oklch, var(--form-primary) 85%, black);
+  /* the hover's specificity and after it, so a mouse press reads over it */
+  &:active:not(:disabled):not([aria-disabled="true"]) {
+    background-color: var(
+      --form-primary-active,
+      color-mix(in oklch, var(--form-primary) 90%, black)
+    );
   }
-  &:disabled {
+  &:disabled,
+  &:is(a)[aria-disabled="true"] {
     background-color: var(--gray-3);
     color: var(--gray-11);
   }
-  /* the in-flight rung, matching the six variants in components.css. it cannot
-     be picked up from there: --form-primary is a tenant value and this tier is
-     the only thing that paints it, so a fill it does not restate stays the
-     tenant's brand while the control is submitting. */
+  /* the in-flight rung, the same one the .btn-* variants get in components.css.
+     it cannot be picked up from there: that block does not list this class,
+     and a components-layer rule loses to this utility's own fill anyway, so
+     without it the control keeps its --form-primary fill while submitting. */
   &.pending {
     background-color: var(--gray-3);
     color: var(--gray-11);
@@ -323,14 +453,12 @@
    spacing and display stay the caller's, the same split the type roles keep
    below.
 
-   both rungs are the ramp's, read off the state ladder's filled row rather than
-   picked: step 9 at rest, step 10 hovered. `--primary` is the ledger's one
-   blessed ink for a text-only control; `--primary-hover` is the step the solid
-   variants already hover to, so a link and a button move together.
+   both rungs are the link roles', declared in the theme file: radix's text
+   steps, 11 at rest and 12 hovered, in light and dark.
 
    the hover is that colour shift and nothing else, in every context — an
    underline that appears or disappears on hover is not this recipe. a RESTING
-   underline is still the caller's and sixteen sites keep one.
+   underline is still the caller's.
 
    no `:not([aria-disabled="true"])` guard on the hover, unlike the button
    variants: `styles/base.css` gives a disabled anchor `pointer-events: none`,
@@ -340,16 +468,15 @@
    focus-visible, never focus — the house trigger, the same one `.btn` and every
    control in styles/components.css carries. stated in full rather than left to
    the UA outline that `styles/base.css` already colours: the width and the
-   offset are the ledger's focus row, and a UA outline has neither.
+   offset are the house focus ring, and a UA outline has neither.
 
    a link whose ink is NOT the brand colour is a different thing and keeps its
    own: the contrast ink on a brand fill (the footer, the announcement banner),
-   the error ink in a destructive band. `link-conformance.node.test.ts` names
-   that set. */
+   the error ink in a destructive band. */
 @utility link {
-  color: var(--primary);
+  color: var(--link);
   &:hover {
-    color: var(--primary-hover);
+    color: var(--link-hover);
   }
   &:focus-visible {
     outline: 2px solid var(--ring);
@@ -360,11 +487,10 @@
 /* a band or panel filled with --primary. use instead of bare `bg-primary`
    whenever the fill contains a control: it rebinds --ring and --border for
    everything inside, because the page-level values are drawn against the page
-   and neither is picked to sit on a brand fill. --ring is the ramp's step 8
-   and no longer equals --primary — it went from vanishing into the fill to
-   merely being quiet on it, so this rebind is a smaller win than it was and
-   still the right one. same mechanism as #donation-container's --ring remap in
-   platform's index.css. */
+   and neither is picked to sit on a brand fill. --ring is radix's step 8, drawn
+   against the page, not against --primary; --primary-ring is. it
+   reaches what reads --ring directly; --form-ring was resolved further up, so
+   btn-form-primary inside keeps the theme's ring. */
 @utility surface-primary {
   background-color: var(--primary);
   color: var(--primary-fg);
@@ -409,8 +535,7 @@
 }
 
 /* the in-flow container: a marketing card, a dashboard tile, a figure, a
-   callout, a link tile. the fill, the edge, the corner and the inset — the
-   shell's half of the ownership rule in packages/brand/design-system.md — and
+   callout, a link tile. the fill, the edge, the corner and the inset, and
    nothing else.
 
    radix's card: step 2 (`bg-card`) with a step-6 edge (`border-hairline`, the
@@ -421,7 +546,7 @@
 
    the inset is one value in every role — no tier, and no per-file variant —
    and one step per width: 16px on a phone, 24px from md, the same breakpoint
-   where the page gutter widens (PM, 2026-11-02).
+   where the page gutter widens.
 
    no layout and no type. `grid`, `flex`, a `gap`, a `divide-y`, a heading size
    are the arrangement of the contents, and the arrangement stays the caller's
@@ -430,8 +555,8 @@
 
    a surface with no inset has delegated it and is a different shell — a table
    shell, a `divide-y` list, an `overflow-hidden` media frame. it spells the
-   same fill, edge and corner itself, and `shell-conformance.node.test.ts` is
-   written to leave it alone. */
+   same fill, edge and corner itself, and a sweep for `card` should leave it
+   alone. */
 @utility card {
   @apply bg-card rounded-card border border-hairline p-4 md:p-6;
 }
