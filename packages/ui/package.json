@@ -13,6 +13,7 @@
     ".": "./src/index.ts",
     "./helpers": "./src/helpers/index.ts",
     "./masks": "./src/components/form/masks/index.ts",
+    "./reformat": "./src/components/form/reformat.ts",
     "./tooltip": "./src/components/tooltip.tsx",
     "./hover-card": "./src/components/hover-card.tsx",
     "./styles.css": "./src/styles/index.css",

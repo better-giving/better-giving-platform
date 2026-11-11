@@ -2,7 +2,7 @@ import * as v from "valibot";
 import { target } from "#/components/goal-selector";
 import { img_output } from "#/components/img-editor";
 import { video } from "#/pages/funds/common/videos";
-import { donate_method } from "#/types/components";
+import { donate_method, richtext_max } from "#/types/components";
 import { CAMPAIGN_TYPES } from "@/campaign";
 import {
   donate_freq_opts_bool,
@@ -10,6 +10,7 @@ import {
   MAX_NUM_INCREMENTS,
   segment_shape,
 } from "@/schemas";
+import { STORY_MAX_CHARS } from "./schema";
 
 const day = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/, "invalid date"));
 
@@ -22,15 +23,13 @@ export const form_schema = v.object({
   campaign_type: v.optional(
     v.union([v.literal(""), v.picklist(CAMPAIGN_TYPES)])
   ),
-  description: v.object({
-    value: v.pipe(v.string(story), v.nonEmpty(story)),
-    length: v.optional(
-      v.pipe(
-        v.number(),
-        v.maxValue(8000, ({ requirement: r }) => `max length is ${r} chars`)
-      )
-    ),
-  }),
+  description: v.pipe(
+    v.object({
+      value: v.pipe(v.string(story), v.nonEmpty(story)),
+      length: v.optional(v.number()),
+    }),
+    richtext_max(STORY_MAX_CHARS)
+  ),
   banner: img_output(),
   logo: img_output(),
   videos: v.array(video),

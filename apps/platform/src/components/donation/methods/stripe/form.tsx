@@ -343,6 +343,10 @@ export function Form(props: TMethodState<"stripe">) {
         ref={rhf.amount.ref}
         combobox={combobox}
         amount={rhf.amount.value}
+        // never below 2, so a decimal typed into a whole-number currency (JPY)
+        // still reaches the schema's "must be a whole number" instead of
+        // vanishing
+        places={Math.max(2, currency_precision(rhf.currency.value.code))}
         amount_usd={
           rhf.currency.value.code === "USD"
             ? 0

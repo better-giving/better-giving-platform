@@ -4,6 +4,7 @@ import {
   check,
   custom,
   excludes,
+  gtValue,
   type InferOutput,
   integer,
   lazy,
@@ -25,6 +26,7 @@ import {
   union,
   url,
 } from "valibot";
+import { amount_num, decimal_str } from "./amount";
 import { segment_block } from "./route-segments";
 
 export const file_obj = object({
@@ -153,10 +155,16 @@ export const increment_label = pipe(
   )
 );
 
+/** a goal or a preset takes any decimals: rows from before the 2-decimal
+ * mask hold more, and refusing one would block a save of the fields beside it.
+ * the mask caps what is typed */
+const stored_amount = amount_num(Number.POSITIVE_INFINITY);
+
 export const increment_val = pipe(
-  $req_num_gt0,
-  //parsed output
-  transform((x) => x.toString())
+  $req,
+  stored_amount,
+  gtValue(0, "must be > 0"),
+  transform(decimal_str)
 );
 
 export const increment = object({
@@ -169,13 +177,7 @@ export interface IIncrement extends InferOutput<typeof increment> {}
 export const target = union([
   literal("smart"),
   // "0" - none, `${number}` - fixed
-  pipe(
-    string(),
-    transform((v) => +v),
-    number(),
-    minValue(0),
-    transform((v) => v.toString())
-  ),
+  pipe(stored_amount, minValue(0), transform(decimal_str)),
 ]);
 
 const frequencies = ["one-time", "monthly", "weekly", "annual"] as const;

@@ -60,15 +60,23 @@ function thanks_from(url: URL): {
 export const loader = async ({ params, request, url }: Route.LoaderArgs) => {
   const campaign = await campaign_public(params.org, params.campaign);
   if (!campaign || campaign.owner_npo_id == null) throw resp.status(404);
-  // a published owner with a slug lives at it; its id url is an alias. an
-  // unpublished owner's slug stays out of this public, cached redirect
+  // a published owner with a slug lives at it, and a campaign at its stored
+  // slug: the owner's id url, and either slug in another case (the lookup
+  // matches case-insensitively), are aliases. an unpublished owner's slug stays
+  // out of this public, cached redirect
+  const org_slug = campaign.owner_published ? campaign.owner_slug : null;
   if (
-    /^\d+$/.test(params.org) &&
-    campaign.owner_slug &&
-    campaign.owner_published
+    org_slug &&
+    (params.org !== org_slug || params.campaign !== campaign.slug)
   ) {
+    // a slug edited to change only its case would turn a long-cached
+    // redirect into a loop, so a case-only variant is cached for a minute
+    const case_only =
+      params.org.toLowerCase() === org_slug.toLowerCase() &&
+      params.campaign.toLowerCase() === campaign.slug.toLowerCase();
     throw moved(
-      `${href("/org/:org/:campaign", { org: campaign.owner_slug, campaign: campaign.slug })}${url.search}`
+      `${href("/org/:org/:campaign", { org: org_slug, campaign: campaign.slug })}${url.search}`,
+      case_only ? "public, max-age=60, s-maxage=60" : undefined
     );
   }
   // the campaign page follows its owner: an unpublished owner's pages show only
@@ -140,7 +148,8 @@ export const loader = async ({ params, request, url }: Route.LoaderArgs) => {
       closed: !campaign_accepts(campaign, now),
       now: now.toISOString(),
       base_url: url.origin,
-      canonical: `${url.origin}/org/${params.org}/${params.campaign}`,
+      // the stored slugs, never the casing the visitor typed
+      canonical: `${url.origin}${href("/org/:org/:campaign", { org: org_slug ?? params.org, campaign: campaign.slug })}`,
       prefill_amount_usd: amount,
       prefill_frequency: frequency_ok ?? monthly_default,
       donor_count,

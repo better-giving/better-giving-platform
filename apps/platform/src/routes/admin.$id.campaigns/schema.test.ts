@@ -57,3 +57,44 @@ describe("campaign field messages", () => {
     expect(banner?.message).toBe("Enter a valid https link.");
   });
 });
+
+describe("campaign story length", () => {
+  const story = (n: number) =>
+    JSON.stringify([
+      {
+        _type: "block",
+        _key: "k",
+        style: "normal",
+        markDefs: [],
+        children: [
+          { _type: "span", _key: "s", text: "a".repeat(n), marks: [] },
+        ],
+      },
+    ]);
+  const body = (description_pt: string) => ({
+    name: "Winter",
+    slug: "winter",
+    description_pt,
+    donate_methods: ["stripe"],
+    donate_frequencies: ["one-time"],
+    target: "0",
+  });
+
+  it("refuses a story past 8000 characters on a direct request", () => {
+    const r = safeParse(campaign_body, body(story(8001)));
+    expect(r.issues?.map((i) => i.message)).toContain(
+      "max length is 8000 chars"
+    );
+  });
+
+  it("refuses an oversized body that is not a rich-text document", () => {
+    const r = safeParse(campaign_body, body("x".repeat(8001)));
+    expect(r.issues?.map((i) => i.message)).toContain(
+      "max length is 8000 chars"
+    );
+  });
+
+  it("accepts a story at the cap", () => {
+    expect(safeParse(campaign_body, body(story(8000))).success).toBe(true);
+  });
+});

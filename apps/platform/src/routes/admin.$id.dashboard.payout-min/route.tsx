@@ -1,16 +1,17 @@
-import { Field } from "@better-giving/ui";
 import { valibotResolver } from "@hookform/resolvers/valibot";
 import { X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import type { MetaFunction } from "react-router";
 import { Link, useFetcher, useSearchParams } from "react-router";
 import * as v from "valibot";
+import { MoneyField } from "#/components/money-field";
 import { RouteModal } from "#/components/route-modal";
 import { endowUpdate } from "#/pages/admin/endow-update-action";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
 import { search } from "@/helpers/https";
 import type { INpoUpdate } from "@/npo";
 import { min_payout_amount } from "@/npo/schema";
+import { amount_num } from "@/schemas/amount";
 
 interface IContent {
   prev: number;
@@ -21,7 +22,8 @@ export const action = endowUpdate({ redirect: ".." });
 
 export const amount = v.pipe(
   v.string(),
-  v.transform((x) => +x),
+  v.nonEmpty("Please enter an amount"),
+  amount_num(),
   v.minValue(min_payout_amount, (x) => `minimum is $${x.requirement}`),
   v.transform((x) => x.toString())
 );
@@ -56,7 +58,7 @@ function Content(props: IContent) {
 
   const {
     handleSubmit,
-    register,
+    control,
     formState: { errors, isDirty },
   } = useForm({
     defaultValues: { amount: props.prev.toString() || "" },
@@ -88,12 +90,13 @@ function Content(props: IContent) {
         </Link>
       </div>
 
-      <Field
+      <MoneyField
         sub="Grant amount to accumulate to trigger payout"
         required
         label="Amount (USD)"
         placeholder="e.g. $100"
-        {...register("amount")}
+        control={control}
+        name="amount"
         error={errors.amount?.message}
         classes="mb-4"
       />

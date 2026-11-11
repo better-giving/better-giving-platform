@@ -4,7 +4,7 @@ import type { IDonation, IStripeIntentReturn } from "@/donations";
 import { rd2num } from "@/helpers/decimal";
 import { resp } from "@/helpers/https";
 import { db } from "$/pg/db";
-import { donation_put } from "$/pg/queries/donation";
+import { donation_put, donation_update } from "$/pg/queries/donation";
 import type { Provider } from "../types";
 import { customer_with_currency } from "./customer-with-currency";
 import { npo_descriptor_suffix } from "./descriptor-suffix";
@@ -79,6 +79,10 @@ export const stripe_intent: Provider = async ({
           })
         : await setup_intent(don.id, customer_id, don.currency, bank_only);
   } catch (err) {
+    // no intent exists, so nothing can ever pay this row. left as `created` it
+    // would read as a checkout that might still be paid, and keep its campaign
+    // from being deleted
+    await donation_update(db, don.id, { status: "failed" }).catch(() => {});
     const refusal = donor_refusal(err);
     if (!refusal) throw err;
     // 4xx is kept off sentry, so this line is the only record of the refusal

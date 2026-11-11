@@ -1,8 +1,9 @@
-import { Field, Select } from "@better-giving/ui";
+import { Select } from "@better-giving/ui";
 import { valibotResolver } from "@hookform/resolvers/valibot";
 import { InfoIcon } from "lucide-react";
 import { useEffect } from "react";
 import { useController, useForm } from "react-hook-form";
+import { MoneyField } from "#/components/money-field";
 import { humanize } from "@/helpers/decimal";
 import { type Props, type Schema, type Source, schema, sources } from "./types";
 
@@ -14,13 +15,13 @@ const opts_display: { [K in Source]: string } = {
 export function Panel(props: Props) {
   const {
     handleSubmit,
-    register,
     formState: { errors, isDirty },
     control,
     setError,
     setValue,
   } = useForm<Schema>({
     defaultValues: {
+      amount: "",
       // the dashboard offers both sources; a blank select there read as a
       // control with nothing in it, so it opens on the first like the presets
       source: props.from ?? sources[0],
@@ -72,12 +73,13 @@ export function Panel(props: Props) {
         }
         disabled={props.is_submitting || !!props.from}
       />
-      <Field
+      <MoneyField
         classes="mt-5"
         required
         label="Amount"
-        {...register("amount")}
-        placeholder="e.g. $ 100"
+        control={control}
+        name="amount"
+        placeholder="e.g. 100"
         error={errors.amount?.message}
       />
 

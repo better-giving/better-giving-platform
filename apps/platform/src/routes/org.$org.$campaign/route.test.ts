@@ -251,6 +251,85 @@ describe("public campaign page", () => {
     );
   });
 
+  describe("casing", () => {
+    async function publish(npo_id: number) {
+      await test_db
+        .current!.db.update(npos)
+        .set({ published: true })
+        .where(eq(npos.id, npo_id));
+    }
+
+    it.each([
+      ["https://x/org/Acme/winter?amount=50", "/org/acme/winter?amount=50"],
+      ["https://x/org/acme/Winter", "/org/acme/winter"],
+      ["https://x/org/ACME/WINTER?a=1&b=2", "/org/acme/winter?a=1&b=2"],
+    ])("301s %s to the stored slugs, keeping the query", async (url, to) => {
+      const npo = await org();
+      await publish(npo.id);
+      await campaign(npo.id);
+
+      const res = await load(url).catch((e: unknown) => e);
+
+      expect(res).toBeInstanceOf(Response);
+      expect((res as Response).status).toBe(301);
+      expect((res as Response).headers.get("location")).toBe(to);
+    });
+
+    it("caches a case-only 301 for a minute, so a case-only rename can't loop", async () => {
+      const npo = await org();
+      await publish(npo.id);
+      await campaign(npo.id);
+
+      const res = (await load("https://x/org/Acme/winter").catch(
+        (e: unknown) => e
+      )) as Response;
+
+      expect(res.headers.get("cache-control")).toBe(
+        "public, max-age=60, s-maxage=60"
+      );
+    });
+
+    it("keeps the long cache on the id alias, which no rename reverses", async () => {
+      const npo = await org();
+      await publish(npo.id);
+      await campaign(npo.id);
+
+      const res = (await load(`https://x/org/${npo.id}/winter`).catch(
+        (e: unknown) => e
+      )) as Response;
+
+      expect(res.headers.get("cache-control")).toBe(
+        "public, max-age=3600, s-maxage=86400"
+      );
+    });
+
+    it("serves the exact stored slugs, with them as the canonical url", async () => {
+      const npo = await org();
+      await publish(npo.id);
+      await campaign(npo.id);
+
+      const data = await load("https://x/org/acme/winter");
+
+      expect(data.canonical).toBe("https://x/org/acme/winter");
+    });
+
+    it("keeps an unpublished owner's slug out of a cached redirect", async () => {
+      const npo = await org();
+      await test_db
+        .current!.db.update(npos)
+        .set({ published: false })
+        .where(eq(npos.id, npo.id));
+      await campaign(npo.id);
+
+      const res = await respond("https://x/org/Acme/winter").catch(
+        (e: unknown) => e
+      );
+
+      expect(res).toBeInstanceOf(Response);
+      expect((res as Response).status).toBe(404);
+    });
+  });
+
   async function unpublish(npo_id: number) {
     await test_db
       .current!.db.update(npos)
@@ -1349,11 +1428,11 @@ describe("campaign page structured data", () => {
     }
   );
 
-  it("joins the owner's profile node whatever case the link was typed in", async () => {
+  it("joins the owner's profile node at the stored slugs (another case redirects there)", async () => {
     const npo = await org();
     await campaign(npo.id);
 
-    const [page] = lds_of(await meta_of("https://x/org/ACME/winter"));
+    const [page] = lds_of(await meta_of("https://x/org/acme/winter"));
 
     expect(page.about.parentOrganization).toMatchObject({
       "@id": `${base_url}/org/acme#org`,

@@ -9,7 +9,6 @@ import {
   Select,
 } from "@better-giving/ui";
 import { valibotResolver } from "@hookform/resolvers/valibot";
-import { DollarSign } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   type FieldPath,
@@ -26,6 +25,7 @@ import {
   to_target,
 } from "#/components/goal-selector";
 import { ImgEditor } from "#/components/img-editor";
+import { MoneyField } from "#/components/money-field";
 import { RichText, to_content } from "#/components/rich-text";
 import { img_spec } from "#/pages/funds/common";
 import { Videos } from "#/pages/funds/common/videos";
@@ -37,6 +37,7 @@ import { publish_lock_body } from "./copy";
 import { type FV, form_schema } from "./form-schema";
 import { link_from_name } from "./link";
 import { LinkField } from "./link-field";
+import { STORY_MAX_CHARS } from "./schema";
 
 const TYPE_LABEL: Record<(typeof CAMPAIGN_TYPES)[number], string> = {
   year_end: "Year-end",
@@ -428,7 +429,7 @@ export function CampaignForm({
           content={desc.value}
           onChange={desc.onChange}
           placeHolder="The story of this campaign"
-          charLimit={8000}
+          charLimit={STORY_MAX_CHARS}
           classes={{
             container: "min-w-0",
             field:
@@ -495,8 +496,10 @@ export function CampaignForm({
           onChange={target_type.onChange}
         />
         {target_type.value === "fixed" && (
-          <Field
-            {...register("target.value", { shouldUnregister: true })}
+          <MoneyField
+            control={control}
+            name="target.value"
+            unregister
             label="Amount to raise"
             classes="mt-2"
             placeholder="$"
@@ -534,19 +537,20 @@ export function CampaignForm({
         countError={errors.increments?.root?.message}
         field={(idx) => (
           <>
-            <BaseField.Root className="grid grid-rows-subgrid row-span-2">
-              <div className="relative w-full">
-                <DollarSign className="text-gray-11 absolute top-1/2 left-2 -translate-y-1/2 icon-md" />
-                <input
-                  type="number"
-                  {...register(`increments.${idx}.value`)}
-                  className="w-full h-full outline-ring rounded text-sm font-medium bg-surface pl-8 pr-4 py-3.5 border border-input hover:border-input-hover"
-                />
-              </div>
-              <p className="mt-1 empty:hidden text-left text-xs text-destructive-subtle-fg">
-                {errors.increments?.[idx]?.value?.message}
-              </p>
-            </BaseField.Root>
+            <MoneyField
+              control={control}
+              name={`increments.${idx}.value`}
+              label={`Increment ${idx + 1} amount`}
+              placeholder="$"
+              classes={{
+                // a cell of the Increments subgrid: the "Amount" column header is
+                // the visible label
+                container: "grid grid-rows-subgrid row-span-2",
+                label: "sr-only",
+                input: "h-full font-medium",
+              }}
+              error={errors.increments?.[idx]?.value?.message}
+            />
             <BaseField.Root className="grid grid-rows-subgrid row-span-2">
               <textarea
                 {...register(`increments.${idx}.label`)}

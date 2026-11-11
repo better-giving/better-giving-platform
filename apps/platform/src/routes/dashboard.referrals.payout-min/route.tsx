@@ -1,12 +1,14 @@
 import { Field } from "@ark-ui/react/field";
 import { valibotResolver } from "@hookform/resolvers/valibot";
-import { useForm } from "react-hook-form";
+import { useController, useForm } from "react-hook-form";
 import { useFetcher, useSearchParams } from "react-router";
 import * as v from "valibot";
+import { useMoneyInput } from "#/components/money-field";
 import { RouteModal } from "#/components/route-modal";
 import { config } from "#/pages/user-dashboard/referrals/config";
 import { search } from "@/helpers/https";
 import { $req } from "@/schemas";
+import { amount_num } from "@/schemas/amount";
 import type { Route } from "./+types/route";
 
 interface IContent {
@@ -28,12 +30,13 @@ export default function Page({ loaderData: user }: Route.ComponentProps) {
   );
 }
 
-const schema = v.object({
+export const schema = v.object({
   amount: v.lazy((x) => {
     if (!x) return $req;
     return v.pipe(
       $req,
-      v.transform((x) => +x),
+      // whole dollars: the `pay_min` column is an integer
+      amount_num(0),
       v.minValue(config.pay_min, `pay_minimum of $${config.pay_min}`),
       v.transform((x) => x.toString())
     );
@@ -46,11 +49,18 @@ function Content(props: IContent) {
 
   const {
     handleSubmit,
-    register,
+    control,
     formState: { errors, isDirty },
   } = useForm<FV>({
     defaultValues: { amount: props.prev.toString() || "" },
     resolver: valibotResolver(schema),
+  });
+  const { field } = useController({ control, name: "amount" });
+  const money = useMoneyInput({
+    value: field.value,
+    onChange: field.onChange,
+    places: 0,
+    ref: field.ref,
   });
 
   return (
@@ -69,7 +79,9 @@ function Content(props: IContent) {
         </Field.Label>
         <input
           placeholder="e.g. $ 100"
-          {...register("amount")}
+          name={field.name}
+          onBlur={field.onBlur}
+          {...money}
           className="field-input"
         />
         <span className="text-destructive-subtle-fg text-xs text-right empty:hidden mt-1">

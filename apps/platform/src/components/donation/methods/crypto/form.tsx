@@ -162,6 +162,12 @@ export function Form(props: TMethodState<"crypto">) {
         combobox={combobox}
         ref={token.ref}
         amount={token.value.amount}
+        // the picked token's own decimals; no cap until one is picked
+        places={
+          token.value.id
+            ? Math.max(2, token.value.precision)
+            : Number.POSITIVE_INFINITY
+        }
         amount_usd={token.value.usdpu * +token.value.amount}
         on_change={(x) => token.onChange({ ...token.value, amount: x })}
         error={

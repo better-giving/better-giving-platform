@@ -1,21 +1,21 @@
-import { Field } from "@better-giving/ui";
 import { valibotResolver } from "@hookform/resolvers/valibot";
 import { InfoIcon, MoveLeft, MoveRight } from "lucide-react";
 import { useEffect } from "react";
 import { useController, useForm } from "react-hook-form";
+import { MoneyField } from "#/components/money-field";
 import { humanize } from "@/helpers/decimal";
 import { type Props, type Schema, schema } from "./types";
 
 export function Panel(props: Props) {
   const {
     handleSubmit,
-    register,
     formState: { errors, isDirty },
     control,
     setError,
     setValue,
   } = useForm<Schema>({
     defaultValues: {
+      amount: "",
       source: props.from || "liq",
       bals: props.bals,
     },
@@ -119,12 +119,13 @@ export function Panel(props: Props) {
         </div>
       )}
 
-      <Field
+      <MoneyField
         classes="mt-4"
         required
         label="Amount"
-        {...register("amount")}
-        placeholder="e.g. $ 100"
+        control={control}
+        name="amount"
+        placeholder="e.g. 100"
         error={errors.amount?.message}
       />
 

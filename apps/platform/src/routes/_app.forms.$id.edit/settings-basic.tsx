@@ -1,11 +1,11 @@
 import { Field as BaseField } from "@ark-ui/react/field";
 import { Field, Form, Increments } from "@better-giving/ui";
 import { valibotResolver } from "@hookform/resolvers/valibot";
-import { DollarSign } from "lucide-react";
 import { useController, useFieldArray, useForm } from "react-hook-form";
 import { DonateFrequencies } from "#/components/donate-frequencies";
 import { DonateMethods } from "#/components/donate-methods";
 import { GoalSelector } from "#/components/goal-selector";
+import { MoneyField } from "#/components/money-field";
 import { bg_accent_primary, bg_accent_secondary } from "#/styles/colors";
 import { increment_label_max_chars } from "@/schemas";
 import { type FVBasic, schema_basic } from "./types";
@@ -115,21 +115,20 @@ export function SettingsBasic({
         countError={errors.increments?.root?.message}
         field={(idx) => (
           <>
-            <BaseField.Root className="grid grid-rows-subgrid row-span-2">
-              <div className="relative w-full">
-                <DollarSign className="text-gray-11 absolute top-1/2 left-3 -translate-y-1/2 icon-sm" />
-                <input
-                  type="number"
-                  placeholder="0.00"
-                  step="any"
-                  {...register(`increments.${idx}.value`)}
-                  className="field-input h-full pl-8 font-medium"
-                />
-              </div>
-              <p className="mt-1 empty:hidden text-left text-xs text-destructive-subtle-fg">
-                {errors.increments?.[idx]?.value?.message}
-              </p>
-            </BaseField.Root>
+            <MoneyField
+              control={control}
+              name={`increments.${idx}.value`}
+              label={`Increment ${idx + 1} amount`}
+              placeholder="$"
+              classes={{
+                // a cell of the Increments subgrid: the "Amount" column header is
+                // the visible label
+                container: "grid grid-rows-subgrid row-span-2",
+                label: "sr-only",
+                input: "h-full font-medium",
+              }}
+              error={errors.increments?.[idx]?.value?.message}
+            />
             <BaseField.Root className="grid grid-rows-subgrid row-span-2">
               <textarea
                 rows={2}
@@ -151,8 +150,10 @@ export function SettingsBasic({
         <p className="label mb-3">Donation goal</p>
         <GoalSelector value={target.value} onChange={target.onChange} />
         {target.value === "fixed" && (
-          <Field
-            {...register("target.value", { shouldUnregister: true })}
+          <MoneyField
+            control={control}
+            name="target.value"
+            unregister
             label="How much money do you want to raise?"
             required
             classes="mt-4 mb-6"

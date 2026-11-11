@@ -23,6 +23,8 @@ const pay_min = v.pipe(
   v.transform(Number),
   v.number(),
   v.finite("pay_min must be a number"),
+  // the `pay_min` column is an integer: postgres refuses "100.5" outright
+  v.integer("pay_min must be whole dollars"),
   v.minValue(config.pay_min, `pay_min floor is $${config.pay_min}`)
 );
 

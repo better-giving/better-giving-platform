@@ -39,8 +39,10 @@ export {
   RmxForm,
   useRmxForm,
 } from "./components/form/form";
+export type { IMask } from "./components/form/mask-types";
 export { ornament_end_cls } from "./components/form/ornament";
 export type { Classes as FormClasses } from "./components/form/types";
+export { useMaskedInput } from "./components/form/use-masked-input";
 // not in the published set: it renders an sr-only bait input with no visual
 // state at all, so there is nothing for the design agent to see or vary.
 export { Honeypot } from "./components/honeypot";

@@ -274,7 +274,7 @@ describe("payment method form state persistence", () => {
 
     await expect
       .element(screen.getByPlaceholder(/enter amount/i))
-      .toHaveValue("1000");
+      .toHaveValue("1,000");
   });
 
   test("form state persists after going to checkout from one method and switching to another", async () => {

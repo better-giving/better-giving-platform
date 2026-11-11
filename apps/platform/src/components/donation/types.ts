@@ -9,6 +9,7 @@ import {
   type IIncrement,
   type TFrequency,
 } from "@/schemas";
+import { amount_num, decimal_str } from "@/schemas/amount";
 
 export type { IDonorFv, ITribute } from "@/donations/schema";
 
@@ -53,11 +54,11 @@ export const amount = ({ required = false } = {}) =>
       return v.pipe(v.string(), v.nonEmpty("Please enter an amount"));
     }
     return v.pipe(
-      v.string(),
-      v.transform((x) => +x),
-      v.number("Please enter a valid number"),
+      // no decimals cap here: the currency's or token's own precision is the
+      // check that follows, with its own message
+      amount_num(Number.POSITIVE_INFINITY),
       v.gtValue(0, "amount must be greater than 0"),
-      v.transform((x) => x.toString())
+      v.transform(decimal_str)
     );
   });
 
