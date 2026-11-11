@@ -60,6 +60,8 @@ export interface IRow {
   recipient_id: number;
   allocation?: IAllocation;
   status?: "settled" | "refunded" | "refunded_loss";
+  /** a reversed duplicate: its dist reads `refunded`, but no refund was made */
+  cancelled?: boolean;
   stripe_payout?: TStripePayout;
 }
 
@@ -102,6 +104,7 @@ export const to_csv_row = (x: INpoDonation): IRow => {
     recipient_id: x.to_id ?? 0,
     allocation: x.alloc ?? undefined,
     status: x.status,
+    cancelled: x.donation_status === "cancelled",
     stripe_payout: stripe_payout_of(x),
   };
   return row;

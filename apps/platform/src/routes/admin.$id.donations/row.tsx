@@ -70,7 +70,16 @@ export function Row(props: IRow) {
             tip={
               <Content className="max-w-xs text-xs">
                 <Arrow />
-                Refunded
+                {props.cancelled ? (
+                  <>
+                    <span className="font-semibold">Cancelled</span>
+                    <br />
+                    Recorded twice. This duplicate was cancelled, so it doesn't
+                    count toward your totals. No refund was made.
+                  </>
+                ) : (
+                  "Refunded"
+                )}
               </Content>
             }
           >

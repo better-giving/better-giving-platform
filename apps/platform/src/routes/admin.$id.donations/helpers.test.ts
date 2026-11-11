@@ -39,6 +39,7 @@ const dist: INpoDonation = {
   stripe_transfer_created_at: null,
   refunds_cut_share: null,
   settled_net: null,
+  donation_status: "settled",
   frequency: "one-time",
   via: "stripe",
   source: "bg-marketplace",
@@ -125,5 +126,28 @@ describe("to_csv_row's stripe payout", () => {
       stripe_transfer_id: "tr_1",
     });
     expect(row.stripe_payout).toBe("reversed");
+  });
+});
+
+describe("to_csv_row's cancelled flag", () => {
+  test("a reversed duplicate (donation cancelled, dist refunded) is cancelled", () => {
+    const row = to_csv_row({
+      ...dist,
+      status: "refunded",
+      donation_status: "cancelled",
+    });
+    expect(row).toMatchObject({ status: "refunded", cancelled: true });
+  });
+
+  test.each(["refunded", "refunded_loss"] as const)(
+    "a real %s refund is not cancelled",
+    (status) => {
+      const row = to_csv_row({ ...dist, status, donation_status: status });
+      expect(row.cancelled).toBe(false);
+    }
+  );
+
+  test("a settled donation is not cancelled", () => {
+    expect(to_csv_row(dist).cancelled).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 import { createRoutesStub } from "react-router";
 import { describe, expect, test } from "vitest";
+import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import type { IRow } from "./helpers";
 import { Row } from "./row";
@@ -92,10 +93,47 @@ describe("a reversed donation's net", () => {
     const figure = net.element().firstElementChild as HTMLElement;
     return {
       struck: getComputedStyle(figure).textDecorationLine === "line-through",
-      // the "Refunded" tooltip's trigger
+      // the reversal tooltip's trigger
       flagged: net.element().querySelector("svg") !== null,
     };
   }
+
+  async function tip_of(row: IRow) {
+    const Stub = createRoutesStub([
+      {
+        path: "/",
+        Component: () => (
+          <table>
+            <tbody>
+              <tr>
+                <Row {...row} />
+              </tr>
+            </tbody>
+          </table>
+        ),
+      },
+    ]);
+    const screen = await render(<Stub initialEntries={["/"]} />);
+    const net = screen.getByRole("cell").nth(6);
+    await expect.element(net).toBeVisible();
+    await userEvent.hover(net.element().querySelector("svg") as Element);
+    return screen;
+  }
+
+  test("a cancelled duplicate strikes its net and says Cancelled, not Refunded", async () => {
+    const row = { ...refunded, cancelled: true };
+    expect(await render_row(row)).toEqual({ struck: true, flagged: true });
+    const screen = await tip_of(row);
+    await expect.element(screen.getByText("Cancelled")).toBeVisible();
+    await expect.element(screen.getByText(/No refund was made/)).toBeVisible();
+    expect(screen.container.textContent).not.toMatch(/Refunded/);
+  });
+
+  test("a real refund still says Refunded", async () => {
+    const screen = await tip_of({ ...refunded, cancelled: false });
+    await expect.element(screen.getByText("Refunded")).toBeVisible();
+    expect(screen.container.textContent).not.toMatch(/Cancelled/);
+  });
 
   test.each(["refunded", "refunded_loss"] as const)(
     "a %s row strikes its net and flags it refunded",
