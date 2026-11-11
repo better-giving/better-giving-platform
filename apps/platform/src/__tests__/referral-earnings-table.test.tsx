@@ -33,7 +33,7 @@ describe.each([
     return tip;
   }
 
-  test("a cancelled duplicate says Cancelled and that it earns no commission", async () => {
+  test("a cancelled duplicate says Cancelled, recorded twice, no refund made", async () => {
     const tip = await tip_of({ donation_status: "cancelled" });
     await expect
       .element(tip)
