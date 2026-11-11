@@ -7,6 +7,9 @@ import { BANK_PAYOUT_SENTENCE } from "./rows";
 export interface IBankPayoutSection {
   /** the bank accounts table; absent while none is on file */
   table?: ReactNode;
+  /** a default bank is on file and takes payouts. a non-empty table alone
+   *  doesn't mean so: it lists rejected and under-review accounts too */
+  has_bank: boolean;
   /** the nonprofit's Stripe account */
   stripe_status: TConnectStatus;
   /** the held-money card shows above, carrying its own Add bank account, so
@@ -25,6 +28,7 @@ export interface IBankPayoutSection {
  *  one */
 export function BankPayoutSection({
   table,
+  has_bank,
   stripe_status,
   holds_money,
   bank_pending = false,
@@ -44,7 +48,7 @@ export function BankPayoutSection({
           </h2>
           <p className="text-sm text-gray-11 max-w-3xl">
             {BANK_PAYOUT_SENTENCE}
-            {table && stripe_ready && (
+            {has_bank && stripe_ready && (
               <>
                 {" "}
                 Everything except card, bank and wallet donations pays out here.

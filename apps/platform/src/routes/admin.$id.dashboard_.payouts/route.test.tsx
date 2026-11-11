@@ -305,7 +305,7 @@ describe("the payouts page", () => {
     await expect
       .element(
         region.getByText(
-          "Card, bank and wallet donations, each sent here as its own transfer, after fees. What Stripe has paid on to your bank is in your Stripe dashboard."
+          "Card, bank and wallet donations are sent to your Stripe account, each as its own transfer, after fees. What Stripe has paid on to the bank on your Stripe account is in your Stripe dashboard."
         )
       )
       .toBeVisible();
@@ -610,7 +610,7 @@ describe("the payouts page", () => {
       await expect
         .element(
           earlier.getByText(
-            "Card, bank and wallet donations sent to your Stripe account before. New ones pay out to your bank. What Stripe has paid on to your bank is in your Stripe dashboard."
+            "Your Stripe account is connected but no longer receives card, bank and wallet donations, so new ones pay out to your bank. These were made while it received them. What Stripe has paid on to the bank on your Stripe account is in your Stripe dashboard."
           )
         )
         .toBeVisible();
@@ -618,7 +618,7 @@ describe("the payouts page", () => {
       await expect
         .element(
           where.getByText(
-            "Card, bank and wallet donations sent to your Stripe account before. New ones are not sent there."
+            "Card, bank and wallet donations made while your Stripe account received them. New ones are not sent there."
           )
         )
         .toBeVisible();
@@ -771,7 +771,7 @@ describe("SentToStripe", () => {
     await expect
       .element(
         screen.getByText(
-          /^Showing the most recent\. Card, bank and wallet donations, each sent here/
+          /^Showing the most recent\. Card, bank and wallet donations are sent to your Stripe account/
         )
       )
       .toBeVisible();

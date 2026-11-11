@@ -51,6 +51,7 @@ function Page({ loaderData, params }: Route.ComponentProps) {
             </div>
           ) : undefined
         }
+        has_bank={has_bank}
         stripe_status={stripe.status}
         holds_money={holds_money}
         bank_pending={bank_pending}

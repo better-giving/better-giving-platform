@@ -47,12 +47,12 @@ const list_copy = (
     case "on":
       return {
         heading: "Sent to your Stripe account",
-        lead: "Card, bank and wallet donations, each sent here as its own transfer, after fees.",
+        lead: "Card, bank and wallet donations are sent to your Stripe account, each as its own transfer, after fees.",
       };
     case "off":
       return {
         heading: "Sent to Stripe earlier",
-        lead: `Card, bank and wallet donations sent to your Stripe account before. New ones ${has_bank ? "pay out to your bank" : held_for_bank(bank_pending)}.`,
+        lead: `Your Stripe account is connected but no longer receives card, bank and wallet donations, so new ones ${has_bank ? "pay out to your bank" : held_for_bank(bank_pending)}. These were made while it received them.`,
       };
     case "waiting":
       return {
@@ -168,7 +168,8 @@ export function SentToStripe({
         </h2>
         <p className="text-sm text-gray-11 max-w-3xl">
           {sent.truncated && "Showing the most recent. "}
-          {copy.lead} What Stripe has paid on to your bank is in your{" "}
+          {copy.lead} What Stripe has paid on to the bank on your Stripe account
+          is in your{" "}
           <ExtLink
             href="https://dashboard.stripe.com/"
             className="inline-flex items-center gap-1 link"
@@ -275,7 +276,7 @@ const wells = (link: TStripeLink, bank: IBank): [IWell, IWell] => {
           title: "Payouts",
           detail: has_bank
             ? "PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before Stripe was ready: the Grant share of each, sent to your bank."
-            : `PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before Stripe was ready: the Grant share of each that was sent to your bank before. New PayPal, DAF, crypto, stock and cheque donations ${held_for_bank(bank_pending)}.`,
+            : `PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before Stripe was ready: the Grant share of each that was sent to your bank before. New PayPal, DAF grants, crypto, stocks and cheques, and Savings and Investments withdrawals, ${held_for_bank(bank_pending)}.`,
         },
       ];
     case "off":
@@ -285,7 +286,7 @@ const wells = (link: TStripeLink, bank: IBank): [IWell, IWell] => {
           title,
           detail:
             link === "off"
-              ? "Card, bank and wallet donations sent to your Stripe account before. New ones are not sent there."
+              ? "Card, bank and wallet donations made while your Stripe account received them. New ones are not sent there."
               : "Nothing has been sent to your Stripe account. New card, bank and wallet donations are not sent there.",
         },
         {

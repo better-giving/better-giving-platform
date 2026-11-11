@@ -32,7 +32,7 @@ describe("no bank on file: nothing promises a bank payout", () => {
     [
       "Stripe off",
       off(),
-      "Card, bank and wallet donations sent to your Stripe account before. New ones wait in your Better Giving balance until you add a bank account.",
+      "Your Stripe account is connected but no longer receives card, bank and wallet donations, so new ones wait in your Better Giving balance until you add a bank account. These were made while it received them.",
     ],
     [
       "Stripe disconnected",
@@ -80,7 +80,7 @@ describe("a bank under review: new donations wait for its approval", () => {
     [
       "Stripe off",
       off(),
-      "Card, bank and wallet donations sent to your Stripe account before. New ones wait in your Better Giving balance until your bank account is approved.",
+      "Your Stripe account is connected but no longer receives card, bank and wallet donations, so new ones wait in your Better Giving balance until your bank account is approved. These were made while it received them.",
     ],
     [
       "Stripe disconnected",
@@ -300,6 +300,17 @@ describe("routed donations with no transfer", () => {
     expect(screen.container.textContent).not.toMatch(
       /isn't receiving|Nothing has been sent/
     );
+    // no transfer went out, so neither the lead nor the well claims one did
+    await expect
+      .element(
+        screen.getByText(
+          "Card, bank and wallet donations made while your Stripe account received them. New ones are not sent there."
+        )
+      )
+      .toBeVisible();
+    expect(screen.container.textContent).not.toMatch(
+      /sent to your Stripe account/
+    );
   });
 });
 
@@ -309,7 +320,7 @@ describe("Stripe on: the Payouts well follows the bank", () => {
     "PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before Stripe was ready:";
 
   test("a bank on file: the Grant share of each is sent to it", async () => {
-    const screen = await render(<WhereMoneyShows link={link} />);
+    const screen = await render(<WhereMoneyShows link={link} has_bank />);
     await expect
       .element(
         screen.getByText(`${PRIOR} the Grant share of each, sent to your bank.`)
@@ -341,7 +352,7 @@ describe("Stripe on: the Payouts well follows the bank", () => {
       await expect
         .element(
           screen.getByText(
-            `${PRIOR} the Grant share of each that was sent to your bank before. New PayPal, DAF, crypto, stock and cheque donations ${wait}.`
+            `${PRIOR} the Grant share of each that was sent to your bank before. New PayPal, DAF grants, crypto, stocks and cheques, and Savings and Investments withdrawals, ${wait}.`
           )
         )
         .toBeVisible();

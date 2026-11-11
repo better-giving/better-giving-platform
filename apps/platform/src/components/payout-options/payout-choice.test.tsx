@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { createRoutesStub } from "react-router";
 import { describe, expect, test, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
 import { BankRequired } from "./bank-required";
@@ -41,6 +42,13 @@ const held_badges = (dl: HTMLElement) =>
     d.textContent?.startsWith("Held")
   ).length;
 
+/** the option card around a radio */
+const card_of = (screen: TScreen, name: string) =>
+  screen
+    .getByRole("radio", { name, exact: true })
+    .element()
+    .closest(".rounded-card") as HTMLElement;
+
 const READY_CELL =
   "Straight to your Stripe account as each donation's own transfer, after fees. They skip your split.";
 
@@ -68,6 +76,25 @@ describe("PayoutChoice option cards", () => {
     ],
     [
       "not_connected",
+      true,
+      { first: "Until then, they go to your bank.", others: "", held: 0 },
+    ],
+    [
+      "pending",
+      false,
+      {
+        first: "They skip your split. Until then they're held.",
+        others: "until you add a bank account.",
+        held: 3,
+      },
+    ],
+    [
+      "incomplete",
+      true,
+      { first: "Until then, they go to your bank.", others: "", held: 0 },
+    ],
+    [
+      "pending",
       true,
       { first: "Until then, they go to your bank.", others: "", held: 0 },
     ],
@@ -150,6 +177,32 @@ describe("PayoutChoice option cards", () => {
         .toBeVisible();
     }
   );
+
+  test("an option card firms its edge only over the part that selects", async () => {
+    const screen = await render_choice();
+    await expect
+      .element(screen.getByRole("radio", { name: "Bank", exact: true }))
+      .toBeInTheDocument();
+    const card = card_of(screen, "Bank");
+    const edge = () => getComputedStyle(card).borderTopColor;
+    const rest = edge();
+    await userEvent.hover(card.querySelector("dl") as HTMLElement);
+    expect(edge()).toBe(rest);
+    await userEvent.hover(card.querySelector("label") as HTMLElement);
+    await expect.poll(edge).not.toBe(rest);
+  });
+
+  test("the chosen card keeps its primary edge under the pointer", async () => {
+    const screen = await render_choice({ selected: "bank", bank_saved: true });
+    await expect
+      .element(screen.getByRole("radio", { name: "Bank", exact: true }))
+      .toBeChecked();
+    const card = card_of(screen, "Bank");
+    const edge = () => getComputedStyle(card).borderTopColor;
+    const chosen = edge();
+    await userEvent.hover(card.querySelector("label") as HTMLElement);
+    expect(edge()).toBe(chosen);
+  });
 });
 
 describe("PayoutChoice summaries", () => {
@@ -249,6 +302,43 @@ describe("PayoutChoice hints and intro", () => {
     const screen = await render_choice(props);
 
     await expect.element(screen.getByText(line, { exact: true })).toBeVisible();
+  });
+
+  test("nothing chosen: Continue is held, described by its hint, which sits under it on its right edge", async () => {
+    const onSelect = vi.fn();
+    const screen = await render_choice({ onSelect });
+    const next = screen.getByRole("link", { name: "Continue", exact: true });
+    const hint = screen.getByText("Choose an option to continue.");
+
+    await expect.element(next).toHaveAttribute("aria-disabled", "true");
+    await expect.element(hint).toBeVisible();
+    await expect
+      .element(next)
+      .toHaveAccessibleDescription("Choose an option to continue.");
+
+    // the <p> is a full-width block, so its box shares Continue's right edge
+    // however the text is aligned; the text's own extent is what moves
+    const text = document.createRange();
+    text.selectNodeContents(hint.element());
+    const text_box = text.getBoundingClientRect();
+    const next_box = next.element().getBoundingClientRect();
+    expect(Math.abs(text_box.right - next_box.right)).toBeLessThan(1);
+    expect(text_box.top).toBeGreaterThanOrEqual(next_box.bottom - 1);
+    expect(text_box.top - next_box.bottom).toBeLessThan(16);
+
+    await screen.getByText("Stripe", { exact: true }).click();
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith("stripe");
+  });
+
+  test("an option set up: Back and Continue go where the step says", async () => {
+    const screen = await render_choice({ selected: "bank", bank_saved: true });
+
+    await expect
+      .element(screen.getByRole("link", { name: "Back", exact: true }))
+      .toHaveAttribute("href", "/back");
+    await expect
+      .element(screen.getByRole("link", { name: "Continue", exact: true }))
+      .toHaveAttribute("href", "/next");
   });
 
   test("stripe chosen without a link: Continue is held and says why", async () => {
@@ -352,7 +442,9 @@ describe("BankRequired", () => {
     expect(text).toContain("including card, bank and wallet donations");
     expect(text).toContain("pays out to your bank");
     expect(text).not.toMatch(/headquartered/i);
-    await expect.element(screen.getByText("form")).toBeVisible();
+    await expect
+      .element(screen.getByText("form", { exact: true }))
+      .toBeVisible();
   });
 
   test("outside the transfer set: names the country and where Stripe is offered", async () => {
@@ -402,9 +494,17 @@ describe("SavedBank", () => {
     await expect
       .element(screen.getByRole("link", { name: "Bank statement" }))
       .toHaveAttribute("href", "https://example.com/s.pdf");
+    // the heading already says it: no "Bank payout:" lead-in
     await expect
-      .element(screen.getByText(/every 3 days/i))
-      .toMatchTextContent(/payout minimum/);
+      .element(
+        screen
+          .getByRole("region", { name: "Bank payout" })
+          .getByText(
+            "We send it to your bank account every 3 days once your balance reaches your payout minimum.",
+            { exact: true }
+          )
+      )
+      .toBeVisible();
     await screen.getByRole("button", { name: "Change" }).click();
     expect(onChange).toHaveBeenCalledOnce();
   });

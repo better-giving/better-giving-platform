@@ -1115,6 +1115,18 @@ describe("stripe connect card", () => {
     no_wise(screen);
   });
 
+  it("stripe ready, accounts listed but no default: the bank section claims no payouts", async () => {
+    const npo = await seed_npo(READY);
+    await seed_bapp(npo.id, { status: "under-review" });
+    await seed_bapp(npo.id, { status: "rejected" });
+
+    const screen = await render_list(npo.id);
+
+    const bank = screen.getByRole("region", { name: "Bank payout" });
+    await expect.element(bank.getByRole("table")).toBeVisible();
+    expect(bank.element().textContent).not.toMatch(/pays out here/);
+  });
+
   it("disconnected with no bank: everything is held, with both ways back", async () => {
     const npo = await seed_npo({
       ...READY,

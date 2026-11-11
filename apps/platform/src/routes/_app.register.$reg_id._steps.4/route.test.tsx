@@ -396,7 +396,7 @@ describe("registration step 4: choose how you get paid", () => {
   }, 30_000);
 
   describe("stripe connected, no bank", () => {
-    it("lets the applicant finish without a bank, and nudges toward one", async () => {
+    it("lets the applicant finish without a bank, nudges toward one, and offers the skip only once the bank form is open", async () => {
       account_status_live.mockResolvedValue("ready");
       const id = await seed_step_4();
       await link_stripe(id);
@@ -413,6 +413,11 @@ describe("registration step 4: choose how you get paid", () => {
         screen.getByText("Connect Stripe to continue.").query()
       ).toBeNull();
 
+      // the skip link shows only while the bank form is open and none is saved
+      expect(
+        screen.getByRole("link", { name: /without a bank account/i }).query()
+      ).toBeNull();
+
       // Bank opens its form; the link is then the way on that skips it
       await screen.getByText("Bank", { exact: true }).click();
       await expect.element(submit_bank(screen)).toBeVisible();
@@ -420,21 +425,6 @@ describe("registration step 4: choose how you get paid", () => {
         .getByRole("link", { name: /continue without a bank account/i })
         .click();
       await expect.element(screen.getByText(/summary/i)).toBeVisible();
-    }, 30_000);
-
-    it("the skip link shows only while the bank form is open and none is saved", async () => {
-      account_status_live.mockResolvedValue("ready");
-      const id = await seed_step_4();
-      await link_stripe(id);
-      const screen = await render_step_4(id);
-
-      expect(
-        screen.getByRole("link", { name: /without a bank account/i }).query()
-      ).toBeNull();
-      await screen.getByText("Bank", { exact: true }).click();
-      await expect
-        .element(screen.getByRole("link", { name: /without a bank account/i }))
-        .toBeVisible();
     }, 30_000);
 
     it("a connected account that is not ready finishes the step too", async () => {

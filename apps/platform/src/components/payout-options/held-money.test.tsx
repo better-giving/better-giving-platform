@@ -437,6 +437,7 @@ describe("a bank account under review", () => {
       <BankPayoutSection
         add_href="new"
         table={<p>accounts table</p>}
+        has_bank={false}
         stripe_status="incomplete"
         holds_money={false}
         bank_pending
@@ -459,13 +460,18 @@ describe("BankPayoutSection: Banking", () => {
   const TABLE = <p>accounts table</p>;
   const render_section = (p: {
     table?: ReactNode;
+    has_bank?: boolean;
     stripe_status: TConnectStatus;
     holds_money: boolean;
-  }) => in_router(<BankPayoutSection add_href="new" {...p} />);
+  }) =>
+    in_router(
+      <BankPayoutSection add_href="new" {...p} has_bank={p.has_bank ?? false} />
+    );
 
   test("bank only: the payout line, the accounts, and Add bank account", async () => {
     const screen = await render_section({
       table: TABLE,
+      has_bank: true,
       stripe_status: "not_connected",
       holds_money: false,
     });
@@ -488,6 +494,7 @@ describe("BankPayoutSection: Banking", () => {
   test("bank and Stripe ready: says what the bank no longer gets", async () => {
     const screen = await render_section({
       table: TABLE,
+      has_bank: true,
       stripe_status: "ready",
       holds_money: false,
     });
@@ -498,6 +505,25 @@ describe("BankPayoutSection: Banking", () => {
         )
       )
       .toBeVisible();
+  });
+
+  // rejected, under review, or approved with none set as default
+  test("accounts listed but no default bank, Stripe ready: nothing says it pays out here", async () => {
+    const screen = await render_section({
+      table: TABLE,
+      has_bank: false,
+      stripe_status: "ready",
+      holds_money: true,
+    });
+    const section = screen.getByRole("region", { name: "Bank payout" });
+    await expect.element(section.getByText("accounts table")).toBeVisible();
+    expect(
+      section
+        .getByText(
+          "Everything except card, bank and wallet donations pays out here."
+        )
+        .query()
+    ).toBeNull();
   });
 
   test.each<[TConnectStatus, string]>([

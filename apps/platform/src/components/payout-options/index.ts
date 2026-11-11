@@ -12,7 +12,6 @@ export {
 export { type IPayoutChoice, PayoutChoice } from "./payout-choice";
 export {
   BANK_PAYOUT_LEAD,
-  BANK_PAYOUT_SENTENCE,
   is_linked,
   type TPayoutOption,
 } from "./rows";

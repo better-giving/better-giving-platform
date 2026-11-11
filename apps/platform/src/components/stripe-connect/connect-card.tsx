@@ -78,7 +78,7 @@ function notice_message({ result, reason }: IConnectNotice) {
 const with_replace = (href: string) =>
   `${href}${href.includes("?") ? "&" : "?"}replace=1`;
 
-/** the first mention in a state's body; later sentences say "these" or "they" */
+/** the first mention in a state's body; later sentences say "they" or "them" */
 const FIRST =
   "card, bank and wallet donations (like Apple Pay, Google Pay and Link)";
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
