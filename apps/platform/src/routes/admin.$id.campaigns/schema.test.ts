@@ -87,6 +87,13 @@ describe("campaign story length", () => {
     );
   });
 
+  it("refuses an oversized body that is not a rich-text document", () => {
+    const r = safeParse(campaign_body, body("x".repeat(8001)));
+    expect(r.issues?.map((i) => i.message)).toContain(
+      "max length is 8000 chars"
+    );
+  });
+
   it("accepts a story at the cap", () => {
     expect(safeParse(campaign_body, body(story(8000))).success).toBe(true);
   });

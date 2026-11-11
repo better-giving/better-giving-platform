@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import { to_text } from "#/components/rich-text/helpers";
+import { story_length } from "#/components/rich-text/helpers";
 import { CAMPAIGN_TYPES } from "@/campaign";
 import {
   $,
@@ -27,7 +27,7 @@ export const campaign_body = v.object({
     v.nonEmpty("Enter a story."),
     // the form checks the same count; a direct request must not skip it
     v.check(
-      (x) => to_text(x).length <= STORY_MAX_CHARS,
+      (x) => story_length(x) <= STORY_MAX_CHARS,
       `max length is ${STORY_MAX_CHARS} chars`
     )
   ),

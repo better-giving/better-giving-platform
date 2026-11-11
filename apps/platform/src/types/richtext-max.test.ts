@@ -39,6 +39,20 @@ describe("a story saved without a length", () => {
   });
 });
 
+describe("a story that is not a rich-text document", () => {
+  test.each([
+    ["unparseable text", "x".repeat(8001)],
+    ["json that is not blocks", JSON.stringify({ a: "x".repeat(8001) })],
+    ["an array of non-blocks", JSON.stringify(["x".repeat(8001)])],
+  ])("counts %s by its length, not as empty", (_, value) => {
+    expect(v.safeParse(field, { value }).success).toBe(false);
+  });
+
+  test("a short one passes the cap", () => {
+    expect(v.safeParse(field, { value: "a short note" }).success).toBe(true);
+  });
+});
+
 describe("the admin campaign story", () => {
   const description_schema = v.pick(form_schema, ["description"]);
 

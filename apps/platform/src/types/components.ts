@@ -1,6 +1,6 @@
 //token selector
 import * as v from "valibot";
-import { to_text } from "#/components/rich-text/helpers";
+import { story_length } from "#/components/rich-text/helpers";
 import { donate_method_id } from "@/npo/schema";
 
 //selector
@@ -38,7 +38,7 @@ export const richtext_max = (maxChars: number) =>
   v.forward(
     v.check(
       (c: { value: string; length?: number | undefined }) =>
-        to_text(c.value).length <= maxChars,
+        story_length(c.value) <= maxChars,
       `max length is ${maxChars} chars`
     ),
     ["length"]

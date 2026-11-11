@@ -78,3 +78,21 @@ export function list_ordinal(
   }
   return n;
 }
+
+/** the length a story's cap counts: its text when it is a rich-text document,
+ * else the string itself. `to_text` reads anything that isn't one as empty, and
+ * a cap must not take unparseable or non-text input at any size for 0 */
+export function story_length(json: string): number {
+  try {
+    const parsed: unknown = JSON.parse(json);
+    if (
+      Array.isArray(parsed) &&
+      parsed.every(
+        (b) => b && typeof b === "object" && (b as any)._type === "block"
+      )
+    ) {
+      return toPlainText(parsed as PortableTextBlock[]).length;
+    }
+  } catch {}
+  return json.length;
+}
