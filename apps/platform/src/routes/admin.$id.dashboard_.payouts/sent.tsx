@@ -11,9 +11,9 @@ import {
   type TUnsentKind,
 } from "@/stripe-connect/sent";
 
-/** where a card gift made now goes: the connected account (`on`), or the bank
- * while the account stays linked (`off`, or `waiting` when nothing was ever
- * sent to it) or after a disconnect */
+/** where a card, bank or wallet donation made now goes: the connected account
+ * (`on`), or the bank while the account stays linked (`off`, or `waiting` when
+ * nothing was ever sent to it) or after a disconnect */
 export type TStripeLink = "on" | "off" | "waiting" | "disconnected";
 
 export const stripe_link = (sent: INpoSent): TStripeLink => {
@@ -38,7 +38,7 @@ interface IBank {
 const held_for_bank = (bank_pending: boolean) =>
   `wait in your Better Giving balance ${bank_pending ? "until your bank account is approved" : "until you add a bank account"}`;
 
-/** where new card, bank and wallet donations go hangs on a bank */
+/** off Stripe, where new donations go hangs on a bank: without one they wait */
 const list_copy = (
   link: TStripeLink,
   { has_bank, bank_pending }: IBank
@@ -47,7 +47,7 @@ const list_copy = (
     case "on":
       return {
         heading: "Sent to your Stripe account",
-        lead: "Each donation paid through Stripe is sent here as its own transfer, after fees.",
+        lead: "Card, bank and wallet donations, each sent here as its own transfer, after fees.",
       };
     case "off":
       return {

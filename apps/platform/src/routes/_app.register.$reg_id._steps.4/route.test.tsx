@@ -390,7 +390,65 @@ describe("registration step 4: choose how you get paid", () => {
     await expect
       .element(continue_link(screen))
       .toHaveAttribute("aria-disabled", "true");
+    await expect
+      .element(screen.getByText("Connect Stripe to continue."))
+      .toBeVisible();
   }, 30_000);
+
+  describe("stripe connected, no bank", () => {
+    it("lets the applicant finish without a bank, and nudges toward one", async () => {
+      account_status_live.mockResolvedValue("ready");
+      const id = await seed_step_4();
+      await link_stripe(id);
+      const screen = await render_step_4(id);
+
+      await expect.element(radio(screen, "Stripe")).toBeChecked();
+      await expect
+        .element(continue_link(screen))
+        .not.toHaveAttribute("aria-disabled", "true");
+      await expect
+        .element(screen.getByText(/want everything to pay out/i))
+        .toBeVisible();
+      expect(
+        screen.getByText("Connect Stripe to continue.").query()
+      ).toBeNull();
+
+      // Bank opens its form; the link is then the way on that skips it
+      await screen.getByText("Bank", { exact: true }).click();
+      await expect.element(submit_bank(screen)).toBeVisible();
+      await screen
+        .getByRole("link", { name: /continue without a bank account/i })
+        .click();
+      await expect.element(screen.getByText(/summary/i)).toBeVisible();
+    }, 30_000);
+
+    it("the skip link shows only while the bank form is open and none is saved", async () => {
+      account_status_live.mockResolvedValue("ready");
+      const id = await seed_step_4();
+      await link_stripe(id);
+      const screen = await render_step_4(id);
+
+      expect(
+        screen.getByRole("link", { name: /without a bank account/i }).query()
+      ).toBeNull();
+      await screen.getByText("Bank", { exact: true }).click();
+      await expect
+        .element(screen.getByRole("link", { name: /without a bank account/i }))
+        .toBeVisible();
+    }, 30_000);
+
+    it("a connected account that is not ready finishes the step too", async () => {
+      account_status_live.mockResolvedValue("incomplete");
+      const id = await seed_step_4();
+      await link_stripe(id);
+      const screen = await render_step_4(id);
+
+      await screen.getByText("Stripe", { exact: true }).click();
+      await expect
+        .element(continue_link(screen))
+        .not.toHaveAttribute("aria-disabled", "true");
+    }, 30_000);
+  });
 
   it("lands back on the stripe option after connecting, a saved bank or not", async () => {
     account_status_live.mockResolvedValue("ready");

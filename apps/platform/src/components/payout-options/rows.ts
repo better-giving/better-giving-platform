@@ -34,7 +34,7 @@ export interface IRow {
 
 const to_bank: ICell = { text: "To your bank." };
 /** Stripe with no bank on file */
-const stripe_unready_held: ICell = {
+const stripe_without_bank: ICell = {
   text: "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. Until then they're held. They skip your split.",
 };
 const held_others: ICell = {
@@ -54,7 +54,7 @@ export const rows: IRow[] = [
       bank: {
         text: "To your bank, after your Grant, Savings and Investments split.",
       },
-      stripe: stripe_unready_held,
+      stripe: stripe_without_bank,
       stripe_with_bank: {
         text: "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. They skip your split. Until then, they go to your bank.",
       },

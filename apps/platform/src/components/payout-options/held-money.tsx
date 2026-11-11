@@ -77,8 +77,9 @@ const until = (bank_pending: boolean) =>
 const release_line = (bank_pending: boolean, netted: boolean) =>
   `Once ${bank_pending ? "your bank account is approved" : "you add a bank account"}, this money pays out with your bank payout${netted ? "" : ", less any refunds or disputes owed,"} once your balance reaches your payout minimum.`;
 
-/** the lead while card, bank and wallet donations are among what waits: true at every
- *  linked status, ready included, since a gift held before ready stays held */
+/** the lead while card, bank and wallet donations are among what waits: true
+ *  at every linked status, ready included, since a gift held before ready
+ *  stays held */
 const stripe_held_lead = (bank_pending: boolean) =>
   `Card, bank and wallet donations that arrive before your Stripe account is ready wait here, along with the donations Stripe can't receive. They stay in your Better Giving balance ${until(bank_pending)}. Nothing is lost.`;
 

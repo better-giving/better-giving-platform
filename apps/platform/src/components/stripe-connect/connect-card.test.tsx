@@ -295,6 +295,37 @@ describe("StripeConnectCard", () => {
     }
   );
 
+  test("not connected, brief (step 4, no bank): keeps its body, since no band says it", async () => {
+    const screen = await render_card({
+      status: "not_connected",
+      has_bank: false,
+      brief: true,
+      heading_level: 3,
+    });
+    const card = screen.getByRole("region", { name: "Stripe account" });
+
+    await expect.element(card.getByText(NOT_CONNECTED_HELD)).toBeVisible();
+    await expect
+      .element(card.getByRole("link", { name: "Connect Stripe" }))
+      .toHaveAttribute("href", START);
+  });
+
+  test("pending, brief (step 4, no bank): the band alone", async () => {
+    const screen = await render_card({
+      status: "pending",
+      has_bank: false,
+      brief: true,
+      heading_level: 3,
+    });
+    const card = screen.getByRole("region", { name: "Stripe account" });
+
+    await expect.element(card.getByText(PENDING_HELD)).toBeVisible();
+    const text = card.element().textContent ?? "";
+    for (const other of ALL.filter((p) => p !== PENDING_HELD)) {
+      expect(text).not.toContain(other);
+    }
+  });
+
   test("a connect that landed is said once, by the status's own band, which takes focus", async () => {
     const screen = await render_card({
       status: "incomplete",

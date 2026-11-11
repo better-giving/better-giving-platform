@@ -116,8 +116,8 @@ function Page({ loaderData: page1, params }: Route.ComponentProps) {
   const { sent, held, has_bank, bank_pending } = page1;
   const payouts_heading_id = useId();
   // the bank table's empty row is this page's only content off Connect, and
-  // where card gifts land once they stop routing. beside a live stripe list it
-  // would still say nothing was paid after a transfer
+  // where card, bank and wallet donations land once they stop routing. beside a
+  // live stripe list it would still say nothing was paid after a transfer
   const show_bank =
     (!sent?.on_stripe && !holds_money(held)) || page1.items.length > 0;
 

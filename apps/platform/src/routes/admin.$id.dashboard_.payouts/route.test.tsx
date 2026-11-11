@@ -305,7 +305,7 @@ describe("the payouts page", () => {
     await expect
       .element(
         region.getByText(
-          "Each donation paid through Stripe is sent here as its own transfer, after fees. What Stripe has paid on to your bank is in your Stripe dashboard."
+          "Card, bank and wallet donations, each sent here as its own transfer, after fees. What Stripe has paid on to your bank is in your Stripe dashboard."
         )
       )
       .toBeVisible();
@@ -768,7 +768,7 @@ describe("SentToStripe", () => {
     await expect
       .element(
         screen.getByText(
-          /^Showing the most recent\. Each donation paid through Stripe is sent here/
+          /^Showing the most recent\. Card, bank and wallet donations, each sent here/
         )
       )
       .toBeVisible();

@@ -102,7 +102,7 @@ function Held({ to, bank_pending }: IHeld) {
     );
   }
   // a stripe gift that lands before ready stays held after ready too, per the
-  // held cards' STRIPE_HELD_LEAD (components/payout-options/held-money.tsx)
+  // held card's stripe_held_lead (components/payout-options/held-money.tsx)
   if (!to.ready) {
     return (
       <p className="text-sm">

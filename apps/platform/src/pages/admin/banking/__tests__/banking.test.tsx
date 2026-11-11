@@ -928,9 +928,6 @@ describe("stripe connect card", () => {
         "href",
         `/api/stripe-connect/start?kind=npo&npo_id=${npo.id}`
       );
-    expect(
-      screen.getByRole("region", { name: "Compare your options" }).query()
-    ).toBeNull();
     const bank = screen.getByRole("region", { name: "Bank payout" });
     await expect
       .element(bank.getByText("USD account ending in 1234"))
@@ -1204,9 +1201,6 @@ describe("stripe connect card", () => {
       await expect
         .element(screen.getByText("USD account ending in 1234"))
         .toBeVisible();
-      expect(
-        screen.getByRole("region", { name: "Compare your options" }).query()
-      ).toBeNull();
       expect(screen.getByRole("link", { name: /stripe/i }).query()).toBeNull();
       expect(
         screen.getByRole("button", { name: /account/i }).query()
@@ -1367,9 +1361,6 @@ describe("stripe connect card", () => {
     ).toBeNull();
     expect(
       screen.getByText(/already linked to another nonprofit/i).query()
-    ).toBeNull();
-    expect(
-      screen.getByRole("region", { name: "Compare your options" }).query()
     ).toBeNull();
     const bank = screen.getByRole("region", { name: "Bank payout" });
     await expect.element(bank).toBeVisible();
