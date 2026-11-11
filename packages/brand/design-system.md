@@ -2423,7 +2423,7 @@ makes the rebind reach every element inside. A call site still writes
 `border-gray-6`.
 
 What is still closed is everything outside both sets. The `--color-*` namespace
-is reset to `initial`, so a raw Tailwind palette name (`accent-600`, `gray-950`)
+is reset to `initial`, so a raw Tailwind palette name (`blue-600`, `gray-950`)
 compiles to no rule. Tailwind drops an unknown utility silently, with no build
 error, which is why retiring a name is only safe after a grep proves zero call
 sites.
