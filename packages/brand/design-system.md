@@ -1,7 +1,8 @@
 # Design tokens: what each one is for
 
-Ledger for the palette in `packages/ui/src/styles/colors.css` (copied in from the
-design registry; see "The design registry" below). Values live in the CSS; this file says
+Ledger for the palette in `packages/ui/src/styles/themes/default.css` (the scales)
+and `packages/ui/src/styles/colors.css` (the semantic roles aliased onto them), both
+copied in from the design registry; see "The design registry" below. Values live in the CSS; this file says
 what to reach for and what has already been measured, so nobody rediscovers it.
 
 Type and elevation are here too, and their values are **not** in this package:
@@ -42,16 +43,18 @@ it. A **call-site count** is a grep over `apps/platform/src` at the time of
 writing and drifts with every commit; each one is labelled and carries the
 command that produced it. Re-run it rather than quoting it.
 
-## The palette is light-only
+## The app renders light only
 
-There is no dark theme. The product ships no theme toggle, never applies `.dark`
-to any element, and has no `prefers-color-scheme` query anywhere: a dark half
-would double the cost of every palette change for no user-visible benefit.
+The registry theme ships a dark half: the `.dark` block in `themes/default.css`
+swaps the scales, and `theme.css` binds the `dark:` variant to the same class.
+Nothing in the app switches it on. The product ships no theme toggle, never applies `.dark`
+to any element, and has no `prefers-color-scheme` query anywhere, so every
+screen renders the light half.
 
-**This is a decision, not an oversight.** Don't derive a dark half because a
-token "is missing one". Shipping dark mode is a product decision first; the
-palette follows it, not the other way round. Everything below is measured on the
-light values, and the light values are the only ones there are.
+**This is a decision, not an oversight.** The dark half being in the file does
+not ship dark mode. Shipping it is a product decision first; the palette
+follows it, not the other way round. Everything below is measured on the
+light values, and `colors.ts` mirrors the light half only.
 
 ## The ramp
 
@@ -66,10 +69,10 @@ https://www.radix-ui.com/colors/custom?accent-light=1E6DAB&gray-light=E2E8F0&bac
 **Step 9 of each of the four accent scales is its input hex unmodified**, which
 is what keeps the brand color exactly where it is: `--accent-9` is `#1e6dab`. The
 gray input is a different kind of seed: it tints the whole neutral scale rather
-than landing on a step, so `--gray-9` is `#868f9a`, not `#e2e8f0`. Only the
-light half was captured; the tool emits a matched dark half and the palette is
-light-only by the decision above. The tool names a scale after the nearest stock Radix hue and
-returned the amber input as `orange`; **amber is the name here**.
+than landing on a step, so `--gray-9` is `#868f9a`, not `#e2e8f0`. The
+generator emits a matched dark half and the theme file keeps it; the app
+renders light by the decision above. The status scales are named for their
+role, `--destructive-*`, `--success-*` and `--warning-*`, never for a hue.
 
 **A step's number is its job.** That is the whole reason for adopting a scale,
 and it is what replaced a set of hand-mixed values:
@@ -93,24 +96,28 @@ slate.
 Three properties of the generated set travel with it:
 
 - **Each step is authored as the `oklch()` its source hex converts to**, and the
-  trailing comment in `colors.css` is that source hex. `colors.test.ts` converts
+  trailing comment in `themes/default.css` is that source hex. `colors.test.ts` converts
   one back into the other, so a hand-tuned step fails the suite. A step is
   generated output: nothing is nudged.
 - **`--warning-8` (`#f19a00`) is darker than `--warning-9` (`#f59e0b`).**
   Non-monotonic, exactly as stock Radix amber is. Any "the steps ascend"
   assertion will trip on it; the ramp is not broken.
-- **No alpha steps.** Radix emits `-a1 … -a12` per scale; none is here, because
-  the email mirror has no alpha channel and a token with no flat twin is a token
-  the drift guard cannot police.
+- **Alpha steps exist for accent and gray only.** `--accent-a1 … -a12` and
+  `--gray-a1 … -a12` (plus `--accent-surface` / `--gray-surface`) are
+  `color(display-p3 …)` over the page, mapped to utilities in `theme.css`
+  (`bg-accent-a3`, `text-gray-a11`). They have **no email twin**: the mirror
+  has no alpha channel, so `colors.test.ts` exempts exactly that name pattern
+  and the drift guard does not police them. The status scales have none.
 
 ### Which step each token points at
 
-The values live in `colors.css`; this is the shape. Every semantic token
+The values live in `themes/default.css`, and the roles that point at them in
+`colors.css`; this is the shape. Every semantic token
 resolves to a step, to `#ffffff`, or to a `color-mix()` off one, and since
 2026-11-01 each neutral one sits on the step whose **Radix role** is its job
 (see "Resting surfaces").
 
-| step | blue | red | green | amber | gray |
+| step | accent | destructive | success | warning | gray |
 | --- | --- | --- | --- | --- | --- |
 | 1 | | | | | `--background` `--surface` `--popover` |
 | 2 | `--band` | | | | `--card` |
@@ -207,11 +214,11 @@ Lc 60 are the step-11 inks on the `accent-5` pressed rung.
 
 | | app | email |
 | --- | --- | --- |
-| file | `packages/ui/src/styles/colors.css` | `packages/brand/src/colors.ts` |
+| file | `packages/ui/src/styles/themes/default.css` + `colors.css` | `packages/brand/src/colors.ts` |
 | form | `:root`, real `oklch()` | flat hex |
 | `var()` / `color-mix()` | fine | **impossible** |
 
-`src/colors.test.ts` parses `:root` and asserts `colors.ts` matches it key-for-key.
+`src/colors.test.ts` parses the light `:root` block of both files and asserts `colors.ts` matches them key-for-key.
 Three rules fall out of that test, and all three are load-bearing:
 
 - **A `var()` alias mirrors; a `color-mix()` does not.** The test reads a literal
@@ -754,8 +761,8 @@ does not (see "decisions that look like bugs"). It is the outline CTA on the
 already in the palette; a second name for the same value is the drift trap the
 `--warning-subtle-fg` section names, and the test cannot catch it.
 
-**Not named `--primary-dark`.** In a palette that deleted its `.dark` set on
-purpose, a `-dark` suffix reads as "the dark-mode primary" to the next person.
+**Not named `--primary-dark`.** In a palette whose `.dark` half swaps the
+scales under a class, a `-dark` suffix reads as "the dark-mode primary" to the next person.
 `-deep` says depth, which is what it is.
 
 Being a `var()` alias onto a ramp step it mirrors into `colors.ts` and the drift
@@ -1943,7 +1950,7 @@ the rule is that a color belongs to exactly one of them and is named in it.
 
 | layer | file | what belongs | email twin |
 | --- | --- | --- | --- |
-| **semantic palette** | `packages/ui/src/styles/colors.css` | every color that carries meaning or ink: surfaces, states, brand, chrome | yes, by the guard |
+| **semantic palette** | `packages/ui/src/styles/themes/default.css` + `colors.css` | every color that carries meaning or ink: surfaces, states, brand, chrome | yes, by the guard |
 | **decorative marketing washes** | `apps/platform/src/index.css` `@theme` | flat pastel grounds behind marketing copy, carrying `gray-12` and nothing else | no, and deliberately |
 
 The semantic set is closed and greppable precisely because it is small. Pouring
@@ -2374,15 +2381,16 @@ Two seams the stylesheet does **not** reach, both fed from the same files:
 ## The design registry
 
 `packages/ui/bg-design.json` records which registry items this repo copied, at
-which version, and a hash of each file. Items today: `tokens`, `fonts`, `button`,
+which version, and a hash of each file. Items today: `tokens`, `variables`, `fonts`, `button`,
 `input`, `dialog`, `tooltip`. The copied files, the color palette among them
-(`packages/ui/src/styles/colors.css`), are not edited here: CI runs
+(`packages/ui/src/styles/themes/default.css` and `colors.css`), are not edited here: CI runs
 `bg-design diff --check`, which fails on a file that no longer matches what was
 copied and on an item that is behind the registry. A change belongs in the
 registry repo, then `bg-design update`.
 
 `packages/brand` keeps `colors.ts`, the flat-hex mirror the email templates and
-the PDF need, and reads `colors.css` through `@better-giving/ui/colors.css`.
+the PDF need, and reads the palette through `@better-giving/ui/colors.css` and
+`@better-giving/ui/themes/default.css`.
 `generate-colors` and the drift tests still run against it. After a registry
 update that moves a palette token, run `pnpm --filter @better-giving/brand
 generate-colors` and commit `colors.ts` with it.

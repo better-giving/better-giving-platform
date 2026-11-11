@@ -778,6 +778,20 @@ const css = ["colors.css", "themes/default.css"]
   )
   .join("\n");
 
+// the light appearance of each file: the block whose selector list opens with
+// `:root`, as colors.test.ts reads it
+const light_css = ["colors.css", "themes/default.css"]
+  .map((f) => {
+    const text = readFileSync(
+      createRequire(import.meta.url).resolve(`@better-giving/ui/${f}`),
+      "utf8"
+    );
+    const m = text.match(/(?:^|\n):root\s*(?:,[^{]*)?{([^}]*)}/s);
+    if (!m) throw new Error(`${f}: no :root block`);
+    return m[1];
+  })
+  .join("\n");
+
 type Recipe = { first: string; pct: number; second: string };
 
 function recipe(token: string): Recipe {
@@ -791,9 +805,9 @@ function recipe(token: string): Recipe {
       `--${token}: no color-mix(in oklch, var(--x) n%, …) declaration to measure`
     );
   }
-  // the strength may itself be a custom property; light's value is declared first
+  // the strength may itself be a custom property; read it from the light block
   const strength = m[2].startsWith("var(")
-    ? css.match(new RegExp(`${m[2].slice(4, -1)}:\\s*([\\d.]+)%`))?.[1]
+    ? light_css.match(new RegExp(`${m[2].slice(4, -1)}:\\s*([\\d.]+)%`))?.[1]
     : m[2].replace("%", "");
   if (strength === undefined) {
     throw new Error(`--${token}: cannot resolve the mix strength ${m[2]}`);

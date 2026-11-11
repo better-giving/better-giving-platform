@@ -43,6 +43,10 @@ for (const [name, value] of decls) {
   if (m) aliases.set(name, m[1]);
 }
 
+// the display-p3 alpha and surface steps: wide-gamut, no sRGB hex to mirror.
+// named, so a color() on any other token still throws instead of dropping out.
+const P3_TOKEN = /^(accent|gray)-(a\d+|surface)$/;
+
 function hex_of(name: string, seen: readonly string[] = []): string | null {
   if (seen.includes(name)) {
     throw new Error(`--${name}: var() cycle through ${seen.join(" -> ")}`);
@@ -63,7 +67,7 @@ function hex_of(name: string, seen: readonly string[] = []): string | null {
     // has to fail, not the comparison.
     const excluded =
       value.startsWith("color-mix(") ||
-      value.startsWith("color(") ||
+      (value.startsWith("color(") && P3_TOKEN.test(name)) ||
       /^-?[\d.]+(rem|px|em|%|s|ms)?$/.test(value);
     if (excluded) return null;
     throw new Error(
@@ -91,6 +95,28 @@ for (const name of decls.keys()) {
 }
 
 describe("colors.ts matches colors.css", () => {
+  // every declaration in the role file sits in the first :root block; a second
+  // block, or a stray `}` ending the first early, would drop tokens from both
+  // sides of the comparison below without failing it.
+  it("reads every declaration of the role file", () => {
+    const whole = readFileSync(
+      require.resolve("@better-giving/ui/colors.css"),
+      "utf8"
+    ).replace(/\/\*[\s\S]*?\*\//g, "");
+    const in_block = light_block(
+      require.resolve("@better-giving/ui/colors.css")
+    ).replace(/\/\*[\s\S]*?\*\//g, "");
+    const count = (css: string) => css.match(/^\s*--[a-z0-9-]+\s*:/gim)?.length;
+    expect(count(in_block)).toBeGreaterThan(0);
+    expect(count(in_block)).toBe(count(whole));
+  });
+
+  it("excludes exactly the display-p3 steps from the hex mirror", () => {
+    const p3 = [...decls].filter(([, v]) => v.startsWith("color("));
+    expect(p3.length).toBe(26);
+    expect(p3.every(([n]) => P3_TOKEN.test(n))).toBe(true);
+  });
+
   it("has the same token set", () => {
     expect(Object.keys(colors).sort()).toEqual([...css_tokens.keys()].sort());
   });

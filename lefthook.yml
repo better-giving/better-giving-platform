@@ -53,9 +53,9 @@ pre-commit:
       # from platform since each member has its own tsconfig.
       run: pnpm tsc-files -p packages/brand/tsconfig.json {staged_files}
     test-brand:
-      # colors.ts mirrors colors.css (the registry copy in packages/ui) by
-      # hand-run generation, not a build step — this is the only thing enforcing
-      # they stay in lockstep at commit time.
+      # colors.ts mirrors colors.css and themes/default.css (the registry copies
+      # in packages/ui) by hand-run generation, not a build step — this is the
+      # only thing enforcing they stay in lockstep at commit time.
       glob:
         - "packages/brand/**/*.{ts,css}"
         - "packages/ui/src/styles/colors.css"

@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { describe, expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { ContinueBtn } from "./continue-btn";
 import { CpfToggle } from "./cpf-toggle";
 import { Frequency } from "./frequency";
 import { TipField } from "./tip-field";
@@ -98,9 +99,7 @@ describe("donation form controls under keyboard focus", () => {
         style={{ "--form-primary": org } as CSSProperties}
       >
         <input aria-label="Amount" className="outline-ring" />
-        <button type="button" className="btn-form-primary">
-          Continue
-        </button>
+        <ContinueBtn />
       </div>
     );
 

@@ -270,12 +270,12 @@ describe("Field: action", () => {
     const input = screen.getByLabelText("Custom URL").element();
     const button = screen.getByRole("button", { name: "Check" }).element();
 
-    const row = input.closest(".field-row");
-    expect(row).not.toBe(null);
-    expect(row?.contains(button)).toBe(true);
     const a = input.getBoundingClientRect();
     const b = button.getBoundingClientRect();
     expect(b.left).toBeGreaterThanOrEqual(a.right);
+    // one row: the button's box overlaps the input's vertically
+    expect(b.top).toBeLessThan(a.bottom);
+    expect(b.bottom).toBeGreaterThan(a.top);
   });
 
   it("keeps the error and the tooltip under the control, not under the row", async () => {
@@ -289,17 +289,18 @@ describe("Field: action", () => {
       />
     );
     const control = screen.getByLabelText("Custom URL").element();
-    const column = control.closest(".field-control");
+    const button = screen.getByRole("button", { name: "Check" }).element();
+    const a = control.getBoundingClientRect();
+    const b = button.getBoundingClientRect();
 
-    expect(column?.contains(document.getElementById("__tooltip_slug"))).toBe(
-      true
-    );
-    expect(column?.contains(document.getElementById("__error_slug"))).toBe(
-      true
-    );
-    expect(
-      column?.contains(screen.getByRole("button", { name: "Check" }).element())
-    ).toBe(false);
+    for (const id of ["__tooltip_slug", "__error_slug"]) {
+      const r = (
+        document.getElementById(id) as HTMLElement
+      ).getBoundingClientRect();
+      // under the control, in its column: below its box, left of the action
+      expect(r.top).toBeGreaterThanOrEqual(a.bottom);
+      expect(r.left).toBeLessThan(b.left);
+    }
   });
 
   it("keeps the error under the control when there is no tooltip", async () => {
@@ -311,14 +312,20 @@ describe("Field: action", () => {
         action={<button type="button">Check</button>}
       />
     );
-    const column = screen
+    const a = screen
       .getByLabelText("Custom URL")
       .element()
-      .closest(".field-control");
+      .getBoundingClientRect();
+    const b = screen
+      .getByRole("button", { name: "Check" })
+      .element()
+      .getBoundingClientRect();
+    const r = (
+      document.getElementById("__error_slug") as HTMLElement
+    ).getBoundingClientRect();
 
-    expect(column?.contains(document.getElementById("__error_slug"))).toBe(
-      true
-    );
+    expect(r.top).toBeGreaterThanOrEqual(a.bottom);
+    expect(r.left).toBeLessThan(b.left);
   });
 
   it("still describes the control by ids that exist, with an action present", async () => {
@@ -353,15 +360,13 @@ describe("Field: action", () => {
       );
   });
 
-  it("adds no row when there is no action", async () => {
+  it("describes the control by its error when there is no action", async () => {
     const screen = await render(
       <Field label="Custom URL" name="slug" error="Already taken" />
     );
     const input = screen.getByLabelText("Custom URL").element();
 
-    expect(input.closest(".field-row")).toBe(null);
-    expect(input.closest(".field-control")).toBe(null);
-    expect(document.querySelector(".field-action")).toBe(null);
+    expect(screen.getByRole("button").query()).toBeNull();
     expect(input.getAttribute("aria-describedby")).toBe("__error_slug");
   });
 });
