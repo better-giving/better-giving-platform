@@ -32,11 +32,14 @@ export async function close_stripe_payments(
   if (rows.some((r) => r.frequency !== "one-time")) return null;
   const to_cancel: string[] = [];
   for (const row of rows) {
-    const found = await stripe.paymentIntents.search({
-      query: `metadata['order_id']:'${row.id.replaceAll("'", "")}'`,
-      limit: 10,
-    });
-    if (found.data.length === 0) return null;
+    // a rate limit or timeout is a refusal like any other: the campaign stays
+    const found = await stripe.paymentIntents
+      .search({
+        query: `metadata['order_id']:'${row.id.replaceAll("'", "")}'`,
+        limit: 10,
+      })
+      .catch(() => null);
+    if (!found || found.data.length === 0) return null;
     for (const intent of found.data) {
       if (intent.status === "canceled") continue;
       if (!CANCELLABLE.has(intent.status)) return null;

@@ -89,6 +89,12 @@ describe("close_stripe_payments", () => {
     expect(cancel).not.toHaveBeenCalled();
   });
 
+  it("refuses, not throws, when the search itself fails", async () => {
+    search.mockRejectedValue(new Error("rate_limit"));
+    expect(await close_stripe_payments([row("d1")])).toBeNull();
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
   it("one that can't be closed refuses the lot", async () => {
     search
       .mockResolvedValueOnce(found("requires_action"))

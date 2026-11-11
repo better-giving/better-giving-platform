@@ -15,6 +15,7 @@ import {
 import { to_text } from "#/components/rich-text/helpers";
 import type { DonateMethodId, IIncrement, TFrequency } from "@/schemas";
 import { db } from "../db";
+import { is_foreign_key_violation } from "../errors";
 import { user } from "../schema/auth";
 import {
   campaign_members,
@@ -621,9 +622,6 @@ const CLOSED = ["expired", "failed", "cancelled"] as const;
  * not abandoned until its payment is closed. */
 const OPEN = ["created", "intent"] as const;
 
-/** postgres: a row elsewhere still references the one being deleted */
-const FOREIGN_KEY_VIOLATION = "23503";
-
 /** a closed checkout whose provider will not accept money on it again. a
  * crypto deposit address can still be paid after `expired` or `failed`, and
  * settles then, so those keep the campaign */
@@ -762,8 +760,7 @@ export async function campaign_delete(
     // something still points at it (a subscription from a monthly checkout, a
     // gift that settled mid-delete): the campaign stays, as with any gift, and
     // the rolled-back transaction leaves the rows as they were
-    const e = err as { code?: string; cause?: { code?: string } };
-    if ((e.code ?? e.cause?.code) === FOREIGN_KEY_VIOLATION) return false;
+    if (is_foreign_key_violation(err)) return false;
     throw err;
   }
 }
