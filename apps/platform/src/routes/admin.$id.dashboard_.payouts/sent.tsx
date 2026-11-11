@@ -12,8 +12,8 @@ import {
 } from "@/stripe-connect/sent";
 
 /** where a card, bank or wallet donation made now goes: the connected account
- * (`on`), or the bank while the account stays linked (`off`, or `waiting` when
- * nothing was ever sent to it) or after a disconnect */
+ * (`on`), or the bank, or held without one, while the account stays linked
+ * (`off`, or `waiting` when nothing was ever sent to it) or after a disconnect */
 export type TStripeLink = "on" | "off" | "waiting" | "disconnected";
 
 export const stripe_link = (sent: INpoSent): TStripeLink => {
@@ -274,7 +274,7 @@ const wells = (link: TStripeLink, bank: IBank): [IWell, IWell] => {
         {
           title: "Payouts",
           detail:
-            "PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before you connected Stripe: the Grant share of each, sent to your bank.",
+            "PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before Stripe was ready: the Grant share of each, sent to your bank.",
         },
       ];
     case "off":

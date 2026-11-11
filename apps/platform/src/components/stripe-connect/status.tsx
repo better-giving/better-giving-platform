@@ -58,13 +58,10 @@ export function StripeConnectStatus({
     <p
       className={`${classes} flex flex-wrap items-center gap-x-4 gap-y-1 text-sm`}
     >
-      <span
-        className={`inline-flex items-center gap-2 font-medium ${tone.ink}`}
-      >
-        <span
-          aria-hidden
-          className={`size-2 shrink-0 rounded-full ${tone.dot}`}
-        />
+      <span className={`inline-flex items-start gap-2 font-medium ${tone.ink}`}>
+        <span aria-hidden className="h-lh flex items-center shrink-0">
+          <span className={`size-2 rounded-full ${tone.dot}`} />
+        </span>
         {tone.label}
       </span>
       {has_dashboard && (

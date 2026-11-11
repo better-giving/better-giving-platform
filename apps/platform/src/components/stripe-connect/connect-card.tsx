@@ -48,8 +48,8 @@ export interface IStripeConnectCard {
   /** the add-bank page, through the router: linked from the not-available
    *  state while no bank is on file or under review */
   add_bank_href?: string;
-  /** status, band and control only, where an option card above already
-   *  says what Stripe does: registration step 4 */
+  /** drops the body where a band says it or the account is ready, since an
+   *  option card above already says what Stripe does: registration step 4 */
   brief?: boolean;
   /** 3 under a page's own h2, as on registration step 4 */
   heading_level?: 2 | 3;
@@ -159,7 +159,7 @@ const notice_tones: Record<IConnectNotice["result"], TBandTone> = {
 const ineligible_reasons = (i: TConnectIneligibility) =>
   i.reason === "fiscal_sponsored"
     ? "Stripe isn't available to fiscally sponsored nonprofits, so there's nothing to connect."
-    : `Stripe isn't available for nonprofits headquartered in ${i.hq_country}. We can send card, bank and wallet donations to nonprofits headquartered in ${TRANSFER_COUNTRIES_COPY}.`;
+    : `Stripe isn't available for nonprofits headquartered in ${i.hq_country}. We can send card, bank and wallet donations to a Stripe account for nonprofits headquartered in ${TRANSFER_COUNTRIES_COPY}.`;
 
 /** the not-available state: the bank is the only way to get paid */
 const bank_only_line = (has_bank: boolean, bank_pending: boolean) =>

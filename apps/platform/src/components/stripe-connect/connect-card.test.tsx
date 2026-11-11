@@ -475,7 +475,7 @@ describe("StripeConnectCard", () => {
     ],
     [
       { reason: "country", hq_country: "Brazil" },
-      `Stripe isn't available for nonprofits headquartered in Brazil. We can send card, bank and wallet donations to nonprofits headquartered in ${TRANSFER_COUNTRIES_COPY}.`,
+      `Stripe isn't available for nonprofits headquartered in Brazil. We can send card, bank and wallet donations to a Stripe account for nonprofits headquartered in ${TRANSFER_COUNTRIES_COPY}.`,
     ],
   ])(
     "not eligible (%o): says why, offers nothing",

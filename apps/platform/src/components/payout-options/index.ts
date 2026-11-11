@@ -7,7 +7,6 @@ export {
   HeldMoneyCard,
   type IHeldMoneyCard,
   PayoutsHeldCard,
-  rail_labels,
   type THeldRails,
 } from "./held-money";
 export { type IPayoutChoice, PayoutChoice } from "./payout-choice";

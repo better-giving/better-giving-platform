@@ -216,7 +216,9 @@ describe("BankRequired", () => {
     const text = screen.container.textContent ?? "";
 
     expect(text).toContain("headquartered in Brazil");
-    expect(text).toMatch(/card, bank and wallet donations to nonprofits/);
+    expect(text).toMatch(
+      /card, bank and wallet donations to a Stripe account for nonprofits/
+    );
     expect(text).toContain("the US, Canada");
   });
 

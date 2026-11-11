@@ -438,7 +438,7 @@ describe("the payouts page", () => {
     await expect
       .element(
         where.getByText(
-          "PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before you connected Stripe: the Grant share of each, sent to your bank."
+          "PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before Stripe was ready: the Grant share of each, sent to your bank."
         )
       )
       .toBeVisible();
@@ -627,7 +627,7 @@ describe("the payouts page", () => {
         )
         .toBeVisible();
       expect(where.getByText(/its own transfer/).query()).toBeNull();
-      expect(where.getByText(/before you connected/).query()).toBeNull();
+      expect(where.getByText(/before Stripe was ready/).query()).toBeNull();
       await expect
         .element(
           screen.getByRole("heading", {
@@ -738,7 +738,7 @@ describe("the payouts page", () => {
         )
       )
       .toBeVisible();
-    expect(where.getByText(/before you connected/).query()).toBeNull();
+    expect(where.getByText(/before Stripe was ready/).query()).toBeNull();
     await expect.element(screen.getByText("$12.50")).toBeVisible();
   });
 });
