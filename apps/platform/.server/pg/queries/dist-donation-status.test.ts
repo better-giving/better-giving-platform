@@ -25,7 +25,7 @@ import {
 } from "../schema/donation";
 import { subscriptions } from "../schema/subscription";
 import { create_test_db } from "../test-utils/pglite";
-import { npo_donations } from "./dist";
+import { npo_donations, referrer_donations } from "./dist";
 import { user_donations_page } from "./donation";
 import { donor_detail, subscription_dists } from "./subscription";
 
@@ -277,5 +277,58 @@ test("a subscription's dists carry each dist's donation status", async () => {
   expect(by_dist).toEqual({
     "sd-d-settled": ["settled", "settled"],
     "sd-d-cancelled": ["refunded", "cancelled"],
+  });
+});
+
+test("a referrer's earnings carry the donation status, so a cancelled duplicate reads apart from a refund", async () => {
+  const { db } = test_db.current!;
+  await seed_npo(db, {
+    registration_number: "EIN-REFERRER",
+    referral_id: "REF-DUP",
+  });
+  const npo = (await seed_npo(db, {
+    registration_number: "EIN-REFERRED",
+    referrer_npo: "REF-DUP",
+  }))!;
+  const kinds = {
+    duplicate: ["cancelled", "refunded"],
+    refund: ["refunded", "refunded"],
+    loss: ["refunded_loss", "refunded_loss"],
+  } as const;
+  const ids = Object.keys(kinds) as (keyof typeof kinds)[];
+  await db.insert(donations).values(
+    ids.map((id) => ({
+      id: `rf-${id}`,
+      upusd: 1,
+      status: kinds[id][0],
+      amount_base: 40,
+      amount_tip: 0,
+      amount_fee_allowance: 0,
+      currency: "USD",
+      frequency: "one-time",
+      source: "bg-marketplace",
+      via: "stripe:card",
+    }))
+  );
+  await db.insert(dists).values(
+    ids.map((id) => ({
+      id: `rf-d-${id}`,
+      donation_id: `rf-${id}`,
+      to_id: npo.id,
+      status: kinds[id][1],
+      date_created: "2026-08-01T00:00:00.000Z",
+      amount_denom: "USD",
+      net: 40,
+    }))
+  );
+
+  const { items } = await referrer_donations("REF-DUP");
+  const by_dist = Object.fromEntries(
+    items.map((x) => [x.id, [x.status, x.donation_status]])
+  );
+  expect(by_dist).toEqual({
+    "rf-d-duplicate": ["refunded", "cancelled"],
+    "rf-d-refund": ["refunded", "refunded"],
+    "rf-d-loss": ["refunded_loss", "refunded_loss"],
   });
 });

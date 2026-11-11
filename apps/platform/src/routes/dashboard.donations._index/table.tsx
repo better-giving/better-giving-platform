@@ -130,7 +130,7 @@ export function Table({
                         tip={
                           <Content className="max-w-xs text-xs">
                             <Arrow />
-                            {cancelled_note(true)}
+                            {cancelled_note("donor")}
                           </Content>
                         }
                       >
