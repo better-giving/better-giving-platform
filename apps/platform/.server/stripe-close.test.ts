@@ -73,6 +73,22 @@ describe("close_stripe_payments", () => {
     expect(cancel).not.toHaveBeenCalled();
   });
 
+  it("looks at every payment before cancelling any", async () => {
+    search
+      .mockResolvedValueOnce(found("requires_action"))
+      .mockResolvedValueOnce(found("succeeded"));
+    expect(await close_stripe_payments([row("d1"), row("d2")])).toBeNull();
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it("a recurring row among one-time rows refuses before any search or cancel", async () => {
+    expect(
+      await close_stripe_payments([row("d1"), row("d2", "monthly")])
+    ).toBeNull();
+    expect(search).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
   it("one that can't be closed refuses the lot", async () => {
     search
       .mockResolvedValueOnce(found("requires_action"))

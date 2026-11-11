@@ -375,12 +375,11 @@ describe("campaign_delete with open payments", () => {
     });
   });
 
-  it("hands a recurring open payment to the closer with its frequency, and keeps the campaign when refused", async () => {
-    const asked = vi.fn(async () => null);
-    expect(await campaign_delete(acme, "open-monthly", asked)).toBe(false);
-    expect(asked).toHaveBeenCalledWith([
-      { id: "don-open-monthly", frequency: "monthly" },
-    ]);
+  it("keeps a campaign with an open recurring payment, without asking stripe: it counts as a gift", async () => {
+    const never = vi.fn(async () => []);
+    expect(await campaign_gift_count("open-monthly")).toBe(1);
+    expect(await campaign_delete(acme, "open-monthly", never)).toBe(false);
+    expect(never).not.toHaveBeenCalled();
     expect(await row_of("don-open-monthly")).toEqual({
       campaign_id: "open-monthly",
       status: "created",

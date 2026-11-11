@@ -632,10 +632,13 @@ const closed_for_good = and(
   or(like(donations.via, "stripe%"), like(donations.via, "paypal%"))
 );
 
-/** an open stripe payment: closable by cancelling its intent */
+/** an open stripe payment: closable by cancelling its intent. a recurring
+ * gift's setup intent can still start a subscription, and a delete does not
+ * close it, so it is not one: it counts as a gift. */
 const open_stripe = and(
   inArray(donations.status, [...OPEN]),
-  like(donations.via, "stripe%")
+  like(donations.via, "stripe%"),
+  eq(donations.frequency, "one-time")
 );
 
 /** gifts that keep a campaign, for the page: everything that was or may yet be

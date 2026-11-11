@@ -26,8 +26,12 @@ const CANCELLABLE = new Set([
 export async function close_stripe_payments(
   rows: IOpenPayment[]
 ): Promise<string[] | null> {
+  // look at every payment before cancelling any: a refusal found late would
+  // leave the donors whose payments were already cancelled with a dead checkout
+  // for a campaign that is staying
+  if (rows.some((r) => r.frequency !== "one-time")) return null;
+  const to_cancel: string[] = [];
   for (const row of rows) {
-    if (row.frequency !== "one-time") return null;
     const found = await stripe.paymentIntents.search({
       query: `metadata['order_id']:'${row.id.replaceAll("'", "")}'`,
       limit: 10,
@@ -36,12 +40,15 @@ export async function close_stripe_payments(
     for (const intent of found.data) {
       if (intent.status === "canceled") continue;
       if (!CANCELLABLE.has(intent.status)) return null;
-      try {
-        await stripe.paymentIntents.cancel(intent.id);
-      } catch {
-        // it moved on (confirmed, processing) between the search and the cancel
-        return null;
-      }
+      to_cancel.push(intent.id);
+    }
+  }
+  for (const id of to_cancel) {
+    try {
+      await stripe.paymentIntents.cancel(id);
+    } catch {
+      // it moved on (confirmed, processing) between the search and the cancel
+      return null;
     }
   }
   return rows.map((r) => r.id);
