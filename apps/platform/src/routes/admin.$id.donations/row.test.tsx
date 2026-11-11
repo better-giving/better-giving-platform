@@ -115,7 +115,6 @@ describe("a reversed donation's net", () => {
   test.each([
     ["refunded", true],
     ["refunded", false],
-    ["refunded_loss", true],
     ["refunded_loss", false],
   ] as const)(
     "a %s row (cancelled: %s) strikes its net and flags it",
@@ -134,15 +133,11 @@ describe("a reversed donation's net", () => {
     await expect.element(tip).not.toHaveAccessibleDescription(/Refunded/);
   });
 
-  test.each([
-    ["refunded", false],
-    ["refunded_loss", false],
-    // a loss is money that went back, whatever the donation's status
-    ["refunded_loss", true],
-  ] as const)(
-    "a %s row (cancelled: %s) says Refunded",
-    async (status, cancelled) => {
-      const tip = await tip_of({ ...refunded, status, cancelled });
+  // a cancelled donation's loss dist reads not-cancelled: helpers.test.ts
+  test.each(["refunded", "refunded_loss"] as const)(
+    "a %s row that isn't cancelled says Refunded",
+    async (status) => {
+      const tip = await tip_of({ ...refunded, status, cancelled: false });
       await expect.element(tip).toHaveAccessibleDescription("Refunded");
     }
   );

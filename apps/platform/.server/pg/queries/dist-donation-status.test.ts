@@ -23,10 +23,11 @@ import {
   donation_recipients,
   donations,
 } from "../schema/donation";
+import { subscriptions } from "../schema/subscription";
 import { create_test_db } from "../test-utils/pglite";
 import { npo_donations } from "./dist";
 import { user_donations_page } from "./donation";
-import { donor_detail } from "./subscription";
+import { donor_detail, subscription_dists } from "./subscription";
 
 beforeAll(async () => {
   test_db.current = await create_test_db();
@@ -44,13 +45,13 @@ test("the npo's donations carry each donation's status, so a cancelled duplicate
     "refunded",
     "refunded_loss",
     "cancelled",
-    "cancelled_loss",
+    "cancelled_refunded_loss",
   ] as const;
   await db.insert(donations).values(
     statuses.map((status) => ({
       id: `don-${status}`,
       upusd: 1,
-      status: status === "cancelled_loss" ? "cancelled" : status,
+      status: status === "cancelled_refunded_loss" ? "cancelled" : status,
       amount_base: 40,
       amount_tip: 0,
       amount_fee_allowance: 0,
@@ -67,7 +68,7 @@ test("the npo's donations carry each donation's status, so a cancelled duplicate
     refunded: "refunded",
     refunded_loss: "refunded_loss",
     cancelled: "refunded",
-    cancelled_loss: "refunded_loss",
+    cancelled_refunded_loss: "refunded_loss",
   } as const;
   await db.insert(dists).values(
     statuses.map((status, i) => ({
@@ -90,7 +91,7 @@ test("the npo's donations carry each donation's status, so a cancelled duplicate
     "d-refunded": ["refunded", "refunded"],
     "d-refunded_loss": ["refunded_loss", "refunded_loss"],
     "d-cancelled": ["refunded", "cancelled"],
-    "d-cancelled_loss": ["refunded_loss", "cancelled"],
+    "d-cancelled_refunded_loss": ["refunded_loss", "cancelled"],
   });
 });
 
@@ -155,6 +156,14 @@ test("the donor's own list carries the dists' status, so a cancelled duplicate r
       ["refunded", npo.id],
       ["settled", other.id],
     ],
+    split_both_refunded: [
+      ["refunded", npo.id],
+      ["refunded", other.id],
+    ],
+    split_refunded_and_loss: [
+      ["refunded", npo.id],
+      ["refunded_loss", other.id],
+    ],
   } as const;
   const ids = Object.keys(dists_of) as (keyof typeof dists_of)[];
   await db.insert(donations).values(
@@ -206,5 +215,67 @@ test("the donor's own list carries the dists' status, so a cancelled duplicate r
     "ud-duplicate": ["cancelled", "refunded"],
     "ud-cancelled_loss": ["cancelled", "refunded_loss"],
     "ud-split_partly_refunded": ["cancelled", null],
+    "ud-split_both_refunded": ["cancelled", "refunded"],
+    "ud-split_refunded_and_loss": ["cancelled", null],
+  });
+});
+
+test("a subscription's dists carry each dist's donation status", async () => {
+  const { db } = test_db.current!;
+  const npo = (await seed_npo(db, { registration_number: "EIN-SUB" }))!;
+  const now = "2026-07-01T00:00:00.000Z";
+  await db.insert(subscriptions).values({
+    id: "sub-1",
+    interval: "month",
+    interval_count: 1,
+    next_billing: now,
+    amount: 40,
+    amount_usd: 40,
+    currency: "USD",
+    product_id: "prod-1",
+    to_npo_id: npo.id,
+    to_name: "npo",
+    platform: "stripe",
+    status: "active",
+    from_id: "donor@example.com",
+    created_at: now,
+    updated_at: now,
+  });
+  const statuses = ["settled", "cancelled"] as const;
+  await db.insert(donations).values(
+    statuses.map((status) => ({
+      id: `sd-${status}`,
+      subscription_id: "sub-1",
+      upusd: 1,
+      status,
+      amount_base: 40,
+      amount_tip: 0,
+      amount_fee_allowance: 0,
+      currency: "USD",
+      frequency: "month",
+      source: "bg-marketplace",
+      via: "stripe:card",
+    }))
+  );
+  await db.insert(dists).values(
+    statuses.map((status, i) => ({
+      id: `sd-d-${status}`,
+      donation_id: `sd-${status}`,
+      to_id: npo.id,
+      status:
+        status === "settled" ? ("settled" as const) : ("refunded" as const),
+      date_created: `2026-07-0${i + 1}T00:00:00.000Z`,
+      amount_denom: "USD",
+      net: 40,
+    }))
+  );
+
+  const rows = await subscription_dists(npo.id, ["sub-1"]);
+  const by_dist = Object.fromEntries(
+    rows.map((x) => [x.id, [x.status, x.donation_status]])
+  );
+  expect(by_dist).toEqual({
+    "sd-d-settled": ["settled", "settled"],
+    "sd-d-cancelled": ["refunded", "cancelled"],
   });
 });

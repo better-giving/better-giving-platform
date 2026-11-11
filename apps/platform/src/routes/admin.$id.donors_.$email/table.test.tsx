@@ -76,7 +76,7 @@ describe("a donor's reversed gifts' note", () => {
       .last();
   }
 
-  test("a cancelled duplicate says Cancelled, not Refunded, and stays struck", async () => {
+  test("a cancelled duplicate says Cancelled, not Refunded", async () => {
     const tip = await note_of({
       status: "refunded",
       donation_status: "cancelled",
@@ -88,6 +88,7 @@ describe("a donor's reversed gifts' note", () => {
   test.each([
     ["refunded", "refunded"],
     ["refunded_loss", "cancelled"],
+    ["settled", "cancelled"],
   ] as const)(
     "a %s dist under a %s donation has no cancelled note",
     async (status, donation_status) => {

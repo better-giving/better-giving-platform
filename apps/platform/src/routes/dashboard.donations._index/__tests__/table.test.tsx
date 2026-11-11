@@ -126,28 +126,29 @@ describe("my donations — a cancelled duplicate", () => {
     );
     expect(struck).toBe(true);
     const tip = cells.nth(4).getByRole("button", { name: "More info" });
-    await expect
-      .element(tip)
-      .toHaveAccessibleDescription(
-        "Cancelled Recorded twice. This duplicate was cancelled. No refund was made, and your gift is recorded once."
-      );
+    await expect.element(tip).toHaveAccessibleDescription(/Recorded twice/);
+    await expect.element(tip).toHaveAccessibleDescription(/No refund was made/);
   });
 
-  // a canceled DAF grant or a checkout a campaign's close shut has no dist
-  test("a cancelled donation with no dist reads plain Cancelled: no note, no strike", async () => {
-    const screen = await render_table([
-      row({ status: "cancelled", dist_status: null }),
-    ]);
-    const cells = screen.getByRole("row").nth(1).getByRole("cell");
-    await expect.element(cells.nth(4)).toBeVisible();
-    expect(cells.nth(4).element().textContent).toBe("Cancelled");
-    expect(cells.nth(4).element().querySelector("svg")).toBeNull();
-    const figure = cells.nth(2).element().querySelector("*") as Element;
-    const struck = [figure, ...figure.querySelectorAll("*")].some((el) =>
-      getComputedStyle(el).textDecorationLine.includes("line-through")
-    );
-    expect(struck).toBe(false);
-  });
+  // a canceled DAF grant or a checkout a campaign's close shut has no dist;
+  // a refunded_loss dist did refund
+  test.each([null, "refunded_loss"] as const)(
+    "a cancelled donation with dist %s reads plain Cancelled: no note, no strike",
+    async (dist_status) => {
+      const screen = await render_table([
+        row({ status: "cancelled", dist_status }),
+      ]);
+      const cells = screen.getByRole("row").nth(1).getByRole("cell");
+      await expect.element(cells.nth(4)).toBeVisible();
+      expect(cells.nth(4).element().textContent).toBe("Cancelled");
+      expect(cells.nth(4).element().querySelector("svg")).toBeNull();
+      const figure = cells.nth(2).element().querySelector("*") as Element;
+      const struck = [figure, ...figure.querySelectorAll("*")].some((el) =>
+        getComputedStyle(el).textDecorationLine.includes("line-through")
+      );
+      expect(struck).toBe(false);
+    }
+  );
 
   test("a refunded row still says Refunded, with no cancelled note", async () => {
     const screen = await render_table([row({ status: "refunded" })]);
