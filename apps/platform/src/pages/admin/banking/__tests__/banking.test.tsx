@@ -890,10 +890,6 @@ describe("stripe connect card", () => {
     stripe_synced_at: new Date().toISOString(),
   };
 
-  const compare_row = (screen: Awaited<ReturnType<typeof render_list>>) =>
-    screen
-      .getByRole("region", { name: "Compare your options" })
-      .getByRole("button", { name: /compare your options/i });
   const add_bank_links = (screen: Awaited<ReturnType<typeof render_list>>) =>
     screen.getByRole("link", { name: "Add bank account" }).elements();
   const no_wise = (screen: Awaited<ReturnType<typeof render_list>>) =>
@@ -917,7 +913,14 @@ describe("stripe connect card", () => {
       .element(card.getByText("Not connected", { exact: true }))
       .toBeVisible();
     await expect
-      .element(card.getByText(/Everything else keeps paying out to your bank/))
+      .element(card.getByText(/Until then, they go to your bank\./))
+      .toBeVisible();
+    await expect
+      .element(
+        card.getByText(
+          /card, bank and wallet donations \(like Apple Pay, Google Pay and Link\) go straight to your Stripe account/
+        )
+      )
       .toBeVisible();
     await expect
       .element(card.getByRole("link", { name: "Connect Stripe" }))
@@ -925,12 +928,9 @@ describe("stripe connect card", () => {
         "href",
         `/api/stripe-connect/start?kind=npo&npo_id=${npo.id}`
       );
-    await expect
-      .element(compare_row(screen))
-      .toMatchTextContent(/Right now: Bank\. See how Bank and Stripe differ\./);
-    await expect
-      .element(compare_row(screen))
-      .toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.getByRole("region", { name: "Compare your options" }).query()
+    ).toBeNull();
     const bank = screen.getByRole("region", { name: "Bank payout" });
     await expect
       .element(bank.getByText("USD account ending in 1234"))
@@ -939,15 +939,8 @@ describe("stripe connect card", () => {
       .element(bank.getByRole("link", { name: "Add bank account" }))
       .toHaveAttribute("href", `/admin/${npo.id}/banking/new`);
     expect(screen.getByText("Held right now").query()).toBeNull();
-    // the compare row, then the bank, then stripe
-    const [e, b, c] = [
-      screen.getByRole("region", { name: "Compare your options" }),
-      bank,
-      card,
-    ].map((l) => l.element());
-    expect(
-      e.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+    // the bank, then stripe
+    const [b, c] = [bank, card].map((l) => l.element());
     expect(
       b.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
@@ -982,17 +975,14 @@ describe("stripe connect card", () => {
         )
       )
       .toBeVisible();
-    await expect
-      .element(compare_row(screen))
-      .toMatchTextContent(
-        /Right now: Stripe\. See how Bank and Stripe differ\./
-      );
     const card = screen.getByRole("region", { name: "Stripe account" });
     await expect
-      .element(card.getByText("Ready to receive Stripe donations"))
+      .element(
+        card.getByText("Ready to receive card, bank and wallet donations")
+      )
       .toBeVisible();
     await expect
-      .element(card.getByText(/What Stripe pays on to your own bank/))
+      .element(card.getByText(/What Stripe pays on to your bank/))
       .toBeVisible();
     // a synced mirror is read as it stands
     expect(sync_npo_account).not.toHaveBeenCalled();
@@ -1108,17 +1098,20 @@ describe("stripe connect card", () => {
       )
       .toHaveAttribute("href", `/admin/${npo.id}/dashboard/payouts`);
     await expect
-      .element(card.getByText(/Everything else pays out to your bank/))
+      .element(
+        card.getByText(
+          /If you disconnect Better Giving in your Stripe dashboard, they go back to your bank/
+        )
+      )
       .toBeVisible();
     const bank = screen.getByRole("region", { name: "Bank payout" });
     await expect
       .element(
-        bank.getByText(/Everything except Stripe donations pays out here\./)
+        bank.getByText(
+          /Everything except card, bank and wallet donations pays out here\./
+        )
       )
       .toBeVisible();
-    await expect
-      .element(compare_row(screen))
-      .toMatchTextContent(/Right now: Bank and Stripe\. See how they differ\./);
     expect(screen.getByText("Held right now").query()).toBeNull();
     no_wise(screen);
   });
@@ -1161,11 +1154,6 @@ describe("stripe connect card", () => {
           .getByText("Disconnected", { exact: true })
       )
       .toBeVisible();
-    await expect
-      .element(compare_row(screen))
-      .toMatchTextContent(
-        /Right now: nothing set up\. See how Bank and Stripe differ\./
-      );
     no_wise(screen);
   });
 
@@ -1186,9 +1174,6 @@ describe("stripe connect card", () => {
 
     const card = screen.getByRole("region", { name: "Stripe account" });
     await expect.element(card.getByText(line, { exact: true })).toBeVisible();
-    await expect
-      .element(compare_row(screen))
-      .toMatchTextContent(/Right now: Stripe\./);
     expect(sync_npo_account).not.toHaveBeenCalled();
   });
 
@@ -1275,7 +1260,9 @@ describe("stripe connect card", () => {
 
     const card = screen.getByRole("region", { name: "Stripe account" });
     await expect
-      .element(card.getByText("Ready to receive Stripe donations"))
+      .element(
+        card.getByText("Ready to receive card, bank and wallet donations")
+      )
       .toBeVisible();
     expect(sync_npo_account).toHaveBeenCalledWith(npo.id);
   });

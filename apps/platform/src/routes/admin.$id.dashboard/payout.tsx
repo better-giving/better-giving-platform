@@ -106,16 +106,16 @@ function Held({ to, bank_pending }: IHeld) {
   if (!to.ready) {
     return (
       <p className="text-sm">
-        Stripe donations that arrive before your Stripe account is ready wait in
-        your Better Giving balance, along with everything else, until {add_bank}
-        . Nothing is lost.
+        Card, bank and wallet donations that arrive before your Stripe account
+        is ready wait in your Better Giving balance, along with everything else,
+        until {add_bank}. Nothing is lost.
       </p>
     );
   }
   return (
     <p className="text-sm">
-      Stripe donations go straight to your Stripe account. Everything else waits
-      in your Better Giving balance until {add_bank}.
+      Card, bank and wallet donations go straight to your Stripe account.
+      Everything else waits in your Better Giving balance until {add_bank}.
     </p>
   );
 }

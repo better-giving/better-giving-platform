@@ -55,13 +55,22 @@ describe("dashboard Payout", () => {
     }
   );
 
-  test("Stripe not ready: Stripe donations wait for a bank, like the held card says", async () => {
+  test("Stripe not ready: card, bank and wallet donations wait for a bank, like the held card says", async () => {
     const screen = await render_payout({ kind: "stripe", ready: false });
-    const line = screen.getByText(/stripe donations/i);
+    const line = screen.getByText(/card, bank and wallet donations/i);
     await expect.element(line).toBeVisible();
     expect(line.element().textContent).not.toMatch(/once stripe says/i);
     expect(line.element().textContent).toMatch(
-      /before your stripe account is ready wait in your better giving balance.*until you add a bank account/i
+      /^Card, bank and wallet donations that arrive before your Stripe account is ready wait in your Better Giving balance, along with everything else, until you add a bank account\. Nothing is lost\.$/
+    );
+  });
+
+  test("Stripe ready: card, bank and wallet donations go to Stripe, everything else waits", async () => {
+    const screen = await render_payout({ kind: "stripe", ready: true });
+    const line = screen.getByText(/card, bank and wallet donations/i);
+    await expect.element(line).toBeVisible();
+    expect(line.element().textContent).toBe(
+      "Card, bank and wallet donations go straight to your Stripe account. Everything else waits in your Better Giving balance until you add a bank account."
     );
   });
 

@@ -431,14 +431,14 @@ describe("the payouts page", () => {
     await expect
       .element(
         where.getByText(
-          "Donations paid through Stripe (cards, digital wallets and bank debits), each sent as its own transfer, after fees."
+          "Card, bank and wallet donations, each sent as its own transfer, after fees."
         )
       )
       .toBeVisible();
     await expect
       .element(
         where.getByText(
-          "PayPal, DAF grants, crypto, stocks, cheques, and any Stripe donations from before you connected Stripe: the Grant share of each, sent to your bank."
+          "PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before you connected Stripe: the Grant share of each, sent to your bank."
         )
       )
       .toBeVisible();
@@ -607,7 +607,7 @@ describe("the payouts page", () => {
       await expect
         .element(
           earlier.getByText(
-            "Stripe donations sent to your Stripe account before. New Stripe donations pay out to your bank. What Stripe has paid on to your bank is in your Stripe dashboard."
+            "Card, bank and wallet donations sent to your Stripe account before. New ones pay out to your bank. What Stripe has paid on to your bank is in your Stripe dashboard."
           )
         )
         .toBeVisible();
@@ -615,14 +615,14 @@ describe("the payouts page", () => {
       await expect
         .element(
           where.getByText(
-            "Stripe donations sent to your Stripe account before. New ones are not sent there."
+            "Card, bank and wallet donations sent to your Stripe account before. New ones are not sent there."
           )
         )
         .toBeVisible();
       await expect
         .element(
           where.getByText(
-            "Everything sent to your bank, new Stripe donations included."
+            "Everything sent to your bank, including new card, bank and wallet donations."
           )
         )
         .toBeVisible();
@@ -674,7 +674,7 @@ describe("the payouts page", () => {
     await expect
       .element(
         earlier_region(screen).getByText(
-          /New Stripe donations wait in your Better Giving balance until you add a bank account\./
+          /New ones wait in your Better Giving balance until you add a bank account\./
         )
       )
       .toBeVisible();
@@ -690,21 +690,21 @@ describe("the payouts page", () => {
     await expect
       .element(
         earlier_region(screen).getByText(
-          /New Stripe donations wait in your Better Giving balance until your bank account is approved\./
+          /New ones wait in your Better Giving balance until your bank account is approved\./
         )
       )
       .toBeVisible();
     await expect
       .element(
         where_region(screen).getByText(
-          /New donations, Stripe donations included, wait in your Better Giving balance until your bank account is approved\./
+          /New donations, including card, bank and wallet donations, wait in your Better Giving balance until your bank account is approved\./
         )
       )
       .toBeVisible();
     expect(screen.container.textContent).not.toMatch(/add a bank account/);
   });
 
-  test("a disconnected nonprofit is told new Stripe donations pay out to its bank", async () => {
+  test("a disconnected nonprofit is told new card, bank and wallet donations pay out to its bank", async () => {
     await npo("acct_sent", {
       stripe_deauthorized_at: "2026-08-01T00:00:00.000Z",
     });
@@ -719,7 +719,7 @@ describe("the payouts page", () => {
     await expect
       .element(
         earlier.getByText(
-          "Your Stripe account is disconnected, so new Stripe donations pay out to your bank. These were sent to it while it was connected."
+          "Your Stripe account is disconnected, so new card, bank and wallet donations pay out to your bank. These were sent to it while it was connected."
         )
       )
       .toBeVisible();
@@ -727,14 +727,14 @@ describe("the payouts page", () => {
     await expect
       .element(
         where.getByText(
-          "Stripe donations sent to your Stripe account while it was connected."
+          "Card, bank and wallet donations sent to your Stripe account while it was connected."
         )
       )
       .toBeVisible();
     await expect
       .element(
         where.getByText(
-          "Everything sent to your bank. Your Stripe account is disconnected, so new Stripe donations are here too."
+          "Everything sent to your bank. Your Stripe account is disconnected, so new card, bank and wallet donations are here too."
         )
       )
       .toBeVisible();

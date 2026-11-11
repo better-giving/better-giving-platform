@@ -161,7 +161,7 @@ describe("HeldMoneyCard: Banking", () => {
     await expect
       .element(
         card.getByText(
-          "Stripe can only receive Stripe donations. These can't go to Stripe, so they stay in your Better Giving balance until you add a bank account. Nothing is lost."
+          "Stripe can only receive card, bank and wallet donations. The rest can't go to Stripe, so they stay in your Better Giving balance until you add a bank account. Nothing is lost."
         )
       )
       .toBeVisible();
@@ -222,7 +222,10 @@ describe("HeldMoneyCard: Banking", () => {
     await expect
       .element(card.getByText("$2,310.00", { exact: true }))
       .toBeVisible();
-    expect(body_rows(card)[0]).toEqual(["Stripe donations", "$525.50"]);
+    expect(body_rows(card)[0]).toEqual([
+      "Card, bank and wallet donations",
+      "$525.50",
+    ]);
     await expect
       .element(card.getByRole("link", { name: "Add bank account" }))
       .toHaveAttribute("href", "/admin/42/banking/new");
@@ -252,7 +255,7 @@ describe("HeldMoneyCard: Banking", () => {
 // and a gift held then still waits once Stripe is ready: the lead follows the
 // table, whatever the status
 const STRIPE_LEAD =
-  "Stripe donations that arrive before your Stripe account is ready wait here, along with the donations Stripe can't receive. They stay in your Better Giving balance until you add a bank account. Nothing is lost.";
+  "Card, bank and wallet donations that arrive before your Stripe account is ready wait here, along with the donations Stripe can't receive. They stay in your Better Giving balance until you add a bank account. Nothing is lost.";
 
 const WITH_STRIPE: IHeldMoney = {
   total: 2310,
@@ -264,8 +267,8 @@ const WITH_STRIPE: IHeldMoney = {
   ],
 };
 
-describe("Stripe linked, Stripe donations held", () => {
-  test("Banking: the lead says Stripe donations wait too, and the table lists them", async () => {
+describe("Stripe linked, card, bank and wallet donations held", () => {
+  test("Banking: the lead says card, bank and wallet donations wait too, and the table lists them", async () => {
     const screen = await in_router(
       <HeldMoneyCard {...base} held={WITH_STRIPE} />
     );
@@ -274,13 +277,16 @@ describe("Stripe linked, Stripe donations held", () => {
     });
     await expect.element(card.getByText(STRIPE_LEAD)).toBeVisible();
     expect(card.getByText(/These can't go to Stripe/).query()).toBeNull();
-    expect(body_rows(card)[0]).toEqual(["Stripe donations", "$525.50"]);
+    expect(body_rows(card)[0]).toEqual([
+      "Card, bank and wallet donations",
+      "$525.50",
+    ]);
     await expect
       .element(card.getByText("$2,310.00", { exact: true }))
       .toBeVisible();
   });
 
-  test("Payouts: the lead says Stripe donations wait too, and the table lists them", async () => {
+  test("Payouts: the lead says card, bank and wallet donations wait too, and the table lists them", async () => {
     const screen = await in_router(
       <PayoutsHeldCard {...base} held={WITH_STRIPE} />
     );
@@ -290,7 +296,7 @@ describe("Stripe linked, Stripe donations held", () => {
     await expect.element(card.getByText(STRIPE_LEAD)).toBeVisible();
     expect(card.getByText(/everything else waits/).query()).toBeNull();
     expect(body_rows(card)[0]).toEqual([
-      "Stripe donation",
+      "Card, bank or wallet donation",
       "Oct 31, 2026",
       "$525.50",
     ]);
@@ -307,7 +313,7 @@ describe("PayoutsHeldCard: Payouts", () => {
     await expect
       .element(
         card.getByText(
-          "Stripe can only receive Stripe donations, so everything else waits in your Better Giving balance. Nothing is lost."
+          "Stripe can only receive card, bank and wallet donations, so everything else waits in your Better Giving balance. Nothing is lost."
         )
       )
       .toBeVisible();
@@ -378,13 +384,13 @@ describe("a bank account under review", () => {
       "Banking",
       HeldMoneyCard,
       "Waiting for your bank account to be approved",
-      "Stripe can only receive Stripe donations. These can't go to Stripe, so they stay in your Better Giving balance until your bank account is approved. Nothing is lost.",
+      "Stripe can only receive card, bank and wallet donations. The rest can't go to Stripe, so they stay in your Better Giving balance until your bank account is approved. Nothing is lost.",
     ],
     [
       "Payouts",
       PayoutsHeldCard,
       "On hold until your bank account is approved",
-      "Stripe can only receive Stripe donations, so everything else waits in your Better Giving balance until your bank account is approved. Nothing is lost.",
+      "Stripe can only receive card, bank and wallet donations, so everything else waits in your Better Giving balance until your bank account is approved. Nothing is lost.",
     ],
   ])(
     "%s, Stripe linked: the money waits for the review, and no bank is asked for",
@@ -487,7 +493,9 @@ describe("BankPayoutSection: Banking", () => {
     });
     await expect
       .element(
-        screen.getByText("Everything except Stripe donations pays out here.")
+        screen.getByText(
+          "Everything except card, bank and wallet donations pays out here."
+        )
       )
       .toBeVisible();
   });
@@ -497,7 +505,7 @@ describe("BankPayoutSection: Banking", () => {
       "ready",
       "Add one to release held money and have everything else pay out to your bank.",
     ],
-    // before ready, Stripe donations wait for a bank too
+    // before ready, card, bank and wallet donations wait for a bank too
     [
       "incomplete",
       "Add one to release held money and get everything paid out to your bank.",
@@ -522,7 +530,9 @@ describe("BankPayoutSection: Banking", () => {
       expect(section.getByRole("link").query()).toBeNull();
       expect(
         section
-          .getByText("Everything except Stripe donations pays out here.")
+          .getByText(
+            "Everything except card, bank and wallet donations pays out here."
+          )
           .query()
       ).toBeNull();
       no_wise(section);

@@ -39,8 +39,8 @@ export interface IStripeConnectCard {
   /** the Payouts page, linked from the ready state beside a bank */
   payouts_href?: string;
   /** a bank payout is on file: what isn't Stripe's pays out there. without
-   *  one it waits in the balance, and so do Stripe donations until Stripe
-   *  says the account is ready */
+   *  one it waits in the balance, and so do card, bank and wallet donations
+   *  until Stripe says the account is ready */
   has_bank: boolean;
   /** a bank account is filed and under review. read only while `has_bank`
    *  is false */
@@ -78,46 +78,49 @@ function notice_message({ result, reason }: IConnectNotice) {
 const with_replace = (href: string) =>
   `${href}${href.includes("?") ? "&" : "?"}replace=1`;
 
-const READY_STRIPE_ONLY =
-  "Stripe donations go straight to your Stripe account, after fees. What Stripe pays on to your own bank is in your Stripe dashboard.";
+/** the first mention in a state's body; later sentences say "these" or "they" */
+const FIRST =
+  "card, bank and wallet donations (like Apple Pay, Google Pay and Link)";
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+const SENT_AS_TRANSFER =
+  "go straight to your Stripe account as each donation's own transfer, after fees. They skip your Grant, Savings and Investments split.";
+const PAYS_ON = "What Stripe pays on to your bank is in your Stripe dashboard.";
 
 const bodies = (status: TConnectStatus, has_bank: boolean): string[] => {
   switch (status) {
     case "not_connected":
       return [
-        `Connect Stripe to get Stripe donations straight to your Stripe account, after fees, once Stripe says your account is ready.${has_bank ? " Everything else keeps paying out to your bank." : ""}`,
+        `Once Stripe says your account is ready, ${FIRST} ${SENT_AS_TRANSFER} Until then, ${has_bank ? "they go to your bank" : "they're held in your Better Giving balance"}.`,
       ];
     case "disconnected":
       // with no bank they are held, which the held card says while any are
       return has_bank
         ? [
-            "Better Giving was disconnected from your Stripe account in your Stripe dashboard. Stripe donations now go to your bank payout.",
+            `Better Giving was disconnected from your Stripe account in your Stripe dashboard. ${cap(FIRST)} now go to your bank.`,
             "Connect Stripe again to get them straight to your Stripe account, after fees, once Stripe says your account is ready. Donations already sent to your Stripe account stay there.",
           ]
         : [
-            "Better Giving was disconnected from your Stripe account in your Stripe dashboard. Connect Stripe again to get Stripe donations straight to your Stripe account, after fees, once Stripe says your account is ready.",
+            `Better Giving was disconnected from your Stripe account in your Stripe dashboard. Connect Stripe again to get ${FIRST} straight to your Stripe account, after fees, once Stripe says your account is ready.`,
           ];
     case "incomplete":
       // without a bank, the standing band says it
       return has_bank
         ? [
             "Stripe needs a few more details before it can receive donations. Finish setup on Stripe, in your Stripe dashboard.",
-            "Until you do and Stripe says your account is ready, Stripe donations go to your bank payout, so nothing is lost.",
+            `Until you do and Stripe says your account is ready, ${FIRST} go to your bank, so nothing is lost. Then each one goes straight to your Stripe account, after fees, and skips your Grant, Savings and Investments split.`,
           ]
         : [];
     case "pending":
       return has_bank
         ? [
-            "Stripe is reviewing your account. Until it's ready, Stripe donations go to your bank payout.",
+            `Stripe is reviewing your account. Until it's ready, ${FIRST} go to your bank.`,
           ]
         : [];
     case "ready":
-      return has_bank
-        ? [
-            "Stripe donations (cards, digital wallets and bank debits) go straight to your Stripe account, after fees. What Stripe pays on to your own bank is in your Stripe dashboard.",
-            "Everything else pays out to your bank. If you disconnect Better Giving in your Stripe dashboard, Stripe donations go back to your bank.",
-          ]
-        : [READY_STRIPE_ONLY];
+      return [
+        `${cap(FIRST)} ${SENT_AS_TRANSFER} ${PAYS_ON}${has_bank ? " If you disconnect Better Giving in your Stripe dashboard, they go back to your bank." : ""}`,
+      ];
   }
 };
 
@@ -133,18 +136,16 @@ const standing_band = (
   status: TConnectStatus,
   has_bank: boolean
 ): IBand | null => {
-  if (status === "ready")
-    return { tone: "success", text: "Your Stripe account is connected." };
   if (has_bank) return null;
   if (status === "incomplete")
     return {
       tone: "warning",
-      text: "Your Stripe account is connected, but Stripe hasn't finished setting it up. Finish on Stripe. Until it's ready, your Stripe donations are held too.",
+      text: "Your Stripe account is connected, but Stripe hasn't finished setting it up. Finish on Stripe. Until it's ready, your card, bank and wallet donations are held too.",
     };
   if (status === "pending")
     return {
       tone: "warning",
-      text: "Stripe is reviewing your account. Until it's ready, your Stripe donations are held too.",
+      text: "Stripe is reviewing your account. Until it's ready, your card, bank and wallet donations are held too.",
     };
   return null;
 };
@@ -158,15 +159,15 @@ const notice_tones: Record<IConnectNotice["result"], TBandTone> = {
 const ineligible_reasons = (i: TConnectIneligibility) =>
   i.reason === "fiscal_sponsored"
     ? "Stripe isn't available to fiscally sponsored nonprofits, so there's nothing to connect."
-    : `Stripe isn't available for nonprofits headquartered in ${i.hq_country}. We can send Stripe donations to nonprofits headquartered in ${TRANSFER_COUNTRIES_COPY}.`;
+    : `Stripe isn't available for nonprofits headquartered in ${i.hq_country}. We can send card, bank and wallet donations to nonprofits headquartered in ${TRANSFER_COUNTRIES_COPY}.`;
 
 /** the not-available state: the bank is the only way to get paid */
 const bank_only_line = (has_bank: boolean, bank_pending: boolean) =>
   has_bank
-    ? "All your donations, Stripe donations included, pay out to your bank. You don't need to do anything."
+    ? "All your donations, including card, bank and wallet donations, pay out to your bank. You don't need to do anything."
     : bank_pending
-      ? "Your bank account is under review. Until it's approved, all your donations, Stripe donations included, are held in your Better Giving balance. Nothing is lost."
-      : "Until you add a bank account, all your donations, Stripe donations included, are held in your Better Giving balance. Nothing is lost.";
+      ? "Your bank account is under review. Until it's approved, all your donations, including card, bank and wallet donations, are held in your Better Giving balance. Nothing is lost."
+      : "Until you add a bank account, all your donations, including card, bank and wallet donations, are held in your Better Giving balance. Nothing is lost.";
 
 /** Stripe beside bank details — registration step 4 and the banking page. */
 export function StripeConnectCard({
@@ -214,7 +215,9 @@ export function StripeConnectCard({
     notice && !(notice.result === "connected" && standing)
       ? { tone: notice_tones[notice.result], text: notice_message(notice) }
       : standing;
-  const body = brief && band ? [] : bodies(status, has_bank);
+  // brief: the option card above already says what Stripe does
+  const body =
+    brief && (band || status === "ready") ? [] : bodies(status, has_bank);
   const payouts_link = status === "ready" && has_bank && payouts_href;
 
   return (

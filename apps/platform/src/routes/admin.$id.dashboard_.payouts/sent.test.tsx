@@ -32,30 +32,35 @@ describe("no bank on file: nothing promises a bank payout", () => {
     [
       "Stripe off",
       off(),
-      "Stripe donations sent to your Stripe account before. New Stripe donations wait in your Better Giving balance until you add a bank account.",
+      "Card, bank and wallet donations sent to your Stripe account before. New ones wait in your Better Giving balance until you add a bank account.",
     ],
     [
       "Stripe disconnected",
       sent({ on_stripe: false, connected: false }),
-      "Your Stripe account is disconnected, so new Stripe donations wait in your Better Giving balance until you add a bank account. These were sent to it while it was connected.",
+      "Your Stripe account is disconnected, so new card, bank and wallet donations wait in your Better Giving balance until you add a bank account. These were sent to it while it was connected.",
     ],
-  ])("%s: the list says new Stripe donations wait", async (_, s, lead) => {
-    const screen = await render(<SentToStripe sent={s} has_bank={false} />);
-    const list = screen.getByRole("region", { name: "Sent to Stripe earlier" });
-    await expect.element(list.getByText(lead)).toBeVisible();
-    expect(list.element().textContent).not.toMatch(/pay out to your bank/);
-  });
+  ])(
+    "%s: the list says new card, bank and wallet donations wait",
+    async (_, s, lead) => {
+      const screen = await render(<SentToStripe sent={s} has_bank={false} />);
+      const list = screen.getByRole("region", {
+        name: "Sent to Stripe earlier",
+      });
+      await expect.element(list.getByText(lead)).toBeVisible();
+      expect(list.element().textContent).not.toMatch(/pay out to your bank/);
+    }
+  );
 
   test.each<[string, "off" | "disconnected", string]>([
     [
       "Stripe off",
       "off",
-      "Everything sent to your bank before. New donations, Stripe donations included, wait in your Better Giving balance until you add a bank account.",
+      "Everything sent to your bank before. New donations, including card, bank and wallet donations, wait in your Better Giving balance until you add a bank account.",
     ],
     [
       "Stripe disconnected",
       "disconnected",
-      "Everything sent to your bank before. Your Stripe account is disconnected, so new donations, Stripe donations included, wait in your Better Giving balance until you add a bank account.",
+      "Everything sent to your bank before. Your Stripe account is disconnected, so new donations, including card, bank and wallet donations, wait in your Better Giving balance until you add a bank account.",
     ],
   ])(
     "%s: the Payouts well says new donations wait",
@@ -65,7 +70,9 @@ describe("no bank on file: nothing promises a bank payout", () => {
       );
       await expect.element(screen.getByText(detail)).toBeVisible();
       expect(
-        screen.getByText(/new Stripe donations included/).query()
+        screen
+          .getByText(/including new card, bank and wallet donations/)
+          .query()
       ).toBeNull();
     }
   );
@@ -76,12 +83,12 @@ describe("a bank under review: new donations wait for its approval", () => {
     [
       "Stripe off",
       off(),
-      "Stripe donations sent to your Stripe account before. New Stripe donations wait in your Better Giving balance until your bank account is approved.",
+      "Card, bank and wallet donations sent to your Stripe account before. New ones wait in your Better Giving balance until your bank account is approved.",
     ],
     [
       "Stripe disconnected",
       sent({ on_stripe: false, connected: false }),
-      "Your Stripe account is disconnected, so new Stripe donations wait in your Better Giving balance until your bank account is approved. These were sent to it while it was connected.",
+      "Your Stripe account is disconnected, so new card, bank and wallet donations wait in your Better Giving balance until your bank account is approved. These were sent to it while it was connected.",
     ],
   ])("%s: the list asks for no bank", async (_, s, lead) => {
     const screen = await render(
@@ -96,12 +103,12 @@ describe("a bank under review: new donations wait for its approval", () => {
     [
       "Stripe off",
       "off",
-      "Everything sent to your bank before. New donations, Stripe donations included, wait in your Better Giving balance until your bank account is approved.",
+      "Everything sent to your bank before. New donations, including card, bank and wallet donations, wait in your Better Giving balance until your bank account is approved.",
     ],
     [
       "Stripe disconnected",
       "disconnected",
-      "Everything sent to your bank before. Your Stripe account is disconnected, so new donations, Stripe donations included, wait in your Better Giving balance until your bank account is approved.",
+      "Everything sent to your bank before. Your Stripe account is disconnected, so new donations, including card, bank and wallet donations, wait in your Better Giving balance until your bank account is approved.",
     ],
   ])("%s: the Payouts well asks for no bank", async (_, link, detail) => {
     const screen = await render(
@@ -121,21 +128,21 @@ describe("connected, off stripe, nothing sent yet", () => {
     await expect
       .element(
         list.getByText(
-          "Your Stripe account is connected but isn't receiving Stripe donations, so new Stripe donations pay out to your bank."
+          "Your Stripe account is connected but isn't receiving card, bank and wallet donations, so new ones pay out to your bank."
         )
       )
       .toBeVisible();
     expect(list.element().textContent).not.toMatch(/earlier|before/);
   });
 
-  test("with no bank, the list says new Stripe donations wait", async () => {
+  test("with no bank, the list says new card, bank and wallet donations wait", async () => {
     const screen = await render(
       <SentToStripe sent={waiting} has_bank={false} />
     );
     await expect
       .element(
         screen.getByText(
-          "so new Stripe donations wait in your Better Giving balance until you add a bank account."
+          "so new card, bank and wallet donations wait in your Better Giving balance until you add a bank account."
         )
       )
       .toBeVisible();
@@ -148,28 +155,28 @@ describe("connected, off stripe, nothing sent yet", () => {
     await expect
       .element(
         screen.getByText(
-          "Nothing has been sent to your Stripe account. New Stripe donations are not sent there."
+          "Nothing has been sent to your Stripe account. New card, bank and wallet donations are not sent there."
         )
       )
       .toBeVisible();
     await expect
       .element(
         screen.getByText(
-          "Everything sent to your bank, new Stripe donations included."
+          "Everything sent to your bank, including new card, bank and wallet donations."
         )
       )
       .toBeVisible();
   });
 });
 
-test("a bank on file: new Stripe donations pay out to it", async () => {
+test("a bank on file: new card, bank and wallet donations pay out to it", async () => {
   const screen = await render(
     <SentToStripe sent={sent({ on_stripe: false, connected: false })} />
   );
   await expect
     .element(
       screen.getByText(
-        "Your Stripe account is disconnected, so new Stripe donations pay out to your bank. These were sent to it while it was connected."
+        "Your Stripe account is disconnected, so new card, bank and wallet donations pay out to your bank. These were sent to it while it was connected."
       )
     )
     .toBeVisible();

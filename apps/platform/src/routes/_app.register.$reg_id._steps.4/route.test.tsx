@@ -323,7 +323,11 @@ describe("registration step 4: choose how you get paid", () => {
       )
       .toBeVisible();
     await expect
-      .element(stripe_card(screen).getByText(/Stripe donations are held too/))
+      .element(
+        stripe_card(screen).getByText(
+          /card, bank and wallet donations are held too/
+        )
+      )
       .toBeVisible();
     expect(account_status_live).toHaveBeenCalledWith("acct_123");
     expect_no_wise(screen);
@@ -340,14 +344,15 @@ describe("registration step 4: choose how you get paid", () => {
     await expect.element(radio(screen, "Stripe")).toBeChecked();
     await expect
       .element(
-        stripe_card(screen).getByText("Ready to receive Stripe donations")
+        stripe_card(screen).getByText(
+          "Ready to receive card, bank and wallet donations"
+        )
       )
       .toBeVisible();
-    await expect
-      .element(
-        stripe_card(screen).getByText("Your Stripe account is connected.")
-      )
-      .toBeVisible();
+    // no standing band: only a connect that just landed says it
+    expect(
+      stripe_card(screen).getByText("Your Stripe account is connected.").query()
+    ).toBeNull();
     await expect
       .element(continue_link(screen))
       .not.toHaveAttribute("aria-disabled", "true");
@@ -365,7 +370,9 @@ describe("registration step 4: choose how you get paid", () => {
     await screen.getByText("Stripe", { exact: true }).click();
     await expect
       .element(
-        stripe_card(screen).getByText("Ready to receive Stripe donations")
+        stripe_card(screen).getByText(
+          "Ready to receive card, bank and wallet donations"
+        )
       )
       .toBeVisible();
   }, 30_000);

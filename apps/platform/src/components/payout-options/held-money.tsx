@@ -6,7 +6,7 @@ import { humanize } from "@/helpers/decimal";
 import type { HeldRail, IHeldMoney } from "@/payouts";
 
 export const rail_labels: Record<HeldRail, string> = {
-  stripe: "Stripe donations",
+  stripe: "Card, bank and wallet donations",
   paypal: "PayPal donations",
   daf: "DAF grants",
   crypto: "Crypto donations",
@@ -16,7 +16,7 @@ export const rail_labels: Record<HeldRail, string> = {
 
 /** one pending payout, as the Payouts list names it */
 const item_labels: Record<HeldRail, string> = {
-  stripe: "Stripe donation",
+  stripe: "Card, bank or wallet donation",
   paypal: "PayPal donation",
   daf: "DAF grant",
   crypto: "Crypto donation",
@@ -77,10 +77,10 @@ const until = (bank_pending: boolean) =>
 const release_line = (bank_pending: boolean, netted: boolean) =>
   `Once ${bank_pending ? "your bank account is approved" : "you add a bank account"}, this money pays out with your bank payout${netted ? "" : ", less any refunds or disputes owed,"} once your balance reaches your payout minimum.`;
 
-/** the lead while Stripe donations are among what waits: true at every
+/** the lead while card, bank and wallet donations are among what waits: true at every
  *  linked status, ready included, since a gift held before ready stays held */
 const stripe_held_lead = (bank_pending: boolean) =>
-  `Stripe donations that arrive before your Stripe account is ready wait here, along with the donations Stripe can't receive. They stay in your Better Giving balance ${until(bank_pending)}. Nothing is lost.`;
+  `Card, bank and wallet donations that arrive before your Stripe account is ready wait here, along with the donations Stripe can't receive. They stay in your Better Giving balance ${until(bank_pending)}. Nothing is lost.`;
 
 interface ICopy {
   heading: string;
@@ -114,7 +114,7 @@ export function HeldMoneyCard(props: IHeldMoneyCard) {
             : "Waiting for a bank account",
           lead: held.by_rail.some((r) => r.rail === "stripe")
             ? stripe_held_lead(bank_pending)
-            : `Stripe can only receive Stripe donations. These can't go to Stripe, so they stay in your Better Giving balance ${until(bank_pending)}. Nothing is lost.`,
+            : `Stripe can only receive card, bank and wallet donations. The rest can't go to Stripe, so they stay in your Better Giving balance ${until(bank_pending)}. Nothing is lost.`,
         };
   return (
     <HeldShell {...props} {...copy}>
@@ -160,7 +160,7 @@ export function PayoutsHeldCard(props: IHeldMoneyCard) {
             : "On hold until you add a bank account",
           lead: held.items.some((it) => it.rail === "stripe")
             ? stripe_held_lead(bank_pending)
-            : `Stripe can only receive Stripe donations, so everything else waits in your Better Giving balance${bank_pending ? ` ${until(true)}` : ""}. Nothing is lost.`,
+            : `Stripe can only receive card, bank and wallet donations, so everything else waits in your Better Giving balance${bank_pending ? ` ${until(true)}` : ""}. Nothing is lost.`,
         };
   return (
     <HeldShell {...props} {...copy}>

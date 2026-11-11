@@ -4,7 +4,6 @@ import {
   BankPayoutSection,
   HeldMoneyCard,
   is_linked,
-  PayoutOptions,
 } from "#/components/payout-options";
 import { StripeConnectCard } from "#/components/stripe-connect/connect-card";
 import { use_strip_connect_params } from "#/hooks/use-strip-connect-params";
@@ -42,9 +41,6 @@ function Page({ loaderData, params }: Route.ComponentProps) {
           add_bank_href="new"
           {...(offers_stripe && { connect_href: stripe.start_href })}
         />
-      )}
-      {offers_stripe && (
-        <PayoutOptions current={{ bank: has_bank, stripe: stripe_linked }} />
       )}
 
       <BankPayoutSection

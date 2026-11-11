@@ -11,10 +11,5 @@ export {
   type THeldRails,
 } from "./held-money";
 export { type IPayoutChoice, PayoutChoice } from "./payout-choice";
-export {
-  type IPayoutOptions,
-  type IPayoutRails,
-  PayoutOptions,
-} from "./payout-options";
 export { is_linked, type TPayoutOption } from "./rows";
 export { type ISavedBank, SavedBank } from "./saved-bank";

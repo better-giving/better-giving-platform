@@ -1,4 +1,3 @@
-import { TRANSFER_COUNTRIES_COPY } from "@/stripe-connect/eligibility";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
 
 /** the two ways a nonprofit can get paid; having both is possible */
@@ -14,7 +13,7 @@ export const option_names: Record<TPayoutOption, string> = {
 /** the line under an option's name, open or collapsed */
 export const option_summaries: Record<TPayoutOption, string> = {
   bank: "One payout for everything.",
-  stripe: "Stripe donations go straight to your Stripe account.",
+  stripe: "Card, bank and wallet donations go straight to your Stripe account.",
 };
 
 export interface ICell {
@@ -26,18 +25,15 @@ export interface ICell {
 
 export interface IRow {
   term: string;
-  /** step 4's radio cards; absent on a row only the comparison carries.
-   *  `stripe_with_bank` is the Stripe card's cell while a bank is on file */
-  card?: Record<TPayoutOption | "stripe_with_bank", ICell>;
+  /** `stripe_with_bank` is the Stripe card's cell while a bank is on file */
+  card: Record<TPayoutOption | "stripe_with_bank", ICell>;
   /** the card's Stripe sentence once Stripe says the account is ready, bank
    *  or not */
   card_stripe_ready?: string;
-  /** Banking's side-by-side */
-  compare: Record<TPayoutOption, ICell>;
 }
 
 const to_bank: ICell = { text: "To your bank." };
-/** Stripe with no bank on file: the card's and the comparison's alike */
+/** Stripe with no bank on file */
 const stripe_unready_held: ICell = {
   text: "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. Until then they're held. They skip your split.",
 };
@@ -53,7 +49,7 @@ const held_withdrawals: ICell = {
 /** what each option does with each kind of money */
 export const rows: IRow[] = [
   {
-    term: "Stripe donations",
+    term: "Card, bank and wallet donations",
     card: {
       bank: {
         text: "To your bank, after your Grant, Savings and Investments split.",
@@ -65,17 +61,10 @@ export const rows: IRow[] = [
     },
     card_stripe_ready:
       "Straight to your Stripe account as each donation's own transfer, after fees. They skip your split.",
-    compare: {
-      bank: {
-        text: "To your bank, every 3 days once your balance reaches your payout minimum, after your Grant, Savings and Investments split.",
-      },
-      stripe: stripe_unready_held,
-    },
   },
   {
     term: "PayPal, DAF grants, crypto, stocks, cheques",
     card: { bank: to_bank, stripe: held_others, stripe_with_bank: to_bank },
-    compare: { bank: to_bank, stripe: held_others },
   },
   {
     term: "Savings and Investments withdrawals",
@@ -83,14 +72,6 @@ export const rows: IRow[] = [
       bank: to_bank,
       stripe: held_withdrawals,
       stripe_with_bank: to_bank,
-    },
-    compare: { bank: to_bank, stripe: held_withdrawals },
-  },
-  {
-    term: "Available to",
-    compare: {
-      bank: { text: "Every nonprofit." },
-      stripe: { text: `Nonprofits in ${TRANSFER_COUNTRIES_COPY}.` },
     },
   },
 ];

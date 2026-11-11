@@ -29,7 +29,7 @@ const tones: Record<TConnectStatus, ITone> = {
     dot: "bg-warning",
   },
   ready: {
-    label: "Ready to receive Stripe donations",
+    label: "Ready to receive card, bank and wallet donations",
     ink: "text-success-subtle-fg",
     dot: "bg-success",
   },

@@ -1,12 +1,12 @@
 import { RadioGroup as Ark } from "@ark-ui/react/radio-group";
-import { Actions, Button } from "@better-giving/ui";
+import { Actions, Badge, Button } from "@better-giving/ui";
 import { type ReactNode, useId } from "react";
 import { Link } from "react-router";
 import { TRANSFER_COUNTRIES_COPY } from "@/stripe-connect/eligibility";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
-import { Cell } from "./payout-options";
 import {
   BANK_PAYOUT_LINE,
+  type ICell,
   is_linked,
   option_names,
   option_summaries,
@@ -228,7 +228,6 @@ function OptionCard({
         <div className="@container ml-8 border-t border-hairline pt-3">
           <dl className="grid gap-2 text-sm @lg:grid-cols-3 @lg:gap-x-4">
             {rows.map((r) => {
-              if (!r.card) return null;
               const cell =
                 option === "bank"
                   ? r.card.bank
@@ -253,5 +252,22 @@ function OptionCard({
         </div>
       )}
     </div>
+  );
+}
+
+interface ICellView {
+  cell: ICell;
+}
+
+/** a cell's sentence, the Held badge leading it when the money waits */
+function Cell({ cell }: ICellView) {
+  if (!cell.held) return <span className="text-gray-11">{cell.text}</span>;
+  return (
+    <span className="inline-flex items-start gap-2">
+      <Badge tone="warning" className="shrink-0">
+        Held
+      </Badge>
+      <span className="text-gray-11">{cell.text}</span>
+    </span>
   );
 }
