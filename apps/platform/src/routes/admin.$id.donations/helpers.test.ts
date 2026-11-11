@@ -150,4 +150,37 @@ describe("to_csv_row's cancelled flag", () => {
   test("a settled donation is not cancelled", () => {
     expect(to_csv_row(dist).cancelled).toBe(false);
   });
+
+  test("a cancelled donation refunded at a loss is a real refund, not cancelled", () => {
+    const row = to_csv_row({
+      ...dist,
+      status: "refunded_loss",
+      donation_status: "cancelled",
+    });
+    expect(row.cancelled).toBe(false);
+  });
+
+  test("a cancelled donation whose dist is still settled is not cancelled", () => {
+    const row = to_csv_row({ ...dist, donation_status: "cancelled" });
+    expect(row.cancelled).toBe(false);
+  });
+});
+
+describe("a cancelled duplicate's stripe payout", () => {
+  const duplicate = {
+    ...dist,
+    status: "refunded",
+    donation_status: "cancelled",
+    stripe_routed_to: "acct_1",
+    stripe_transfer_id: "tr_1",
+    owed_back: true,
+  } satisfies INpoDonation;
+
+  test.each([true, false])(
+    "never reads refunded when its owed row is open: %s",
+    (owed_open) => {
+      const row = to_csv_row({ ...duplicate, owed_open });
+      expect(row.stripe_payout).toBe("reversed");
+    }
+  );
 });

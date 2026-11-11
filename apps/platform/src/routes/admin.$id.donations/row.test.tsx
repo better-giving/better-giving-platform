@@ -118,12 +118,20 @@ describe("a reversed donation's net", () => {
     return trigger;
   }
 
-  test("a cancelled duplicate strikes its net like a refund", async () => {
-    expect(await render_row({ ...refunded, cancelled: true })).toEqual({
-      struck: true,
-      flagged: true,
-    });
-  });
+  test.each([
+    ["refunded", true],
+    ["refunded", false],
+    ["refunded_loss", true],
+    ["refunded_loss", false],
+  ] as const)(
+    "a %s row (cancelled: %s) strikes its net and flags it",
+    async (status, cancelled) => {
+      expect(await render_row({ ...refunded, status, cancelled })).toEqual({
+        struck: true,
+        flagged: true,
+      });
+    }
+  );
 
   test("a cancelled duplicate says Cancelled, not Refunded", async () => {
     const tip = await tip_of({ ...refunded, cancelled: true });
@@ -132,10 +140,18 @@ describe("a reversed donation's net", () => {
     await expect.element(tip).not.toHaveAccessibleDescription(/Refunded/);
   });
 
-  test("a real refund still says Refunded", async () => {
-    const tip = await tip_of({ ...refunded, cancelled: false });
-    await expect.element(tip).toHaveAccessibleDescription("Refunded");
-  });
+  test.each([
+    ["refunded", false],
+    ["refunded_loss", false],
+    // a loss is money that went back, whatever the donation's status
+    ["refunded_loss", true],
+  ] as const)(
+    "a %s row (cancelled: %s) says Refunded",
+    async (status, cancelled) => {
+      const tip = await tip_of({ ...refunded, status, cancelled });
+      await expect.element(tip).toHaveAccessibleDescription("Refunded");
+    }
+  );
 
   test("a settled row does neither", async () => {
     expect(await render_row({ ...refunded, status: "settled" })).toEqual({

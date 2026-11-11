@@ -12,7 +12,7 @@ import {
 } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { IBalanceTx } from "@/balance-txs";
-import type { IDonationsSearch, IPageOpts } from "@/donations";
+import type { IDonation, IDonationsSearch, IPageOpts } from "@/donations";
 import type { IAddr } from "@/types/donation";
 import { db } from "../db";
 import { bal_txs } from "../schema/bal-tx";
@@ -39,7 +39,7 @@ export interface INpoDonation extends DistRow {
   // from donations
   /** the parent donation's own status; a cancelled duplicate's dist reads
    * `refunded`, which says nothing was refunded only if this is checked */
-  donation_status: string;
+  donation_status: IDonation["status"];
   frequency: string;
   via: string;
   source: string;
@@ -98,7 +98,7 @@ const dist_joined = {
 type JoinedRow = {
   dist: DistRow;
   don: {
-    status: string;
+    status: IDonation["status"];
     frequency: string;
     via: string;
     source: string;

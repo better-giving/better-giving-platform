@@ -19,12 +19,16 @@ export interface IFees {
  * so its allocation would read as a grant to the bank */
 export type TStripePayout = TRoutedKind;
 
-const stripe_payout_of = (x: INpoDonation): TStripePayout | undefined => {
+const stripe_payout_of = (
+  x: INpoDonation,
+  cancelled: boolean
+): TStripePayout | undefined => {
   if (!x.stripe_routed_to) return undefined;
   return routed_kind({
     transfer_id: x.stripe_transfer_id,
     reversed: is_reversed(x.status),
-    kept: x.owed_back,
+    // kept and repaid read "Refunded", and a cancelled duplicate made no refund
+    kept: !cancelled && x.owed_back,
     owing: x.owed_open,
     routed_at: x.date_created,
   });
@@ -60,7 +64,8 @@ export interface IRow {
   recipient_id: number;
   allocation?: IAllocation;
   status?: "settled" | "refunded" | "refunded_loss";
-  /** a reversed duplicate: its dist reads `refunded`, but no refund was made */
+  /** a reversed duplicate: its dist reads `refunded`, but no refund was made.
+   * a `refunded_loss` dist under a cancelled donation did refund, so is not */
   cancelled?: boolean;
   stripe_payout?: TStripePayout;
 }
@@ -72,6 +77,9 @@ export const to_csv_row = (x: INpoDonation): IRow => {
     processing: x.fee_processing ?? 0,
     processing_allowance: x.fee_allowance ?? 0,
   };
+
+  const cancelled =
+    x.status === "refunded" && x.donation_status === "cancelled";
 
   const row: IRow = {
     id: x.sttl_id ?? x.id,
@@ -104,8 +112,8 @@ export const to_csv_row = (x: INpoDonation): IRow => {
     recipient_id: x.to_id ?? 0,
     allocation: x.alloc ?? undefined,
     status: x.status,
-    cancelled: x.donation_status === "cancelled",
-    stripe_payout: stripe_payout_of(x),
+    cancelled,
+    stripe_payout: stripe_payout_of(x, cancelled),
   };
   return row;
 };

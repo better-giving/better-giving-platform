@@ -13,6 +13,8 @@ import { type IRow, origin_text } from "./helpers";
 
 export function Row(props: IRow) {
   const reversed = !!props.status && is_reversed(props.status);
+  // a loss is money that went back, so only a plain refund can be a duplicate
+  const cancelled = props.status === "refunded" && props.cancelled;
   return (
     <>
       <td className="whitespace-nowrap">
@@ -70,7 +72,7 @@ export function Row(props: IRow) {
             tip={
               <Content className="max-w-xs text-xs">
                 <Arrow />
-                {props.cancelled ? (
+                {cancelled ? (
                   <>
                     <span className="font-semibold">Cancelled</span>
                     <br />
