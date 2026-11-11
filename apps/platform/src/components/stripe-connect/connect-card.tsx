@@ -216,7 +216,6 @@ export function StripeConnectCard({
     notice && !(notice.result === "connected" && standing)
       ? { tone: notice_tones[notice.result], text: notice_message(notice) }
       : standing;
-  // brief: the option card above already says what Stripe does
   const body =
     brief && (band || status === "ready") ? [] : bodies(status, has_bank);
   const payouts_link = status === "ready" && has_bank && payouts_href;
