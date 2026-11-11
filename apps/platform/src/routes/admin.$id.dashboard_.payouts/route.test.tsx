@@ -11,7 +11,6 @@ import {
   vi,
 } from "vitest";
 import { cleanup, render } from "vitest-browser-react";
-import { BANK_PAYOUT_SENTENCE } from "#/components/payout-options/rows";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
@@ -236,7 +235,8 @@ const earlier_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
   screen.getByRole("region", { name: "Sent to Stripe earlier" });
 const where_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
   screen.getByRole("region", { name: "Where your money shows" });
-const BANK_SUBHEAD = BANK_PAYOUT_SENTENCE;
+const BANK_SUBHEAD =
+  "We send a payout to your bank account every 3 days once your balance reaches your payout minimum.";
 const held_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
   screen.getByRole("region", { name: "On hold until you add a bank account" });
 const no_wise = (screen: Awaited<ReturnType<typeof render_page>>) =>
@@ -541,6 +541,9 @@ describe("the payouts page", () => {
     await expect.element(table.getByText("$77.00")).toBeVisible();
     expect(table.getByText("Pending").query()).toBeNull();
     expect(table.getByRole("row").elements()).toHaveLength(2);
+    // no bank on file: the heading stays over the paid history, the lead
+    // promising a bank payout does not
+    expect(screen.getByText(BANK_SUBHEAD).query()).toBeNull();
   });
 
   test("a stripe-only nonprofit with nothing waiting has no held card", async () => {

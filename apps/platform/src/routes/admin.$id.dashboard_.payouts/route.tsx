@@ -3,8 +3,11 @@ import { useId } from "react";
 import { href, useSearchParams } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { admin_ctx } from "#/.server/auth";
-import { PayoutsHeldCard, type THeldRails } from "#/components/payout-options";
-import { BANK_PAYOUT_SENTENCE } from "#/components/payout-options/rows";
+import {
+  BANK_PAYOUT_LEAD,
+  PayoutsHeldCard,
+  type THeldRails,
+} from "#/components/payout-options";
 import { use_table } from "#/hooks/use-table";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
 import { search } from "@/helpers/https";
@@ -162,9 +165,12 @@ function Page({ loaderData: page1, params }: Route.ComponentProps) {
             <h2 id={payouts_heading_id} className="font-bold text-lg">
               Payouts
             </h2>
-            <p className="text-sm text-gray-11 max-w-3xl">
-              {BANK_PAYOUT_SENTENCE}
-            </p>
+            {/* without a bank, WhereMoneyShows above says new donations wait */}
+            {has_bank && (
+              <p className="text-sm text-gray-11 max-w-3xl">
+                {BANK_PAYOUT_LEAD}
+              </p>
+            )}
           </div>
           {node}
         </section>

@@ -341,11 +341,13 @@ describe("Stripe on: the Payouts well follows the bank", () => {
       await expect
         .element(
           screen.getByText(
-            `${PRIOR} the Grant share of each that was sent to your bank before. New ones ${wait}.`
+            `${PRIOR} the Grant share of each that was sent to your bank before. New PayPal, DAF, crypto, stock and cheque donations ${wait}.`
           )
         )
         .toBeVisible();
       expect(screen.container.textContent).not.toMatch(/sent to your bank\./);
+      // it names the held methods, not a bare "New ones"
+      expect(screen.container.textContent).not.toContain("New ones");
     }
   );
 });

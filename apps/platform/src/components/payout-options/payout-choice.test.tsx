@@ -52,18 +52,18 @@ describe("PayoutChoice option cards", () => {
       "not_connected",
       false,
       {
-        first: "Until then they're held.",
+        first: "They skip your split. Until then they're held.",
         others: "until you add a bank account.",
-        held: 2,
+        held: 3,
       },
     ],
     [
       "incomplete",
       false,
       {
-        first: "Until then they're held.",
+        first: "They skip your split. Until then they're held.",
         others: "until you add a bank account.",
-        held: 2,
+        held: 3,
       },
     ],
     [
@@ -82,8 +82,8 @@ describe("PayoutChoice option cards", () => {
 
       expect(donations).toContain("Straight to your Stripe account");
       expect(donations).toContain(want.first);
-      // the card's own wording differs by state; "Held" is the badge, never prose
-      expect(donations.startsWith("Held")).toBe(false);
+      // "Held" is the badge, never prose: it leads the cell only while held
+      expect(donations.startsWith("Held")).toBe(want.held === 3);
       if (want.held) {
         expect(others).toMatch(/^Held.*Better Giving balance/);
         expect(withdrawals).toMatch(/^Held.*stay in your balance/);
@@ -150,6 +150,21 @@ describe("PayoutChoice option cards", () => {
         .toBeVisible();
     }
   );
+});
+
+describe("PayoutChoice summaries", () => {
+  test("the Stripe summary promises the transfer only once the account is ready", async () => {
+    const screen = await render_choice();
+
+    await expect
+      .element(
+        screen.getByText(
+          "Card, bank and wallet donations go straight to your Stripe account once it's ready.",
+          { exact: true }
+        )
+      )
+      .toBeVisible();
+  });
 });
 
 describe("PayoutChoice footnote", () => {
@@ -273,6 +288,35 @@ describe("PayoutChoice hints and intro", () => {
     expect(
       screen.getByRole("link", { name: /without a bank account/i }).query()
     ).toBeNull();
+  });
+
+  test("Stripe linked, bank saved, Change pressed: the form is open and offers no skip", async () => {
+    const screen = await render_choice({
+      selected: "bank",
+      stripe_status: "incomplete",
+      bank_saved: true,
+      bank_form_open: true,
+    });
+
+    await expect
+      .element(screen.getByText(/stays in place until you save a new one/i))
+      .toBeVisible();
+    expect(
+      screen.getByRole("link", { name: /without a bank account/i }).query()
+    ).toBeNull();
+  });
+
+  test("Stripe linked, no bank, form open: the skip link is offered", async () => {
+    const screen = await render_choice({
+      selected: "bank",
+      stripe_status: "incomplete",
+    });
+
+    await expect
+      .element(
+        screen.getByRole("link", { name: /continue without a bank account/i })
+      )
+      .toHaveAttribute("href", "/next");
   });
 
   test("bank form open over a saved bank: the saved one stays until replaced", async () => {

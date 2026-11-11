@@ -13,7 +13,8 @@ export const option_names: Record<TPayoutOption, string> = {
 /** the line under an option's name, open or collapsed */
 export const option_summaries: Record<TPayoutOption, string> = {
   bank: "One payout for everything.",
-  stripe: "Card, bank and wallet donations go straight to your Stripe account.",
+  stripe:
+    "Card, bank and wallet donations go straight to your Stripe account once it's ready.",
 };
 
 export interface ICell {
@@ -35,7 +36,8 @@ export interface IRow {
 const to_bank: ICell = { text: "To your bank." };
 /** Stripe with no bank on file */
 const stripe_without_bank: ICell = {
-  text: "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. Until then they're held. They skip your split.",
+  text: "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. They skip your split. Until then they're held.",
+  held: true,
 };
 const held_others: ICell = {
   text: "In your Better Giving balance until you add a bank account.",
@@ -87,3 +89,8 @@ export const BANK_PAYOUT_SENTENCE =
 
 /** the same line where no such heading sits above it (step 4's footnote) */
 export const BANK_PAYOUT_LINE = `Bank payout: ${BANK_PAYOUT_SENTENCE.replace(/^W/, "w")}`;
+
+/** the bank payout sentence where no heading names the bank payout, as under
+ *  a "Payouts" heading */
+export const BANK_PAYOUT_LEAD =
+  "We send a payout to your bank account every 3 days once your balance reaches your payout minimum.";
