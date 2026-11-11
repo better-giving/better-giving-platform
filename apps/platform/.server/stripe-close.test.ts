@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const search = vi.hoisted(() => vi.fn());
+const retrieve = vi.hoisted(() => vi.fn());
+const report = vi.hoisted(() => vi.fn());
+vi.mock("#/errors/report", () => ({ report_error: report }));
 const cancel = vi.hoisted(() => vi.fn());
 vi.mock("./kit/stripe", () => ({
-  stripe: { paymentIntents: { search, cancel } },
+  stripe: { paymentIntents: { search, cancel, retrieve } },
 }));
 
 import { close_stripe_payments } from "./stripe-close";
@@ -16,6 +19,8 @@ const found = (...status: string[]) => ({
 beforeEach(() => {
   search.mockReset();
   cancel.mockReset();
+  retrieve.mockReset();
+  report.mockReset();
   cancel.mockResolvedValue({});
 });
 
@@ -51,9 +56,25 @@ describe("close_stripe_payments", () => {
     }
   );
 
+  it("takes an intent a retry finds already canceled as closed", async () => {
+    search.mockResolvedValue(found("requires_action"));
+    cancel.mockRejectedValue(new Error("payment_intent_unexpected_state"));
+    retrieve.mockResolvedValue({ status: "canceled" });
+    expect(await close_stripe_payments([row("d1")])).toEqual(["d1"]);
+    expect(report).not.toHaveBeenCalled();
+  });
+
+  it("reports a search failure instead of swallowing it", async () => {
+    const err = new Error("rate_limit");
+    search.mockRejectedValue(err);
+    await close_stripe_payments([row("d1")]);
+    expect(report).toHaveBeenCalledWith(err);
+  });
+
   it("refuses when stripe refuses the cancel (the donor got there first)", async () => {
     search.mockResolvedValue(found("requires_action"));
     cancel.mockRejectedValue(new Error("payment_intent_unexpected_state"));
+    retrieve.mockResolvedValue({ status: "succeeded" });
     expect(await close_stripe_payments([row("d1")])).toBeNull();
   });
 

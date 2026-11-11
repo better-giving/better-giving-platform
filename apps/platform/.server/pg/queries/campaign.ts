@@ -625,9 +625,16 @@ const OPEN = ["created", "intent"] as const;
 /** a closed checkout whose provider will not accept money on it again. a
  * crypto deposit address can still be paid after `expired` or `failed`, and
  * settles then, so those keep the campaign */
-const closed_for_good = and(
-  inArray(donations.status, [...CLOSED]),
-  or(like(donations.via, "stripe%"), like(donations.via, "paypal%"))
+const closed_for_good = or(
+  and(
+    inArray(donations.status, [...CLOSED]),
+    or(like(donations.via, "stripe%"), like(donations.via, "paypal%"))
+  ),
+  // a DAF grant is `cancelled` once, and no money moved
+  and(
+    eq(donations.status, "cancelled"),
+    or(like(donations.via, "chariot%"), eq(donations.via, "daf"))
+  )
 );
 
 /** an open stripe payment: closable by cancelling its intent. a recurring
@@ -710,41 +717,31 @@ export async function campaign_delete(
     })
     .from(donations)
     .where(and(eq(donations.campaign_id, id), open_stripe));
-  let closed: string[] = [];
   if (open.length > 0) {
     if (!close_payments) return false;
     const done = await close_payments(
       open.map((r) => ({ id: r.id, frequency: r.frequency }))
     );
     if (!done) return false;
-    closed = done;
+    const closed = done;
+    // their payments are cancelled for good whatever happens next, so the rows
+    // say so now: were this written inside the transaction, a refusal there
+    // would roll it back and leave dead checkouts that read as open
+    await db
+      .update(donations)
+      .set({ status: "cancelled" })
+      .where(and(inArray(donations.id, closed), open_stripe));
   }
 
   try {
     return await db.transaction(async (tx) => {
-      // what keeps the campaign now: anything not closed, other than the open
-      // rows just closed. a gift that settled since still counts
+      // what keeps the campaign now: anything not closed. a gift that settled
+      // since the cancels still counts
       const [still] = await tx
         .select({ n: count() })
         .from(donations)
-        .where(
-          and(
-            eq(donations.campaign_id, id),
-            not(closed_for_good as SQL),
-            not(
-              (closed.length === 0
-                ? sql`false`
-                : and(open_stripe, inArray(donations.id, closed))) as SQL
-            )
-          )
-        );
+        .where(and(eq(donations.campaign_id, id), not(closed_for_good as SQL)));
       if ((still?.n ?? 0) > 0) return false;
-      if (closed.length > 0) {
-        await tx
-          .update(donations)
-          .set({ status: "cancelled" })
-          .where(and(inArray(donations.id, closed), open_stripe));
-      }
       // only closed rows: one that settles after the count above is left
       // attached, and the foreign key then refuses the delete below
       await tx

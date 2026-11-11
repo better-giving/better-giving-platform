@@ -115,6 +115,8 @@ beforeAll(async () => {
       campaign("open-late"),
       campaign("crypto-expired"),
       campaign("paypal-expired"),
+      campaign("daf-cancelled"),
+      campaign("daf-expired"),
       ...BLOCKING.map((st) => campaign(`gift-${st}`)),
     ]);
   const donation = (
@@ -176,6 +178,8 @@ beforeAll(async () => {
     },
     donation("don-crypto-expired", "crypto-expired", "expired", "crypto:eth"),
     donation("don-paypal-expired", "paypal-expired", "expired", "paypal"),
+    donation("don-daf-cancelled", "daf-cancelled", "cancelled", "chariot"),
+    donation("don-daf-expired", "daf-expired", "expired", "chariot"),
   ]);
   await db
     .insert(donations)
@@ -333,7 +337,7 @@ describe("campaign_delete with open payments", () => {
     });
   });
 
-  it("refuses a checkout that opens while the others are being closed, closing none of it for good", async () => {
+  it("refuses a checkout that opens while the others are being closed, keeping those it closed marked cancelled", async () => {
     const opens_another = vi.fn(async (rows: { id: string }[]) => {
       await test_db.current!.db.insert(donations).values({
         id: "don-open-late-2",
@@ -352,9 +356,10 @@ describe("campaign_delete with open payments", () => {
     });
     expect(await campaign_delete(acme, "open-late", opens_another)).toBe(false);
     expect(await present("open-late")).toBe(true);
+    // closed at stripe before the refusal, so the row says so and stays
     expect(await row_of("don-open-late-1")).toEqual({
       campaign_id: "open-late",
-      status: "created",
+      status: "cancelled",
     });
     expect(await row_of("don-open-late-2")).toEqual({
       campaign_id: "open-late",
@@ -403,5 +408,18 @@ describe("campaign_delete with open payments", () => {
       campaign_id: null,
       status: "expired",
     });
+  });
+
+  it("detaches a cancelled DAF grant: no money moved", async () => {
+    expect(await campaign_delete(acme, "daf-cancelled")).toBe(true);
+    expect(await row_of("don-daf-cancelled")).toEqual({
+      campaign_id: null,
+      status: "cancelled",
+    });
+  });
+
+  it("keeps a campaign whose DAF grant only expired", async () => {
+    expect(await campaign_delete(acme, "daf-expired")).toBe(false);
+    expect(await present("daf-expired")).toBe(true);
   });
 });

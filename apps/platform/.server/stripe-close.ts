@@ -1,3 +1,4 @@
+import { report_error } from "#/errors/report";
 import { stripe } from "./kit/stripe";
 
 export interface IOpenPayment {
@@ -38,7 +39,10 @@ export async function close_stripe_payments(
         query: `metadata['order_id']:'${row.id.replaceAll("'", "")}'`,
         limit: 10,
       })
-      .catch(() => null);
+      .catch((err) => {
+        report_error(err);
+        return null;
+      });
     if (!found || found.data.length === 0) return null;
     for (const intent of found.data) {
       if (intent.status === "canceled") continue;
@@ -49,8 +53,12 @@ export async function close_stripe_payments(
   for (const id of to_cancel) {
     try {
       await stripe.paymentIntents.cancel(id);
-    } catch {
-      // it moved on (confirmed, processing) between the search and the cancel
+    } catch (err) {
+      // already canceled (a retry after a partial run) is closed; anything
+      // else moved on (confirmed, processing) between the search and the cancel
+      const now = await stripe.paymentIntents.retrieve(id).catch(() => null);
+      if (now?.status === "canceled") continue;
+      report_error(err);
       return null;
     }
   }
