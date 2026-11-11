@@ -179,18 +179,17 @@ describe("the link recipe", () => {
 
   test("both rungs are the ramp's own tokens", () => {
     // --link and --link-hover are step aliases the theme generator picks per
-    // appearance (accent 11/12, rest and hover, in light and in dark). a color-mix or an
-    // alpha here would be a value nobody generated and nobody re-measures
-    // when the ramp moves.
+    // appearance (accent 11/12, rest and hover, in light and in dark). a
+    // color-mix or an alpha here would be a value nobody generated and nobody
+    // re-measures when the ramp moves.
     expect(recipe).not.toMatch(/color-mix|oklch\(|#[0-9a-f]{3}/i);
   });
 
   test("the theme sets --link on accent-11 and --link-hover on accent-12, in light and in dark", () => {
     // the recipe reads var(--link): an undefined one paints nothing and
     // inherits, with no error anywhere. the rungs are radix's text steps, 11
-    // at rest and 12 hovered, in both appearances (packages/ui/src/styles/
-    // colors.css) — a literal here, since reading them back out of the theme
-    // would only compare the theme to itself.
+    // at rest and 12 hovered, in both appearances. literals here, since
+    // reading them back out of the theme would only compare it to itself.
     const theme =
       sources.find(
         (x) => x.file === "packages/ui/src/styles/themes/default.css"

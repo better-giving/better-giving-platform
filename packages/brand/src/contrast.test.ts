@@ -365,8 +365,8 @@ const pairings: Pairing[] = [
     70.3,
     min.content
   ),
-  // destructive-4 carries no token: the row is the ledger's illustration of a step-11
-  // ink degrading as the surface climbs its own scale.
+  // destructive-4 carries no token: the row is the ledger's illustration of a
+  // step-11 ink degrading as the surface climbs its own scale.
   p(
     "destructive-11 on destructive-4",
     colors.destructive_11,

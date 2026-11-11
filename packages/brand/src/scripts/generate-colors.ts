@@ -1,4 +1,4 @@
-// regenerates colors.ts from colors.css's :root tokens.
+// regenerates colors.ts from the :root tokens of colors.css and themes/default.css.
 // run: pnpm --filter @better-giving/brand generate-colors
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -78,12 +78,13 @@ for (const name of decls.keys()) {
 const body = entries.map(([key, hex]) => `  ${key}: "${hex}",`).join("\n");
 
 const out = `// GENERATED — do not hand-edit; run \`pnpm --filter @better-giving/brand generate-colors\`.
-// hex twin of the light palette (colors.css roles + themes/default.css scales), for consumers that can't read
-// oklch() or CSS custom properties — currently the transactional email templates.
-// no dark mode: the literal oklch() tokens plus the var() aliases that resolve to
-// one, converted. color-mix() has no single literal and is left out. keys are the
-// css token name with hyphens as underscores.
-// colors.test.ts asserts this never drifts from colors.css — keep them in lockstep.
+// hex twin of the light palette (colors.css roles + themes/default.css scales),
+// for consumers that can't read oklch() or CSS custom properties — currently the
+// transactional email templates. light half only: the literal oklch() tokens
+// plus the var() aliases that resolve to one, converted. color-mix() and color()
+// have no single literal and are left out. keys are the css token name with
+// hyphens as underscores.
+// colors.test.ts asserts this never drifts from those files — keep them in lockstep.
 export const colors = {
 ${body}
 };
