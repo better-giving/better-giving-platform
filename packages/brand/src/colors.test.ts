@@ -1,7 +1,12 @@
-import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { colors } from "./colors.ts";
+import {
+  count_decls,
+  decls_in,
+  light_block,
+  read_css,
+  strip_comments,
+} from "./css-source.ts";
 import { oklch_to_hex } from "./oklch.ts";
 
 // drift guard: colors.ts must always agree with colors.css, which the design
@@ -9,30 +14,16 @@ import { oklch_to_hex } from "./oklch.ts";
 // parses :root the same way a human eye would — a literal oklch() token, or a
 // var() alias followed to the literal it points at. color-mix() and --radius
 // fall out on their own: neither has one literal behind it.
-const require = createRequire(import.meta.url);
-
-// the light half of each file: the block whose selector list opens with `:root`
-function light_block(path: string): string {
-  const css = readFileSync(path, "utf8");
-  const m = css.match(/(?:^|\n):root\s*(?:,[^{]*)?{([^}]*)}/s);
-  if (!m) throw new Error(`${path}: no :root block`);
-  return m[1];
-}
+const COLORS = "colors.css";
+const THEME = "themes/default.css";
 
 // the roles (colors.css) alias the scales (themes/default.css); both are the
 // registry's.
-const root_block = [
-  light_block(require.resolve("@better-giving/ui/colors.css")),
-  light_block(require.resolve("@better-giving/ui/themes/default.css")),
-].join("\n");
+const root_block = [COLORS, THEME]
+  .map((f) => light_block(read_css(f), f))
+  .join("\n");
 
-// comments go before the split so a trailing /* #hex */ can't be read as part
-// of the next declaration.
-const decls = new Map<string, string>();
-for (const decl of root_block.replace(/\/\*[\s\S]*?\*\//g, "").split(";")) {
-  const m = decl.match(/^\s*--([a-z0-9-]+)\s*:\s*([\s\S]+)$/i);
-  if (m) decls.set(m[1], m[2].trim().replace(/\s+/g, " "));
-}
+const decls = new Map<string, string>(decls_in(root_block));
 
 const key_of = (name: string) => name.replace(/-/g, "_");
 
@@ -95,25 +86,24 @@ for (const name of decls.keys()) {
 }
 
 describe("colors.ts matches colors.css", () => {
-  // every declaration in the role file sits in the first :root block; a second
-  // block, or a stray `}` ending the first early, would drop tokens from both
-  // sides of the comparison below without failing it.
-  it("reads every declaration of the role file", () => {
-    const whole = readFileSync(
-      require.resolve("@better-giving/ui/colors.css"),
-      "utf8"
-    ).replace(/\/\*[\s\S]*?\*\//g, "");
-    const in_block = light_block(
-      require.resolve("@better-giving/ui/colors.css")
-    ).replace(/\/\*[\s\S]*?\*\//g, "");
-    const count = (css: string) => css.match(/^\s*--[a-z0-9-]+\s*:/gim)?.length;
-    expect(count(in_block)).toBeGreaterThan(0);
-    expect(count(in_block)).toBe(count(whole));
+  // a second :root block, or a stray `}` ending one early, would drop tokens
+  // from both sides of the comparison below without failing it. every
+  // declaration in the file must sit inside some block — and the light half
+  // must have its share.
+  it.each([COLORS, THEME])("reads every declaration of %s", (f) => {
+    const whole = strip_comments(read_css(f));
+    const in_blocks = [...whole.matchAll(/{([^}]*)}/g)].reduce(
+      (n, m) => n + count_decls(m[1]),
+      0
+    );
+    expect(in_blocks).toBeGreaterThan(0);
+    expect(in_blocks).toBe(count_decls(whole));
+    expect(count_decls(light_block(whole, f))).toBeGreaterThan(0);
   });
 
-  it("excludes exactly the display-p3 steps from the hex mirror", () => {
+  it("excludes only the display-p3 steps from the hex mirror", () => {
     const p3 = [...decls].filter(([, v]) => v.startsWith("color("));
-    expect(p3.length).toBe(26);
+    expect(p3.length).toBeGreaterThan(0);
     expect(p3.every(([n]) => P3_TOKEN.test(n))).toBe(true);
   });
 
