@@ -979,7 +979,9 @@ describe("stripe connect card", () => {
       )
       .toBeVisible();
     await expect
-      .element(card.getByText(/What Stripe pays on to your bank/))
+      .element(
+        card.getByText(/What Stripe pays on to the bank on your Stripe account/)
+      )
       .toBeVisible();
     // a synced mirror is read as it stands
     expect(sync_npo_account).not.toHaveBeenCalled();
@@ -1134,6 +1136,10 @@ describe("stripe connect card", () => {
         "href",
         `/api/stripe-connect/start?kind=npo&npo_id=${npo.id}`
       );
+    // disconnected is not linked: the rails are "none", not "stripe"
+    expect(
+      screen.getByRole("region", { name: "Waiting for a bank account" }).query()
+    ).toBeNull();
     expect(add_bank_links(screen)).toHaveLength(1);
     await expect
       .element(

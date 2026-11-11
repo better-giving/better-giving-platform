@@ -85,7 +85,8 @@ const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 const SENT_AS_TRANSFER =
   "go straight to your Stripe account as each donation's own transfer, after fees. They skip your Grant, Savings and Investments split.";
-const PAYS_ON = "What Stripe pays on to your bank is in your Stripe dashboard.";
+const PAYS_ON =
+  "What Stripe pays on to the bank on your Stripe account is in your Stripe dashboard.";
 
 const bodies = (status: TConnectStatus, has_bank: boolean): string[] => {
   switch (status) {

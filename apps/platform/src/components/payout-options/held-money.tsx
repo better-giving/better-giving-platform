@@ -5,7 +5,7 @@ import { to_utc_day } from "@/helpers/date";
 import { humanize } from "@/helpers/decimal";
 import type { HeldRail, IHeldMoney } from "@/payouts";
 
-export const rail_labels: Record<HeldRail, string> = {
+const rail_labels: Record<HeldRail, string> = {
   stripe: "Card, bank and wallet donations",
   paypal: "PayPal donations",
   daf: "DAF grants",

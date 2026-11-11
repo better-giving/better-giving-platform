@@ -11,6 +11,7 @@ import {
   vi,
 } from "vitest";
 import { cleanup, render } from "vitest-browser-react";
+import { BANK_PAYOUT_SENTENCE } from "#/components/payout-options/rows";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
@@ -235,8 +236,7 @@ const earlier_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
   screen.getByRole("region", { name: "Sent to Stripe earlier" });
 const where_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
   screen.getByRole("region", { name: "Where your money shows" });
-const BANK_SUBHEAD =
-  "Sent to your bank every 3 days once your balance reaches your payout minimum.";
+const BANK_SUBHEAD = BANK_PAYOUT_SENTENCE;
 const held_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
   screen.getByRole("region", { name: "On hold until you add a bank account" });
 const no_wise = (screen: Awaited<ReturnType<typeof render_page>>) =>

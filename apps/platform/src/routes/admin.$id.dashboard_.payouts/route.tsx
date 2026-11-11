@@ -4,6 +4,7 @@ import { href, useSearchParams } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { admin_ctx } from "#/.server/auth";
 import { PayoutsHeldCard, type THeldRails } from "#/components/payout-options";
+import { BANK_PAYOUT_SENTENCE } from "#/components/payout-options/rows";
 import { use_table } from "#/hooks/use-table";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
 import { search } from "@/helpers/https";
@@ -162,8 +163,7 @@ function Page({ loaderData: page1, params }: Route.ComponentProps) {
               Payouts
             </h2>
             <p className="text-sm text-gray-11 max-w-3xl">
-              Sent to your bank every 3 days once your balance reaches your
-              payout minimum.
+              {BANK_PAYOUT_SENTENCE}
             </p>
           </div>
           {node}

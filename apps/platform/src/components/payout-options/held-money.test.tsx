@@ -276,7 +276,7 @@ describe("Stripe linked, card, bank and wallet donations held", () => {
       name: "Waiting for a bank account",
     });
     await expect.element(card.getByText(STRIPE_LEAD)).toBeVisible();
-    expect(card.getByText(/These can't go to Stripe/).query()).toBeNull();
+    expect(card.getByText(/The rest can't go to Stripe/).query()).toBeNull();
     expect(body_rows(card)[0]).toEqual([
       "Card, bank and wallet donations",
       "$525.50",

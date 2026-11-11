@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { createRoutesStub } from "react-router";
 import { describe, expect, test, vi } from "vitest";
-import { render } from "vitest-browser-react";
+import { cleanup, render } from "vitest-browser-react";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
 import { BankRequired } from "./bank-required";
 import { type IPayoutChoice, PayoutChoice } from "./payout-choice";
+import type { TPayoutOption } from "./rows";
 import { SavedBank } from "./saved-bank";
 
 /** `Button`'s link form needs a router around it */
@@ -118,20 +119,123 @@ describe("PayoutChoice option cards", () => {
     }
   });
 
-  test("choosing one collapses the other to its summary", async () => {
-    const screen = await render_choice({ selected: "stripe" });
+  test.each<[TPayoutOption, string, string]>([
+    [
+      "stripe",
+      "Straight to your Stripe account",
+      "To your bank, after your Grant",
+    ],
+    [
+      "bank",
+      "To your bank, after your Grant",
+      "Straight to your Stripe account",
+    ],
+  ])(
+    "choosing %s keeps its card open and collapses the other to its summary",
+    async (selected, open_cell, closed_cell) => {
+      const screen = await render_choice({ selected });
 
-    expect(cards(screen).length).toBe(1);
+      expect(cards(screen).length).toBe(1);
+      const [donations] = cells(cards(screen)[0]);
+      expect(donations).toContain(open_cell);
+      expect(donations).not.toContain(closed_cell);
+      await expect
+        .element(
+          screen.getByText(
+            selected === "stripe"
+              ? "One payout for everything."
+              : /go straight to your Stripe account/i
+          )
+        )
+        .toBeVisible();
+    }
+  );
+});
+
+describe("PayoutChoice footnote", () => {
+  const footnote = (screen: TScreen) =>
+    screen.getByText(/Bank payout: we send it to your bank account/);
+
+  test("shows the bank cadence and where Stripe is offered until the chosen option is set up", async () => {
+    for (const props of [
+      {},
+      { selected: "stripe" as const },
+      { selected: "bank" as const, bank_form_open: true, bank_saved: true },
+    ]) {
+      const screen = await render_choice(props);
+      await expect
+        .element(footnote(screen))
+        .toMatchTextContent(
+          /every 3 days once your balance reaches your payout minimum\. Stripe is available to nonprofits in the US, Canada/
+        );
+      await cleanup();
+    }
+  });
+
+  test.each<[string, Partial<IPayoutChoice>]>([
+    ["bank saved and chosen", { selected: "bank", bank_saved: true }],
+    [
+      "stripe linked and chosen",
+      { selected: "stripe", stripe_status: "incomplete" },
+    ],
+  ])("%s: nothing is left to explain, so it hides", async (_, props) => {
+    const screen = await render_choice(props);
+
     await expect
-      .element(screen.getByText("One payout for everything."))
+      .element(screen.getByRole("link", { name: "Continue", exact: true }))
       .toBeVisible();
-    await expect
-      .element(screen.getByText(/go straight to your Stripe account/i))
-      .toBeVisible();
+    expect(footnote(screen).query()).toBeNull();
   });
 });
 
 describe("PayoutChoice hints and intro", () => {
+  test.each<[string, Partial<IPayoutChoice>, string]>([
+    [
+      "nothing chosen, nothing set up",
+      {},
+      "We need one to finish onboarding. You can add the other later from Banking.",
+    ],
+    [
+      "disconnected Stripe is not set up",
+      { stripe_status: "disconnected" },
+      "We need one to finish onboarding. You can add the other later from Banking.",
+    ],
+    [
+      "bank saved and chosen",
+      { selected: "bank", bank_saved: true },
+      "Your bank payout is saved. You can continue now, and add Stripe here too, or any time from Banking.",
+    ],
+    [
+      "stripe ready and chosen",
+      { selected: "stripe", stripe_status: "ready" },
+      "Your Stripe account is ready. You can continue now.",
+    ],
+    [
+      "stripe incomplete and chosen",
+      { selected: "stripe", stripe_status: "incomplete" },
+      "Your Stripe account is connected. You can continue now.",
+    ],
+    [
+      "bank chosen, Stripe already linked",
+      { selected: "bank", stripe_status: "pending" },
+      "Your Stripe account is connected, so you can continue now. Add a bank account here too, or any time from Banking.",
+    ],
+    [
+      "Stripe pressed over a saved bank",
+      { selected: "stripe", bank_saved: true },
+      "Your bank payout is saved, so you can continue now. Connect Stripe here too, or any time from Banking.",
+    ],
+    [
+      "Stripe pressed while the bank form is open over a saved bank",
+      { selected: "stripe", bank_saved: true, bank_form_open: true },
+      "Your bank payout is saved, so you can continue now. Connect Stripe here too, or any time from Banking.",
+    ],
+  ])("%s: the step's guidance", async (_, props, line) => {
+    const screen = await render_choice(props);
+
+    await expect.element(screen.getByText(line, { exact: true })).toBeVisible();
+  });
+
   test("stripe chosen without a link: Continue is held and says why", async () => {
     const screen = await render_choice({ selected: "stripe" });
 

@@ -302,3 +302,50 @@ describe("routed donations with no transfer", () => {
     );
   });
 });
+
+describe("Stripe on: the Payouts well follows the bank", () => {
+  const link = stripe_link(sent({ on_stripe: true, connected: true }));
+  const PRIOR =
+    "PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before Stripe was ready:";
+
+  test("a bank on file: the Grant share of each is sent to it", async () => {
+    const screen = await render(<WhereMoneyShows link={link} />);
+    await expect
+      .element(
+        screen.getByText(`${PRIOR} the Grant share of each, sent to your bank.`)
+      )
+      .toBeVisible();
+  });
+
+  test.each<[string, boolean, string]>([
+    [
+      "no bank",
+      false,
+      "wait in your Better Giving balance until you add a bank account",
+    ],
+    [
+      "a bank under review",
+      true,
+      "wait in your Better Giving balance until your bank account is approved",
+    ],
+  ])(
+    "%s: new ones wait, and nothing promises a bank payout",
+    async (_, bank_pending, wait) => {
+      const screen = await render(
+        <WhereMoneyShows
+          link={link}
+          has_bank={false}
+          bank_pending={bank_pending}
+        />
+      );
+      await expect
+        .element(
+          screen.getByText(
+            `${PRIOR} the Grant share of each that was sent to your bank before. New ones ${wait}.`
+          )
+        )
+        .toBeVisible();
+      expect(screen.container.textContent).not.toMatch(/sent to your bank\./);
+    }
+  );
+});

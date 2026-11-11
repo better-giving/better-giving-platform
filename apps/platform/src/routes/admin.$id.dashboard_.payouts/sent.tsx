@@ -273,8 +273,9 @@ const wells = (link: TStripeLink, bank: IBank): [IWell, IWell] => {
         },
         {
           title: "Payouts",
-          detail:
-            "PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before Stripe was ready: the Grant share of each, sent to your bank.",
+          detail: has_bank
+            ? "PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before Stripe was ready: the Grant share of each, sent to your bank."
+            : `PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before Stripe was ready: the Grant share of each that was sent to your bank before. New ones ${held_for_bank(bank_pending)}.`,
         },
       ];
     case "off":

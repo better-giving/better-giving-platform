@@ -197,8 +197,8 @@ describe("StripeConnectCard", () => {
     "go straight to your Stripe account as each donation's own transfer, after fees. They skip your Grant, Savings and Investments split.";
   const NOT_CONNECTED_WITH_BANK = `Once Stripe says your account is ready, ${FIRST} ${SPLIT} Until then, they go to your bank.`;
   const NOT_CONNECTED_HELD = `Once Stripe says your account is ready, ${FIRST} ${SPLIT} Until then, they're held in your Better Giving balance.`;
-  const BOTH_READY = `Card, bank and wallet donations (like Apple Pay, Google Pay and Link) ${SPLIT} What Stripe pays on to your bank is in your Stripe dashboard. If you disconnect Better Giving in your Stripe dashboard, they go back to your bank.`;
-  const STRIPE_ONLY_READY = `Card, bank and wallet donations (like Apple Pay, Google Pay and Link) ${SPLIT} What Stripe pays on to your bank is in your Stripe dashboard.`;
+  const BOTH_READY = `Card, bank and wallet donations (like Apple Pay, Google Pay and Link) ${SPLIT} What Stripe pays on to the bank on your Stripe account is in your Stripe dashboard. If you disconnect Better Giving in your Stripe dashboard, they go back to your bank.`;
+  const STRIPE_ONLY_READY = `Card, bank and wallet donations (like Apple Pay, Google Pay and Link) ${SPLIT} What Stripe pays on to the bank on your Stripe account is in your Stripe dashboard.`;
   const DISCONNECTED =
     "Better Giving was disconnected from your Stripe account in your Stripe dashboard. Connect Stripe again to get card, bank and wallet donations (like Apple Pay, Google Pay and Link) straight to your Stripe account, after fees, once Stripe says your account is ready.";
   const DISCONNECTED_WITH_BANK = [
@@ -324,6 +324,58 @@ describe("StripeConnectCard", () => {
     for (const other of ALL.filter((p) => p !== PENDING_HELD)) {
       expect(text).not.toContain(other);
     }
+  });
+
+  test.each<[IStripeConnectCard["status"], boolean, string[]]>([
+    ["not_connected", true, [NOT_CONNECTED_WITH_BANK]],
+    ["disconnected", false, [DISCONNECTED]],
+    ["disconnected", true, DISCONNECTED_WITH_BANK],
+    // a bank on file leaves no standing band, so the body is what says it
+    ["incomplete", true, INCOMPLETE_BANK],
+    ["pending", true, [PENDING_BANK]],
+  ])(
+    "%s, bank on file %s, brief (step 4): no band says it, so the body stays",
+    async (status, has_bank, phrases) => {
+      const screen = await render_card({
+        status,
+        has_bank,
+        brief: true,
+        heading_level: 3,
+      });
+      const card = screen.getByRole("region", { name: "Stripe account" });
+
+      for (const phrase of phrases) {
+        await expect.element(card.getByText(phrase)).toBeVisible();
+      }
+      const text = card.element().textContent ?? "";
+      for (const other of ALL.filter(
+        (p) => !phrases.some((own) => own.includes(p))
+      )) {
+        expect(text).not.toContain(other);
+      }
+    }
+  );
+
+  test("ready, bank on file, brief (step 4): the status alone, no body", async () => {
+    const screen = await render_card({
+      status: "ready",
+      has_bank: true,
+      brief: true,
+      heading_level: 3,
+    });
+    const card = screen.getByRole("region", { name: "Stripe account" });
+
+    await expect
+      .element(
+        card.getByText("Ready to receive card, bank and wallet donations")
+      )
+      .toBeVisible();
+    expect(card.element().textContent).not.toContain(
+      "is in your Stripe dashboard"
+    );
+    expect(card.element().textContent).not.toContain(
+      "they go back to your bank"
+    );
   });
 
   test("a connect that landed is said once, by the status's own band, which takes focus", async () => {
