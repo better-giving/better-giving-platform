@@ -38,7 +38,7 @@ type DistInsert = typeof dists.$inferInsert;
 export interface INpoDonation extends DistRow {
   // from donations
   /** the parent donation's own status; a cancelled duplicate's dist reads
-   * `refunded`, which says nothing was refunded only if this is checked */
+   * `refunded` though nothing was refunded, and this tells the two apart */
   donation_status: IDonation["status"];
   frequency: string;
   via: string;
