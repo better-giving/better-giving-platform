@@ -4,6 +4,7 @@ import {
   check,
   custom,
   excludes,
+  gtValue,
   type InferOutput,
   integer,
   lazy,
@@ -76,7 +77,7 @@ export const $int_gte1 = pipe(
   int_gte1
 );
 
-const num_gt0 = pipe(number(), minValue(0, "must be > 0"));
+const num_gt0 = pipe(number(), gtValue(0, "must be > 0"));
 
 const $req_num_gt0 = pipe(
   $req,
@@ -162,7 +163,7 @@ const stored_amount = amount_num(Number.POSITIVE_INFINITY);
 export const increment_val = pipe(
   $req,
   stored_amount,
-  minValue(0, "must be > 0"),
+  gtValue(0, "must be > 0"),
   transform(decimal_str)
 );
 
