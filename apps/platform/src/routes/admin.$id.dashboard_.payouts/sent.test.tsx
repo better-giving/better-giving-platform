@@ -39,17 +39,14 @@ describe("no bank on file: nothing promises a bank payout", () => {
       sent({ on_stripe: false, connected: false }),
       "Your Stripe account is disconnected, so new card, bank and wallet donations wait in your Better Giving balance until you add a bank account. These were sent to it while it was connected.",
     ],
-  ])(
-    "%s: the list says new card, bank and wallet donations wait",
-    async (_, s, lead) => {
-      const screen = await render(<SentToStripe sent={s} has_bank={false} />);
-      const list = screen.getByRole("region", {
-        name: "Sent to Stripe earlier",
-      });
-      await expect.element(list.getByText(lead)).toBeVisible();
-      expect(list.element().textContent).not.toMatch(/pay out to your bank/);
-    }
-  );
+  ])("%s: the list says new ones wait", async (_, s, lead) => {
+    const screen = await render(<SentToStripe sent={s} has_bank={false} />);
+    const list = screen.getByRole("region", {
+      name: "Sent to Stripe earlier",
+    });
+    await expect.element(list.getByText(lead)).toBeVisible();
+    expect(list.element().textContent).not.toMatch(/pay out to your bank/);
+  });
 
   test.each<[string, "off" | "disconnected", string]>([
     [
@@ -135,14 +132,14 @@ describe("connected, off stripe, nothing sent yet", () => {
     expect(list.element().textContent).not.toMatch(/earlier|before/);
   });
 
-  test("with no bank, the list says new card, bank and wallet donations wait", async () => {
+  test("with no bank, the list says new ones wait", async () => {
     const screen = await render(
       <SentToStripe sent={waiting} has_bank={false} />
     );
     await expect
       .element(
         screen.getByText(
-          "so new card, bank and wallet donations wait in your Better Giving balance until you add a bank account."
+          "so new ones wait in your Better Giving balance until you add a bank account."
         )
       )
       .toBeVisible();

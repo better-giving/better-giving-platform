@@ -548,7 +548,7 @@ describe("BankPayoutSection: Banking", () => {
     await expect
       .element(
         section.getByText(
-          "Add one to have everything else pay out to your bank."
+          "Only card, bank and wallet donations go to Stripe. Add a bank account to have everything else paid out."
         )
       )
       .toBeVisible();
