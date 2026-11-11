@@ -19,6 +19,7 @@ import {
 } from "@/donations";
 import { db } from "../db";
 import { is_unique_violation } from "../errors";
+import { dists } from "../schema/dist";
 import {
   DONATION_SETTLEMENTS_STTL_ID_IDX,
   donation_donors,
@@ -27,6 +28,7 @@ import {
   donation_tributes,
   donations,
 } from "../schema/donation";
+import type { DistRow } from "./dist";
 import type { DbOrTx, IPage } from "./helpers";
 import { decode_date_cursor, encode_date_cursor } from "./helpers";
 
@@ -445,6 +447,10 @@ export async function donation_dons_from(
 export interface IUserDonation {
   id: string;
   status: string;
+  /** the status every dist of this donation shares; null when it has no dist
+   * or its dists differ. a cancelled duplicate is a `cancelled` status with a
+   * `refunded` dist_status — the pair `INpoDonation` carries per dist */
+  dist_status: DistRow["status"] | null;
   created_at: string;
   amount_base: number;
   upusd: number;
@@ -472,6 +478,10 @@ export async function user_donations_page(
       don: {
         id: donations.id,
         status: donations.status,
+        dist_status: sql<DistRow["status"] | null>`(
+          select case when min(${dists.status}) = max(${dists.status}) then min(${dists.status}) end
+          from ${dists} where ${dists.donation_id} = ${donations.id}
+        )`,
         created_at: donations.created_at,
         amount_base: donations.amount_base,
         upusd: donations.upusd,
@@ -509,6 +519,7 @@ export async function user_donations_page(
   const items: IUserDonation[] = rows.slice(0, limit).map((r) => ({
     id: r.don.id,
     status: r.don.status,
+    dist_status: r.don.dist_status,
     created_at: r.don.created_at,
     amount_base: r.don.amount_base,
     upusd: r.don.upusd,

@@ -18,9 +18,14 @@ vi.mock("../db", () => ({
 
 import { seed_npo } from "#/__tests__/fixtures/funds";
 import { dists } from "../schema/dist";
-import { donation_donors, donations } from "../schema/donation";
+import {
+  donation_donors,
+  donation_recipients,
+  donations,
+} from "../schema/donation";
 import { create_test_db } from "../test-utils/pglite";
 import { npo_donations } from "./dist";
+import { user_donations_page } from "./donation";
 import { donor_detail } from "./subscription";
 
 beforeAll(async () => {
@@ -133,5 +138,73 @@ test("a donor's detail carries each dist's donation status", async () => {
   expect(by_dist).toEqual({
     "dd-d-settled": ["settled", "settled"],
     "dd-d-cancelled": ["refunded", "cancelled"],
+  });
+});
+
+test("the donor's own list carries the dists' status, so a cancelled duplicate reads apart from a gift cancelled before it settled", async () => {
+  const { db } = test_db.current!;
+  const npo = (await seed_npo(db, { registration_number: "EIN-USER-A" }))!;
+  const other = (await seed_npo(db, { registration_number: "EIN-USER-B" }))!;
+  const email = "own-list@example.com";
+  // never_settled: a cancelled grant or a campaign-closed open payment has no dist
+  const dists_of = {
+    never_settled: [],
+    duplicate: [["refunded", npo.id]],
+    cancelled_loss: [["refunded_loss", npo.id]],
+    split_partly_refunded: [
+      ["refunded", npo.id],
+      ["settled", other.id],
+    ],
+  } as const;
+  const ids = Object.keys(dists_of) as (keyof typeof dists_of)[];
+  await db.insert(donations).values(
+    ids.map((id, i) => ({
+      id: `ud-${id}`,
+      upusd: 1,
+      status: "cancelled",
+      created_at: `2026-08-0${i + 1}T00:00:00.000Z`,
+      amount_base: 40,
+      amount_tip: 0,
+      amount_fee_allowance: 0,
+      currency: "USD",
+      frequency: "one-time",
+      source: "bg-marketplace",
+      via: "stripe:card",
+    }))
+  );
+  await db
+    .insert(donation_donors)
+    .values(ids.map((id) => ({ donation_id: `ud-${id}`, email })));
+  await db.insert(donation_recipients).values(
+    ids.map((id) => ({
+      donation_id: `ud-${id}`,
+      npo_id: npo.id,
+      name: "npo",
+      type: "npo",
+    }))
+  );
+  await db.insert(dists).values(
+    ids.flatMap((id) =>
+      dists_of[id].map(([status, to_id]) => ({
+        id: `ud-d-${id}-${to_id}`,
+        donation_id: `ud-${id}`,
+        to_id,
+        status,
+        date_created: "2026-08-01T00:00:00.000Z",
+        amount_denom: "USD",
+        net: 40,
+      }))
+    )
+  );
+
+  const { items } = await user_donations_page(email);
+  const by_donation = Object.fromEntries(
+    items.map((x) => [x.id, [x.status, x.dist_status]])
+  );
+  expect(by_donation).toEqual({
+    "ud-never_settled": ["cancelled", null],
+    "ud-duplicate": ["cancelled", "refunded"],
+    "ud-cancelled_loss": ["cancelled", "refunded_loss"],
+    "ud-split_partly_refunded": ["cancelled", null],
   });
 });

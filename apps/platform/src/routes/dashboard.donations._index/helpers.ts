@@ -6,6 +6,8 @@ export interface IRow {
   id: string;
   date: string;
   status: TStatus;
+  /** see `IUserDonation.dist_status` */
+  dist_status?: IUserDonation["dist_status"];
   currency: string;
   amount: number;
   usd_value: number;
@@ -24,6 +26,7 @@ export const to_row = (x: IUserDonation): IRow => ({
   id: x.id,
   date: new Date(x.created_at).toLocaleDateString(),
   status: x.status as TStatus,
+  dist_status: x.dist_status,
   currency: x.currency,
   amount: x.amount_base,
   usd_value: x.upusd > 0 ? x.amount_base / x.upusd : 0,

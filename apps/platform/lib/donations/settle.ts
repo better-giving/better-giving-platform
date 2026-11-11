@@ -75,6 +75,19 @@ export function is_reversed(status: IDonation["status"]): boolean {
 }
 
 /**
+ * was this donation recorded twice and its duplicate cancelled? the duplicate's
+ * dist reads `refunded`, but no refund was made. a cancelled donation with no
+ * dist (a canceled DAF grant, a checkout a campaign close shut) or with a
+ * `refunded_loss` dist (money did go back) is not one
+ */
+export function is_cancelled_duplicate(
+  donation_status: string,
+  dist_status: string | null | undefined
+): boolean {
+  return donation_status === "cancelled" && dist_status === "refunded";
+}
+
+/**
  * the queue messages a settled donation row produces.
  *
  * one definition, two callers: `calc_donation_settle` below computes them for

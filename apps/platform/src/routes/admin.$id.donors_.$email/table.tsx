@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { cancelled_note } from "#/components/cancelled-note";
 import { Money } from "#/components/money";
 import { app_name } from "#/constants/env";
+import { is_cancelled_duplicate } from "@/donations";
 import { toPP } from "@/helpers/date";
 import { humanize } from "@/helpers/decimal";
 import type { ISub } from "@/subscriptions";
@@ -101,8 +102,7 @@ export function GiftsTable({ dists, subs }: IProps) {
           const refunded =
             d.status === "refunded" || d.status === "refunded_loss";
           // a reversed duplicate: its dist reads refunded, but no refund was made
-          const cancelled =
-            d.status === "refunded" && d.donation_status === "cancelled";
+          const cancelled = is_cancelled_duplicate(d.donation_status, d.status);
           const strike = refunded
             ? "line-through text-destructive-subtle-fg"
             : "";

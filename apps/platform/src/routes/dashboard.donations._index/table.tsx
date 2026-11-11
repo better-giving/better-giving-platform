@@ -6,7 +6,7 @@ import { cancelled_note } from "#/components/cancelled-note";
 import { Money } from "#/components/money";
 import { PaymentResumer } from "#/pages/user-dashboard/donations/payment-resumer";
 import type { IPaginator } from "#/types/components";
-import { is_reversed, type TStatus } from "@/donations";
+import { is_cancelled_duplicate, is_reversed, type TStatus } from "@/donations";
 import { toPP } from "@/helpers/date";
 import { type IRow, status_label, status_text_color } from "./helpers";
 
@@ -58,6 +58,10 @@ export function Table({
             )
           ) : (
             items.map((row) => {
+              const duplicate = is_cancelled_duplicate(
+                row.status,
+                row.dist_status
+              );
               return (
                 <tr key={row.id}>
                   <td className="whitespace-nowrap">
@@ -102,7 +106,7 @@ export function Table({
                   <td>
                     <Money
                       classes={
-                        is_reversed(row.status) || row.status === "cancelled"
+                        is_reversed(row.status) || duplicate
                           ? "line-through text-destructive-subtle-fg"
                           : ""
                       }
@@ -121,7 +125,7 @@ export function Table({
                     >
                       {status_label(row.status)}
                     </span>
-                    {row.status === "cancelled" && (
+                    {duplicate && (
                       <Tooltip
                         tip={
                           <Content className="max-w-xs text-xs">

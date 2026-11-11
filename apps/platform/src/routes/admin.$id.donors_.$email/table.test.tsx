@@ -88,7 +88,7 @@ describe("a donor's reversed gifts' note", () => {
   test.each([
     ["refunded", "refunded"],
     ["refunded_loss", "cancelled"],
-  ])(
+  ] as const)(
     "a %s dist under a %s donation has no cancelled note",
     async (status, donation_status) => {
       const Stub = createRoutesStub([

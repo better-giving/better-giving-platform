@@ -1,4 +1,8 @@
-import { type IAllocation, is_reversed } from "@/donations";
+import {
+  type IAllocation,
+  is_cancelled_duplicate,
+  is_reversed,
+} from "@/donations";
 import { via_name } from "@/donations/helpers";
 import { routed_kind, type TRoutedKind } from "@/stripe-connect/sent";
 import type { INpoDonation } from "$/pg/queries/dist";
@@ -78,8 +82,7 @@ export const to_csv_row = (x: INpoDonation): IRow => {
     processing_allowance: x.fee_allowance ?? 0,
   };
 
-  const cancelled =
-    x.status === "refunded" && x.donation_status === "cancelled";
+  const cancelled = is_cancelled_duplicate(x.donation_status, x.status);
 
   const row: IRow = {
     id: x.sttl_id ?? x.id,

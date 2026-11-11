@@ -112,7 +112,9 @@ describe("my donations — a refunded gift's amount", () => {
 
 describe("my donations — a cancelled duplicate", () => {
   test("strikes its amount and tells the donor no refund was made", async () => {
-    const screen = await render_table([row({ status: "cancelled" })]);
+    const screen = await render_table([
+      row({ status: "cancelled", dist_status: "refunded" }),
+    ]);
     const cells = screen.getByRole("row").nth(1).getByRole("cell");
     await expect.element(cells.nth(4)).toBeVisible();
     expect(cells.nth(4).element().firstElementChild?.textContent).toBe(
@@ -129,6 +131,22 @@ describe("my donations — a cancelled duplicate", () => {
       .toHaveAccessibleDescription(
         "Cancelled Recorded twice. This duplicate was cancelled. No refund was made, and your gift is recorded once."
       );
+  });
+
+  // a canceled DAF grant or a checkout a campaign's close shut has no dist
+  test("a cancelled donation with no dist reads plain Cancelled: no note, no strike", async () => {
+    const screen = await render_table([
+      row({ status: "cancelled", dist_status: null }),
+    ]);
+    const cells = screen.getByRole("row").nth(1).getByRole("cell");
+    await expect.element(cells.nth(4)).toBeVisible();
+    expect(cells.nth(4).element().textContent).toBe("Cancelled");
+    expect(cells.nth(4).element().querySelector("svg")).toBeNull();
+    const figure = cells.nth(2).element().querySelector("*") as Element;
+    const struck = [figure, ...figure.querySelectorAll("*")].some((el) =>
+      getComputedStyle(el).textDecorationLine.includes("line-through")
+    );
+    expect(struck).toBe(false);
   });
 
   test("a refunded row still says Refunded, with no cancelled note", async () => {
