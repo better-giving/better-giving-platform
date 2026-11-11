@@ -114,24 +114,28 @@ describe("my donations — a cancelled duplicate", () => {
   test("strikes its amount and tells the donor no refund was made", async () => {
     const screen = await render_table([row({ status: "cancelled" })]);
     const cells = screen.getByRole("row").nth(1).getByRole("cell");
-    await expect.element(cells.nth(3)).toHaveTextContent("Cancelled");
+    await expect.element(cells.nth(4)).toBeVisible();
+    expect(cells.nth(4).element().firstElementChild?.textContent).toBe(
+      "Cancelled"
+    );
     const figure = cells.nth(2).element().querySelector("*") as Element;
     const struck = [figure, ...figure.querySelectorAll("*")].some((el) =>
       getComputedStyle(el).textDecorationLine.includes("line-through")
     );
     expect(struck).toBe(true);
-    const tip = cells.nth(3).getByRole("button", { name: "More info" });
+    const tip = cells.nth(4).getByRole("button", { name: "More info" });
     await expect
       .element(tip)
       .toHaveAccessibleDescription(
-        "CancelledRecorded twice. This duplicate was cancelled. No refund was made, and your gift is recorded once."
+        "Cancelled Recorded twice. This duplicate was cancelled. No refund was made, and your gift is recorded once."
       );
   });
 
   test("a refunded row still says Refunded, with no cancelled note", async () => {
     const screen = await render_table([row({ status: "refunded" })]);
-    const status = screen.getByRole("row").nth(1).getByRole("cell").nth(3);
-    await expect.element(status).toHaveTextContent("Refunded");
+    const status = screen.getByRole("row").nth(1).getByRole("cell").nth(4);
+    await expect.element(status).toBeVisible();
+    expect(status.element().firstElementChild?.textContent).toBe("Refunded");
     expect(status.element().querySelector("svg")).toBeNull();
   });
 });

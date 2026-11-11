@@ -2,7 +2,7 @@ import { to_usd } from "@better-giving/ui/helpers";
 import { Arrow, Content, Tooltip } from "@better-giving/ui/tooltip";
 import { InfoIcon, TagIcon } from "lucide-react";
 import { href, Link } from "react-router";
-import { CancelledNote } from "#/components/cancelled-note";
+import { cancelled_note } from "#/components/cancelled-note";
 import { Money } from "#/components/money";
 import { default_allocation } from "@/constants/common";
 import { is_reversed } from "@/donations";
@@ -73,7 +73,7 @@ export function Row(props: IRow) {
             tip={
               <Content className="max-w-xs text-xs">
                 <Arrow />
-                {cancelled ? <CancelledNote /> : "Refunded"}
+                {cancelled ? cancelled_note() : "Refunded"}
               </Content>
             }
           >

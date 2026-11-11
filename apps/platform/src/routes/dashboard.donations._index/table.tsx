@@ -2,7 +2,7 @@ import { Button, EmptyRow, ExtLink, LoadMoreRow } from "@better-giving/ui";
 import { Arrow, Content, Tooltip } from "@better-giving/ui/tooltip";
 import { ArrowDownToLine, InfoIcon } from "lucide-react";
 import { href, Link } from "react-router";
-import { CancelledNote } from "#/components/cancelled-note";
+import { cancelled_note } from "#/components/cancelled-note";
 import { Money } from "#/components/money";
 import { PaymentResumer } from "#/pages/user-dashboard/donations/payment-resumer";
 import type { IPaginator } from "#/types/components";
@@ -126,7 +126,7 @@ export function Table({
                         tip={
                           <Content className="max-w-xs text-xs">
                             <Arrow />
-                            <CancelledNote donor />
+                            {cancelled_note(true)}
                           </Content>
                         }
                       >

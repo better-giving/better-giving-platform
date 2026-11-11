@@ -70,7 +70,10 @@ describe("a donor's reversed gifts' note", () => {
     ]);
     const screen = await render(<Stub initialEntries={["/"]} />);
     await expect.element(screen.getByText("$10.00")).toBeVisible();
-    return screen.getByRole("button", { name: "More info", exact: true });
+    // the net cell's tooltip is the row's last, past the fees one
+    return screen
+      .getByRole("button", { name: "More info", exact: true })
+      .last();
   }
 
   test("a cancelled duplicate says Cancelled, not Refunded, and stays struck", async () => {

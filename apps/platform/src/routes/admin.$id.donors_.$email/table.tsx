@@ -2,7 +2,7 @@ import { EmptyRow } from "@better-giving/ui";
 import { Arrow, Content, Tooltip } from "@better-giving/ui/tooltip";
 import { InfoIcon, RefreshCw, SparklesIcon } from "lucide-react";
 import { useMemo } from "react";
-import { CancelledNote } from "#/components/cancelled-note";
+import { cancelled_note } from "#/components/cancelled-note";
 import { Money } from "#/components/money";
 import { app_name } from "#/constants/env";
 import { toPP } from "@/helpers/date";
@@ -207,7 +207,7 @@ export function GiftsTable({ dists, subs }: IProps) {
                         tip={
                           <Content className="max-w-xs text-xs">
                             <Arrow />
-                            <CancelledNote />
+                            {cancelled_note()}
                           </Content>
                         }
                       >
