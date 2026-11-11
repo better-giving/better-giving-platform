@@ -59,4 +59,5 @@ pre-commit:
       glob:
         - "packages/brand/**/*.{ts,css}"
         - "packages/ui/src/styles/colors.css"
+        - "packages/ui/src/styles/themes/*.css"
       run: pnpm --filter @better-giving/brand test

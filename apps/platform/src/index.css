@@ -47,9 +47,13 @@
   font-feature-settings: "tnum";
 }
 
-/* donation form: override ring so all focus outlines follow the theme */
+/* donation form: override ring so all focus outlines follow the theme.
+   --form-ring too: it resolves --ring on :root (packages/ui variables.css), so
+   btn-form-primary never sees the --ring set here, and this element has no
+   data-theme to re-resolve it. */
 #donation-container {
   --ring: var(--form-primary);
+  --form-ring: var(--form-primary);
 }
 
 /* the ground: the page fill, painted once here for every screen and never per

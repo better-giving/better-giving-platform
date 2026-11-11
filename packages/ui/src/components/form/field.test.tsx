@@ -257,3 +257,111 @@ describe("Field: help text announcement", () => {
     expect(document.getElementById("__sub_street")).toBe(null);
   });
 });
+
+describe("Field: action", () => {
+  it("renders the action beside the control, in the same row", async () => {
+    const screen = await render(
+      <Field
+        label="Custom URL"
+        name="slug"
+        action={<button type="button">Check</button>}
+      />
+    );
+    const input = screen.getByLabelText("Custom URL").element();
+    const button = screen.getByRole("button", { name: "Check" }).element();
+
+    const row = input.closest(".field-row");
+    expect(row).not.toBe(null);
+    expect(row?.contains(button)).toBe(true);
+    const a = input.getBoundingClientRect();
+    const b = button.getBoundingClientRect();
+    expect(b.left).toBeGreaterThanOrEqual(a.right);
+  });
+
+  it("keeps the error and the tooltip under the control, not under the row", async () => {
+    const screen = await render(
+      <Field
+        label="Custom URL"
+        name="slug"
+        tooltip="Lowercase only."
+        error="Already taken"
+        action={<button type="button">Check</button>}
+      />
+    );
+    const control = screen.getByLabelText("Custom URL").element();
+    const column = control.closest(".field-control");
+
+    expect(column?.contains(document.getElementById("__tooltip_slug"))).toBe(
+      true
+    );
+    expect(column?.contains(document.getElementById("__error_slug"))).toBe(
+      true
+    );
+    expect(
+      column?.contains(screen.getByRole("button", { name: "Check" }).element())
+    ).toBe(false);
+  });
+
+  it("keeps the error under the control when there is no tooltip", async () => {
+    const screen = await render(
+      <Field
+        label="Custom URL"
+        name="slug"
+        error="Already taken"
+        action={<button type="button">Check</button>}
+      />
+    );
+    const column = screen
+      .getByLabelText("Custom URL")
+      .element()
+      .closest(".field-control");
+
+    expect(column?.contains(document.getElementById("__error_slug"))).toBe(
+      true
+    );
+  });
+
+  it("still describes the control by ids that exist, with an action present", async () => {
+    const screen = await render(
+      <>
+        <p id="outside_note">Only numbers and letters are permitted.</p>
+        <Field
+          label="Custom URL"
+          name="slug"
+          sub="Your page address."
+          tooltip="Lowercase only."
+          describedby="outside_note"
+          error="Already taken"
+          action={<button type="button">Check</button>}
+        />
+      </>
+    );
+    const input = screen.getByLabelText("Custom URL").element();
+    const ids = (input.getAttribute("aria-describedby") ?? "").split(" ");
+
+    expect(ids).toEqual([
+      "__sub_slug",
+      "__tooltip_slug",
+      "outside_note",
+      "__error_slug",
+    ]);
+    for (const id of ids) expect(document.getElementById(id)).not.toBe(null);
+    await expect
+      .element(input)
+      .toHaveAccessibleDescription(
+        "Your page address. Lowercase only. Only numbers and letters are permitted. (Already taken)"
+      );
+  });
+
+  it("adds no row when there is no action", async () => {
+    const screen = await render(
+      <Field label="Custom URL" name="slug" error="Already taken" />
+    );
+    const input = screen.getByLabelText("Custom URL").element();
+
+    expect(input.closest(".field-row")).toBe(null);
+    expect(input.closest(".field-control")).toBe(null);
+    expect(document.querySelector(".field-action")).toBe(null);
+    expect(input.getAttribute("aria-describedby")).toBe("__error_slug");
+  });
+});
