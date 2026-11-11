@@ -31,8 +31,10 @@ vi.mock("$/env", async (importOriginal) => {
     },
   };
 });
+const donation_update_mock = vi.hoisted(() => vi.fn());
 vi.mock("$/pg/queries/donation", () => ({
   donation_put: async (_db: unknown, r: unknown) => r,
+  donation_update: donation_update_mock,
 }));
 
 const { stripe_intent } = await import("./index");
@@ -63,6 +65,7 @@ const stripe_refusal = (code: string, message: string) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  donation_update_mock.mockResolvedValue({});
   routing.on = false;
 });
 
@@ -135,6 +138,28 @@ describe("stripe_intent refusals", () => {
     const logged = info.mock.calls.length;
     info.mockRestore();
     expect(logged).toBe(0);
+  });
+
+  it("marks the donation failed when the intent could not be created, refused or not", async () => {
+    pi_create_mock.mockRejectedValue(
+      stripe_refusal("amount_too_large", "too much")
+    );
+    await stripe_intent(ctx());
+    const don_id = pi_create_mock.mock.calls[0]![0].metadata.order_id;
+    expect(donation_update_mock).toHaveBeenCalledWith({}, don_id, {
+      status: "failed",
+    });
+
+    donation_update_mock.mockClear();
+    pi_create_mock.mockRejectedValue(new Error("socket hang up"));
+    await expect(stripe_intent(ctx())).rejects.toThrow("socket hang up");
+    expect(donation_update_mock).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the donation alone when the intent was created", async () => {
+    pi_create_mock.mockResolvedValue({ client_secret: "pi_secret" });
+    await stripe_intent(ctx());
+    expect(donation_update_mock).not.toHaveBeenCalled();
   });
 
   it("rethrows a stripe error the donor can't act on", async () => {
