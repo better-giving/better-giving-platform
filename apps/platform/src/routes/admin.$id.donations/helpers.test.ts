@@ -183,4 +183,25 @@ describe("a cancelled duplicate's stripe payout", () => {
       expect(row.stripe_payout).toBe("reversed");
     }
   );
+
+  test("with no transfer it reads not sent", () => {
+    const row = to_csv_row({ ...duplicate, stripe_transfer_id: null });
+    expect(row.stripe_payout).toBe("not_sent");
+  });
+
+  // a loss under a cancelled donation did refund, so the owed row still reads
+  test.each([
+    [true, "kept"],
+    [false, "repaid"],
+  ] as const)(
+    "a refunded_loss dist (owed open: %s) reads %s",
+    (owed_open, payout) => {
+      const row = to_csv_row({
+        ...duplicate,
+        status: "refunded_loss",
+        owed_open,
+      });
+      expect(row.stripe_payout).toBe(payout);
+    }
+  );
 });

@@ -38,12 +38,13 @@ test("the npo's donations carry each donation's status, so a cancelled duplicate
     "refunded",
     "refunded_loss",
     "cancelled",
+    "cancelled_loss",
   ] as const;
   await db.insert(donations).values(
     statuses.map((status) => ({
       id: `don-${status}`,
       upusd: 1,
-      status,
+      status: status === "cancelled_loss" ? "cancelled" : status,
       amount_base: 40,
       amount_tip: 0,
       amount_fee_allowance: 0,
@@ -53,12 +54,14 @@ test("the npo's donations carry each donation's status, so a cancelled duplicate
       via: "stripe:card",
     }))
   );
-  // a reversed duplicate's dist is `refunded`, the only reversal state dists allow
+  // a reversed duplicate's dist is `refunded`; a cancelled donation whose
+  // dist is `refunded_loss` did refund
   const dist_status = {
     settled: "settled",
     refunded: "refunded",
     refunded_loss: "refunded_loss",
     cancelled: "refunded",
+    cancelled_loss: "refunded_loss",
   } as const;
   await db.insert(dists).values(
     statuses.map((status, i) => ({
@@ -81,5 +84,6 @@ test("the npo's donations carry each donation's status, so a cancelled duplicate
     "d-refunded": ["refunded", "refunded"],
     "d-refunded_loss": ["refunded_loss", "refunded_loss"],
     "d-cancelled": ["refunded", "cancelled"],
+    "d-cancelled_loss": ["refunded_loss", "cancelled"],
   });
 });

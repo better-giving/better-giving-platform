@@ -44,6 +44,24 @@ const refunded = {
   status: "refunded",
 } satisfies IRow;
 
+async function mount(row: IRow) {
+  const Stub = createRoutesStub([
+    {
+      path: "/",
+      Component: () => (
+        <table>
+          <tbody>
+            <tr>
+              <Row {...row} />
+            </tr>
+          </tbody>
+        </table>
+      ),
+    },
+  ]);
+  return render(<Stub initialEntries={["/"]} />);
+}
+
 describe("a refunded donation row", () => {
   test("nets the same figure the allocation shows", async () => {
     const Stub = createRoutesStub([
@@ -72,21 +90,7 @@ describe("a refunded donation row", () => {
 
 describe("a reversed donation's net", () => {
   async function render_row(row: IRow) {
-    const Stub = createRoutesStub([
-      {
-        path: "/",
-        Component: () => (
-          <table>
-            <tbody>
-              <tr>
-                <Row {...row} />
-              </tr>
-            </tbody>
-          </table>
-        ),
-      },
-    ]);
-    const screen = await render(<Stub initialEntries={["/"]} />);
+    const screen = await mount(row);
     const net = screen.getByRole("cell").nth(6);
     await expect.element(net).toBeVisible();
     const figure = net.element().firstElementChild as HTMLElement;
@@ -98,22 +102,12 @@ describe("a reversed donation's net", () => {
   }
 
   async function tip_of(row: IRow) {
-    const Stub = createRoutesStub([
-      {
-        path: "/",
-        Component: () => (
-          <table>
-            <tbody>
-              <tr>
-                <Row {...row} />
-              </tr>
-            </tbody>
-          </table>
-        ),
-      },
-    ]);
-    const screen = await render(<Stub initialEntries={["/"]} />);
-    const trigger = screen.getByRole("button", { name: "More info" });
+    const screen = await mount(row);
+    // scoped to the net cell: a stripe_payout adds its own "More info"
+    const trigger = screen
+      .getByRole("cell")
+      .nth(6)
+      .getByRole("button", { name: "More info", exact: true });
     await expect.element(trigger).toBeVisible();
     return trigger;
   }
@@ -163,21 +157,7 @@ describe("a reversed donation's net", () => {
 
 describe("where a donation's net went", () => {
   async function render_row(row: IRow) {
-    const Stub = createRoutesStub([
-      {
-        path: "/",
-        Component: () => (
-          <table>
-            <tbody>
-              <tr>
-                <Row {...row} />
-              </tr>
-            </tbody>
-          </table>
-        ),
-      },
-    ]);
-    const screen = await render(<Stub initialEntries={["/"]} />);
+    const screen = await mount(row);
     const cells = screen.getByRole("cell");
     await expect.element(cells.first()).toBeVisible();
     const [net, allocation] = cells.elements().slice(6, 8);
