@@ -189,7 +189,7 @@ describe("a cancelled duplicate's stripe payout", () => {
     expect(row.stripe_payout).toBe("not_sent");
   });
 
-  // a loss under a cancelled donation did refund, so the owed row still reads
+  // a loss under a cancelled donation did refund, so the owed row still reads kept or repaid
   test.each([
     [true, "kept"],
     [false, "repaid"],
