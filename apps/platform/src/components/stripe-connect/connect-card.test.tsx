@@ -99,6 +99,38 @@ describe("StripeConnectCard", () => {
     }
   );
 
+  test("disconnected, money held: the body says only what the held card above doesn't", async () => {
+    const screen = await render_card({
+      status: "disconnected",
+      has_bank: false,
+      holds_money: true,
+    });
+    const card = screen.getByRole("region", { name: "Stripe account" });
+    await expect
+      .element(
+        card.getByText(
+          "Donations already sent to your Stripe account stay there.",
+          { exact: true }
+        )
+      )
+      .toBeVisible();
+    expect(card.element().textContent).not.toMatch(
+      /was disconnected from your Stripe account|Connect Stripe again/
+    );
+  });
+
+  test("disconnected, bank on file, money held: the body keeps both paragraphs, since the held card only replaces the no-bank text", async () => {
+    const screen = await render_card({
+      status: "disconnected",
+      has_bank: true,
+      holds_money: true,
+    });
+    const card = screen.getByRole("region", { name: "Stripe account" });
+    for (const phrase of DISCONNECTED_WITH_BANK) {
+      await expect.element(card.getByText(phrase)).toBeVisible();
+    }
+  });
+
   test("incomplete, money held: switching accounts stays, the held card offers no connect then", async () => {
     const screen = await render_card({
       status: "incomplete",
@@ -230,7 +262,7 @@ describe("StripeConnectCard", () => {
   const BOTH_READY = `Card, bank and wallet donations (like Apple Pay, Google Pay and Link) ${SPLIT} What Stripe pays on to the bank on your Stripe account is in your Stripe dashboard. If you disconnect Better Giving in your Stripe dashboard, card, bank and wallet donations go to your bank again.`;
   const STRIPE_ONLY_READY = `Card, bank and wallet donations (like Apple Pay, Google Pay and Link) ${SPLIT} What Stripe pays on to the bank on your Stripe account is in your Stripe dashboard.`;
   const DISCONNECTED =
-    "Better Giving was disconnected from your Stripe account in your Stripe dashboard. Connect Stripe again to get card, bank and wallet donations (like Apple Pay, Google Pay and Link) straight to your Stripe account, after fees, once Stripe says your account is ready.";
+    "Better Giving was disconnected from your Stripe account in your Stripe dashboard. Connect Stripe again to get card, bank and wallet donations (like Apple Pay, Google Pay and Link) straight to your Stripe account, after fees, once Stripe says your account is ready. Donations already sent to your Stripe account stay there.";
   const DISCONNECTED_WITH_BANK = [
     "Better Giving was disconnected from your Stripe account in your Stripe dashboard. Card, bank and wallet donations (like Apple Pay, Google Pay and Link) now go to your bank.",
     "Connect Stripe again to get them straight to your Stripe account, after fees, once Stripe says your account is ready. Donations already sent to your Stripe account stay there.",
@@ -351,7 +383,7 @@ describe("StripeConnectCard", () => {
   test.each<[IStripeConnectCard["status"], boolean, string[]]>([
     ["not_connected", false, []],
     ["not_connected", true, []],
-    ["disconnected", false, [DISCONNECTED_BRIEF]],
+    ["disconnected", false, [`${DISCONNECTED_BRIEF} ${KEPT_ON_STRIPE}`]],
     ["disconnected", true, [`${DISCONNECTED_BRIEF} ${KEPT_ON_STRIPE}`]],
     ["incomplete", true, [INCOMPLETE_BANK[0]]],
     ["pending", true, []],

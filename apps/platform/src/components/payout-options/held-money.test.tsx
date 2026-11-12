@@ -608,6 +608,10 @@ describe("BankPayoutSection: Banking", () => {
       "disconnected",
       "Add one to release held money and get everything paid out to your bank.",
     ],
+    [
+      "not_connected",
+      "Add one to release held money and get everything paid out to your bank.",
+    ],
   ])(
     "no bank, Stripe %s, money held: the empty state says what a bank releases, and the held card keeps the one Add",
     async (stripe_status, line) => {
@@ -629,7 +633,12 @@ describe("BankPayoutSection: Banking", () => {
     }
   );
 
-  test.each<TConnectStatus>(["incomplete", "pending", "not_connected"])(
+  test.each<TConnectStatus>([
+    "incomplete",
+    "pending",
+    "not_connected",
+    "disconnected",
+  ])(
     "no bank, Stripe %s, nothing held: the empty state asks for a bank and the section keeps its own Add",
     async (stripe_status) => {
       const screen = await render_section({
@@ -670,6 +679,28 @@ describe("BankPayoutSection: Banking", () => {
       )
       .toBeVisible();
     expect(section.getByRole("link").query()).toBeNull();
+  });
+
+  test("bank on file, Stripe ready, none under review: no review sentence, and the section keeps its Add", async () => {
+    const screen = await render_section({
+      table: TABLE,
+      has_bank: true,
+      bank_pending: false,
+      stripe_status: "ready",
+      holds_money: false,
+    });
+    const section = screen.getByRole("region", { name: "Bank payout" });
+    await expect
+      .element(
+        section.getByText(
+          "Everything except card, bank and wallet donations pays out here."
+        )
+      )
+      .toBeVisible();
+    expect(section.element().textContent).not.toMatch(/under review/);
+    await expect
+      .element(section.getByRole("link", { name: "Add bank account" }))
+      .toBeVisible();
   });
 
   test("no bank, nothing held: the section keeps its own Add", async () => {

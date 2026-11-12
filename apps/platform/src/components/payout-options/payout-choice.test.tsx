@@ -6,7 +6,7 @@ import { cleanup, render } from "vitest-browser-react";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
 import { BankRequired } from "./bank-required";
 import { type IPayoutChoice, PayoutChoice } from "./payout-choice";
-import { BANK_SUMMARY_WITH_STRIPE, type TPayoutOption } from "./rows";
+import type { TPayoutOption } from "./rows";
 import { SavedBank } from "./saved-bank";
 
 /** `Button`'s link form needs a router around it */
@@ -136,33 +136,40 @@ describe("PayoutChoice option cards", () => {
     expect(held_badges(bank)).toBe(0);
   });
 
-  test.each<[TConnectStatus, string, string]>([
+  const SUMMARY_WITH_STRIPE =
+    "One payout for everything your Stripe account doesn't receive.";
+
+  test.each<[TConnectStatus, string, boolean]>([
     [
       "incomplete",
       "To your bank, after your Grant, Savings and Investments split, until Stripe says your account is ready. Then they go straight to your Stripe account instead.",
-      "To your Stripe account, not your bank",
+      false,
     ],
     [
       "pending",
       "To your bank, after your Grant, Savings and Investments split, until Stripe says your account is ready. Then they go straight to your Stripe account instead.",
-      "To your Stripe account, not your bank",
+      false,
     ],
     [
       "ready",
-      "To your Stripe account, not your bank, since it's ready. If you disconnect Better Giving in your Stripe dashboard, they go to your bank again.",
-      "until Stripe says your account is ready",
+      "To your Stripe account, not your bank. If you disconnect Better Giving in your Stripe dashboard, they go to your bank instead.",
+      true,
     ],
   ])(
     "Stripe %s: the bank card says what Stripe takes off it, and the other two rows stay with the bank",
-    async (stripe_status, first, absent) => {
+    async (stripe_status, first, stripe_receives) => {
       const screen = await render_choice({ stripe_status });
       const bank = cards(screen)[0];
 
       expect(cells(bank)).toEqual([first, "To your bank.", "To your bank."]);
-      expect(cells(bank)[0]).not.toContain(absent);
+      // the summary claims a split only once Stripe receives something
+      const [shown, hidden] = stripe_receives
+        ? [SUMMARY_WITH_STRIPE, "One payout for everything."]
+        : ["One payout for everything.", SUMMARY_WITH_STRIPE];
       await expect
-        .element(screen.getByText(BANK_SUMMARY_WITH_STRIPE, { exact: true }))
+        .element(screen.getByText(shown, { exact: true }))
         .toBeVisible();
+      expect(screen.getByText(hidden, { exact: true }).query()).toBeNull();
       expect(held_badges(bank)).toBe(0);
     }
   );
@@ -178,7 +185,7 @@ describe("PayoutChoice option cards", () => {
         "To your bank.",
       ]);
       expect(
-        screen.getByText(BANK_SUMMARY_WITH_STRIPE, { exact: true }).query()
+        screen.getByText(SUMMARY_WITH_STRIPE, { exact: true }).query()
       ).toBeNull();
     }
   );

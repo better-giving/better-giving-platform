@@ -49,8 +49,8 @@ export interface IStripeConnectCard {
    *  a band speaks */
   brief?: boolean;
   /** the held-money card shows above, carrying its own Connect Stripe while
-   *  no account is linked, so the page keeps one, and this card's body asks
-   *  for no reconnect */
+   *  no account is linked, so the page keeps one. it never shows beside a
+   *  bank */
   holds_money?: boolean;
   /** 3 under a page's own h2, as on registration step 4 */
   heading_level?: 2 | 3;
@@ -107,19 +107,17 @@ const bodies = (
         `Once Stripe says your account is ready, ${FIRST} ${SENT_AS_TRANSFER} Until then, ${has_bank ? "they go to your bank" : "they're held in your Better Giving balance"}.`,
       ];
     case "disconnected":
-      // with no bank they are held, which the held card says while any are.
-      // while money is held this card draws no Connect Stripe, so asks for none
       if (has_bank)
         return [
           `${DISCONNECTED} ${cap(FIRST)} now go to your bank.`,
-          holds_money
-            ? KEPT_ON_STRIPE
-            : `Connect Stripe again to get them straight to your Stripe account, after fees, once Stripe says your account is ready. ${KEPT_ON_STRIPE}`,
+          `Connect Stripe again to get them straight to your Stripe account, after fees, once Stripe says your account is ready. ${KEPT_ON_STRIPE}`,
         ];
+      // the held card above already says Stripe is disconnected and carries
+      // Connect Stripe, so only what it never says is left
       return holds_money
-        ? [DISCONNECTED]
+        ? [KEPT_ON_STRIPE]
         : [
-            `${DISCONNECTED} Connect Stripe again to get ${FIRST} straight to your Stripe account, after fees, once Stripe says your account is ready.`,
+            `${DISCONNECTED} Connect Stripe again to get ${FIRST} straight to your Stripe account, after fees, once Stripe says your account is ready. ${KEPT_ON_STRIPE}`,
           ];
     case "incomplete":
       // without a bank, the standing band says it
@@ -146,8 +144,7 @@ const bodies = (
  *  wallet donations go until and once the account is ready, and the status
  *  line names the status, so only what neither says is left */
 const brief_bodies = (status: TConnectStatus, has_bank: boolean): string[] => {
-  if (status === "disconnected")
-    return [has_bank ? `${DISCONNECTED} ${KEPT_ON_STRIPE}` : DISCONNECTED];
+  if (status === "disconnected") return [`${DISCONNECTED} ${KEPT_ON_STRIPE}`];
   if (status === "incomplete" && has_bank) return [FINISH_SETUP];
   return [];
 };

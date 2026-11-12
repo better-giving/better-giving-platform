@@ -26,7 +26,6 @@ function Page({ loaderData, params }: Route.ComponentProps) {
   const { methods, stripe, connect_routing, has_bank, bank_pending, held } =
     loaderData;
   use_strip_connect_params(connect_routing && !!stripe.notice);
-  const offers_stripe = connect_routing && !stripe.ineligible;
   const stripe_linked = is_linked(stripe.status);
   const holds_money = !!held && held.total > 0;
 
@@ -39,7 +38,7 @@ function Page({ loaderData, params }: Route.ComponentProps) {
           rails={stripe_linked ? "stripe" : "none"}
           bank_pending={bank_pending}
           add_bank_href="new"
-          {...(offers_stripe && { connect_href: stripe.start_href })}
+          connect_href={stripe.start_href}
         />
       )}
 

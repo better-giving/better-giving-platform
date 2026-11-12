@@ -17,7 +17,7 @@ export const option_summaries: Record<TPayoutOption, string> = {
     "Card, bank and wallet donations go straight to your Stripe account once it's ready.",
 };
 
-/** the Bank summary while a Stripe account is linked */
+/** the Bank summary once Stripe says the linked account is ready */
 export const BANK_SUMMARY_WITH_STRIPE =
   "One payout for everything your Stripe account doesn't receive.";
 
@@ -75,7 +75,7 @@ export const rows: IRow[] = [
         text: "To your bank, after your Grant, Savings and Investments split, until Stripe says your account is ready. Then they go straight to your Stripe account instead.",
       },
       ready: {
-        text: "To your Stripe account, not your bank, since it's ready. If you disconnect Better Giving in your Stripe dashboard, they go to your bank again.",
+        text: "To your Stripe account, not your bank. If you disconnect Better Giving in your Stripe dashboard, they go to your bank instead.",
       },
     },
   },

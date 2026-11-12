@@ -186,10 +186,10 @@ interface IOptionCard {
   option: TPayoutOption;
   /** the chosen card, or both while neither is */
   expanded: boolean;
-  /** the Bank card says what Stripe takes off it */
+  /** the Bank card's first row says what Stripe will take off it */
   stripe_linked: boolean;
   /** the Stripe card's first row drops its until-ready clause, and the Bank
-   *  card's says Stripe receives it */
+   *  card's summary and first row say Stripe receives it */
   stripe_ready: boolean;
   /** the Stripe card sends what it can't receive to the bank, not to held */
   bank_saved: boolean;
@@ -208,7 +208,7 @@ function OptionCard({
 }: IOptionCard) {
   const desc_id = useId();
   const summary =
-    option === "bank" && stripe_linked
+    option === "bank" && stripe_ready
       ? BANK_SUMMARY_WITH_STRIPE
       : option_summaries[option];
   return (
