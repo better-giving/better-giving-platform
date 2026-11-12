@@ -13,7 +13,8 @@ import {
 
 /** where a card, bank or wallet donation made now goes: the connected account
  * (`on`), or the bank, or held without one, while the account stays linked
- * (`off`, or `waiting` when nothing was ever sent to it) or after a disconnect */
+ * (`off`, or `waiting` when nothing was ever sent to it) or after a
+ * disconnect */
 export type TStripeLink = "on" | "off" | "waiting" | "disconnected";
 
 export const stripe_link = (sent: INpoSent): TStripeLink => {
