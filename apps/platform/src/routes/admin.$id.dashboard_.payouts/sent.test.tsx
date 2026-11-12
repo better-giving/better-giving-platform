@@ -319,11 +319,13 @@ describe("Stripe on: the Payouts well follows the bank", () => {
   const PRIOR =
     "PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before Stripe was ready:";
 
-  test("a bank on file: the Grant share of each is sent to it", async () => {
+  test("a bank on file: the Grant share of each, and withdrawals, are sent to it", async () => {
     const screen = await render(<WhereMoneyShows link={link} has_bank />);
     await expect
       .element(
-        screen.getByText(`${PRIOR} the Grant share of each, sent to your bank.`)
+        screen.getByText(
+          `${PRIOR} the Grant share of each, sent to your bank. Savings and Investments withdrawals are sent there too.`
+        )
       )
       .toBeVisible();
   });

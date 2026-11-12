@@ -1099,7 +1099,7 @@ describe("stripe connect card", () => {
     await expect
       .element(
         card.getByText(
-          /If you disconnect Better Giving in your Stripe dashboard, they go back to your bank/
+          /If you disconnect Better Giving in your Stripe dashboard, card, bank and wallet donations go to your bank again/
         )
       )
       .toBeVisible();

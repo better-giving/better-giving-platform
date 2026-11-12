@@ -109,6 +109,48 @@ describe("held card, net of what is owed", () => {
       .toBeVisible();
   });
 
+  test.each<[string, typeof HeldMoneyCard, boolean, string]>([
+    [
+      "Banking",
+      HeldMoneyCard,
+      false,
+      "Stripe is disconnected and you have no bank account, so every donation is held in your Better Giving balance. Nothing is lost.",
+    ],
+    [
+      "Payouts",
+      PayoutsHeldCard,
+      true,
+      "Stripe is disconnected and your bank account is still under review, so every donation is held in your Better Giving balance. Nothing is lost.",
+    ],
+  ])(
+    "%s, Stripe disconnected, owing all of it: the lead promises no payout either",
+    async (_, Card, bank_pending, lead) => {
+      const screen = await in_router(
+        <Card
+          {...base}
+          rails="none"
+          bank_pending={bank_pending}
+          held={{ ...HELD, net: 0 }}
+        />
+      );
+      const region = screen.getByRole("region");
+      await expect
+        .element(
+          region.getByText(
+            "What you owe Better Giving covers all of it, so none of it will pay out to you."
+          )
+        )
+        .toBeVisible();
+      await expect
+        .element(region.getByText(lead, { exact: true }))
+        .toBeVisible();
+      // the heading's "No way to get paid" is a fact, not a promise
+      expect(region.element().textContent).not.toMatch(
+        /pays out once|again to get paid/
+      );
+    }
+  );
+
   test("owed money back: the foot adds it, and the headline says so", async () => {
     const screen = await in_router(
       <PayoutsHeldCard {...base} held={{ ...HELD, net: 1800 }} />
@@ -323,7 +365,7 @@ describe("PayoutsHeldCard: Payouts", () => {
     expect(body_rows(card)).toEqual([
       ["PayPal donation", "Oct 30, 2026", "$640.00"],
       ["DAF grant", "Oct 28, 2026", "$420.00"],
-      ["Savings withdrawal", "Oct 27, 2026", "$500.00"],
+      ["Savings or Investments withdrawal", "Oct 27, 2026", "$500.00"],
       ["Crypto donation", "Oct 25, 2026", "$150.50"],
       ["Stock or cheque donation", "Oct 22, 2026", "$74.00"],
     ]);
@@ -525,6 +567,27 @@ describe("BankPayoutSection: Banking", () => {
         .query()
     ).toBeNull();
   });
+
+  test.each<TConnectStatus>(["incomplete", "pending", "not_connected"])(
+    "bank on file, Stripe %s: card, bank and wallet donations still wait, so nothing says everything else pays out here",
+    async (stripe_status) => {
+      const screen = await render_section({
+        table: TABLE,
+        has_bank: true,
+        stripe_status,
+        holds_money: false,
+      });
+      const section = screen.getByRole("region", { name: "Bank payout" });
+      await expect.element(section.getByText("accounts table")).toBeVisible();
+      expect(
+        section
+          .getByText(
+            "Everything except card, bank and wallet donations pays out here."
+          )
+          .query()
+      ).toBeNull();
+    }
+  );
 
   test.each<[TConnectStatus, string]>([
     [

@@ -438,7 +438,7 @@ describe("the payouts page", () => {
     await expect
       .element(
         where.getByText(
-          "PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before Stripe was ready: the Grant share of each, sent to your bank."
+          "PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before Stripe was ready: the Grant share of each, sent to your bank. Savings and Investments withdrawals are sent there too."
         )
       )
       .toBeVisible();

@@ -24,7 +24,7 @@ export interface ICell {
   held?: boolean;
 }
 
-export interface IRow {
+interface IRow {
   term: string;
   /** `stripe_with_bank` is the Stripe card's cell while a bank is on file */
   card: Record<TPayoutOption | "stripe_with_bank", ICell>;
@@ -34,10 +34,10 @@ export interface IRow {
 }
 
 const to_bank: ICell = { text: "To your bank." };
-/** Stripe with no bank on file */
+/** Stripe with no bank on file. no Held badge: holding is only the
+ *  until-ready tail, and the badge would lead the whole outcome */
 const stripe_without_bank: ICell = {
   text: "Straight to your Stripe account as each donation's own transfer, after fees, once Stripe says your account is ready. They skip your split. Until then they're held.",
-  held: true,
 };
 const held_others: ICell = {
   text: "In your Better Giving balance until you add a bank account.",

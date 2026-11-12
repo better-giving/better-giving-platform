@@ -62,7 +62,7 @@ describe("PayoutChoice option cards", () => {
       {
         first: "They skip your split. Until then they're held.",
         others: "until you add a bank account.",
-        held: 3,
+        held: 2,
       },
     ],
     [
@@ -71,7 +71,7 @@ describe("PayoutChoice option cards", () => {
       {
         first: "They skip your split. Until then they're held.",
         others: "until you add a bank account.",
-        held: 3,
+        held: 2,
       },
     ],
     [
@@ -85,7 +85,7 @@ describe("PayoutChoice option cards", () => {
       {
         first: "They skip your split. Until then they're held.",
         others: "until you add a bank account.",
-        held: 3,
+        held: 2,
       },
     ],
     [
@@ -109,8 +109,9 @@ describe("PayoutChoice option cards", () => {
 
       expect(donations).toContain("Straight to your Stripe account");
       expect(donations).toContain(want.first);
-      // "Held" is the badge, never prose: it leads the cell only while held
-      expect(donations.startsWith("Held")).toBe(want.held === 3);
+      // "Held" is the badge, never prose. the Stripe outcome never carries it:
+      // holding is only its until-ready tail
+      expect(donations.startsWith("Held")).toBe(false);
       if (want.held) {
         expect(others).toMatch(/^Held.*Better Giving balance/);
         expect(withdrawals).toMatch(/^Held.*stay in your balance/);
@@ -216,6 +217,71 @@ describe("PayoutChoice summaries", () => {
           { exact: true }
         )
       )
+      .toBeVisible();
+  });
+});
+
+describe("PayoutChoice slots", () => {
+  test.each<[TPayoutOption, string, string]>([
+    ["bank", "bank slot", "stripe slot"],
+    ["stripe", "stripe slot", "bank slot"],
+  ])(
+    "choosing %s shows its slot and not the other",
+    async (selected, shown, hidden) => {
+      const screen = await render_choice({ selected });
+
+      await expect
+        .element(screen.getByText(shown, { exact: true }))
+        .toBeVisible();
+      expect(screen.getByText(hidden, { exact: true }).query()).toBeNull();
+    }
+  );
+
+  test("nothing chosen shows neither slot", async () => {
+    const screen = await render_choice();
+
+    await expect
+      .element(screen.getByRole("radio", { name: "Bank", exact: true }))
+      .toBeInTheDocument();
+    expect(screen.getByText("bank slot", { exact: true }).query()).toBeNull();
+    expect(screen.getByText("stripe slot", { exact: true }).query()).toBeNull();
+  });
+
+  test("a saved bank, Stripe chosen but unlinked: Continue is open and Stripe is no gate", async () => {
+    const screen = await render_choice({
+      selected: "stripe",
+      bank_saved: true,
+    });
+
+    await expect
+      .element(screen.getByRole("link", { name: "Continue", exact: true }))
+      .not.toHaveAttribute("aria-disabled", "true");
+    await expect
+      .element(screen.getByRole("link", { name: "Continue", exact: true }))
+      .toHaveAttribute("href", "/next");
+    expect(screen.getByText("Connect Stripe to continue.").query()).toBeNull();
+  });
+
+  test("Stripe linked, bank form open: the skip is a link and Submit stays the one primary", async () => {
+    const screen = await render_choice({
+      selected: "bank",
+      stripe_status: "incomplete",
+      bank: (
+        <button type="submit" className="btn btn-primary">
+          Submit
+        </button>
+      ),
+    });
+
+    const skip = screen.getByRole("link", {
+      name: /continue without a bank account/i,
+    });
+    await expect.element(skip).toBeVisible();
+    expect(skip.element().tagName).toBe("A");
+    expect(skip.element().classList.contains("btn")).toBe(false);
+    expect(screen.container.querySelectorAll(".btn-primary").length).toBe(1);
+    await expect
+      .element(screen.getByRole("button", { name: "Submit", exact: true }))
       .toBeVisible();
   });
 });

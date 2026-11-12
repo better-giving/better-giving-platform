@@ -21,7 +21,7 @@ const item_labels: Record<HeldRail, string> = {
   daf: "DAF grant",
   crypto: "Crypto donation",
   stock_cheque: "Stock or cheque donation",
-  withdrawal: "Savings withdrawal",
+  withdrawal: "Savings or Investments withdrawal",
 };
 
 /** `stripe`: a Stripe account is linked (ready or not yet) and no bank is
@@ -88,16 +88,23 @@ interface ICopy {
   lead: string;
 }
 
-const none_copy = (bank_pending: boolean, pending_heading: string): ICopy =>
-  bank_pending
+/** the payout promise drops while `is_covered`, as `release_line` does */
+const none_copy = (
+  held: IHeldMoney,
+  bank_pending: boolean,
+  pending_heading: string
+): ICopy => {
+  const promise = !is_covered(held);
+  return bank_pending
     ? {
         heading: pending_heading,
-        lead: "Stripe is disconnected and your bank account is still under review, so every donation is held in your Better Giving balance. Nothing is lost. It pays out once your bank account is approved, or connect Stripe again to get paid there.",
+        lead: `Stripe is disconnected and your bank account is still under review, so every donation is held in your Better Giving balance. Nothing is lost.${promise ? " It pays out once your bank account is approved, or connect Stripe again to get paid there." : ""}`,
       }
     : {
         heading: "No way to get paid right now",
-        lead: "Stripe is disconnected and you have no bank account, so every donation is held in your Better Giving balance. Nothing is lost. Add a bank account or connect Stripe again to get paid.",
+        lead: `Stripe is disconnected and you have no bank account, so every donation is held in your Better Giving balance. Nothing is lost.${promise ? " Add a bank account or connect Stripe again to get paid." : ""}`,
       };
+};
 
 const BANKING_PENDING_HEADING = "Waiting for your bank account to be approved";
 
@@ -108,7 +115,7 @@ export function HeldMoneyCard(props: IHeldMoneyCard) {
   if (held.total <= 0) return null;
   const copy =
     rails === "none"
-      ? none_copy(bank_pending, BANKING_PENDING_HEADING)
+      ? none_copy(held, bank_pending, BANKING_PENDING_HEADING)
       : {
           heading: bank_pending
             ? BANKING_PENDING_HEADING
@@ -154,7 +161,7 @@ export function PayoutsHeldCard(props: IHeldMoneyCard) {
   );
   const copy =
     rails === "none"
-      ? none_copy(bank_pending, PAYOUTS_PENDING_HEADING)
+      ? none_copy(held, bank_pending, PAYOUTS_PENDING_HEADING)
       : {
           heading: bank_pending
             ? PAYOUTS_PENDING_HEADING
