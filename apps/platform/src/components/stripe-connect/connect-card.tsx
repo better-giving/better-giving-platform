@@ -49,8 +49,9 @@ export interface IStripeConnectCard {
    *  a band speaks */
   brief?: boolean;
   /** the held-money card shows above, carrying its own Connect Stripe while
-   *  no account is linked, so the page keeps one. it never shows beside a
-   *  bank */
+   *  no account is linked, so the page keeps one. the page shows it only
+   *  without a bank payout on file; given one anyway, a disconnected body
+   *  keeps both its paragraphs */
   holds_money?: boolean;
   /** 3 under a page's own h2, as on registration step 4 */
   heading_level?: 2 | 3;

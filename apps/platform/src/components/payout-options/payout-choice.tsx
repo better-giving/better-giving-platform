@@ -185,8 +185,10 @@ function intro(
   // the other option is the one set up
   if (linked)
     return "Your Stripe account is connected, so you can continue now. Add a bank account here too, or any time from Banking.";
-  if (bank_saved)
-    return `Your bank payout is saved, so you can continue now. Connect Stripe ${stripe_status === "disconnected" ? "again " : ""}here${stripe_status === "disconnected" ? "" : " too"}, or any time from Banking.`;
+  if (bank_saved) {
+    const again = stripe_status === "disconnected";
+    return `Your bank payout is saved, so you can continue now. Connect Stripe ${again ? "again here" : "here too"}, or any time from Banking.`;
+  }
   return "We need one to finish onboarding. You can add the other later from Banking.";
 }
 
