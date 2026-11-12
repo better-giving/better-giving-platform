@@ -6,7 +6,9 @@ import { TRANSFER_COUNTRIES_COPY } from "@/stripe-connect/eligibility";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
 import {
   BANK_PAYOUT_LINE,
+  BANK_SUMMARY_WITH_STRIPE,
   type ICell,
+  type IRow,
   is_linked,
   option_names,
   option_summaries,
@@ -97,6 +99,7 @@ export function PayoutChoice({
             key={o}
             option={o}
             expanded={!selected || selected === o}
+            stripe_linked={stripe_linked}
             stripe_ready={stripe_ready}
             bank_saved={bank_saved}
           />
@@ -183,7 +186,10 @@ interface IOptionCard {
   option: TPayoutOption;
   /** the chosen card, or both while neither is */
   expanded: boolean;
-  /** the Stripe card's first row drops its until-ready clause */
+  /** the Bank card says what Stripe takes off it */
+  stripe_linked: boolean;
+  /** the Stripe card's first row drops its until-ready clause, and the Bank
+   *  card's says Stripe receives it */
   stripe_ready: boolean;
   /** the Stripe card sends what it can't receive to the bank, not to held */
   bank_saved: boolean;
@@ -196,10 +202,15 @@ const radio_control =
 function OptionCard({
   option,
   expanded,
+  stripe_linked,
   stripe_ready,
   bank_saved,
 }: IOptionCard) {
   const desc_id = useId();
+  const summary =
+    option === "bank" && stripe_linked
+      ? BANK_SUMMARY_WITH_STRIPE
+      : option_summaries[option];
   return (
     // the label (Ark's Item) holds the radio, the option's name and its
     // summary; the rows sit beside it, since a label holds phrasing content
@@ -219,7 +230,7 @@ function OptionCard({
             {option_names[option]}
           </Ark.ItemText>
           <span id={desc_id} className="text-sm text-gray-11">
-            {option_summaries[option]}
+            {summary}
           </span>
         </span>
         <Ark.ItemHiddenInput aria-describedby={desc_id} />
@@ -230,7 +241,7 @@ function OptionCard({
             {rows.map((r) => {
               const cell =
                 option === "bank"
-                  ? r.card.bank
+                  ? bank_cell(r, stripe_linked, stripe_ready)
                   : stripe_ready && r.card_stripe_ready
                     ? { text: r.card_stripe_ready }
                     : bank_saved
@@ -254,6 +265,11 @@ function OptionCard({
     </div>
   );
 }
+
+const bank_cell = (r: IRow, stripe_linked: boolean, stripe_ready: boolean) =>
+  stripe_linked && r.bank_with_stripe
+    ? r.bank_with_stripe[stripe_ready ? "ready" : "linked"]
+    : r.card.bank;
 
 interface ICellView {
   cell: ICell;

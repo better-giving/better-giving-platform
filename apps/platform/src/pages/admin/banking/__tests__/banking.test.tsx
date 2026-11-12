@@ -1058,9 +1058,9 @@ describe("stripe connect card", () => {
         card.getByText(/Until you add a bank account, all your donations/)
       )
       .toBeVisible();
-    await expect
-      .element(card.getByRole("link", { name: "Add a bank account" }))
-      .toHaveAttribute("href", `/admin/${npo.id}/banking/new`);
+    // the card carries no link of its own; the bank section is the one way in
+    expect(card.getByRole("link").elements()).toHaveLength(0);
+    expect(add_bank_links(screen)).toHaveLength(1);
     expect(screen.getByText("Held right now").query()).toBeNull();
   });
 
@@ -1153,6 +1153,10 @@ describe("stripe connect card", () => {
       screen.getByRole("region", { name: "Waiting for a bank account" }).query()
     ).toBeNull();
     expect(add_bank_links(screen)).toHaveLength(1);
+    // one Connect Stripe on the page: the held region's, not a second on the card
+    expect(
+      screen.getByRole("link", { name: "Connect Stripe" }).elements()
+    ).toHaveLength(1);
     await expect
       .element(
         screen

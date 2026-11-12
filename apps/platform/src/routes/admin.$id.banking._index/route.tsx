@@ -64,7 +64,6 @@ function Page({ loaderData, params }: Route.ComponentProps) {
           has_bank={has_bank}
           bank_pending={bank_pending}
           holds_money={holds_money}
-          add_bank_href="new"
           payouts_href={href("/admin/:id/dashboard/payouts", { id: params.id })}
         />
       )}

@@ -503,6 +503,7 @@ describe("BankPayoutSection: Banking", () => {
   const render_section = (p: {
     table?: ReactNode;
     has_bank?: boolean;
+    bank_pending?: boolean;
     stripe_status: TConnectStatus;
     holds_money: boolean;
   }) =>
@@ -627,6 +628,49 @@ describe("BankPayoutSection: Banking", () => {
       no_wise(section);
     }
   );
+
+  test.each<TConnectStatus>(["incomplete", "pending", "not_connected"])(
+    "no bank, Stripe %s, nothing held: the empty state asks for a bank and the section keeps its own Add",
+    async (stripe_status) => {
+      const screen = await render_section({
+        stripe_status,
+        holds_money: false,
+      });
+      const section = screen.getByRole("region", { name: "Bank payout" });
+      await expect
+        .element(
+          section.getByText(
+            "Add one to get everything paid out to your bank.",
+            {
+              exact: true,
+            }
+          )
+        )
+        .toBeVisible();
+      await expect
+        .element(section.getByRole("link", { name: "Add bank account" }))
+        .toBeVisible();
+    }
+  );
+
+  test("bank on file and a second under review, Stripe ready: both sentences, and no Add", async () => {
+    const screen = await render_section({
+      table: TABLE,
+      has_bank: true,
+      bank_pending: true,
+      stripe_status: "ready",
+      holds_money: false,
+    });
+    const section = screen.getByRole("region", { name: "Bank payout" });
+    await expect
+      .element(
+        section.getByText(
+          /Everything except card, bank and wallet donations pays out here\. Your bank account is under review\. Bank payouts start once it's approved\./
+        )
+      )
+      .toBeVisible();
+    expect(section.getByRole("link").query()).toBeNull();
+  });
 
   test("no bank, nothing held: the section keeps its own Add", async () => {
     const screen = await render_section({

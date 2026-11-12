@@ -16,7 +16,7 @@ const tones: Record<TConnectStatus, ITone> = {
   not_connected: {
     label: "Not connected",
     ink: "text-gray-11",
-    dot: "bg-gray-11",
+    dot: "bg-gray-9",
   },
   incomplete: {
     label: "Finish setup on Stripe",

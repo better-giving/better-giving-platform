@@ -17,6 +17,10 @@ export const option_summaries: Record<TPayoutOption, string> = {
     "Card, bank and wallet donations go straight to your Stripe account once it's ready.",
 };
 
+/** the Bank summary while a Stripe account is linked */
+export const BANK_SUMMARY_WITH_STRIPE =
+  "One payout for everything your Stripe account doesn't receive.";
+
 export interface ICell {
   text: string;
   /** the money waits in the balance: the Held badge leads the text, so the
@@ -24,13 +28,16 @@ export interface ICell {
   held?: boolean;
 }
 
-interface IRow {
+export interface IRow {
   term: string;
   /** `stripe_with_bank` is the Stripe card's cell while a bank is on file */
   card: Record<TPayoutOption | "stripe_with_bank", ICell>;
   /** the card's Stripe sentence once Stripe says the account is ready, bank
    *  or not */
   card_stripe_ready?: string;
+  /** the Bank card's cell while a Stripe account is linked, before and once
+   *  Stripe says it's ready. rows Stripe never receives keep `card.bank` */
+  bank_with_stripe?: { linked: ICell; ready: ICell };
 }
 
 const to_bank: ICell = { text: "To your bank." };
@@ -63,6 +70,14 @@ export const rows: IRow[] = [
     },
     card_stripe_ready:
       "Straight to your Stripe account as each donation's own transfer, after fees. They skip your split.",
+    bank_with_stripe: {
+      linked: {
+        text: "To your bank, after your Grant, Savings and Investments split, until Stripe says your account is ready. Then they go straight to your Stripe account instead.",
+      },
+      ready: {
+        text: "To your Stripe account, not your bank, since it's ready. If you disconnect Better Giving in your Stripe dashboard, they go to your bank again.",
+      },
+    },
   },
   {
     term: "PayPal, DAF grants, crypto, stocks, cheques",

@@ -6,7 +6,7 @@ import { cleanup, render } from "vitest-browser-react";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
 import { BankRequired } from "./bank-required";
 import { type IPayoutChoice, PayoutChoice } from "./payout-choice";
-import type { TPayoutOption } from "./rows";
+import { BANK_SUMMARY_WITH_STRIPE, type TPayoutOption } from "./rows";
 import { SavedBank } from "./saved-bank";
 
 /** `Button`'s link form needs a router around it */
@@ -136,6 +136,53 @@ describe("PayoutChoice option cards", () => {
     expect(held_badges(bank)).toBe(0);
   });
 
+  test.each<[TConnectStatus, string, string]>([
+    [
+      "incomplete",
+      "To your bank, after your Grant, Savings and Investments split, until Stripe says your account is ready. Then they go straight to your Stripe account instead.",
+      "To your Stripe account, not your bank",
+    ],
+    [
+      "pending",
+      "To your bank, after your Grant, Savings and Investments split, until Stripe says your account is ready. Then they go straight to your Stripe account instead.",
+      "To your Stripe account, not your bank",
+    ],
+    [
+      "ready",
+      "To your Stripe account, not your bank, since it's ready. If you disconnect Better Giving in your Stripe dashboard, they go to your bank again.",
+      "until Stripe says your account is ready",
+    ],
+  ])(
+    "Stripe %s: the bank card says what Stripe takes off it, and the other two rows stay with the bank",
+    async (stripe_status, first, absent) => {
+      const screen = await render_choice({ stripe_status });
+      const bank = cards(screen)[0];
+
+      expect(cells(bank)).toEqual([first, "To your bank.", "To your bank."]);
+      expect(cells(bank)[0]).not.toContain(absent);
+      await expect
+        .element(screen.getByText(BANK_SUMMARY_WITH_STRIPE, { exact: true }))
+        .toBeVisible();
+      expect(held_badges(bank)).toBe(0);
+    }
+  );
+
+  test.each<TConnectStatus>(["not_connected", "disconnected"])(
+    "Stripe %s counts as not linked: the bank card keeps its plain summary and cells",
+    async (stripe_status) => {
+      const screen = await render_choice({ stripe_status });
+
+      expect(cells(cards(screen)[0])).toEqual([
+        "To your bank, after your Grant, Savings and Investments split.",
+        "To your bank.",
+        "To your bank.",
+      ]);
+      expect(
+        screen.getByText(BANK_SUMMARY_WITH_STRIPE, { exact: true }).query()
+      ).toBeNull();
+    }
+  );
+
   test("the terms are the three kinds of money, on both cards", async () => {
     const screen = await render_choice();
     for (const dl of cards(screen)) {
@@ -262,28 +309,31 @@ describe("PayoutChoice slots", () => {
     expect(screen.getByText("Connect Stripe to continue.").query()).toBeNull();
   });
 
-  test("Stripe linked, bank form open: the skip is a link and Submit stays the one primary", async () => {
-    const screen = await render_choice({
-      selected: "bank",
-      stripe_status: "incomplete",
-      bank: (
-        <button type="submit" className="btn btn-primary">
-          Submit
-        </button>
-      ),
-    });
+  test.each<TConnectStatus>(["incomplete", "pending", "ready"])(
+    "Stripe %s, then Bank pressed: the skip is a link and Submit stays the one primary",
+    async (stripe_status) => {
+      const screen = await render_choice({
+        selected: "bank",
+        stripe_status,
+        bank: (
+          <button type="submit" className="btn btn-primary">
+            Submit
+          </button>
+        ),
+      });
 
-    const skip = screen.getByRole("link", {
-      name: /continue without a bank account/i,
-    });
-    await expect.element(skip).toBeVisible();
-    expect(skip.element().tagName).toBe("A");
-    expect(skip.element().classList.contains("btn")).toBe(false);
-    expect(screen.container.querySelectorAll(".btn-primary").length).toBe(1);
-    await expect
-      .element(screen.getByRole("button", { name: "Submit", exact: true }))
-      .toBeVisible();
-  });
+      const skip = screen.getByRole("link", {
+        name: /continue without a bank account/i,
+      });
+      await expect.element(skip).toBeVisible();
+      expect(skip.element().tagName).toBe("A");
+      expect(skip.element().classList.contains("btn")).toBe(false);
+      expect(screen.container.querySelectorAll(".btn-primary").length).toBe(1);
+      await expect
+        .element(screen.getByRole("button", { name: "Submit", exact: true }))
+        .toBeVisible();
+    }
+  );
 });
 
 describe("PayoutChoice footnote", () => {
@@ -475,6 +525,18 @@ describe("PayoutChoice hints and intro", () => {
       .toHaveAttribute("href", "/next");
   });
 
+  test("Bank chosen, nothing saved yet: the form draws its own Back, so neither Back nor Continue is here", async () => {
+    const screen = await render_choice({ selected: "bank" });
+
+    await expect.element(screen.getByText("bank slot")).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "Back", exact: true }).query()
+    ).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Continue", exact: true }).query()
+    ).toBeNull();
+  });
+
   test("bank form open over a saved bank: the saved one stays until replaced", async () => {
     const screen = await render_choice({
       selected: "bank",
@@ -489,25 +551,41 @@ describe("PayoutChoice hints and intro", () => {
     expect(
       screen.getByRole("link", { name: "Continue", exact: true }).query()
     ).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Back", exact: true }).query()
+    ).toBeNull();
   });
 });
 
 describe("BankRequired", () => {
+  const REQUIRED_LINE =
+    "Your bank payout is how you get paid, so it's required. Every donation, including card, bank and wallet donations, pays out to your bank, every 3 days once your balance reaches your payout minimum.";
+  const PLAIN_LINE =
+    "Your bank payout is how you get paid. Every donation pays out to your bank, every 3 days once your balance reaches your payout minimum.";
+
   test("fiscally sponsored: badged Required, says what pays out and no more", async () => {
     const screen = await render(
       <BankRequired ineligible={{ reason: "fiscal_sponsored" }}>
         <p>form</p>
       </BankRequired>
     );
-    const text = screen.container.textContent ?? "";
 
     await expect
       .element(screen.getByText("Required", { exact: true }))
       .toBeVisible();
-    expect(text).toContain("fiscally sponsored");
-    expect(text).toContain("including card, bank and wallet donations");
-    expect(text).toContain("pays out to your bank");
-    expect(text).not.toMatch(/headquartered/i);
+    await expect
+      .element(
+        screen.getByText(
+          "Stripe isn't available to fiscally sponsored nonprofits.",
+          { exact: true }
+        )
+      )
+      .toBeVisible();
+    await expect
+      .element(screen.getByText(REQUIRED_LINE, { exact: true }))
+      .toBeVisible();
+    expect(screen.getByText(PLAIN_LINE, { exact: true }).query()).toBeNull();
+    expect(screen.container.textContent).not.toMatch(/headquartered/i);
     await expect
       .element(screen.getByText("form", { exact: true }))
       .toBeVisible();
@@ -519,16 +597,20 @@ describe("BankRequired", () => {
         <p>form</p>
       </BankRequired>
     );
-    const text = screen.container.textContent ?? "";
 
-    expect(text).toContain("headquartered in Brazil");
-    expect(text).toMatch(
-      /card, bank and wallet donations to a Stripe account for nonprofits/
-    );
-    expect(text).toContain("the US, Canada");
+    await expect
+      .element(
+        screen.getByText(
+          /^Stripe isn't available for nonprofits headquartered in Brazil\. We can send card, bank and wallet donations to a Stripe account for nonprofits headquartered in the US, Canada/
+        )
+      )
+      .toBeVisible();
+    await expect
+      .element(screen.getByText(REQUIRED_LINE, { exact: true }))
+      .toBeVisible();
   });
 
-  test("routing off: no badge and no word about Stripe", async () => {
+  test("routing off: no badge, no word about Stripe, and the plain paragraph", async () => {
     const screen = await render(
       <BankRequired>
         <p>form</p>
@@ -538,9 +620,12 @@ describe("BankRequired", () => {
     await expect
       .element(screen.getByRole("heading", { name: "Set up your bank payout" }))
       .toBeVisible();
+    await expect
+      .element(screen.getByText(PLAIN_LINE, { exact: true }))
+      .toBeVisible();
+    expect(screen.getByText(REQUIRED_LINE, { exact: true }).query()).toBeNull();
     expect(screen.getByText("Required", { exact: true }).query()).toBeNull();
     expect(screen.container.textContent).not.toMatch(/stripe/i);
-    expect(screen.container.textContent).toContain("pays out to your bank");
   });
 });
 

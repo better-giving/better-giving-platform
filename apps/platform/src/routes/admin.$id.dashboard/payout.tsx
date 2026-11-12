@@ -101,8 +101,6 @@ function Held({ to, bank_pending }: IHeld) {
       </p>
     );
   }
-  // a stripe gift that lands before ready stays held after ready too, per the
-  // held card's stripe_held_lead (components/payout-options/held-money.tsx)
   if (!to.ready) {
     return (
       <p className="text-sm">
@@ -112,6 +110,8 @@ function Held({ to, bank_pending }: IHeld) {
       </p>
     );
   }
+  // a stripe gift that lands before ready stays held after ready too, per the
+  // held card's stripe_held_lead (components/payout-options/held-money.tsx)
   return (
     <p className="text-sm">
       New card, bank and wallet donations go straight to your Stripe account.

@@ -592,7 +592,7 @@ describe("StripeConnectCard", () => {
     }
   );
 
-  test("not eligible, no bank: says every donation is held, and links adding one", async () => {
+  test("not eligible, no bank: says every donation is held, and leaves adding one to the bank section", async () => {
     const Stub = createRoutesStub([
       {
         path: "/",
@@ -602,7 +602,6 @@ describe("StripeConnectCard", () => {
             start_href={START}
             ineligible={{ reason: "fiscal_sponsored" }}
             has_bank={false}
-            add_bank_href="/admin/42/banking/new"
           />
         ),
       },
@@ -618,9 +617,7 @@ describe("StripeConnectCard", () => {
       )
       .toBeVisible();
     expect(card.getByText(/don't need to do anything/).query()).toBeNull();
-    await expect
-      .element(card.getByRole("link", { name: "Add a bank account" }))
-      .toHaveAttribute("href", "/admin/42/banking/new");
+    expect(card.getByRole("link").query()).toBeNull();
     expect(card.getByRole("button").query()).toBeNull();
   });
 
@@ -629,7 +626,6 @@ describe("StripeConnectCard", () => {
       ineligible: { reason: "country", hq_country: "Brazil" },
       has_bank: false,
       bank_pending: true,
-      add_bank_href: "/admin/42/banking/new",
     });
     const card = screen.getByRole("region", { name: "Stripe account" });
 

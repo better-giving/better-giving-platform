@@ -43,16 +43,14 @@ export interface IStripeConnectCard {
   /** a bank account is filed and under review. read only while `has_bank`
    *  is false */
   bank_pending?: boolean;
-  /** the add-bank page, through the router: linked from the not-available
-   *  state while no bank is on file or under review */
-  add_bank_href?: string;
   /** registration step 4: the Stripe option card above already says where
    *  card, bank and wallet donations go before and once the account is
    *  ready, so the body keeps only what that row can't say, and none where
    *  a band speaks */
   brief?: boolean;
   /** the held-money card shows above, carrying its own Connect Stripe while
-   *  no account is linked, so the page keeps one */
+   *  no account is linked, so the page keeps one, and this card's body asks
+   *  for no reconnect */
   holds_money?: boolean;
   /** 3 under a page's own h2, as on registration step 4 */
   heading_level?: 2 | 3;
@@ -98,19 +96,28 @@ const KEPT_ON_STRIPE =
 const FINISH_SETUP =
   "Stripe needs a few more details before it can receive donations. Finish setup on Stripe, in your Stripe dashboard.";
 
-const bodies = (status: TConnectStatus, has_bank: boolean): string[] => {
+const bodies = (
+  status: TConnectStatus,
+  has_bank: boolean,
+  holds_money: boolean
+): string[] => {
   switch (status) {
     case "not_connected":
       return [
         `Once Stripe says your account is ready, ${FIRST} ${SENT_AS_TRANSFER} Until then, ${has_bank ? "they go to your bank" : "they're held in your Better Giving balance"}.`,
       ];
     case "disconnected":
-      // with no bank they are held, which the held card says while any are
-      return has_bank
-        ? [
-            `${DISCONNECTED} ${cap(FIRST)} now go to your bank.`,
-            `Connect Stripe again to get them straight to your Stripe account, after fees, once Stripe says your account is ready. ${KEPT_ON_STRIPE}`,
-          ]
+      // with no bank they are held, which the held card says while any are.
+      // while money is held this card draws no Connect Stripe, so asks for none
+      if (has_bank)
+        return [
+          `${DISCONNECTED} ${cap(FIRST)} now go to your bank.`,
+          holds_money
+            ? KEPT_ON_STRIPE
+            : `Connect Stripe again to get them straight to your Stripe account, after fees, once Stripe says your account is ready. ${KEPT_ON_STRIPE}`,
+        ];
+      return holds_money
+        ? [DISCONNECTED]
         : [
             `${DISCONNECTED} Connect Stripe again to get ${FIRST} straight to your Stripe account, after fees, once Stripe says your account is ready.`,
           ];
@@ -199,7 +206,6 @@ export function StripeConnectCard({
   payouts_href,
   has_bank,
   bank_pending = false,
-  add_bank_href,
   brief = false,
   holds_money = false,
   heading_level = 2,
@@ -219,13 +225,6 @@ export function StripeConnectCard({
         <Body>
           <p>{ineligible_reasons(ineligible)}</p>
           <p>{bank_only_line(has_bank, bank_pending)}</p>
-          {!has_bank && !bank_pending && add_bank_href && (
-            <p>
-              <Link to={add_bank_href} className="link">
-                Add a bank account
-              </Link>
-            </p>
-          )}
         </Body>
       </CardShell>
     );
@@ -238,7 +237,7 @@ export function StripeConnectCard({
       ? { tone: notice_tones[notice.result], text: notice_message(notice) }
       : standing;
   const body = !brief
-    ? bodies(status, has_bank)
+    ? bodies(status, has_bank, holds_money)
     : band
       ? []
       : brief_bodies(status, has_bank);

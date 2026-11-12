@@ -353,10 +353,37 @@ describe("registration step 4: choose how you get paid", () => {
     expect(
       stripe_card(screen).getByText("Your Stripe account is connected.").query()
     ).toBeNull();
+    // `brief`: the option row above says where donations go, so the card
+    // repeats none of the full-body paragraph
+    expect(stripe_card(screen).element().textContent).not.toMatch(
+      /Apple Pay|as each donation's own transfer|What Stripe pays on/
+    );
     await expect
       .element(continue_link(screen))
       .not.toHaveAttribute("aria-disabled", "true");
     expect_no_wise(screen);
+  }, 30_000);
+
+  it("an unfinished stripe account beside a saved bank: no standing band, only the finish-setup line", async () => {
+    account_status_live.mockResolvedValue("incomplete");
+    const id = await seed_step_4();
+    await save_bank(id, { o_stripe_account_id: "acct_123" });
+    const screen = await render_step_4(id);
+
+    await expect.element(radio(screen, "Bank")).toBeChecked();
+    await screen.getByText("Stripe", { exact: true }).click();
+    await expect
+      .element(
+        stripe_card(screen).getByText(
+          "Stripe needs a few more details before it can receive donations. Finish setup on Stripe, in your Stripe dashboard.",
+          { exact: true }
+        )
+      )
+      .toBeVisible();
+    // the band's wording is for a nonprofit with no bank to fall back on
+    expect(stripe_card(screen).element().textContent).not.toMatch(
+      /are held too|Stripe hasn't finished setting it up/
+    );
   }, 30_000);
 
   it("shows the bank as chosen when both are saved, with stripe a press away", async () => {

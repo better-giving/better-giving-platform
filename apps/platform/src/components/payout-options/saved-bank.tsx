@@ -1,6 +1,7 @@
 import { Badge, ExtLink } from "@better-giving/ui";
 import { SquareArrowOutUpRight } from "lucide-react";
 import { type Ref, useId } from "react";
+import { BANK_PAYOUT_SENTENCE } from "./rows";
 
 export interface ISavedBank {
   /** the recipient account's id at the payout provider */
@@ -47,10 +48,7 @@ export function SavedBank({
           Change
         </button>
       </div>
-      <p className="text-gray-11">
-        We send it to your bank account every 3 days once your balance reaches
-        your payout minimum.
-      </p>
+      <p className="text-gray-11">{BANK_PAYOUT_SENTENCE}</p>
       <p>
         <span className="font-semibold">Account ID:</span>{" "}
         <span className="text-gray-11">{account_id}</span>
