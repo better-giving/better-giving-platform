@@ -569,7 +569,12 @@ describe("BankPayoutSection: Banking", () => {
     ).toBeNull();
   });
 
-  test.each<TConnectStatus>(["incomplete", "pending", "not_connected"])(
+  test.each<TConnectStatus>([
+    "incomplete",
+    "pending",
+    "not_connected",
+    "disconnected",
+  ])(
     "bank on file, Stripe %s: card, bank and wallet donations still wait, so nothing says everything else pays out here",
     async (stripe_status) => {
       const screen = await render_section({

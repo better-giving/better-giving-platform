@@ -14,6 +14,7 @@ import {
   option_summaries,
   options,
   rows,
+  STRIPE_SUMMARY_READY,
   type TPayoutOption,
 } from "./rows";
 
@@ -165,10 +166,17 @@ function intro(
   stripe_status: TConnectStatus
 ) {
   const linked = is_linked(stripe_status);
-  if (selected === "bank" && bank_saved)
-    return bank_form_shown
-      ? "Your saved bank payout stays in place until you save a new one."
+  if (selected === "bank" && bank_saved) {
+    if (bank_form_shown)
+      return "Your saved bank payout stays in place until you save a new one.";
+    if (stripe_status === "ready")
+      return "Your bank payout is saved and your Stripe account is ready. You can continue now.";
+    if (linked)
+      return "Your bank payout is saved and your Stripe account is connected. You can continue now.";
+    return stripe_status === "disconnected"
+      ? "Your bank payout is saved. You can continue now, and connect Stripe again here, or any time from Banking."
       : "Your bank payout is saved. You can continue now, and add Stripe here too, or any time from Banking.";
+  }
   // the line under the Stripe card offers the bank while none is saved
   if (selected === "stripe" && linked)
     return stripe_status === "ready"
@@ -178,7 +186,7 @@ function intro(
   if (linked)
     return "Your Stripe account is connected, so you can continue now. Add a bank account here too, or any time from Banking.";
   if (bank_saved)
-    return "Your bank payout is saved, so you can continue now. Connect Stripe here too, or any time from Banking.";
+    return `Your bank payout is saved, so you can continue now. Connect Stripe ${stripe_status === "disconnected" ? "again " : ""}here${stripe_status === "disconnected" ? "" : " too"}, or any time from Banking.`;
   return "We need one to finish onboarding. You can add the other later from Banking.";
 }
 
@@ -188,8 +196,8 @@ interface IOptionCard {
   expanded: boolean;
   /** the Bank card's first row says what Stripe will take off it */
   stripe_linked: boolean;
-  /** the Stripe card's first row drops its until-ready clause, and the Bank
-   *  card's summary and first row say Stripe receives it */
+  /** the Stripe card's summary and first row drop their until-ready clause,
+   *  and the Bank card's summary and first row say Stripe receives it */
   stripe_ready: boolean;
   /** the Stripe card sends what it can't receive to the bank, not to held */
   bank_saved: boolean;
@@ -207,10 +215,11 @@ function OptionCard({
   bank_saved,
 }: IOptionCard) {
   const desc_id = useId();
-  const summary =
-    option === "bank" && stripe_ready
+  const summary = !stripe_ready
+    ? option_summaries[option]
+    : option === "bank"
       ? BANK_SUMMARY_WITH_STRIPE
-      : option_summaries[option];
+      : STRIPE_SUMMARY_READY;
   return (
     // the label (Ark's Item) holds the radio, the option's name and its
     // summary; the rows sit beside it, since a label holds phrasing content

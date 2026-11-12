@@ -233,6 +233,22 @@ describe("PayoutChoice option cards", () => {
     }
   );
 
+  test.each<[TConnectStatus, string]>([
+    ["pending", "One payout for everything."],
+    ["ready", "One payout for everything your Stripe account doesn't receive."],
+  ])(
+    "Stripe %s and chosen: the collapsed bank card shows its summary for that status",
+    async (stripe_status, summary) => {
+      const screen = await render_choice({ selected: "stripe", stripe_status });
+
+      const bank = card_of(screen, "Bank");
+      expect(bank.querySelector("dl")).toBeNull();
+      await expect
+        .element(screen.getByRole("radio", { name: "Bank", exact: true }))
+        .toHaveAccessibleDescription(summary);
+    }
+  );
+
   test("an option card firms its edge only over the part that selects", async () => {
     const screen = await render_choice();
     await expect
@@ -261,18 +277,28 @@ describe("PayoutChoice option cards", () => {
 });
 
 describe("PayoutChoice summaries", () => {
-  test("the Stripe summary promises the transfer only once the account is ready", async () => {
-    const screen = await render_choice();
+  const UNTIL_READY =
+    "Card, bank and wallet donations go straight to your Stripe account once it's ready.";
+  const READY =
+    "Card, bank and wallet donations go straight to your Stripe account.";
 
-    await expect
-      .element(
-        screen.getByText(
-          "Card, bank and wallet donations go straight to your Stripe account once it's ready.",
-          { exact: true }
-        )
-      )
-      .toBeVisible();
-  });
+  test.each<[TConnectStatus, string, string]>([
+    ["not_connected", UNTIL_READY, READY],
+    ["disconnected", UNTIL_READY, READY],
+    ["incomplete", UNTIL_READY, READY],
+    ["pending", UNTIL_READY, READY],
+    ["ready", READY, UNTIL_READY],
+  ])(
+    "Stripe %s: the Stripe summary drops its until-ready clause only once the account is ready",
+    async (stripe_status, shown, hidden) => {
+      const screen = await render_choice({ stripe_status });
+
+      await expect
+        .element(screen.getByText(shown, { exact: true }))
+        .toBeVisible();
+      expect(screen.getByText(hidden, { exact: true }).query()).toBeNull();
+    }
+  );
 });
 
 describe("PayoutChoice slots", () => {
@@ -397,6 +423,26 @@ describe("PayoutChoice hints and intro", () => {
       "Your bank payout is saved. You can continue now, and add Stripe here too, or any time from Banking.",
     ],
     [
+      "bank saved and chosen, Stripe disconnected",
+      { selected: "bank", bank_saved: true, stripe_status: "disconnected" },
+      "Your bank payout is saved. You can continue now, and connect Stripe again here, or any time from Banking.",
+    ],
+    [
+      "bank saved and chosen, Stripe incomplete",
+      { selected: "bank", bank_saved: true, stripe_status: "incomplete" },
+      "Your bank payout is saved and your Stripe account is connected. You can continue now.",
+    ],
+    [
+      "bank saved and chosen, Stripe pending",
+      { selected: "bank", bank_saved: true, stripe_status: "pending" },
+      "Your bank payout is saved and your Stripe account is connected. You can continue now.",
+    ],
+    [
+      "bank saved and chosen, Stripe ready",
+      { selected: "bank", bank_saved: true, stripe_status: "ready" },
+      "Your bank payout is saved and your Stripe account is ready. You can continue now.",
+    ],
+    [
       "stripe ready and chosen",
       { selected: "stripe", stripe_status: "ready" },
       "Your Stripe account is ready. You can continue now.",
@@ -415,6 +461,11 @@ describe("PayoutChoice hints and intro", () => {
       "Stripe pressed over a saved bank",
       { selected: "stripe", bank_saved: true },
       "Your bank payout is saved, so you can continue now. Connect Stripe here too, or any time from Banking.",
+    ],
+    [
+      "Stripe pressed over a saved bank, Stripe disconnected",
+      { selected: "stripe", bank_saved: true, stripe_status: "disconnected" },
+      "Your bank payout is saved, so you can continue now. Connect Stripe again here, or any time from Banking.",
     ],
     [
       "Stripe pressed while the bank form is open over a saved bank",

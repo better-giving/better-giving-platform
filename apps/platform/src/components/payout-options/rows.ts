@@ -21,6 +21,10 @@ export const option_summaries: Record<TPayoutOption, string> = {
 export const BANK_SUMMARY_WITH_STRIPE =
   "One payout for everything your Stripe account doesn't receive.";
 
+/** the Stripe summary once Stripe says the linked account is ready */
+export const STRIPE_SUMMARY_READY =
+  "Card, bank and wallet donations go straight to your Stripe account.";
+
 export interface ICell {
   text: string;
   /** the money waits in the balance: the Held badge leads the text, so the

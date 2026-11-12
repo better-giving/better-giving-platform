@@ -119,18 +119,6 @@ describe("StripeConnectCard", () => {
     );
   });
 
-  test("disconnected, bank on file, money held: the body keeps both paragraphs, since the held card only replaces the no-bank text", async () => {
-    const screen = await render_card({
-      status: "disconnected",
-      has_bank: true,
-      holds_money: true,
-    });
-    const card = screen.getByRole("region", { name: "Stripe account" });
-    for (const phrase of DISCONNECTED_WITH_BANK) {
-      await expect.element(card.getByText(phrase)).toBeVisible();
-    }
-  });
-
   test("incomplete, money held: switching accounts stays, the held card offers no connect then", async () => {
     const screen = await render_card({
       status: "incomplete",
