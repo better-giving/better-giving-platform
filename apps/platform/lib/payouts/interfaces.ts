@@ -31,6 +31,16 @@ export interface ICancelledStatus {
   type: "cancelled";
 }
 
+/** the bank sent the wise transfer back: the money is in the npo's balance, and goes out again once its next bank account is approved */
+export interface IReturnedStatus {
+  type: "returned";
+}
+
+/** voided by ops: not a grant, not counted */
+export interface IVoidStatus {
+  type: "void";
+}
+
 export type PayoutStatus =
   | IErrorStatus
   | ISettledStatus
@@ -38,7 +48,9 @@ export type PayoutStatus =
   | IProcessingStatus
   | IRefundedStatus
   | IRefundedLossStatus
-  | ICancelledStatus;
+  | ICancelledStatus
+  | IReturnedStatus
+  | IVoidStatus;
 
 /**
  * donation - a payout from a donation

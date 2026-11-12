@@ -34,7 +34,7 @@ export const payouts = pgTable(
     check("amount_check", sql`${t.amount} > 0`),
     check(
       "type_check",
-      sql`${t.type} IN ('pending','processing','settled','error','refunded','refunded_loss','cancelled')`
+      sql`${t.type} IN ('pending','processing','settled','error','refunded','refunded_loss','cancelled','returned','void')`
     ),
     index("payouts_npo_id_date_idx").on(t.npo_id, t.date),
     index("payouts_type_date_idx").on(t.type, t.date),
@@ -50,7 +50,10 @@ export const settlements = pgTable(
     date: timestamptz("date").notNull(),
     amount: numeric_as_number("amount", { precision: 38, scale: 18 }).notNull(),
     sources: text("sources").array(),
+    /** the transfer's wise state (`returned` once its money came back) */
     status: text("status").notNull(),
+    /** when ops was told this npo's payouts are held after a return: once */
+    hold_alerted_at: timestamptz("hold_alerted_at"),
   },
   (t) => [index("settlements_npo_id_date_idx").on(t.npo_id, t.date)]
 );
