@@ -54,6 +54,7 @@ vi.mock("../kit/stripe", () => ({
 
 // --- imports (after mocks) ---
 
+import { enqueue } from "../kit/queue";
 import {
   dispute_close,
   dispute_get,
@@ -67,7 +68,6 @@ import {
 } from "../pg/queries/owed";
 import { create_test_db } from "../pg/test-utils/pglite";
 import { dispute_opened, dispute_won } from "./dispute";
-import { enqueue } from "../kit/queue";
 import { reverse_charge } from "./reverse";
 
 // --- setup ---

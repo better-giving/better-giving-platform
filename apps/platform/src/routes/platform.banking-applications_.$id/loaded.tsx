@@ -50,7 +50,9 @@ export function Loaded(props: LoaderData) {
 
       {props.own_account && (
         <WarningCallout title="This is Better Giving's own bank account">
-          Payouts to it never reach the nonprofit, so it can't be approved.
+          {prev_verdict
+            ? "Payouts to it never reach the nonprofit."
+            : "Payouts to it never reach the nonprofit, so it can't be approved."}
         </WarningCallout>
       )}
       {awaits_verdict && props.holder_match === "mismatch" && (

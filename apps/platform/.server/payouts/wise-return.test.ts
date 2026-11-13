@@ -697,15 +697,13 @@ describe("poll_wise_returns", () => {
 
   /** the npo's account the grants run pays, approved or made default at `at` */
   const seed_default_bank = (npo_id: number, at: string) =>
-    db()
-      .insert(banking_apps)
-      .values({
-        id: "bank-1",
-        npo_id,
-        status: "default",
-        date_created: at,
-        updated_at: at,
-      });
+    db().insert(banking_apps).values({
+      id: "bank-1",
+      npo_id,
+      status: "default",
+      date_created: at,
+      updated_at: at,
+    });
 
   test("a return found after the npo's account changed re-sends its payouts, and tells ops", async () => {
     const npo = await seed_npo(500);

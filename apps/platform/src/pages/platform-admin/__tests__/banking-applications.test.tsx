@@ -191,6 +191,10 @@ const WISE_FIXTURE = {
   currency: "USD",
   country: "US",
   name: { fullName: "Jane Doe" },
+  account_holder: "Jane Doe",
+  legal_name: "Jane Doe Foundation",
+  holder_match: "match" as const,
+  own_account: false,
   type: "checking",
   legalEntityType: "PERSON" as const,
   longAccountSummary: "USD account ending in 1234",
@@ -293,7 +297,15 @@ describe("application detail", () => {
     await expect
       .element(screen.getByText("US", { exact: true }))
       .toBeInTheDocument();
-    await expect.element(screen.getByText("Jane Doe")).toBeInTheDocument();
+    await expect
+      .element(screen.getByText("Jane Doe", { exact: true }))
+      .toBeInTheDocument();
+    await expect
+      .element(screen.getByText("Jane Doe Foundation"))
+      .toBeInTheDocument();
+    await expect
+      .element(screen.getByText("Matches legal name"))
+      .toBeInTheDocument();
 
     await expect
       .element(screen.getByRole("link", { name: /approve/i }))

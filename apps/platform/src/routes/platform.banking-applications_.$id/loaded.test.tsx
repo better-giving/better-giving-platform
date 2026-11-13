@@ -155,18 +155,17 @@ describe("banking application review — account holder", () => {
       .toBeVisible();
   });
 
-  test.each([
-    "approved",
-    "default",
-    "rejected",
-  ] as const)("a %s application keeps the badge and drops the holder callout", async (status) => {
-    const d = data({ holder_match: "mismatch", own_account: false });
-    const screen = await render_page({ ...d, ba: { ...d.ba, status } });
-    await expect
-      .element(screen.getByText("Doesn't match", { exact: true }))
-      .toBeVisible();
-    expect(screen.getByRole("region").query()).toBeNull();
-  });
+  test.each(["approved", "default", "rejected"] as const)(
+    "a %s application keeps the badge and drops the holder callout",
+    async (status) => {
+      const d = data({ holder_match: "mismatch", own_account: false });
+      const screen = await render_page({ ...d, ba: { ...d.ba, status } });
+      await expect
+        .element(screen.getByText("Doesn't match", { exact: true }))
+        .toBeVisible();
+      expect(screen.getByRole("region").query()).toBeNull();
+    }
+  );
 
   test("an approved application on Better Giving's own account still calls it out", async () => {
     const d = data({ holder_match: "mismatch", own_account: true });
@@ -184,6 +183,25 @@ describe("banking application review — account holder", () => {
     expect(
       screen.getByRole("region", { name: MISMATCH_TITLE }).query()
     ).toBeNull();
+  });
+
+  test("a decided application on Better Giving's own account drops the approval sentence", async () => {
+    const d = data({ own_account: true });
+    const decided = await render_page({
+      ...d,
+      ba: { ...d.ba, status: "rejected" },
+    });
+    await expect
+      .element(decided.getByText("Payouts to it never reach the nonprofit."))
+      .toBeVisible();
+    expect(decided.getByText("so it can't be approved").query()).toBeNull();
+  });
+
+  test("an under-review application on Better Giving's own account says it can't be approved", async () => {
+    const screen = await render_page(data({ own_account: true }));
+    await expect
+      .element(screen.getByText(/so it can't be approved/))
+      .toBeVisible();
   });
 
   test("a decided application with no legal name keeps the badge and drops the callout", async () => {
