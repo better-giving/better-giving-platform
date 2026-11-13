@@ -29,36 +29,40 @@ const render_table = (items: IPayout[]) => {
   return render(<Stub initialEntries={["/"]} />);
 };
 
-const row_of = (cell: Element) => cell.closest("tr") as HTMLTableRowElement;
-
 describe("payouts table — returned and void", () => {
-  test("an explanation row follows a returned and a void payout, and no other", async () => {
+  test("a returned and a void payout each get a (!) button, and no other row does", async () => {
     const screen = await render_table(ITEMS);
     await expect.element(screen.getByText("Returned")).toBeVisible();
-    // four payouts, two explanations
-    expect(screen.container.querySelectorAll("tbody tr")).toHaveLength(6);
-
-    const returned_note = screen
-      .getByText(/Your bank sent this back, and the money is in your balance/)
-      .element();
-    expect(row_of(returned_note).previousElementSibling).toBe(
-      row_of(screen.getByText("Returned").element())
-    );
+    // four payouts, no explanation rows
+    expect(screen.container.querySelectorAll("tbody tr")).toHaveLength(4);
     await expect
-      .element(screen.getByRole("link", { name: "bank details", exact: true }))
-      .toHaveAttribute("href", "/admin/42/banking");
+      .element(screen.getByRole("button", { name: "What Returned means" }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByRole("button", { name: "What Void means" }))
+      .toBeVisible();
+    expect(screen.getByRole("button").elements()).toHaveLength(2);
+  });
 
-    const void_note = screen
-      .getByText("Not counted as a grant.", { exact: true })
-      .element();
-    expect(row_of(void_note).previousElementSibling).toBe(
-      row_of(screen.getByText("Void", { exact: true }).element())
-    );
+  test("opening the returned button shows what it means", async () => {
+    const screen = await render_table(ITEMS);
+    await screen.getByRole("button", { name: "What Returned means" }).click();
+    await expect
+      .element(
+        screen.getByText(
+          "Your bank sent this back, and the money is in your balance. Update your bank details; it goes out again once the new ones are approved.",
+          { exact: true }
+        )
+      )
+      .toBeVisible();
+  });
 
-    // the processing row is followed by the refunded one, nothing between
-    expect(
-      row_of(screen.getByText("Processing").element()).nextElementSibling
-    ).toBe(row_of(screen.getByText("Refunded").element()));
+  test("opening the void button shows what it means", async () => {
+    const screen = await render_table(ITEMS);
+    await screen.getByRole("button", { name: "What Void means" }).click();
+    await expect
+      .element(screen.getByText("Not counted as a grant.", { exact: true }))
+      .toBeVisible();
   });
 
   test("strikes a void amount, not a returned one", async () => {
@@ -73,9 +77,10 @@ describe("payouts table — returned and void", () => {
     expect(struck("$320.00")).toBe("line-through");
   });
 
-  test("a table with no returned or void payout has no explanation rows", async () => {
+  test("a table with no returned or void payout has no (!) button", async () => {
     const screen = await render_table([ITEMS[2]!, ITEMS[3]!]);
     await expect.element(screen.getByText("Processing")).toBeVisible();
     expect(screen.container.querySelectorAll("tbody tr")).toHaveLength(2);
+    expect(screen.getByRole("button").query()).toBeNull();
   });
 });

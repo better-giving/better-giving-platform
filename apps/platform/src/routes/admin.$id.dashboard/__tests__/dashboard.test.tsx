@@ -880,10 +880,11 @@ describe("dashboard — returned payout notice", () => {
         screen.getByRole("link", { name: "Update bank details", exact: true })
       )
       .toHaveAttribute("href", `/admin/${npo.id}/banking`);
-    // the grant items card shows the same payout with its explanation row
+    // the grant items card shows the same payout with its (!) explanation
     await expect
       .element(screen.getByText("Returned", { exact: true }))
       .toBeVisible();
+    await screen.getByRole("button", { name: "What Returned means" }).click();
     await expect
       .element(screen.getByText(/Your bank sent this back/))
       .toBeVisible();

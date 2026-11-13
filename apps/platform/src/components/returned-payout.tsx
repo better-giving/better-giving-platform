@@ -1,38 +1,53 @@
 import { PayoutStatus } from "@better-giving/ui";
-import { href, Link } from "react-router";
+import { Content, Tooltip } from "@better-giving/ui/tooltip";
+import { CircleAlertIcon } from "lucide-react";
 import type { IPayout } from "@/payouts";
 
-interface IPayoutNote {
+const TIPS = {
+  returned:
+    "Your bank sent this back, and the money is in your balance. Update your bank details; it goes out again once the new ones are approved.",
+  void: "Not counted as a grant.",
+  grant:
+    "Your bank sent this grant back, so it isn't counted in your grant totals. It goes out again once new bank details are approved.",
+} as const;
+
+const NAMES = {
+  returned: "What Returned means",
+  void: "What Void means",
+  grant: "What Returned means",
+} as const;
+
+interface IStatusTip {
+  kind: keyof typeof TIPS;
+  classes?: string;
+}
+
+/** the (!) beside a status that needs explaining: opens on hover, focus and tap */
+function StatusTip({ kind, classes = "" }: IStatusTip) {
+  return (
+    <Tooltip tip={<Content className="text-sm max-w-xs">{TIPS[kind]}</Content>}>
+      <span className={`inline-flex ${classes}`}>
+        <CircleAlertIcon className="text-gray-11 icon-sm" />
+        <span className="sr-only">{NAMES[kind]}</span>
+      </span>
+    </Tooltip>
+  );
+}
+
+interface IPayoutStatusCell {
   payout: IPayout;
 }
 
-/** the explanation row under a returned or void payout; nothing for the rest */
-export function PayoutNote({ payout }: IPayoutNote) {
-  if (payout.type !== "returned" && payout.type !== "void") return null;
+/** a payout's status, with its explanation for returned and void; nothing extra for the rest */
+export function PayoutStatusCell({ payout }: IPayoutStatusCell) {
+  if (payout.type !== "returned" && payout.type !== "void") {
+    return <PayoutStatus type={payout.type} />;
+  }
   return (
-    <tr>
-      <td colSpan={5} className="border-t-0 pt-0 pe-2 pb-2 ps-0">
-        {/* pinned to the scroller's left edge, so a table scrolled sideways
-            on a phone still shows the line from its start */}
-        <div className="sticky left-0 max-w-[100cqw] ps-10 text-xs text-gray-11">
-          {payout.type === "returned" ? (
-            <>
-              Your bank sent this back, and the money is in your balance. Update
-              your{" "}
-              <Link
-                to={href("/admin/:id/banking", { id: String(payout.npo_id) })}
-                className="link font-medium"
-              >
-                bank details
-              </Link>
-              ; it goes out again once the new ones are approved.
-            </>
-          ) : (
-            "Not counted as a grant."
-          )}
-        </div>
-      </td>
-    </tr>
+    <span className="inline-flex items-center gap-1.5">
+      <PayoutStatus type={payout.type} />
+      <StatusTip kind={payout.type} />
+    </span>
   );
 }
 
@@ -40,19 +55,14 @@ interface IReturnedGrant {
   amount: string;
 }
 
-/** a grant whose transfer the bank sent back: struck amount, status, and why */
+/** a grant whose transfer the bank sent back: struck amount, status, and why on tap */
 export function ReturnedGrant({ amount }: IReturnedGrant) {
   return (
-    <>
-      <div className="flex items-baseline gap-3 flex-wrap">
-        <span className="line-through text-gray-11">{amount}</span>
-        <PayoutStatus type="returned" />
-      </div>
-      <p className="text-sm text-gray-11 max-w-[44ch] mt-1">
-        Your bank sent this grant back, so it isn't counted in your grant
-        totals. It goes out again once new bank details are approved.
-      </p>
-    </>
+    <div className="flex items-baseline gap-3 flex-wrap">
+      <span className="line-through text-gray-11">{amount}</span>
+      <PayoutStatus type="returned" />
+      <StatusTip kind="grant" classes="self-center -ml-1.5" />
+    </div>
   );
 }
 

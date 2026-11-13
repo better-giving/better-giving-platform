@@ -19,7 +19,7 @@ const WHY =
   "Your bank sent this grant back, so it isn't counted in your grant totals. It goes out again once new bank details are approved.";
 
 describe("grants table — a returned grant", () => {
-  test("strikes the amount, marks it Returned and says why", async () => {
+  test("strikes the amount, marks it Returned and says why on open", async () => {
     const screen = await render(
       <GrantsTable
         items={[grant("g1", 1250, { status: "returned" }), grant("g2", 960.4)]}
@@ -33,6 +33,8 @@ describe("grants table — a returned grant", () => {
     await expect
       .element(screen.getByText("Returned", { exact: true }))
       .toBeVisible();
+    expect(screen.getByText(WHY).query()).toBeNull();
+    await screen.getByRole("button", { name: "What Returned means" }).click();
     await expect.element(screen.getByText(WHY, { exact: true })).toBeVisible();
   });
 
@@ -41,9 +43,10 @@ describe("grants table — a returned grant", () => {
     await expect.element(screen.getByText("$960.40")).toBeVisible();
     expect(screen.getByText("Returned").query()).toBeNull();
     expect(screen.getByText(WHY).query()).toBeNull();
+    expect(screen.getByRole("button").query()).toBeNull();
   });
 
-  test("keeps a returned grant's gross and net under its explanation", async () => {
+  test("keeps a returned grant's gross and net beside its badge", async () => {
     const screen = await render(
       <GrantsTable
         items={[
@@ -67,11 +70,11 @@ describe("grants table — a returned grant", () => {
         ]}
       />
     );
-    const why = screen.getByText(WHY, { exact: true }).element();
+    const badge = screen.getByText("Returned", { exact: true }).element();
     const gross = screen.getByText("Gross $1,250.00").element();
     await expect.element(gross).toBeVisible();
     expect(
-      why.compareDocumentPosition(gross) & Node.DOCUMENT_POSITION_FOLLOWING
+      badge.compareDocumentPosition(gross) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
   });
 });

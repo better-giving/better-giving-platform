@@ -1,11 +1,10 @@
-import { EmptyRow, LoadMoreRow, PayoutStatus } from "@better-giving/ui";
+import { EmptyRow, LoadMoreRow } from "@better-giving/ui";
 import { format } from "date-fns";
 import { ArrowRightIcon } from "lucide-react";
-import { Fragment } from "react";
 import {
   amount_cls,
   arrow_cls,
-  PayoutNote,
+  PayoutStatusCell,
 } from "#/components/returned-payout";
 import type { IPaginator } from "#/types/components";
 import { humanize } from "@/helpers/decimal";
@@ -39,28 +38,25 @@ export function PayoutsTable({
             <EmptyRow col_span={5}>No payouts yet</EmptyRow>
           ) : (
             items.map((payout, idx) => (
-              <Fragment key={idx}>
-                <tr>
-                  <td className="w-8">
-                    <ArrowRightIcon
-                      className={`inline ${arrow_cls(payout)} icon-sm`}
-                    />
-                  </td>
-                  <td>
-                    <span className={amount_cls(payout)}>
-                      ${humanize(payout.amount)}
-                    </span>
-                  </td>
-                  <td>{desc(payout)}</td>
-                  <td className="whitespace-nowrap">
-                    {format(payout.date, "PP")}
-                  </td>
-                  <td>
-                    <PayoutStatus type={payout.type} />
-                  </td>
-                </tr>
-                <PayoutNote payout={payout} />
-              </Fragment>
+              <tr key={idx}>
+                <td className="w-8">
+                  <ArrowRightIcon
+                    className={`inline ${arrow_cls(payout)} icon-sm`}
+                  />
+                </td>
+                <td>
+                  <span className={amount_cls(payout)}>
+                    ${humanize(payout.amount)}
+                  </span>
+                </td>
+                <td>{desc(payout)}</td>
+                <td className="whitespace-nowrap">
+                  {format(payout.date, "PP")}
+                </td>
+                <td>
+                  <PayoutStatusCell payout={payout} />
+                </td>
+              </tr>
             ))
           )}
         </tbody>
