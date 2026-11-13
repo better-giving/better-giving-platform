@@ -3,6 +3,7 @@ import { CircleAlert, SquareArrowOutUpRight } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { href, NavLink, Outlet, useFetcher } from "react-router";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
+import { doc_href } from "@/docs";
 import type { Route } from "./+types/route";
 
 export { ErrorBoundary } from "#/components/error";
@@ -67,7 +68,7 @@ export default function Page({ loaderData: d, params }: Route.ComponentProps) {
           </>
         )}
         <Row label="Bank statement">
-          <ExtLink href={d.ba.bank_statement_url} className="link">
+          <ExtLink href={doc_href(d.ba.bank_statement_url)} className="link">
             <span className="break-all">{d.ba.bank_statement_url}</span>
             <SquareArrowOutUpRight className="inline relative bottom-px ml-2 icon-md" />
           </ExtLink>

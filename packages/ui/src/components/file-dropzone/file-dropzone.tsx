@@ -20,6 +20,10 @@ interface Props {
   /** hands the accepted file to the app's upload endpoint and resolves to the
    * stored url. injected: the endpoint is the app's, not the design system's. */
   upload: (file: File) => Promise<string>;
+  /** the link the stored value opens at, when the stored value is not itself
+   * openable. injected for the same reason as `upload`: where a stored file is
+   * served from is the app's. */
+  view_href?: (value: string) => string;
   /** where a failed upload goes (sentry, a logger). required: `onChange("failure")`
    * is the user-visible outcome, so without this a failed upload is silent to
    * everyone but the donor in front of it. */
@@ -179,7 +183,10 @@ export function FileDropzone({ ref, ...props }: Props & { ref?: Ref<El> }) {
           focusable link inside a role="button" — in the tab order, and folded
           into the button's accessible name, so the button announced a url. */}
       {is_url(props.value) && (
-        <ExtLink href={props.value} className="text-sm link mt-1 inline-block">
+        <ExtLink
+          href={props.view_href ? props.view_href(props.value) : props.value}
+          className="text-sm link mt-1 inline-block"
+        >
           View uploaded file
         </ExtLink>
       )}

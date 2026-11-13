@@ -1,6 +1,7 @@
 import { Badge, ExtLink } from "@better-giving/ui";
 import { SquareArrowOutUpRight } from "lucide-react";
 import { type Ref, useId } from "react";
+import { doc_href } from "@/docs";
 
 export interface ISavedBank {
   /** the recipient account's id at the payout provider */
@@ -56,7 +57,7 @@ export function SavedBank({
         <span className="text-gray-11">{account_id}</span>
       </p>
       <ExtLink
-        href={statement_href}
+        href={doc_href(statement_href)}
         className="flex items-center gap-2 link justify-self-start"
       >
         <SquareArrowOutUpRight aria-hidden className="icon-md" />

@@ -95,7 +95,7 @@ export function ImgEditor({ ref, id, ...props }: ControlledProps) {
 
     try {
       props.on_change("loading");
-      const url = await uploadFile(cropped);
+      const url = await uploadFile(cropped, "image");
       return props.on_change(url);
     } catch (err) {
       report_error(err);
