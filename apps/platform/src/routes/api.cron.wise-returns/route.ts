@@ -3,8 +3,8 @@ import { verify_qstash } from "$/kit/queue";
 import { wise } from "$/kit/wise";
 import { poll_wise_returns } from "$/payouts/wise-return";
 
-/** daily: finds the grants runs whose wise transfer came back, and takes each
- * back into the npo's books (`.server/payouts/wise-return.ts`) */
+/** finds the grants runs whose wise transfer came back, and takes each back
+ * into the npo's books (`.server/payouts/wise-return.ts`) */
 export const action: ActionFunction = async ({ request }) => {
   await verify_qstash(request);
   await poll_wise_returns(async (id) => {

@@ -205,13 +205,13 @@ function ReturnedNotice({ returned, classes = "" }: IReturnedNotice) {
       classes={classes}
       action={
         <Link to="../banking" className="btn btn-primary btn-sm">
-          Check bank details
+          Update bank details
         </Link>
       }
     >
       {returned.count === 1
-        ? `${total} from ${format(returned.latest_date, "MMM d")} didn't reach your bank account, so it's back in your balance. Check your bank details and it goes out again.`
-        : `${returned.count} payouts (${total}) didn't reach your bank account, so they're back in your balance. Check your bank details and they go out again.`}
+        ? `${total} from ${format(returned.latest_date, "MMM d")} didn't reach your bank account, so it's back in your balance. Update your bank details, and it goes out again once the new ones are approved.`
+        : `${returned.count} payouts (${total}) didn't reach your bank account, so they're back in your balance. Update your bank details, and they go out again once the new ones are approved.`}
     </WarningCallout>
   );
 }

@@ -17,7 +17,7 @@ export function PayoutNote({ payout }: IPayoutNote) {
         <div className="sticky left-0 max-w-[100cqw] ps-10 text-xs text-gray-11">
           {payout.type === "returned" ? (
             <>
-              Your bank sent this back, and the money is in your balance. Check
+              Your bank sent this back, and the money is in your balance. Update
               your{" "}
               <Link
                 to={href("/admin/:id/banking", { id: String(payout.npo_id) })}
@@ -25,7 +25,7 @@ export function PayoutNote({ payout }: IPayoutNote) {
               >
                 bank details
               </Link>
-              ; it goes out again once they're fixed.
+              ; it goes out again once the new ones are approved.
             </>
           ) : (
             "Not counted as a grant."
@@ -50,7 +50,7 @@ export function ReturnedGrant({ amount }: IReturnedGrant) {
       </div>
       <p className="text-sm text-gray-11 max-w-[44ch] mt-1">
         Your bank sent this grant back, so it isn't counted in your grant
-        totals. It goes out again once your bank details are fixed.
+        totals. It goes out again once new bank details are approved.
       </p>
     </>
   );

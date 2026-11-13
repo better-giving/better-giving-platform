@@ -84,7 +84,7 @@ export function Loaded(props: LoaderData) {
                 <Badge tone="success">Matches legal name</Badge>
               )}
               {props.holder_match === "mismatch" && (
-                <Badge tone="warning">Doesn't match</Badge>
+                <Badge tone="warning">Name mismatch</Badge>
               )}
               {props.holder_match === "no_legal_name" && (
                 <Badge tone="warning">No legal name on file</Badge>

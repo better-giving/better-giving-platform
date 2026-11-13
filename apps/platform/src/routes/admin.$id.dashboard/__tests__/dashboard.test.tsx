@@ -870,14 +870,14 @@ describe("dashboard — returned payout notice", () => {
         page
           .elementLocator(notice(screen).element())
           .getByText(
-            "$250.00 from Nov 9 didn't reach your bank account, so it's back in your balance. Check your bank details and it goes out again.",
+            "$250.00 from Nov 9 didn't reach your bank account, so it's back in your balance. Update your bank details, and it goes out again once the new ones are approved.",
             { exact: true }
           )
       )
       .toBeVisible();
     await expect
       .element(
-        screen.getByRole("link", { name: "Check bank details", exact: true })
+        screen.getByRole("link", { name: "Update bank details", exact: true })
       )
       .toHaveAttribute("href", `/admin/${npo.id}/banking`);
     // the grant items card shows the same payout with its explanation row
@@ -907,7 +907,7 @@ describe("dashboard — returned payout notice", () => {
         page
           .elementLocator(notice(screen).element())
           .getByText(
-            "3 payouts ($730.00) didn't reach your bank account, so they're back in your balance. Check your bank details and they go out again.",
+            "3 payouts ($730.00) didn't reach your bank account, so they're back in your balance. Update your bank details, and they go out again once the new ones are approved.",
             { exact: true }
           )
       )

@@ -58,7 +58,7 @@ describe("banking application review — account holder", () => {
       })
     );
     await expect
-      .element(screen.getByText("Doesn't match", { exact: true }))
+      .element(screen.getByText("Name mismatch", { exact: true }))
       .toBeVisible();
     const callout = screen.getByRole("region", { name: MISMATCH_TITLE });
     await expect.element(callout).toBeVisible();
@@ -102,7 +102,7 @@ describe("banking application review — account holder", () => {
         )
       )
       .toBeVisible();
-    expect(screen.getByText("Doesn't match").query()).toBeNull();
+    expect(screen.getByText("Name mismatch").query()).toBeNull();
     expect(
       screen.getByRole("region", { name: MISMATCH_TITLE }).query()
     ).toBeNull();
@@ -119,7 +119,7 @@ describe("banking application review — account holder", () => {
       .element(screen.getByText("Account holder", { exact: true }))
       .toBeVisible();
     expect(screen.getByText("Matches legal name").query()).toBeNull();
-    expect(screen.getByText("Doesn't match").query()).toBeNull();
+    expect(screen.getByText("Name mismatch").query()).toBeNull();
   });
 
   test("Better Giving's own account is called out and can't be approved", async () => {
@@ -141,7 +141,7 @@ describe("banking application review — account holder", () => {
       data({ holder_match: "mismatch", own_account: false })
     );
     await expect
-      .element(screen.getByText("Doesn't match", { exact: true }))
+      .element(screen.getByText("Name mismatch", { exact: true }))
       .toBeVisible();
     await expect
       .element(screen.getByRole("region", { name: MISMATCH_TITLE }))
@@ -164,7 +164,7 @@ describe("banking application review — account holder", () => {
       )
       .toBeVisible();
     await expect
-      .element(screen.getByText("Doesn't match", { exact: true }))
+      .element(screen.getByText("Name mismatch", { exact: true }))
       .toBeVisible();
     expect(
       screen.getByRole("region", { name: MISMATCH_TITLE }).query()
@@ -198,7 +198,7 @@ describe("banking application review — account holder", () => {
       const d = data({ holder_match: "mismatch", own_account: false });
       const screen = await render_page({ ...d, ba: { ...d.ba, status } });
       await expect
-        .element(screen.getByText("Doesn't match", { exact: true }))
+        .element(screen.getByText("Name mismatch", { exact: true }))
         .toBeVisible();
       expect(screen.getByRole("region").query()).toBeNull();
     }

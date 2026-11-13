@@ -91,9 +91,9 @@ interface IKept {
 
 /**
  * takes back the run behind settlement `id`, whose wise transfer came back:
- * once, in one transaction. locks as `release()` in ./settle does: the npo's
- * run lock, then (the settlement, which only this takes,) the payouts, the
- * npo, the owed rows
+ * once, in one transaction. locks as `release()` in ./settle does, with the
+ * settlement added (only this locks it): the npo's run lock, the settlement,
+ * the payouts, the npo, the owed rows
  */
 export async function return_settlement(id: string): Promise<ReturnResult> {
   let out: { res: ReturnResult; s?: SettlementRow; npo_name?: string };

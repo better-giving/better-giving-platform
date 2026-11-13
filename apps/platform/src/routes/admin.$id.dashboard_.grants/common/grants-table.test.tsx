@@ -16,7 +16,7 @@ const grant = (id: string, amount: number, o: Partial<IGrantLine> = {}) =>
   }) as IGrantLine;
 
 const WHY =
-  "Your bank sent this grant back, so it isn't counted in your grant totals. It goes out again once your bank details are fixed.";
+  "Your bank sent this grant back, so it isn't counted in your grant totals. It goes out again once new bank details are approved.";
 
 describe("grants table — a returned grant", () => {
   test("strikes the amount, marks it Returned and says why", async () => {
