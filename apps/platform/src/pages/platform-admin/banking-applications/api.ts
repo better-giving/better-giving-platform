@@ -109,8 +109,8 @@ export const action: ActionFunction = async ({ params, request }) => {
     }
     // fail closed: a payout to our own balance is the money never reaching the npo
     const own = await is_own_recipient(wacc).catch(report_degraded_null);
-    if (own === null) throw resp.refuse(OWN_LOOKUP_REFUSAL, 409);
-    if (own) throw resp.refuse(OWN_ACCOUNT_REFUSAL, 409);
+    if (own === null) throw resp.status(409, OWN_LOOKUP_REFUSAL);
+    if (own) throw resp.status(409, OWN_ACCOUNT_REFUSAL);
 
     const holder = x.account_holder ?? wacc.name?.fullName ?? null;
     const legal = (await npo_legal_names([x.npo_id])).get(x.npo_id);
