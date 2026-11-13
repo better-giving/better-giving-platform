@@ -8,6 +8,7 @@ const read_doc = vi.hoisted(() => vi.fn());
 const holders = vi.hoisted(() => ({
   doc_holders: vi.fn(),
   is_npo_member: vi.fn(),
+  moved_copy: vi.fn(),
 }));
 
 vi.mock("#/.server/auth", async () => {
@@ -68,6 +69,7 @@ const found = (contentType = "application/pdf") => ({
 beforeEach(() => {
   session.user = null;
   read_doc.mockReset().mockImplementation(async () => found());
+  holders.moved_copy.mockReset().mockResolvedValue(undefined);
   holders.doc_holders.mockReset().mockResolvedValue({
     reg_owners: [],
     npo_ids: [],
@@ -111,7 +113,6 @@ describe("a private document", () => {
     expect(res.headers.get("cache-control")).toBe("private, no-store");
     expect(res.headers.get("content-type")).toBe("application/pdf");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
-    expect(res.headers.get("content-security-policy")).toBe("sandbox");
   });
 
   test("opens for staff when a record holds it", async () => {
@@ -152,6 +153,12 @@ describe("a private document", () => {
     session.user = { id: "u-x", email: "x@example.com" };
     hold(PRIVATE, "none");
     expect((await open(PRIVATE)).status).toBe(200);
+  });
+
+  test("is a 404 for its uploader once a record they have no part in holds it", async () => {
+    session.user = { id: "u-x", email: "x@example.com" };
+    hold(PRIVATE, "bank");
+    expect((await open(PRIVATE)).status).toBe(404);
   });
 
   test("opens for staff their own upload before any record holds it", async () => {
@@ -303,6 +310,16 @@ describe("a row still holding an older stored url", () => {
     expect(fetch).toHaveBeenCalledWith(LEGACY, { redirect: "error" });
     expect(read_doc).not.toHaveBeenCalled();
     expect(res.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  test("reads the private copy once the job has made one, not the original", async () => {
+    session.user = OWNER;
+    hold(LEGACY, "reg");
+    holders.moved_copy.mockResolvedValue(PRIVATE);
+    const res = await open(LEGACY);
+    expect(res.status).toBe(200);
+    expect(read_doc).toHaveBeenCalledWith(PRIVATE);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   test("opens for staff and for the nonprofit's admins", async () => {

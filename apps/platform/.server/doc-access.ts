@@ -75,7 +75,9 @@ export async function can_read_doc(
   if (viewer.role === "admin" && held) return true;
   if (h.reg_owners.includes(viewer.email)) return true;
   if (await is_npo_member(viewer.id, h.npo_ids)) return true;
-  return path.startsWith(own_folder(viewer.id));
+  // only until a record holds it: after that, who may open it is the record's
+  // call, and an uploader no longer on the nonprofit is not on it
+  return !held && path.startsWith(own_folder(viewer.id));
 }
 
 /** where a user's own uploads land: `store_doc` files them by uploader */

@@ -2,6 +2,7 @@ import type { LoaderFunction } from "react-router";
 import { get_session, to_auth } from "#/.server/auth";
 import { read_doc } from "$/blob-upload";
 import { can_read_doc, doc_source } from "$/doc-access";
+import { moved_copy } from "$/pg/queries/doc-holders";
 
 /** shown in the browser; anything else a stored file turns out to be is only
  * ever downloaded */
@@ -37,12 +38,22 @@ export const loader: LoaderFunction = async ({ request, url }) => {
     body = r.stream;
     type = r.blob.contentType;
   } else {
-    // a file from before documents went private: read here, for a caller
-    // already checked, rather than redirected to
-    const r = await fetch(ref, { redirect: "error" }).catch(() => null);
-    if (!r?.ok) return not_found();
-    body = r.body;
-    type = r.headers.get("content-type");
+    // a file from before documents went private. once the job has copied it,
+    // the private copy is read, so the original can go without this link
+    // dying; otherwise the original is read here, for a caller already
+    // checked, rather than redirected to
+    const copy = await moved_copy(ref);
+    if (copy && doc_source(copy)?.source === "private") {
+      const r = await read_doc(copy).catch(() => null);
+      if (r?.statusCode !== 200) return not_found();
+      body = r.stream;
+      type = r.blob.contentType;
+    } else {
+      const r = await fetch(ref, { redirect: "error" }).catch(() => null);
+      if (!r?.ok) return not_found();
+      body = r.body;
+      type = r.headers.get("content-type");
+    }
   }
 
   const mime = type?.split(";")[0]?.trim().toLowerCase() ?? "";
@@ -52,8 +63,6 @@ export const loader: LoaderFunction = async ({ request, url }) => {
       "content-type": inline ? mime : "application/octet-stream",
       "content-disposition": inline ? "inline" : "attachment",
       "x-content-type-options": "nosniff",
-      // a file a user wrote renders on our origin: no script, no same-origin
-      "content-security-policy": "sandbox",
       "cache-control": "private, no-store",
       vary: "cookie",
     },

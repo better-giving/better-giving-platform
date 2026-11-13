@@ -51,6 +51,16 @@ export async function doc_holders(ref: string): Promise<IDocHolders> {
   };
 }
 
+/** the private copy the job made of an older stored url, if it did */
+export async function moved_copy(ref: string): Promise<string | undefined> {
+  const [row] = await db
+    .select({ url: doc_url_aliases.new_url })
+    .from(doc_url_aliases)
+    .where(eq(doc_url_aliases.old_url, ref))
+    .limit(1);
+  return row?.url;
+}
+
 /** whether the user is an admin of any of the nonprofits */
 export async function is_npo_member(
   user_id: string,

@@ -27,7 +27,11 @@ import { registrations } from "../.server/pg/schema/registration";
  *
  * env (a `--env-file` or the shell): `DATABASE_URL` — the database to read and
  * write; `BLOB_PRIVATE_READ_WRITE_TOKEN` — the private store's token. Not
- * `BLOB_READ_WRITE_TOKEN`: the original store is only read, by url.
+ * `BLOB_READ_WRITE_TOKEN`: the original store is only read, by url. The job
+ * loads the app's env module, which refuses to load without the app's own
+ * required values (`BASE_URL`, the `APP_*` secrets, the NOWPayments values), so
+ * use the target environment's env file. Check that `DATABASE_URL` in it is
+ * the database you mean to change before passing `--commit`.
  *
  * 1. dry run — `bun --env-file=<env> jobs/migrate-private-docs.ts`. Writes
  *    nothing and copies nothing; checks each file is still there and prints
