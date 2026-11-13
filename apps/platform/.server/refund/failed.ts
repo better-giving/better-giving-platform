@@ -15,6 +15,7 @@ import {
   referrer_of,
   scaled,
   share_of_net,
+  void_loss_id,
 } from "./plan";
 import {
   type IRoutedRefundFailed,
@@ -159,11 +160,24 @@ async function credit_failed(
           src: { source: "refund", source_ref: take.ref },
           now,
         });
-    const by_hand = ds.flatMap((d) =>
-      [taken_by_hand(d), cut_short(d, after)].flatMap((hand) =>
-        hand ? [`dist ${d.id} to ${dist_npo(d)}: ${hand}`] : []
+    // the donor got nothing back, so the platform lost nothing on the payout
+    for (const d of ds.filter(is_void_loss)) {
+      await tx.delete(loss_logs).where(eq(loss_logs.id, void_loss_id(d.id)));
+    }
+    const owing = new Set(
+      moves.flatMap((m) =>
+        m.was && "npo_id" in m.party ? [m.party.npo_id] : []
       )
     );
+    const by_hand = ds.flatMap((d) => {
+      const hands = [
+        taken_by_hand(d, owing.has(d.to_id)),
+        cut_short(d, after),
+      ];
+      return hands.flatMap((hand) =>
+        hand ? [`dist ${d.id} to ${dist_npo(d)}: ${hand}`] : []
+      );
+    });
 
     const credited: string[] = [];
     for (const { party, was, row, credited: back, wanted } of moves) {
@@ -335,9 +349,14 @@ function cut_short(d: LockedDist, after: ITake[]): string | null {
   return `${what}: the npo is short $${humanize(short)}; pay it by hand`;
 }
 
+/** a reversal of a dist whose payout is void: a loss for its void cash share */
+const is_void_loss = (d: LockedDist) =>
+  d.refund_status === "loss" && d.payout_type === "void";
+
 /** what of the dist the refund moved outside the ledger, for ops to undo; a
- * routed dist's is its transfer's, which `routed_refund_failed` words */
-function taken_by_hand(d: LockedDist): string | null {
+ * routed dist's is its transfer's, which `routed_refund_failed` words.
+ * `npo_owes`: the npo has a row on the gift, which the credit back answers */
+function taken_by_hand(d: LockedDist, npo_owes: boolean): string | null {
   if (d.routed) return null;
   if (d.status === "settled") {
     return grant_went_out(d)
@@ -346,6 +365,11 @@ function taken_by_hand(d: LockedDist): string | null {
   }
   if (d.refund_status === "completed") {
     return "its reversal took it back from the npo's balances or pending payout; re-settle it by hand";
+  }
+  // owing nothing, the npo's savings and investment shares were taken from
+  // its balances (`calc_refund_plan`); its void cash share was never there
+  if (is_void_loss(d) && !npo_owes && d.cash_pct < 100) {
+    return "its reversal took its savings and investment shares back from the npo's balances; re-settle them by hand";
   }
   return d.payout_type === "refunded" && cash_recovered(d) > 0
     ? "its reversal cancelled its unsent payout; re-settle that by hand"

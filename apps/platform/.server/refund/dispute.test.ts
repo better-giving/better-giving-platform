@@ -68,6 +68,7 @@ import {
 } from "../pg/queries/owed";
 import { create_test_db } from "../pg/test-utils/pglite";
 import { dispute_opened, dispute_won } from "./dispute";
+import { refund_failed } from "./failed";
 import { reverse_charge } from "./reverse";
 
 // --- setup ---
@@ -1459,6 +1460,27 @@ describe("a gift whose grant transfer came back", () => {
           fees_processing: 1.6,
         },
       ]);
+    });
+
+    test("a full refund that then fails books no loss and has ops re-settle the savings share", async () => {
+      const { id } = await seed(HALF_SAVED);
+      expect((await refund(id, "refund")).status).toBe("reversed");
+
+      const res = await refund_failed({
+        donation_id: id,
+        rail: "stripe",
+        refund_id: "re_1",
+      });
+
+      expect(res).toMatchObject({
+        status: "by_hand",
+        by_hand: [
+          expect.stringMatching(
+            /savings and investment shares back from the npo's balances; re-settle them by hand/
+          ),
+        ],
+      });
+      expect(await losses_of(id)).toEqual([]);
     });
 
     test("a partial refund leaves its books and records nothing owed", async () => {
