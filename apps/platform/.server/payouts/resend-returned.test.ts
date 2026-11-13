@@ -220,6 +220,34 @@ describe("resend_returned", () => {
     });
   });
 
+  test("an account approved as the default demotes the one the transfer bounced from in the same write, and lifts the hold", async () => {
+    await seed_returned("p-1");
+    await seed_bapp("old", "default");
+    await seed_bapp("new", "under-review");
+
+    expect(await bapp_approve("new", npo_id, { as_default: true })).toEqual({
+      id: "new",
+      status: "under-review",
+    });
+
+    const bapps = await db()
+      .select()
+      .from(banking_apps)
+      .where(eq(banking_apps.npo_id, npo_id));
+    expect(
+      Object.fromEntries(
+        bapps.map((b) => [
+          b.id,
+          [b.status, new Date(b.updated_at) > new Date(SENT)],
+        ])
+      )
+    ).toEqual({ old: ["approved", true], new: ["default", true] });
+    expect(await resend_returned(npo_id)).toEqual({
+      status: "resent",
+      ids: ["p-1"],
+    });
+  });
+
   test("reads the hold and re-sends under the npo's run lock, the one a return takes", async () => {
     await seed_returned("p-1");
     await seed_bapp("new", "default", "2026-11-05T00:00:00.000Z");
