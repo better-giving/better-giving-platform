@@ -192,6 +192,22 @@ describe("wise_pay", () => {
     expect(wise.fund_transfer).not.toHaveBeenCalled();
   });
 
+  test("a transfer that does not say what it sends is cancelled, never funded", async () => {
+    wise.transfer.mockResolvedValue({
+      id: TRANSFER_ID,
+      status: "incoming_payment_waiting",
+      sourceCurrency: "USD",
+    });
+
+    const err = await wise_pay(777, 100, REF).catch((e) => e);
+
+    expect(err).toBeInstanceOf(NotFundedError);
+    expect(err.cause).toBeInstanceOf(PayRefused);
+    expect(String(err.cause)).toContain("an amount wise did not return");
+    expect(wise.cancel_transfer).toHaveBeenCalledWith(TRANSFER_ID);
+    expect(wise.fund_transfer).not.toHaveBeenCalled();
+  });
+
   test("a transfer whose cancel fails is still unfunded, and says to cancel it by hand", async () => {
     wise.transfer.mockResolvedValue(waiting(98.35));
     wise.cancel_transfer.mockRejectedValue("cancel 500");

@@ -107,7 +107,7 @@ describe("banking application verdict prompt", () => {
     await expect.element(submit).toHaveAttribute("aria-disabled", "true");
 
     press(submit.element());
-    await new Promise((r) => setTimeout(r, 100));
+    await expect.element(submit).toHaveAttribute("aria-disabled", "true");
     expect(action).not.toHaveBeenCalled();
 
     const box = screen.getByRole("checkbox", {

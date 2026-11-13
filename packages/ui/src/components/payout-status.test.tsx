@@ -42,6 +42,43 @@ describe("PayoutStatus", () => {
     );
   });
 
+  test("keeps returned's ink and dot apart from cancelled's and void's gray", async () => {
+    const screen = await render(
+      <>
+        <PayoutStatus type="returned" />
+        <PayoutStatus type="cancelled" />
+        <PayoutStatus type="void" />
+      </>
+    );
+    const label = (name: string) =>
+      screen.getByText(name, { exact: true }).element() as HTMLElement;
+    const returned = label("Returned");
+    const cancelled = label("Cancelled");
+    const voided = label("Void");
+    await expect.element(returned).toBeVisible();
+
+    expect(getComputedStyle(returned).color).not.toBe(
+      getComputedStyle(cancelled).color
+    );
+    expect(getComputedStyle(returned).color).not.toBe(
+      getComputedStyle(voided).color
+    );
+    expect(dot_of(returned).backgroundColor).not.toBe(
+      dot_of(cancelled).backgroundColor
+    );
+    expect(dot_of(returned).backgroundColor).not.toBe(
+      dot_of(voided).backgroundColor
+    );
+    // void is hollow where cancelled is filled: same ink, different dot
+    expect(getComputedStyle(voided).color).toBe(
+      getComputedStyle(cancelled).color
+    );
+    expect(dot_of(voided).backgroundColor).not.toBe(
+      dot_of(cancelled).backgroundColor
+    );
+    expect(dot_of(voided).boxShadow).not.toBe(dot_of(cancelled).boxShadow);
+  });
+
   test("draws a void payout's dot as a gray ring with no fill", async () => {
     const screen = await render(<PayoutStatus type="void" />);
     const label = screen.getByText("Void").element() as HTMLElement;
