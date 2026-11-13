@@ -10,7 +10,6 @@ import {
   isNull,
   ne,
   notInArray,
-  or,
   sql,
 } from "drizzle-orm";
 import {
@@ -394,50 +393,14 @@ export interface IRunPayout {
 }
 
 /**
- * whether another settlement owns a payout among `s.sources`: a run in which
- * every payout was loss-refunded in flight owns none by `settled_id`, so a
- * hand-sent copy of a run whose other payouts did settle is told from the run
- * itself by this
- */
-export async function sources_owned_elsewhere(
-  tx: DbOrTx,
-  s: Pick<SettlementRow, "id" | "npo_id" | "sources">
-): Promise<boolean> {
-  if (s.npo_id === null || !s.sources || s.sources.length === 0) return false;
-  const [row] = await tx
-    .select({ id: payouts.id })
-    .from(payouts)
-    .where(
-      and(
-        eq(payouts.npo_id, s.npo_id),
-        inArray(payouts.source_id, s.sources),
-        isNotNull(payouts.settled_id),
-        ne(payouts.settled_id, s.id)
-      )
-    )
-    .limit(1);
-  return row !== undefined;
-}
-
-/**
- * every payout of the run behind `s`, row-locked in id order: those it
- * settled (`settled_id`), whatever they are now, and those of its claimed
- * sources loss-refunded while its transfer was in flight, which never got a
- * `settled_id`
+ * every payout of the run behind `s`, row-locked in id order: those it owns
+ * by `settled_id`, whatever they are now. one a refund took while the transfer
+ * was in flight is the run's too: the settle stamps it when it records the run
  */
 export async function run_payouts_locked(
   tx: DbOrTx,
-  s: Pick<SettlementRow, "id" | "npo_id" | "sources">
+  s: Pick<SettlementRow, "id">
 ): Promise<IRunPayout[]> {
-  const in_flight_loss =
-    s.npo_id !== null && s.sources && s.sources.length > 0
-      ? and(
-          eq(payouts.npo_id, s.npo_id),
-          isNull(payouts.settled_id),
-          eq(payouts.type, "refunded_loss"),
-          inArray(payouts.source_id, s.sources)
-        )
-      : undefined;
   return tx
     .select({
       id: payouts.id,
@@ -446,15 +409,15 @@ export async function run_payouts_locked(
       settled_id: payouts.settled_id,
     })
     .from(payouts)
-    .where(or(eq(payouts.settled_id, s.id), in_flight_loss))
+    .where(eq(payouts.settled_id, s.id))
     .orderBy(asc(payouts.id))
     .for("update");
 }
 
-/** names `settlement_id` as the run of loss-refunded payouts `ids` that were
- * in flight when it went out, so no other settlement sharing its sources takes
- * them back too */
-export async function payouts_own_in_flight_loss(
+/** names `settlement_id` as the run of loss-refunded payouts `ids`, which a
+ * refund took while the run's transfer was in flight, so they never got a
+ * `settled_id` from the settle */
+export async function payouts_own_loss(
   tx: DbOrTx,
   ids: string[],
   settlement_id: string

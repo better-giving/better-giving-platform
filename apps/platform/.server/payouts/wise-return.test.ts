@@ -440,6 +440,28 @@ describe("return_settlement", () => {
     expect(await npo_cash(npo.id)).toBe(400);
   });
 
+  test("a hand-sent copy of an all-loss run, returned before it, takes nothing: only the run's own return credits", async () => {
+    const npo = await seed_npo(500);
+    const { don } = await seed_donation_payout(npo.id, "p-1", 100);
+    const run = await sent(npo, ["p-1"], () => refund(don));
+    const [first] = await db().select().from(settlements);
+    await db()
+      .insert(settlements)
+      .values({ ...first!, id: "hand-sent-1", other_id: "hand-ref" });
+
+    expect(await return_settlement("hand-sent-1")).toEqual({
+      status: "nothing_to_return",
+    });
+    expect(await payout_types()).toEqual({ "p-1": "refunded_loss" });
+    expect(await npo_cash(npo.id)).toBe(400);
+
+    const res = await return_settlement(run);
+
+    expect(res).toMatchObject({ status: "returned", loss_reversed: ["p-1"] });
+    expect(await payout_types()).toEqual({ "p-1": "refunded" });
+    expect(await npo_cash(npo.id)).toBe(400);
+  });
+
   test("a payout loss-refunded after it settled is refunded as if pending once the money is back", async () => {
     const npo = await seed_npo(500);
     await seed_payout(npo.id, "p-1", 60);

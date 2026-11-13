@@ -9,6 +9,7 @@ import { outstanding_for_npo, unrecover_owed } from "../pg/queries/owed";
 import {
   payouts_in,
   payouts_move,
+  payouts_own_loss,
   pending_payouts_locked,
   settlement_put,
 } from "../pg/queries/payout";
@@ -211,6 +212,9 @@ export async function settle_npo_payouts(
       // a loss refund may take a payout in flight; the npo keeps that money
       const moved_on = ids.filter((id) => !settled.includes(id));
       const loss_refunded = await payouts_in(tx, moved_on, "refunded_loss");
+      // the run owns them too: a return finds its payouts by `settled_id`, and
+      // a copy of the run sharing its sources must never take them
+      await payouts_own_loss(tx, loss_refunded, transfer_id);
       return moved_on.filter((id) => !loss_refunded.includes(id));
     });
   } catch (err) {
