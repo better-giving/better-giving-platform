@@ -211,8 +211,9 @@ export interface IReturnedPayouts {
   latest_date: string;
 }
 
-/** the npo's payouts whose transfer came back, waiting for a new bank account
- * (`resend_returned` moves them back to pending); null when none */
+/** the npo's payouts whose transfer came back, waiting until a newer approved
+ * account is the one the grants run pays (`npo_return_hold`;
+ * `resend_returned` moves them back to pending); null when none */
 export async function npo_returned_payouts(
   npo_id: number
 ): Promise<IReturnedPayouts | null> {

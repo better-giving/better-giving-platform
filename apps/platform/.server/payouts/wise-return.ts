@@ -310,6 +310,9 @@ const ORDINARY: ReadonlySet<string> = new Set([
   "outgoing_payment_sent",
 ]);
 const MONEY_BACK = "funds_refunded";
+/** off the ordinary path toward `MONEY_BACK`, which the poll takes back by
+ * itself: a hand settlement of the payouts would count the money twice */
+const RETURNING: ReadonlySet<string> = new Set(["bounced_back", "cancelled"]);
 
 /**
  * asks wise the state of every grants-run transfer from the last 90 days not
@@ -333,7 +336,9 @@ export async function poll_wise_returns(state_of: TransferState) {
       if (changed && !ORDINARY.has(state)) {
         await alert({
           title: `Wise transfer ${state}: npo:${s.npo_id}`,
-          body: `nothing was changed but the stored state: check the transfer in Wise and settle its payouts by hand if its money moved`,
+          body: RETURNING.has(state)
+            ? `Wise is returning this transfer, or may still deliver it: once it reaches ${MONEY_BACK}, the next poll takes the run back by itself. Change nothing by hand`
+            : `nothing was changed but the stored state: check the transfer in Wise and settle its payouts by hand if its money moved`,
           fields: [
             { name: "settlement", value: s.id },
             { name: "state", value: state },

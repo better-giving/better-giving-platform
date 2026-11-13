@@ -777,6 +777,11 @@ describe("poll_wise_returns", () => {
       expect(send_alert).toHaveBeenCalledOnce();
       const [alert] = send_alert.mock.calls[0]!;
       expect(alert.title).toBe(`Wise transfer ${state}: npo:${npo.id}`);
+      expect(alert.body).toMatch(
+        state === "cancelled" || state === "bounced_back"
+          ? /the next poll takes the run back by itself\. Change nothing by hand/
+          : /settle its payouts by hand if its money moved/
+      );
       expect(alert.fields).toEqual(
         expect.arrayContaining([
           { name: "settlement", value: "1001" },
