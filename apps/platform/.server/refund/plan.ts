@@ -198,7 +198,7 @@ export const dist_settled_usd = (
   >
 ): number => settled_net(d) + d.fee_base + d.fee_fsa + fee_processing_usd(d);
 
-/** the loss log a reversal books for a dist's void payout */
+/** the id of the loss log a reversal books for a dist's void payout */
 export const void_loss_id = (dist_id: string) => `void:${dist_id}`;
 
 export function calc_refund_plan(

@@ -129,8 +129,8 @@ export const action: ActionFunction = async ({ params, request }) => {
     }
     // a held npo's old default is the account that bounced: the replacement
     // has to be the one the grants run pays, or `banking-approved` releases
-    // nothing. read before the write, and safe to: the hold keys on the current
-    // default, not on this application
+    // nothing. read before the write, which is safe: the hold keys on the
+    // current default, not on this application
     const held = Boolean(await npo_return_hold(x.npo_id));
     // auto-default when nothing pays out yet: rejected and pending rows don't count
     const prev = await bapp_approve(bank_id.toString(), x.npo_id, {

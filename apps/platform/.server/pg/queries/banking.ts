@@ -298,8 +298,6 @@ export async function bapp_approve(
       (r) => r.id !== id && r.status === "default"
     );
     const now = new Date().toISOString();
-    // the row lock above means `prev.status` is what this guard sees, so
-    // `prev` reporting under-review is the update having landed
     if (opts.as_default && has_default && prev.status === "under-review") {
       await tx
         .update(banking_apps)
@@ -311,6 +309,8 @@ export async function bapp_approve(
           )
         );
     }
+    // the row lock above means `prev.status` is what this guard sees, so
+    // `prev` reporting under-review is the update having landed
     await tx
       .update(banking_apps)
       .set({
