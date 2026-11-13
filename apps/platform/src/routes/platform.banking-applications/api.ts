@@ -43,7 +43,7 @@ export const loader = async ({ url }: Route.LoaderArgs) => {
     items: page.items.map((b): IBappRow & { holder_match: THolderMatch } => ({
       ...b,
       npo_name: names.get(b.npo_id),
-      holder_match: holder_match(b.account_holder, legal.get(b.npo_id) ?? ""),
+      holder_match: holder_match(b.account_holder, legal.get(b.npo_id)),
     })),
   };
 };

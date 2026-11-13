@@ -26,7 +26,7 @@ export default function Approved({ loaderData: d }: Route.ComponentProps) {
     <Prompt
       verdict="approved"
       confirm_holder={
-        d.holder_match === "mismatch"
+        d.holder_match === "mismatch" || d.holder_match === "no_legal_name"
           ? { holder: d.account_holder ?? "", legal_name: d.legal_name ?? "" }
           : undefined
       }

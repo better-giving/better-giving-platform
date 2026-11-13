@@ -9,6 +9,7 @@ import { wise_pay } from "$/payouts/wise-pay";
 import {
   hold_alert_claim,
   hold_alert_unclaim,
+  npo_returned_payouts,
   pending_payouts,
   processing_payouts,
 } from "$/pg/queries/payout";
@@ -85,12 +86,12 @@ async function alert_unsettled_claims() {
 }
 
 /** once per returned settlement: the npo stays held run after run until a new
- * account is approved, and ops needs telling only when it starts */
+ * account is the one the run pays, and ops needs telling only when it starts */
 async function alert_held(el: Extract<GrantEligibility, { status: "held" }>) {
-  const { npo, returned, total } = el;
-  const claimed = await hold_alert_claim(npo.id);
-  if (!claimed) return;
+  const { npo, hold, total } = el;
+  if (!(await hold_alert_claim(hold.settlement_id))) return;
   try {
+    const returned = await npo_returned_payouts(npo.id);
     await aws_monitor.send_alert({
       type: "ERROR",
       from: fn,
@@ -99,15 +100,17 @@ async function alert_held(el: Extract<GrantEligibility, { status: "held" }>) {
       fields: [
         {
           name: "returned",
-          value: `${returned.count} payout(s), ${returned.total}`,
+          value: returned
+            ? `${returned.count} payout(s), ${returned.total}`
+            : "none left",
         },
         { name: "pending", value: total.toString() },
-        { name: "settlement", value: claimed },
+        { name: "settlement", value: hold.settlement_id },
       ],
     });
   } catch (err) {
     report_error(err, { npo_id: npo.id });
-    await hold_alert_unclaim(claimed);
+    await hold_alert_unclaim(hold.settlement_id);
   }
 }
 

@@ -9,13 +9,15 @@ import type { IUpdate } from "@/banking/schema";
 
 interface IConfirmHolder {
   holder: string;
+  /** "" when the npo has no legal name on file */
   legal_name: string;
 }
 
 type Props = {
   verdict: Extract<TStatus, "approved" | "rejected">;
-  /** the account's holder isn't the npo's legal name: approving takes a tick
-   * that the reviewer confirmed it, which the action refuses without */
+  /** the account's holder isn't the npo's legal name, or there is no legal
+   * name to check it against: approving takes a tick that the reviewer
+   * confirmed it, which the action refuses without */
   confirm_holder?: IConfirmHolder;
 };
 
@@ -127,7 +129,7 @@ function Content({ verdict, confirm_holder }: Props) {
             </div>
             <div className="flex gap-2 flex-wrap">
               <dt className="font-bold">Legal name</dt>
-              <dd>{confirm_holder.legal_name}</dd>
+              <dd>{confirm_holder.legal_name || "No legal name on file"}</dd>
             </div>
           </dl>
           <CheckField

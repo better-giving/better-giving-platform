@@ -5,24 +5,26 @@ import {
   Content as HoverContent,
 } from "@better-giving/ui/hover-card";
 import { Arrow, Content } from "@better-giving/ui/tooltip";
+import { format } from "date-fns";
 import {
   ArrowDownToLineIcon,
   ArrowLeftRightIcon,
   ArrowUpFromLineIcon,
 } from "lucide-react";
-import { NavLink } from "react-router";
+import { Link, NavLink } from "react-router";
 import { Cell, Pie, PieChart } from "recharts";
+import { WarningCallout } from "#/components/warning-callout";
 import { category_colors } from "#/pages/admin/ticker-category-colors";
 import { use_admin_data } from "#/pages/admin/use-admin-data";
 import type { TickerCategory } from "@/nav/interfaces";
 import { group_by_category } from "@/nav/interfaces";
 import { min_payout_amount } from "@/npo/schema";
+import type { IReturnedPayouts } from "$/pg/queries/payout";
 import type { DashboardData } from "./api";
 import { GrantsTable } from "./common/grants-table";
 import { PayoutsTable } from "./common/payouts-table";
 import { Figure } from "./figure";
 import { Payout } from "./payout";
-import { ReturnedNotice } from "./returned-notice";
 
 interface Props extends DashboardData {
   classes?: string;
@@ -187,5 +189,29 @@ export function Loaded({ classes = "", ...props }: Props) {
         </section>
       </div>
     </div>
+  );
+}
+
+interface IReturnedNotice {
+  returned: IReturnedPayouts;
+  classes?: string;
+}
+
+function ReturnedNotice({ returned, classes = "" }: IReturnedNotice) {
+  const total = to_usd(returned.total, 2);
+  return (
+    <WarningCallout
+      title="Your bank sent a payout back"
+      classes={classes}
+      action={
+        <Link to="../banking" className="btn btn-primary btn-sm">
+          Check bank details
+        </Link>
+      }
+    >
+      {returned.count === 1
+        ? `${total} from ${format(returned.latest_date, "MMM d")} didn't reach your bank account, so it's back in your balance. Check your bank details and it goes out again.`
+        : `${returned.count} payouts (${total}) didn't reach your bank account, so they're back in your balance. Check your bank details and they go out again.`}
+    </WarningCallout>
   );
 }

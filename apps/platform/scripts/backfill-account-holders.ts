@@ -56,10 +56,10 @@ for (;;) {
       nameless++;
       continue;
     }
-    const legal_name = legal.get(r.npo_id) ?? "";
-    if (holder_match(holder, legal_name) === "mismatch") {
+    const legal_name = legal.get(r.npo_id);
+    if (holder_match(holder, legal_name) !== "match") {
       mismatches.push(
-        `bapp ${r.id} npo ${r.npo_id}: holder "${holder}" vs legal name "${legal_name}"`
+        `bapp ${r.id} npo ${r.npo_id}: holder "${holder}" vs legal name ${legal_name ? `"${legal_name}"` : "(none on file)"}`
       );
     }
     if (write && (await bapp_set_holder(r.id, holder))) stored++;

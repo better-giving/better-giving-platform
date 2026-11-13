@@ -23,8 +23,8 @@ async function release_returned(npo_id: number) {
         }
       : {
           type: "ERROR" as const,
-          title: `Returned payouts still held for npo:${npo_id}`,
-          body: `a bank account was approved or made default, but payouts whose transfer came back stay held: ${res.reason}. make the new account the npo's default to send them`,
+          title: `Grants still held for npo:${npo_id}`,
+          body: `a bank account was approved or made default, but the npo's last transfer came back and its grants stay held: ${res.reason}. make the new account the npo's default to release them`,
         };
   try {
     await aws_monitor.send_alert({ ...a, from: `wise-returns:${stage}` });

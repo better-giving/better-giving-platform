@@ -376,7 +376,8 @@ export async function bapp_delete_guarded(
 /**
  * each npo's legal name: the name it registered under (`registrations.o_name`,
  * filed with its proof of registration and frozen at approval), else its
- * `name`, which starts as that and is the page name its admins edit since
+ * `name`, which starts as that and is the page name its admins edit since.
+ * an npo with neither, blank counting as none, is left out
  */
 export async function npo_legal_names(
   npo_ids: number[]
@@ -385,7 +386,7 @@ export async function npo_legal_names(
   const rows = await db
     .select({
       id: npos.id,
-      name: npos.name,
+      name: sql<string | null>`nullif(trim(${npos.name}), '')`,
       registered: sql<string | null>`nullif(trim(${registrations.o_name}), '')`,
     })
     .from(npos)
@@ -393,9 +394,8 @@ export async function npo_legal_names(
     .where(inArray(npos.id, npo_ids));
   const names = new Map<number, string>();
   for (const r of rows) {
-    if (r.registered || !names.has(r.id)) {
-      names.set(r.id, r.registered ?? r.name);
-    }
+    const legal = r.registered ?? r.name;
+    if (legal && (r.registered || !names.has(r.id))) names.set(r.id, legal);
   }
   return names;
 }

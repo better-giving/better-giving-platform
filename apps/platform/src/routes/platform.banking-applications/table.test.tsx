@@ -26,7 +26,7 @@ const render_table = (items: IBappRow[]) => {
 };
 
 describe("banking applications list — account holder", () => {
-  test("puts the stored holder under the account, and flags only a mismatched one", async () => {
+  test("puts the stored holder under the account, and flags only a mismatched one, not one with no legal name", async () => {
     const screen = await render_table([
       row("4821", {
         account_holder: "Dana Whitfield",
@@ -36,6 +36,10 @@ describe("banking applications list — account holder", () => {
         account_holder: "Harbor Light Food Pantry Inc.",
         holder_match: "match",
       }),
+      row("5507", {
+        account_holder: "Mesa Verde Literacy Fund",
+        holder_match: "no_legal_name",
+      }),
     ]);
     const dana = screen.getByText("Dana Whitfield");
     await expect.element(dana).toBeVisible();
@@ -43,6 +47,10 @@ describe("banking applications list — account holder", () => {
       .element(screen.getByText("Harbor Light Food Pantry Inc."))
       .toBeVisible();
 
+    // no legal name on file is the review page's call, not a list flag
+    await expect
+      .element(screen.getByText("Mesa Verde Literacy Fund"))
+      .toBeVisible();
     const badges = screen.getByText("Name mismatch", { exact: true });
     expect(badges.elements()).toHaveLength(1);
     expect(dana.element().contains(badges.element())).toBe(true);

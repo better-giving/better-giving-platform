@@ -1,8 +1,7 @@
-import { EmptyRow, LoadMoreRow } from "@better-giving/ui";
+import { EmptyRow, LoadMoreRow, PayoutStatus } from "@better-giving/ui";
 import { format } from "date-fns";
 import { ArrowRightIcon } from "lucide-react";
 import { Fragment } from "react";
-import { PayoutStatus } from "#/components/payout-status";
 import {
   amount_cls,
   arrow_cls,

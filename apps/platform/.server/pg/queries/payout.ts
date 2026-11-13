@@ -337,43 +337,31 @@ export async function settlements_to_poll(
     .orderBy(asc(settlements.date), asc(settlements.id));
 }
 
-/** when the npo's latest transfer that came back was sent; null when none did */
-export async function npo_last_return_sent(
+/** the npo's latest settlement whose transfer came back; null when none did */
+export async function npo_last_return(
   npo_id: number
-): Promise<string | null> {
+): Promise<Pick<SettlementRow, "id" | "date"> | null> {
   const [row] = await db
-    .select({
-      date: sql<string | null>`max(${settlements.date})`.mapWith(
-        settlements.date
-      ),
-    })
-    .from(settlements)
-    .where(
-      and(eq(settlements.npo_id, npo_id), eq(settlements.status, "returned"))
-    );
-  return row?.date ?? null;
-}
-
-/** marks the npo's latest returned settlement as the one ops was told holds
- * its grants; its id, or null when ops was already told of it (or there is
- * none). the marker is the dedupe: one alert per returned settlement */
-export async function hold_alert_claim(npo_id: number): Promise<string | null> {
-  const latest = db
-    .select({ id: settlements.id })
+    .select({ id: settlements.id, date: settlements.date })
     .from(settlements)
     .where(
       and(eq(settlements.npo_id, npo_id), eq(settlements.status, "returned"))
     )
     .orderBy(desc(settlements.date), desc(settlements.id))
     .limit(1);
-  const [row] = await db
+  return row ?? null;
+}
+
+/** marks returned settlement `id` as the one ops was told holds its npo's
+ * grants; false when ops was already told of it. the marker is the dedupe:
+ * one alert per returned settlement */
+export async function hold_alert_claim(id: string): Promise<boolean> {
+  const rows = await db
     .update(settlements)
     .set({ hold_alerted_at: new Date().toISOString() })
-    .where(
-      and(inArray(settlements.id, latest), isNull(settlements.hold_alerted_at))
-    )
+    .where(and(eq(settlements.id, id), isNull(settlements.hold_alerted_at)))
     .returning({ id: settlements.id });
-  return row?.id ?? null;
+  return rows.length > 0;
 }
 
 /** a hold alert that did not go out: the next run claims it again */

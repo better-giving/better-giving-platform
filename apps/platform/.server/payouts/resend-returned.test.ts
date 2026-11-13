@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import {
   afterAll,
   beforeAll,
@@ -10,6 +11,8 @@ import {
 import type { TestDb } from "../pg/test-utils/pglite";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
+const sent_mail = vi.hoisted(() => [] as unknown[]);
+const send_alert = vi.hoisted(() => vi.fn());
 vi.mock("../pg/db", () => ({
   db: new Proxy({} as any, {
     get(_, prop) {
@@ -18,7 +21,23 @@ vi.mock("../pg/db", () => ({
   }),
 }));
 
-const { resend_returned } = await import("./resend-returned");
+vi.mock("$/env", () => ({ base_url: "https://bg.test", stage: "test" }));
+vi.mock("$/pg/queries/user", () => ({
+  npo_admins: async () => [{ email: "a@bg.test" }],
+}));
+vi.mock("$/kit/slack", () => ({ aws_monitor: { send_alert } }));
+vi.mock("#/errors/report", () => ({ report_error: vi.fn() }));
+// what the npo's payouts were when its admins were emailed
+vi.mock("$/email", () => ({
+  send_email_or_throw: vi.fn(async () => {
+    sent_mail.push(await rows());
+  }),
+}));
+
+const { npo_return_hold, resend_returned } = await import("./resend-returned");
+const { handle_banking_approved, handle_banking_set_default } = await import(
+  "#/routes/api.q-handler.$event/handle-banking"
+);
 const { bapp_approve, bapp_set_default } = await import(
   "../pg/queries/banking"
 );
@@ -52,6 +71,8 @@ const npo = (registration_number: string) => ({
 });
 
 beforeEach(async () => {
+  sent_mail.length = 0;
+  send_alert.mockReset();
   await db().delete(payouts);
   await db().delete(settlements);
   await db().delete(npos);
@@ -193,5 +214,95 @@ describe("resend_returned", () => {
       status: "held",
       reason: "no approved account",
     });
+  });
+});
+
+describe("npo_return_hold", () => {
+  test("an npo whose transfers never came back is not held", async () => {
+    await seed_bapp("old", "default");
+
+    expect(await npo_return_hold(npo_id)).toBeNull();
+  });
+
+  test("refunding every returned payout leaves the npo held: the run would pay the account that bounced", async () => {
+    await seed_returned("p-1");
+    await seed_bapp("old", "default");
+    await db().update(payouts).set({ type: "refunded" });
+
+    expect(await npo_return_hold(npo_id)).toEqual({
+      settlement_id: `sttl-${npo_id}`,
+      reason: "the default account predates the returned transfer",
+    });
+  });
+
+  test("an account approved beside the old default leaves it held; made default, it lifts the hold and re-sends what is still returned", async () => {
+    await seed_returned("p-1");
+    await seed_returned("p-2");
+    await seed_bapp("old", "default");
+    await db()
+      .update(payouts)
+      .set({ type: "refunded" })
+      .where(eq(payouts.id, "p-1"));
+    await seed_bapp("new", "under-review");
+    await bapp_approve("new", npo_id);
+
+    expect(await npo_return_hold(npo_id)).not.toBeNull();
+
+    await bapp_set_default("new", npo_id);
+
+    expect(await npo_return_hold(npo_id)).toBeNull();
+    expect(await resend_returned(npo_id)).toEqual({
+      status: "resent",
+      ids: ["p-2"],
+    });
+    expect(await rows()).toEqual({
+      "p-1": ["refunded", `sttl-${npo_id}`, SENT],
+      "p-2": ["pending", null, null],
+    });
+  });
+});
+
+describe.each([
+  ["an approval", handle_banking_approved],
+  ["a new default", handle_banking_set_default],
+])("%s, handled off the queue", (_, handle) => {
+  test("re-sends the npo's returned payouts before its admins are emailed, and tells ops", async () => {
+    await seed_returned("p-1");
+    await seed_returned("p-2");
+    await seed_bapp("new", "default", "2026-11-05T00:00:00.000Z");
+
+    await handle({ npo_id });
+
+    expect(sent_mail).toEqual([
+      { "p-1": ["pending", null, null], "p-2": ["pending", null, null] },
+    ]);
+    expect(send_alert).toHaveBeenCalledOnce();
+    const [alert] = send_alert.mock.calls[0]!;
+    expect(alert.title).toBe(`Returned payouts re-sent for npo:${npo_id}`);
+    expect(alert.fields).toContainEqual({
+      name: "payout_ids",
+      value: "p-1, p-2",
+    });
+  });
+
+  test("tells ops when the npo's grants stay held", async () => {
+    await seed_returned("p-1");
+    await seed_bapp("old", "default");
+
+    await handle({ npo_id });
+
+    const [alert] = send_alert.mock.calls[0]!;
+    expect(alert.title).toBe(`Grants still held for npo:${npo_id}`);
+    expect(alert.body).toMatch(/predates the returned transfer/);
+    expect(sent_mail).toHaveLength(1);
+  });
+
+  test("an npo with nothing returned is only emailed", async () => {
+    await seed_bapp("new", "default");
+
+    await handle({ npo_id });
+
+    expect(sent_mail).toHaveLength(1);
+    expect(send_alert).not.toHaveBeenCalled();
   });
 });

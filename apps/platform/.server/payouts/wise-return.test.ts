@@ -16,6 +16,15 @@ const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
 const report_error = vi.hoisted(() => vi.fn());
 const send_alert = vi.hoisted(() => vi.fn());
 const deductions = vi.hoisted(() => ({ on: false }));
+const verify_qstash = vi.hoisted(() => vi.fn());
+const transfer_get = vi.hoisted(() =>
+  vi.fn(
+    async (id: number): Promise<{ id: number; status?: string }> => ({
+      id,
+      status: "funds_refunded",
+    })
+  )
+);
 
 vi.mock("#/errors/report", () => ({ report_error }));
 vi.mock("../env", () => ({
@@ -30,6 +39,8 @@ vi.mock("@/terms", async (io) => ({
   TERMS_RECOVERY_FROM: "2026-01-01",
   TERMS_POSTED: "",
 }));
+vi.mock("../kit/queue", () => ({ verify_qstash }));
+vi.mock("../kit/wise", () => ({ wise: { transfer_get } }));
 vi.mock("../kit/slack", () => ({
   aws_monitor: { send_alert },
   fiat_monitor: { send_alert: vi.fn() },
@@ -48,6 +59,9 @@ vi.mock("../pg/db", () => ({
 }));
 
 const { poll_wise_returns, return_settlement } = await import("./wise-return");
+const { action: cron_action } = await import(
+  "#/routes/api.cron.wise-returns/route"
+);
 const { settle_npo_payouts } = await import("./settle");
 const { dists_for_refund } = await import("../pg/queries/dist");
 const { process_refund } = await import("../refund/process");
@@ -738,6 +752,57 @@ describe("poll_wise_returns", () => {
     expect(await status_of("1002")).toBe("processing");
     expect(report_error).toHaveBeenCalledWith("wise 503", {
       settlement_id: "1001",
+    });
+  });
+
+  describe("the daily cron route", () => {
+    const deliver = async () =>
+      (await cron_action({
+        request: new Request("https://bg.test/api/cron/wise-returns", {
+          method: "POST",
+        }),
+      } as any)) as Response;
+
+    beforeEach(() => {
+      verify_qstash.mockReset();
+      transfer_get.mockClear();
+    });
+
+    test("a verified tick reads each transfer's state from wise", async () => {
+      const npo = await seed_npo(0);
+      await seed_settlement(npo.id, "2449407370");
+
+      const res = await deliver();
+
+      expect(res.status).toBe(200);
+      expect(verify_qstash).toHaveBeenCalledOnce();
+      expect(transfer_get).toHaveBeenCalledWith(2449407370);
+      expect(await status_of("2449407370")).toBe("returned");
+    });
+
+    test("a tick qstash did not sign polls nothing", async () => {
+      const npo = await seed_npo(0);
+      await seed_settlement(npo.id, "1001");
+      verify_qstash.mockRejectedValueOnce(new Response(null, { status: 401 }));
+
+      await expect(deliver()).rejects.toBeInstanceOf(Response);
+      expect(transfer_get).not.toHaveBeenCalled();
+    });
+
+    test("a transfer wise answers without a state is not taken for a change", async () => {
+      const npo = await seed_npo(0);
+      await seed_settlement(npo.id, "1001");
+      transfer_get.mockResolvedValueOnce({ id: 1001 });
+
+      await deliver();
+
+      expect(await status_of("1001")).toBe("");
+      expect(report_error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringMatching(/no status/),
+        }),
+        { settlement_id: "1001" }
+      );
     });
   });
 });

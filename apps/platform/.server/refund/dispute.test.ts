@@ -1344,4 +1344,125 @@ describe("a gift whose grant transfer came back", () => {
     expect(await owed_of(id)).toEqual([]);
     expect(await balance_of(test_db.current!.db, npo_ids[0]!)).toBe(0);
   });
+
+  /** a void payout's cash share was never a grant: the platform takes its
+   * loss, so a dispute of it owes nothing, fees included */
+  test.each(["lost", "won"] as const)(
+    "a dispute on a void payout records nothing owed, open or %s",
+    async (end) => {
+      const { id, npo_ids } = await seed({ ...PAID_GRANT, payout: "void" });
+      const npo_id = npo_ids[0]!;
+
+      await dispute_opened(opened_on(id));
+      const at_open = await books_of(id, npo_id);
+      if (end === "lost") expect((await lose(id)).status).toBe("reversed");
+      else await dispute_won(won_on(id));
+
+      expect(at_open).toEqual({
+        npo: { cash: 0, liq: 0, lock_units: 0 },
+        dist: { status: "settled", refund_status: null },
+        payout: "void",
+        donation: "settled",
+        owed: [],
+      });
+      expect(await books_of(id, npo_id)).toEqual(
+        end === "lost"
+          ? {
+              npo: { cash: 0, liq: 0, lock_units: 0 },
+              dist: { status: "refunded", refund_status: "completed" },
+              payout: "void",
+              donation: "refunded",
+              owed: [],
+            }
+          : at_open
+      );
+    }
+  );
+
+  describe("with half its net in savings", () => {
+    const HALF_SAVED: IDistSeed = {
+      ...PAID_GRANT,
+      payout: "void",
+      savings: 50,
+    };
+
+    test("a full refund takes the savings share back, and nothing of the void cash share", async () => {
+      const { id, npo_ids } = await seed(HALF_SAVED);
+      const npo_id = npo_ids[0]!;
+      expect((await books_of(id, npo_id)).npo).toEqual({
+        cash: 0,
+        liq: 45,
+        lock_units: 0,
+      });
+
+      expect((await refund(id, "refund")).status).toBe("reversed");
+
+      expect(await books_of(id, npo_id)).toEqual({
+        npo: { cash: 0, liq: 0, lock_units: 0 },
+        dist: { status: "refunded", refund_status: "completed" },
+        payout: "void",
+        donation: "refunded",
+        owed: [],
+      });
+    });
+
+    test("a partial refund leaves its books and records nothing owed", async () => {
+      const { id, npo_ids } = await seed(HALF_SAVED);
+
+      expect((await refund(id, "refund", 30)).status).toBe("partial_pending");
+
+      expect(await books_of(id, npo_ids[0]!)).toEqual({
+        npo: { cash: 0, liq: 45, lock_units: 0 },
+        dist: { status: "settled", refund_status: null },
+        payout: "void",
+        donation: "settled",
+        owed: [],
+      });
+    });
+
+    test("a dispute open owes the savings share and its part of the fees; lost, it takes the savings back and leaves the fees owed", async () => {
+      const { id, npo_ids } = await seed(HALF_SAVED);
+      const npo_id = npo_ids[0]!;
+
+      await dispute_opened(opened_on(id));
+      const at_open = await books_of(id, npo_id);
+      expect((await lose(id)).status).toBe("reversed");
+
+      expect(at_open).toMatchObject({
+        npo: { cash: 0, liq: 45, lock_units: 0 },
+        owed: [
+          {
+            received_usd: 45,
+            fee_processing_usd: 1.6,
+            fee_dispute_usd: 7.5,
+            outstanding_usd: 54.1,
+          },
+        ],
+      });
+      expect(await books_of(id, npo_id)).toEqual({
+        npo: { cash: 0, liq: 0, lock_units: 0 },
+        dist: { status: "refunded", refund_status: "completed" },
+        payout: "void",
+        donation: "refunded",
+        owed: [
+          expect.objectContaining({ received_usd: 45, outstanding_usd: 9.1 }),
+        ],
+      });
+    });
+
+    test("a dispute won leaves the savings and owes nothing", async () => {
+      const { id, npo_ids } = await seed(HALF_SAVED);
+      await dispute_opened(opened_on(id));
+
+      await dispute_won(won_on(id));
+
+      expect(await books_of(id, npo_ids[0]!)).toMatchObject({
+        npo: { cash: 0, liq: 45, lock_units: 0 },
+        dist: { status: "settled", refund_status: null },
+        payout: "void",
+        donation: "settled",
+        owed: [expect.objectContaining({ outstanding_usd: 0 })],
+      });
+    });
+  });
 });

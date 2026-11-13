@@ -710,6 +710,33 @@ describe("grants cron execute", () => {
     ).toHaveLength(2);
   });
 
+  test("an npo whose returned payouts were all refunded stays held: its account is still the one that bounced", async () => {
+    const npo_id = await seed_npo({ cash: 200 });
+    await old_account();
+    await seed_returned(npo_id, "p-back", 100);
+    await mark_refunded("p-back");
+    await seed_payout(npo_id, "p-new", 200);
+
+    await index();
+
+    expect(wise_pay_mock).not.toHaveBeenCalled();
+    expect(await payout_types()).toEqual({
+      "p-back": "refunded",
+      "p-new": "pending",
+    });
+    const held = send_alert.mock.calls
+      .map(([a]) => a)
+      .filter((a) => a.title.startsWith("Grants held"));
+    expect(held).toEqual([
+      expect.objectContaining({
+        fields: expect.arrayContaining([
+          { name: "returned", value: "none left" },
+          { name: "pending", value: "200" },
+        ]),
+      }),
+    ]);
+  });
+
   test("a new account made default releases the hold: the next run pays the returned payouts with the new ones", async () => {
     const { bapp_set_default } = await import("$/pg/queries/banking");
     const { resend_returned } = await import("$/payouts/resend-returned");

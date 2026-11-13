@@ -75,6 +75,42 @@ describe("banking application review — account holder", () => {
       .toHaveAttribute("aria-disabled", "false");
   });
 
+  test("with no legal name on file, the holder gets the warning badge and the callout asks to confirm", async () => {
+    const screen = await render_page(
+      data({
+        account_holder: "Dana Whitfield",
+        legal_name: "",
+        holder_match: "no_legal_name",
+      })
+    );
+    // the badge beside the holder, and the same words in the legal-name row
+    const in_rows = screen
+      .getByRole("definition")
+      .getByText("No legal name on file", { exact: true });
+    expect(in_rows.all()).toHaveLength(2);
+    const holder = screen.getByText("Dana Whitfield");
+    await expect.element(holder).toBeVisible();
+    expect(holder.element().contains(in_rows.first().element())).toBe(true);
+    const callout = screen.getByRole("region", {
+      name: "No legal name on file",
+    });
+    await expect.element(callout).toBeVisible();
+    await expect
+      .element(
+        callout.getByText(
+          "We can't check this account's holder against the nonprofit's name. Confirm the account holder with the nonprofit first."
+        )
+      )
+      .toBeVisible();
+    expect(screen.getByText("Doesn't match").query()).toBeNull();
+    expect(
+      screen.getByRole("region", { name: MISMATCH_TITLE }).query()
+    ).toBeNull();
+    await expect
+      .element(screen.getByRole("link", { name: "Approve" }))
+      .toHaveAttribute("aria-disabled", "false");
+  });
+
   test("an unknown holder gets no badge", async () => {
     const screen = await render_page(
       data({ account_holder: null, holder_match: "unknown" })

@@ -61,6 +61,17 @@ describe("holder_match", () => {
     }
   );
 
+  test.each([undefined, "", "  "])(
+    "a holder against no legal name (%s) is no_legal_name, not a mismatch",
+    (legal) => {
+      expect(holder_match("Dana Whitfield", legal)).toBe("no_legal_name");
+    }
+  );
+
+  test("no stored holder stays unknown when there is no legal name either", () => {
+    expect(holder_match(null, undefined)).toBe("unknown");
+  });
+
   test("a holder that is nothing but a suffix matches nothing", () => {
     expect(holder_match("Inc.", "LLC")).toBe("mismatch");
   });

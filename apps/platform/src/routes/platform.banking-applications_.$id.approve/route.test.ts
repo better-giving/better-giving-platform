@@ -14,7 +14,10 @@ const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
 vi.mock("$/pg/queries/banking", () => q);
 vi.mock("$/pg/queries/npo", () => ({ npos_batch_get: async () => [] }));
 vi.mock("$/kit/wise", () => ({ wise }));
-vi.mock("$/payouts/own-accounts", () => own);
+vi.mock("$/payouts/own-accounts", async (io) => ({
+  ...(await io<typeof import("$/payouts/own-accounts")>()),
+  ...own,
+}));
 vi.mock("$/kit/queue", () => ({ enqueue: vi.fn() }));
 vi.mock("#/.server/toast", () => ({ redirectWithSuccess: vi.fn() }));
 vi.mock("#/errors/report", () => ({ report_degraded_null: () => null }));
@@ -194,6 +197,32 @@ describe("the approve submit, posted around the page", () => {
     expect((r as Response).status).toBe(409);
     expect(q.bapp_approve).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["without confirmation is refused", false],
+    ["once the reviewer confirms it is approved", true],
+  ])(
+    "an account of a nonprofit with no legal name on file %s",
+    async (_, confirm_holder) => {
+      q.bapp_get.mockResolvedValue(bapp("under-review", "Dana Whitfield"));
+      q.npo_legal_names.mockResolvedValue(new Map());
+      q.bapp_approve.mockResolvedValue({ status: "under-review" });
+
+      const r: unknown = await submit("approved", { confirm_holder }).catch(
+        (e: unknown) => e
+      );
+
+      if (confirm_holder) {
+        expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7);
+      } else {
+        expect((r as Response).status).toBe(409);
+        expect(await (r as Response).text()).toMatch(
+          /no legal name on file.*Dana Whitfield/
+        );
+        expect(q.bapp_approve).not.toHaveBeenCalled();
+      }
+    }
+  );
 
   it("approves without confirmation when no holder is known at all", async () => {
     q.bapp_get.mockResolvedValue(bapp("under-review", null));

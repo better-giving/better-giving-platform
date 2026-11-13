@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { doc_args } from "#/__tests__/fixtures/route-args";
 
 const npos_batch_get = vi.hoisted(() => vi.fn());
-const stored = vi.hoisted(() => ({ holder: null as string | null }));
+const stored = vi.hoisted(() => ({
+  holder: null as string | null,
+  legal: new Map([[7, "Riverbend Youth Coding Collective Inc."]]),
+}));
 const wise = vi.hoisted(() => ({ v2_account: vi.fn() }));
 const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
 
@@ -15,12 +18,14 @@ vi.mock("$/pg/queries/banking", () => ({
   }),
   bapp_update_status: vi.fn(),
   npo_bapp_count: vi.fn(),
-  npo_legal_names: async () =>
-    new Map([[7, "Riverbend Youth Coding Collective Inc."]]),
+  npo_legal_names: async () => stored.legal,
 }));
 vi.mock("$/pg/queries/npo", () => ({ npos_batch_get }));
 vi.mock("$/kit/wise", () => ({ wise }));
-vi.mock("$/payouts/own-accounts", () => own);
+vi.mock("$/payouts/own-accounts", async (io) => ({
+  ...(await io<typeof import("$/payouts/own-accounts")>()),
+  ...own,
+}));
 vi.mock("$/kit/queue", () => ({ enqueue: vi.fn() }));
 vi.mock("#/.server/toast", () => ({ redirectWithSuccess: vi.fn() }));
 vi.mock("#/errors/report", () => ({
@@ -38,6 +43,7 @@ const call = () =>
 
 beforeEach(() => {
   stored.holder = null;
+  stored.legal = new Map([[7, "Riverbend Youth Coding Collective Inc."]]);
   npos_batch_get.mockReset().mockResolvedValue([]);
   wise.v2_account.mockReset().mockResolvedValue({
     id: 40001,
@@ -56,6 +62,19 @@ describe("banking application detail loader", () => {
       legal_name: "Riverbend Youth Coding Collective Inc.",
       holder_match: "mismatch",
     });
+  });
+
+  it("says when the nonprofit has no legal name on file", async () => {
+    stored.holder = "Dana Whitfield";
+    stored.legal = new Map();
+
+    const data = await call();
+
+    expect(data).toMatchObject({
+      account_holder: "Dana Whitfield",
+      holder_match: "no_legal_name",
+    });
+    expect(data.legal_name).toBeUndefined();
   });
 
   it("falls back to wise's name for the account when none is stored", async () => {

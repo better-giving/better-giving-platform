@@ -1,6 +1,6 @@
+import { PayoutStatus } from "@better-giving/ui";
 import { href, Link } from "react-router";
 import type { IPayout } from "@/payouts";
-import { PayoutStatus } from "./payout-status";
 
 interface IPayoutNote {
   payout: IPayout;

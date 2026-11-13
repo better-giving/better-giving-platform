@@ -15,7 +15,11 @@ import { $int_gte1 } from "@/schemas";
 import type { V2RecipientAccount } from "@/wise";
 import { enqueue } from "$/kit/queue";
 import { wise } from "$/kit/wise";
-import { is_own_recipient } from "$/payouts/own-accounts";
+import {
+  is_own_recipient,
+  OWN_ACCOUNT_REFUSAL,
+  OWN_LOOKUP_REFUSAL,
+} from "$/payouts/own-accounts";
 import {
   bapp_approve,
   bapp_get,
@@ -42,9 +46,6 @@ export type LoaderData = Partial<V2RecipientAccount> & {
    * that couldn't be checked, which the approve action refuses on */
   own_account: boolean;
 };
-
-const OWN_ACCOUNT_REFUSAL =
-  "This bank account belongs to Better Giving, so it can't receive the nonprofit's payouts.";
 
 export const loader = async ({ params }: LoaderFunctionArgs) => {
   const p = safeParse($int_gte1, params.id);
@@ -79,7 +80,7 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
     npo_name: npo?.name,
     account_holder,
     legal_name,
-    holder_match: holder_match(account_holder, legal_name ?? ""),
+    holder_match: holder_match(account_holder, legal_name),
     own_account,
   } satisfies LoaderData;
 };
@@ -107,19 +108,21 @@ export const action: ActionFunction = async ({ params, request }) => {
     }
     // fail closed: a payout to our own balance is the money never reaching the npo
     const own = await is_own_recipient(wacc).catch(report_degraded_null);
-    if (own === null) {
-      throw resp.refuse(
-        "We couldn't check this bank account against Better Giving's own accounts. Try again in a few minutes.",
-        409
-      );
-    }
+    if (own === null) throw resp.refuse(OWN_LOOKUP_REFUSAL, 409);
     if (own) throw resp.refuse(OWN_ACCOUNT_REFUSAL, 409);
 
     const holder = x.account_holder ?? wacc.name?.fullName ?? null;
-    const legal = (await npo_legal_names([x.npo_id])).get(x.npo_id) ?? "";
-    if (holder_match(holder, legal) === "mismatch" && !fv.data.confirm_holder) {
+    const legal = (await npo_legal_names([x.npo_id])).get(x.npo_id);
+    const matched = holder_match(holder, legal);
+    if (matched === "mismatch" && !fv.data.confirm_holder) {
       throw resp.refuse(
         `The account holder, ${holder}, doesn't match the nonprofit's legal name, ${legal}. Confirm the account holder to approve this account.`,
+        409
+      );
+    }
+    if (matched === "no_legal_name" && !fv.data.confirm_holder) {
+      throw resp.refuse(
+        `The nonprofit has no legal name on file to check the account holder, ${holder}, against. Confirm the account holder to approve this account.`,
         409
       );
     }

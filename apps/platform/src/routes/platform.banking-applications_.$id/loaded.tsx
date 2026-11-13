@@ -58,6 +58,12 @@ export function Loaded(props: LoaderData) {
           the nonprofit first.
         </WarningCallout>
       )}
+      {props.holder_match === "no_legal_name" && (
+        <WarningCallout title="No legal name on file">
+          We can't check this account's holder against the nonprofit's name.
+          Confirm the account holder with the nonprofit first.
+        </WarningCallout>
+      )}
 
       <dl className="grid sm:grid-cols-[auto_auto_1fr] bg-card rounded-card border border-hairline">
         {/* the wise half of the record; the rows below it are our own and
@@ -72,8 +78,17 @@ export function Loaded(props: LoaderData) {
               {props.holder_match === "mismatch" && (
                 <Badge tone="warning">Doesn't match</Badge>
               )}
+              {props.holder_match === "no_legal_name" && (
+                <Badge tone="warning">No legal name on file</Badge>
+              )}
             </Row>
-            <Row label="Nonprofit legal name">{props.legal_name}</Row>
+            <Row label="Nonprofit legal name">
+              {props.holder_match === "no_legal_name" ? (
+                <span className="text-gray-11">No legal name on file</span>
+              ) : (
+                props.legal_name
+              )}
+            </Row>
             <Row label="Currency">{props.currency}</Row>
             <Row label="Country">{props.country}</Row>
             <Row label="Account type">{props.type}</Row>

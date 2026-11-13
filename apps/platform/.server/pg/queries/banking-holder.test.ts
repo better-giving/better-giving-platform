@@ -8,6 +8,7 @@ import {
   test,
   vi,
 } from "vitest";
+import { doc_args } from "#/__tests__/fixtures/route-args";
 import { banking_apps } from "../schema/banking";
 import { npos } from "../schema/npo";
 import { registrations } from "../schema/registration";
@@ -24,6 +25,9 @@ vi.mock("../db", () => ({
 
 const { bapp_set_holder, bapps_missing_holder, npo_legal_names } = await import(
   "./banking"
+);
+const { loader: list_loader } = await import(
+  "#/routes/platform.banking-applications/api"
 );
 
 beforeAll(async () => {
@@ -98,6 +102,46 @@ describe("npo_legal_names", () => {
         [blank, "Acme Relief"],
       ])
     );
+  });
+
+  test("a nonprofit with neither a registered name nor a name has none", async () => {
+    const id = await insert_npo("EIN-6", "  ");
+
+    expect(await npo_legal_names([id])).toEqual(new Map());
+  });
+});
+
+describe("banking applications list loader", () => {
+  test("carries each row's holder and whether it matches the nonprofit's legal name", async () => {
+    const pantry = await insert_npo("EIN-7", "Harbor Light Food Pantry");
+    const nameless = await insert_npo("EIN-8", "");
+    await db()
+      .insert(banking_apps)
+      .values([
+        {
+          id: "1",
+          npo_id: pantry,
+          account_holder: "Harbor Light Food Pantry Inc.",
+        },
+        { id: "2", npo_id: pantry, account_holder: "Dana Whitfield" },
+        { id: "3", npo_id: pantry },
+        { id: "4", npo_id: nameless, account_holder: "Dana Whitfield" },
+      ]);
+
+    const page = await (list_loader as any)(
+      doc_args(new Request("http://x/platform/banking-applications"))
+    );
+
+    expect(
+      page.items
+        .map((r: any) => [r.id, r.account_holder, r.holder_match])
+        .sort()
+    ).toEqual([
+      ["1", "Harbor Light Food Pantry Inc.", "match"],
+      ["2", "Dana Whitfield", "mismatch"],
+      ["3", null, "unknown"],
+      ["4", "Dana Whitfield", "no_legal_name"],
+    ]);
   });
 });
 

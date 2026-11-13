@@ -269,6 +269,32 @@ describe("commissions cron", () => {
     });
   });
 
+  test("a payout wise prices off the total is refused before any transfer: back to pending, nothing paid, ops told", async () => {
+    await seed("d-1", 60);
+    wise.quote.mockImplementationOnce(async (_, q) => ({
+      id: "q-off",
+      sourceAmount: q.sourceAmount + 1,
+      sourceCurrency: "USD",
+      payOut: "BANK_TRANSFER",
+      paymentOptions: [],
+    }));
+
+    await index();
+
+    expect(wise.transfer).not.toHaveBeenCalled();
+    expect(await statuses()).toEqual({ "d-1": "pending" });
+    // only the failure row: nothing recorded as paid
+    expect(
+      (await db().select().from(referrer_payouts)).map((p) => p.error)
+    ).toEqual(["Failed to process commission"]);
+    const refused = send_alert.mock.calls
+      .map(([a]) => a)
+      .find((a) => a.title === `commission payout refused for ${REFERRER}`);
+    expect(refused?.fields).toEqual(
+      expect.arrayContaining([{ name: "recipient", value: "42" }])
+    );
+  });
+
   test("a retry over a grown set after an unknown funding outcome pays only the new commission", async () => {
     await seed("d-1", 25);
     await seed("d-2", 30);
