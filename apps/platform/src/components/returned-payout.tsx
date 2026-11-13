@@ -19,14 +19,13 @@ const NAMES = {
 
 interface IStatusTip {
   kind: keyof typeof TIPS;
-  classes?: string;
 }
 
 /** the (!) beside a status that needs explaining: opens on hover, focus and tap */
-function StatusTip({ kind, classes = "" }: IStatusTip) {
+function StatusTip({ kind }: IStatusTip) {
   return (
     <Tooltip tip={<Content className="text-sm max-w-xs">{TIPS[kind]}</Content>}>
-      <span className={`inline-flex ${classes}`}>
+      <span className="inline-flex">
         <CircleAlertIcon className="text-gray-11 icon-sm" />
         <span className="sr-only">{NAMES[kind]}</span>
       </span>
@@ -61,7 +60,10 @@ export function ReturnedGrant({ amount }: IReturnedGrant) {
     <div className="flex items-baseline gap-3 flex-wrap">
       <span className="line-through text-gray-11">{amount}</span>
       <PayoutStatus type="returned" />
-      <StatusTip kind="grant" classes="self-center -ml-1.5" />
+      {/* the tooltip's own button is the flex item, so the offsets sit on this span */}
+      <span className="inline-flex self-center -ml-1.5">
+        <StatusTip kind="grant" />
+      </span>
     </div>
   );
 }
