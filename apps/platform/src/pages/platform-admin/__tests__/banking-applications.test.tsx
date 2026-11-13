@@ -11,6 +11,7 @@ import {
 } from "vitest";
 import { cleanup, render } from "vitest-browser-react";
 import { doc_args } from "#/__tests__/fixtures/route-args";
+import { ErrorModal } from "#/components/error";
 import { get_qstash_events } from "#/setup-tests-browser";
 import { banking_apps } from "$/pg/schema/banking";
 import { npos } from "$/pg/schema/npo";
@@ -395,6 +396,7 @@ describe("approve flow", () => {
           {
             path: "approve",
             Component: ApprovePage,
+            ErrorBoundary: ErrorModal,
             loader: () => ({
               account_holder: "Jane Doe",
               legal_name: "Jane Doe",
@@ -414,6 +416,35 @@ describe("approve flow", () => {
       <Stub initialEntries={[`/platform/banking-applications/${bapp_id}`]} />
     );
   }
+
+  // first in the block: a successful own-account lookup is held for an hour
+  // per module, so a later failure would never reach the wise call
+  it("shows the refusal in the dialog when our own accounts can't be checked", async () => {
+    const npo = await seed_npo();
+    const bapp_id = await seed_bapp(npo.id);
+    const row = await get_bapp(bapp_id);
+    vi.mocked(wise.account_details).mockRejectedValueOnce(
+      new Error("wise is down")
+    );
+
+    const screen = await render_with_approve(bapp_id, row);
+
+    await screen.getByRole("link", { name: /approve/i }).click();
+    await expect
+      .element(screen.getByText(/you are about to approve/i))
+      .toBeVisible();
+    (
+      screen.getByRole("button", { name: /submit/i }).element() as HTMLElement
+    ).click();
+
+    await expect
+      .element(screen.getByText(/couldn't check this bank account/i))
+      .toBeVisible();
+    expect(
+      screen.getByText("Unexpected Application Error!").query()
+    ).toBeNull();
+    expect((await get_bapp(bapp_id)).status).toBe("under-review");
+  });
 
   it("approves bapp — status becomes approved when npo already has a default", async () => {
     const npo = await seed_npo();

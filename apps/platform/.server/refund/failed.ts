@@ -172,10 +172,7 @@ async function credit_failed(
       )
     );
     const by_hand = ds.flatMap((d) => {
-      const hands = [
-        taken_by_hand(d, owing.has(d.to_id)),
-        cut_short(d, after),
-      ];
+      const hands = [taken_by_hand(d, owing.has(d.to_id)), cut_short(d, after)];
       return hands.flatMap((hand) =>
         hand ? [`dist ${d.id} to ${dist_npo(d)}: ${hand}`] : []
       );

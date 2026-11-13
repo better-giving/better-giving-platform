@@ -33,9 +33,13 @@ export function ErrorModal() {
 
   let message = GENERIC_ERROR_MESSAGE;
   if (isRouteErrorResponse(error)) {
+    // a refusal (`resp.refuse`) carries its words in the body, not the status text
+    const refusal =
+      error.status < 500 && typeof error.data === "string" ? error.data : "";
     message =
-      STATUS_MESSAGES[error.status] ??
-      error.statusText ??
+      STATUS_MESSAGES[error.status] ||
+      error.statusText ||
+      refusal ||
       GENERIC_ERROR_MESSAGE;
   }
 
