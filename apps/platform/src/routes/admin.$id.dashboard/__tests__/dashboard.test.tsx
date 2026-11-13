@@ -929,3 +929,97 @@ describe("dashboard — returned payout notice", () => {
     expect(screen.getByText("Your bank sent a payout back").query()).toBeNull();
   });
 });
+
+describe("dashboard — payout strip during a return hold", () => {
+  const RETURNED_AT = "2026-11-09T15:00:00.000Z";
+  const seed_returned = async (npo_id: number) => {
+    await test_db.current!.db.insert(settlements).values({
+      id: `set-${npo_id}`,
+      npo_id,
+      date: RETURNED_AT,
+      amount: 250,
+      status: "returned",
+    });
+    await test_db.current!.db.insert(payouts).values({
+      id: `p-${npo_id}`,
+      source_id: `don-${npo_id}`,
+      npo_id,
+      source: "donation",
+      type: "returned",
+      amount: 250,
+      date: RETURNED_AT,
+    });
+  };
+  // the default account predates the returned transfer, so payouts stay held
+  const file_old_bank = (npo_id: number) =>
+    test_db.current!.db.insert(banking_apps).values({
+      id: `bank-${npo_id}`,
+      npo_id,
+      status: "default",
+      bank_summary: "Chase ••1234",
+      date_created: "2026-11-01T15:00:00.000Z",
+      updated_at: "2026-11-01T15:00:00.000Z",
+    });
+  const hold_sentence = (
+    screen: Awaited<ReturnType<typeof render_dashboard>>
+  ) => screen.getByText(/Payouts are on hold until your/);
+
+  it("with a bank, shows the hold sentence and drops the Total / will-be-paid-out strip", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await seed_returned(npo.id);
+    await file_old_bank(npo.id);
+
+    const screen = await render_dashboard(npo.id);
+
+    await expect.element(hold_sentence(screen)).toBeVisible();
+    await expect
+      .element(screen.getByRole("link", { name: "new bank details" }))
+      .toHaveAttribute("href", `/admin/${npo.id}/banking`);
+    await expect
+      .element(
+        screen.getByText(
+          "are approved. Donations wait in your Better Giving balance. Nothing is lost."
+        )
+      )
+      .toBeVisible();
+    expect(screen.getByText("Total", { exact: true }).query()).toBeNull();
+    expect(screen.getByText(/will be paid out/).query()).toBeNull();
+  });
+
+  it("without a hold, the payout strip renders as before", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await file_old_bank(npo.id);
+    await test_db.current!.db.insert(payouts).values({
+      id: "p-ok",
+      source_id: "don-ok",
+      npo_id: npo.id,
+      source: "donation",
+      type: "settled",
+      amount: 250,
+      date: RETURNED_AT,
+    });
+
+    const screen = await render_dashboard(npo.id);
+
+    await expect
+      .element(screen.getByText("Total", { exact: true }))
+      .toBeVisible();
+    await expect.element(screen.getByText(/will be paid out/)).toBeVisible();
+    expect(hold_sentence(screen).query()).toBeNull();
+  });
+
+  it("held with no bank keeps the no-bank copy, not the hold sentence", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await seed_returned(npo.id);
+
+    const screen = await render_dashboard(npo.id);
+
+    await expect
+      .element(screen.getByText(/You have no way to get paid right now\./))
+      .toBeVisible();
+    expect(hold_sentence(screen).query()).toBeNull();
+  });
+});

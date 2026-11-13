@@ -159,16 +159,19 @@ export function Loaded({ classes = "", ...props }: Props) {
 
           {/* no bank: what is held is news before any payout exists */}
           {(props.recent_payouts.items.length > 0 ||
-            props.payout_to.kind !== "bank") && (
-            <Payout
-              next_payout={props.next_payout}
-              bal_cash={props.bal_cash}
-              threshold={payout_min}
-              to={props.payout_to}
-              bank_pending={props.bank_pending}
-              classes=""
-            />
-          )}
+            props.payout_to.kind !== "bank") &&
+            (props.return_hold && props.payout_to.kind === "bank" ? (
+              <ReturnHold />
+            ) : (
+              <Payout
+                next_payout={props.next_payout}
+                bal_cash={props.bal_cash}
+                threshold={payout_min}
+                to={props.payout_to}
+                bank_pending={props.bank_pending}
+                classes=""
+              />
+            ))}
         </section>
 
         <section className="card">
@@ -213,5 +216,18 @@ function ReturnedNotice({ returned, classes = "" }: IReturnedNotice) {
         ? `${total} from ${format(returned.latest_date, "MMM d")} didn't reach your bank account, so it's back in your balance. Update your bank details, and it goes out again once the new ones are approved.`
         : `${returned.count} payouts (${total}) didn't reach your bank account, so they're back in your balance. Update your bank details, and they go out again once the new ones are approved.`}
     </WarningCallout>
+  );
+}
+
+function ReturnHold() {
+  return (
+    <p className="text-sm">
+      Payouts are on hold until your{" "}
+      <Link to="../banking" className="link font-medium">
+        new bank details
+      </Link>{" "}
+      are approved. Donations wait in your Better Giving balance. Nothing is
+      lost.
+    </p>
   );
 }
