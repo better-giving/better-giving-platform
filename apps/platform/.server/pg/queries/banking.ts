@@ -276,8 +276,8 @@ export async function bapp_set_default(
  * says so, demoting the default it has. under the row lock
  * `bapp_set_default` takes, so of two approvals at once only the first sees
  * no default. only an `under-review` row moves: a verdict that committed after
- * the caller's read stands. returns the row's id and status as they were —
- * anything but `under-review` means nothing changed — undefined when `id` is
+ * the caller's read stands. returns the row's id and status as they were
+ * (anything but `under-review` means nothing changed), undefined when `id` is
  * not the npo's
  */
 export async function bapp_approve(

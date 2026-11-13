@@ -17,13 +17,13 @@ const CANCELLABLE = new Set([
 
 /** closes the stripe payment behind each donation so none of them can collect
  * money any more. returns the ids it closed, or `null` when any payment can't
- * be shown closed — the caller then keeps the campaign, because money may
+ * be shown closed; the caller then keeps the campaign, because money may
  * still land on it. what counts as closed is a PaymentIntent found by its
  * `order_id` and cancelled (or already canceled). refused, never inferred
  * closed: a recurring gift (its setup intent can start a subscription later),
  * an intent that is processing, succeeded or awaiting capture, a cancel stripe
- * refused, and a row with no intent found — the search lags, and a checkout
- * session's payment isn't found by it at all. */
+ * refused, and a row with no intent found (the search lags, and a checkout
+ * session's payment isn't found by it at all). */
 export async function close_stripe_payments(
   rows: IOpenPayment[]
 ): Promise<string[] | null> {

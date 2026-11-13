@@ -55,7 +55,7 @@ export const change_identity = async (
   if (reg.r_id !== user.email && user.role !== "admin") {
     throw resp.status(401);
   }
-  // in review and approved are closed to the applicant — the identity a
+  // in review and approved are closed to the applicant: the identity a
   // reviewer is reading must not move under them. a rejected one is open: the
   // rejection asks for it to be put right and resubmitted.
   if (!reg.status || !EDITABLE.includes(reg.status)) return closed(reg);
@@ -131,7 +131,7 @@ export const change_identity = async (
    * a 501(c)(3) sitting at banking that becomes international lands back on
    * the agreement on its own, and one that goes the other way skips it. */
   // the guarded write's bare `.returning()` hands back the whole row, so
-  // nothing is missing for `.step` — the cast is only IReg's optionals against
+  // nothing is missing for `.step`; the cast is only IReg's optionals against
   // the columns' nulls, the same mismatch `reg_get` casts through.
   const step = new Progress(
     updated.row as unknown as IReg,

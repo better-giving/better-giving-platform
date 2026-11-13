@@ -107,7 +107,7 @@ describe("banking application verdict prompt", () => {
     await expect.element(submit).toHaveAttribute("aria-disabled", "true");
 
     const box = screen.getByRole("checkbox", {
-      name: "I've confirmed with the nonprofit that its payouts should go to Dana Whitfield's account.",
+      name: "I've confirmed with the nonprofit that its payouts should go to the account held by Dana Whitfield.",
     });
     press(box.element());
     await expect.element(box).toBeChecked();
@@ -137,7 +137,7 @@ describe("banking application verdict prompt", () => {
     await expect.element(submit).toHaveAttribute("aria-disabled", "true");
 
     const box = screen.getByRole("checkbox", {
-      name: "I've confirmed with the nonprofit that its payouts should go to Dana Whitfield's account.",
+      name: "I've confirmed with the nonprofit that its payouts should go to the account held by Dana Whitfield.",
     });
     press(box.element());
     await expect.element(submit).toHaveAttribute("aria-disabled", "false");

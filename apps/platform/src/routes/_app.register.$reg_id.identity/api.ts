@@ -31,7 +31,7 @@ export const loader = async ({ params, request, url }: Route.LoaderArgs) => {
     const to = `../../${routes.success}?name=${reg.o_name}&id=${reg.status_approved_npo_id}`;
     return redirect(to);
   }
-  // in review — the wizard is read-only, and so is the identity. a rejected
+  // in review: the wizard is read-only, and so is the identity. a rejected
   // one stays open, as every other step does for its resubmit.
   if (!reg.status || !EDITABLE.includes(reg.status)) {
     return redirect(`../${steps.summary}`);

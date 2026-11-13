@@ -139,8 +139,8 @@ function Content({ verdict, confirm_holder }: Props) {
             onChange={(e) => set_confirmed(e.target.checked)}
             classes={{ input: "self-start mt-0.5", label: "text-sm" }}
           >
-            I've confirmed with the nonprofit that its payouts should go to{" "}
-            {confirm_holder.holder}'s account.
+            I've confirmed with the nonprofit that its payouts should go to the
+            account held by {confirm_holder.holder}.
           </CheckField>
         </div>
       )}

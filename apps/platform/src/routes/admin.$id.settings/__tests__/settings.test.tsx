@@ -587,7 +587,7 @@ describe("donation form tab — add increment", () => {
       await page.elementLocator(plus_btn).click();
     });
 
-    // fill value + label — the amount is named "Increment 1 amount"
+    // fill value + label: the amount is named "Increment 1 amount"
     await vi.waitFor(async () => {
       const panel = screen.getByRole("tabpanel").element();
       await screen.getByLabelText(/increment 1 amount/i).fill("100");

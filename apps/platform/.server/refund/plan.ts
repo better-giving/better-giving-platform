@@ -136,9 +136,8 @@ export interface RefundPlan {
   /** what each party owes in usd, as the plan sees it. the npo's — on the loss
    * path — is its settled net less the cash share a cancelled payout recovers
    * or a void one never paid, plus the processing fee; bg's own fees are
-   * forgone, not owed. the
-   * referrer's is a commission paid or claimed for a transfer, which apply
-   * re-reads under its lock */
+   * forgone, not owed. the referrer's is a commission paid or claimed for a
+   * transfer, which apply re-reads under its lock */
   amount: { party: OwedParty; usd: number }[];
   effects: RefundEffect[];
   preview: RefundPreview;
@@ -424,8 +423,8 @@ export function calc_refund_plan(
       lock_units: refund_lock_units,
       cash: bd.cash,
     };
-    // all zero — nothing credited, a total cut, a void payout's cash share
-    // alone — sets no column, which drizzle refuses
+    // all zero (nothing credited, a total cut, a void payout's cash share
+    // alone) sets no column, which drizzle refuses
     if (refund_deltas.liq || refund_deltas.lock_units || refund_deltas.cash) {
       effects.push({
         kind: "balance_update",

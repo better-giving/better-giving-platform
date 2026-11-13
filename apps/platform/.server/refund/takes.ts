@@ -173,10 +173,9 @@ export async function legacy_routed_npos(
 /**
  * each npo's part of the gift's active dispute fees, split over its dists by
  * settled amount less a void payout's cash share (`owable_part`), recorded
- * on its row once the gift is reversed: the
- * reversal records what the dists received and their card fees only, and a
- * dispute whose open never ran recorded no fee. a fee its open recorded
- * already changes nothing
+ * on its row once the gift is reversed: the reversal records what the dists
+ * received and their card fees only, and a dispute whose open never ran
+ * recorded no fee. a fee its open recorded already changes nothing
  */
 export async function record_dispute_fees(
   tx: DbOrTx,
