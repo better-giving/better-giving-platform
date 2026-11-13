@@ -67,8 +67,10 @@ import {
   recover_owed,
 } from "../pg/queries/owed";
 import { create_test_db } from "../pg/test-utils/pglite";
+import { apply_refund_plan } from "./apply";
 import { dispute_opened, dispute_won } from "./dispute";
 import { refund_failed } from "./failed";
+import type { RefundPlan } from "./plan";
 import { reverse_charge } from "./reverse";
 
 // --- setup ---
@@ -1481,6 +1483,47 @@ describe("a gift whose grant transfer came back", () => {
         ],
       });
       expect(await losses_of(id)).toEqual([]);
+    });
+
+    test("a plan's void loss applied twice is booked once", async () => {
+      const { id, npo_ids } = await seed(HALF_SAVED);
+      const dist_id = `dist-${id}-0`;
+      const plan: RefundPlan = {
+        is_loss: true,
+        loss_reasons: [],
+        amount: [],
+        effects: [
+          {
+            kind: "loss_log",
+            loss: {
+              id: `void:${dist_id}`,
+              date: new Date().toISOString(),
+              donation_id: id,
+              dist_id,
+              npo_id: npo_ids[0]!,
+              referrer_user: null,
+              referrer_npo: null,
+              type: "payout",
+              amount: 50,
+              npo_amount: 45,
+              fees_bg: 3.4,
+              fees_processing: 1.6,
+              reason: "payout is void",
+              actor: null,
+            },
+          },
+        ],
+        preview: { effects: [], blockers: [], warnings: [] },
+      };
+      const db = test_db.current!.db as unknown as DbOrTx;
+      const src = { source: "refund", source_ref: "re_1" } as const;
+
+      await apply_refund_plan(db, plan, src);
+      await apply_refund_plan(db, plan, src);
+
+      expect(await losses_of(id)).toEqual([
+        expect.objectContaining({ id: `void:${dist_id}`, amount: 50 }),
+      ]);
     });
 
     test("a partial refund leaves its books and records nothing owed", async () => {
