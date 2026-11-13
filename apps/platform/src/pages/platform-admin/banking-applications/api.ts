@@ -20,9 +20,11 @@ import {
   OWN_ACCOUNT_REFUSAL,
   OWN_LOOKUP_REFUSAL,
 } from "$/payouts/own-accounts";
+import { npo_return_hold } from "$/payouts/resend-returned";
 import {
   bapp_approve,
   bapp_get,
+  bapp_set_default,
   bapp_update_status,
   npo_legal_names,
 } from "$/pg/queries/banking";
@@ -131,6 +133,11 @@ export const action: ActionFunction = async ({ params, request }) => {
     // a verdict that landed after the read above stands, and nothing applied
     if (prev?.status !== "under-review") {
       throw resp.status(409, "This application is no longer under review.");
+    }
+    // a held npo's old default is the account that bounced: the replacement
+    // has to be the one the grants run pays, or `banking-approved` releases nothing
+    if (await npo_return_hold(x.npo_id)) {
+      await bapp_set_default(bank_id.toString(), x.npo_id);
     }
     await enqueue(msg("banking-approved", { npo_id: x.npo_id }));
   } else {

@@ -31,7 +31,7 @@ export interface ICancelledStatus {
   type: "cancelled";
 }
 
-/** the bank sent the wise transfer back: the money is in the npo's balance, and goes out again once its next bank account is approved */
+/** the bank sent the wise transfer back: the money is in the npo's balance, and goes out again once a newer approved account is the one the grants run pays (`npo_return_hold`) */
 export interface IReturnedStatus {
   type: "returned";
 }

@@ -4,12 +4,15 @@ import { doc_args } from "#/__tests__/fixtures/route-args";
 const q = vi.hoisted(() => ({
   bapp_approve: vi.fn(),
   bapp_get: vi.fn(),
+  bapp_set_default: vi.fn(),
   bapp_update_status: vi.fn(),
   npo_default_bapp: vi.fn(),
   npo_legal_names: vi.fn(),
 }));
 const wise = vi.hoisted(() => ({ v2_account: vi.fn() }));
 const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
+const hold = vi.hoisted(() => ({ npo_return_hold: vi.fn() }));
+const queue = vi.hoisted(() => ({ enqueue: vi.fn() }));
 
 vi.mock("$/pg/queries/banking", () => q);
 vi.mock("$/pg/queries/npo", () => ({ npos_batch_get: async () => [] }));
@@ -18,15 +21,26 @@ vi.mock("$/payouts/own-accounts", async (io) => ({
   ...(await io<typeof import("$/payouts/own-accounts")>()),
   ...own,
 }));
-vi.mock("$/kit/queue", () => ({ enqueue: vi.fn() }));
+vi.mock("$/payouts/resend-returned", () => hold);
+vi.mock("$/kit/queue", () => queue);
 vi.mock("#/.server/toast", () => ({ redirectWithSuccess: vi.fn() }));
 vi.mock("#/errors/report", () => ({ report_degraded_null: () => null }));
+/** `real` sends the request through remix-hook-form's own parse */
 const form = vi.hoisted(() => ({
   data: { type: "approved" } as Record<string, unknown>,
+  real: false,
 }));
-vi.mock("remix-hook-form", () => ({
-  getValidatedFormData: async () => ({ data: form.data }),
-}));
+vi.mock("remix-hook-form", async (io) => {
+  const actual = await io<typeof import("remix-hook-form")>();
+  return {
+    getValidatedFormData: (
+      ...a: Parameters<typeof actual.getValidatedFormData>
+    ) =>
+      form.real
+        ? actual.getValidatedFormData(...a)
+        : Promise.resolve({ data: form.data }),
+  };
+});
 
 import { action, loader } from "./route";
 
@@ -71,6 +85,9 @@ beforeEach(() => {
   });
   q.npo_legal_names.mockResolvedValue(new Map([[7, LEGAL]]));
   own.is_own_recipient.mockReset().mockResolvedValue(false);
+  hold.npo_return_hold.mockReset().mockResolvedValue(null);
+  queue.enqueue.mockReset();
+  form.real = false;
 });
 
 describe("the approve prompt opened by URL", () => {
@@ -230,6 +247,56 @@ describe("the approve submit, posted around the page", () => {
     q.bapp_approve.mockResolvedValue({ status: "under-review" });
 
     await submit("approved");
+
+    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7);
+  });
+});
+
+describe("approving a replacement account", () => {
+  beforeEach(() => {
+    q.bapp_get.mockResolvedValue(bapp("under-review"));
+    q.bapp_approve.mockResolvedValue({ status: "under-review" });
+  });
+
+  it("makes it the default when the npo's grants are held on a returned transfer", async () => {
+    hold.npo_return_hold.mockResolvedValue({
+      settlement_id: "s1",
+      reason: "the default account predates the returned transfer",
+    });
+    q.bapp_set_default.mockResolvedValue(true);
+
+    await submit("approved");
+
+    expect(q.bapp_set_default).toHaveBeenCalledWith(String(BAPP_ID), 7);
+    // promoted before the release runs, so it sees the new default
+    expect(q.bapp_set_default.mock.invocationCallOrder[0]).toBeLessThan(
+      queue.enqueue.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("leaves the existing default alone when the npo isn't held", async () => {
+    await submit("approved");
+
+    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7);
+    expect(q.bapp_set_default).not.toHaveBeenCalled();
+    expect(queue.enqueue).toHaveBeenCalled();
+  });
+});
+
+describe("the posted confirmation, through the real form parse", () => {
+  it("reads confirm_holder=true from the prompt as the reviewer's confirmation", async () => {
+    form.real = true;
+    q.bapp_get.mockResolvedValue(bapp("under-review", "Dana Whitfield"));
+    q.bapp_approve.mockResolvedValue({ status: "under-review" });
+    const body = new FormData();
+    body.set("type", "approved");
+    body.set("confirm_holder", "true");
+    const request = new Request(`http://x${DETAIL}/approve`, {
+      method: "POST",
+      body,
+    });
+
+    await (action as any)({ request, params: { id: String(BAPP_ID) } });
 
     expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7);
   });
