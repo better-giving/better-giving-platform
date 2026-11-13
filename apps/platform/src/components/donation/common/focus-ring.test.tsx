@@ -1,6 +1,8 @@
+import type { CSSProperties } from "react";
 import { describe, expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { ContinueBtn } from "./continue-btn";
 import { CpfToggle } from "./cpf-toggle";
 import { Frequency } from "./frequency";
 import { TipField } from "./tip-field";
@@ -87,5 +89,33 @@ describe("donation form controls under keyboard focus", () => {
     expect(switch_ring).toEqual(radio_ring);
     expect(fee_ring).toEqual(radio_ring);
     expect(freq_ring).toEqual(radio_ring);
+  });
+
+  test("the donate button rings in the org's colour, as the fields around it do", async () => {
+    const org = "rgb(200, 0, 100)";
+    const screen = await render(
+      <div
+        id="donation-container"
+        style={{ "--form-primary": org } as CSSProperties}
+      >
+        <input aria-label="Amount" className="outline-ring" />
+        <ContinueBtn />
+      </div>
+    );
+
+    await userEvent.tab();
+    const field = screen.getByLabelText("Amount").element();
+    await expect.element(screen.getByLabelText("Amount")).toHaveFocus();
+
+    await userEvent.tab();
+    const button = screen.getByRole("button", { name: "Continue" });
+    await expect.element(button).toHaveFocus();
+    expect(ring(button.element())).toMatchObject({
+      style: "solid",
+      color: org,
+    });
+    expect(ring(button.element()).color).toBe(
+      getComputedStyle(field).outlineColor
+    );
   });
 });

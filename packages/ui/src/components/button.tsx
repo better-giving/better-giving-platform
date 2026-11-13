@@ -13,6 +13,7 @@ type Variant =
   | "ghost"
   | "outline"
   | "destructive"
+  | "destructive-outline"
   | "success"
   | "warning";
 
@@ -26,6 +27,7 @@ const variant_class: Record<Variant, string> = {
   ghost: "btn-ghost",
   outline: "btn-outline",
   destructive: "btn-destructive",
+  "destructive-outline": "btn-destructive-outline",
   success: "btn-success",
   warning: "btn-warning",
 };

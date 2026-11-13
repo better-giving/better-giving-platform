@@ -166,8 +166,8 @@ describe("the link recipe", () => {
       (m) => `${m[1]}: ${m[2]}`
     );
     expect(decls).toEqual([
-      "color: var(--primary)",
-      "color: var(--primary-hover)",
+      "color: var(--link)",
+      "color: var(--link-hover)",
       "outline: 2px solid var(--ring)",
       "outline-offset: 2px",
     ]);
@@ -178,10 +178,42 @@ describe("the link recipe", () => {
   });
 
   test("both rungs are the ramp's own tokens", () => {
-    // step 9 at rest, step 10 hovered — the state ladder's filled row. a
-    // color-mix or an alpha of --primary here would be a value nobody
-    // generated and nobody re-measures when the ramp moves.
+    // --link and --link-hover are step aliases the theme generator picks per
+    // appearance (accent 11/12, rest and hover, in light and in dark). a
+    // color-mix or an alpha here would be a value nobody generated and nobody
+    // re-measures when the ramp moves.
     expect(recipe).not.toMatch(/color-mix|oklch\(|#[0-9a-f]{3}/i);
+  });
+
+  test("the theme sets --link on accent-11 and --link-hover on accent-12, in light and in dark", () => {
+    // the recipe reads var(--link): an undefined one paints nothing and
+    // inherits, with no error anywhere. the rungs are radix's text steps, 11
+    // at rest and 12 hovered, in both appearances. literals here, since
+    // reading them back out of the theme would only compare it to itself.
+    const theme =
+      sources.find(
+        (x) => x.file === "packages/ui/src/styles/themes/default.css"
+      )?.text ?? "";
+    const appearance = (scheme: "light" | "dark") => {
+      const at = theme.indexOf(`color-scheme: ${scheme};`);
+      const next = theme.indexOf("color-scheme:", at + 1);
+      return at < 0 ? "" : theme.slice(at, next < 0 ? undefined : next);
+    };
+    const rung = (block: string, name: string) =>
+      [...block.matchAll(new RegExp(`^\\s*--${name}:\\s*([^;]+);`, "gm"))].map(
+        (m) => m[1]
+      );
+    for (const scheme of ["light", "dark"] as const) {
+      const block = appearance(scheme);
+      expect({ scheme, link: rung(block, "link") }).toEqual({
+        scheme,
+        link: ["var(--accent-11)"],
+      });
+      expect({ scheme, hover: rung(block, "link-hover") }).toEqual({
+        scheme,
+        hover: ["var(--accent-12)"],
+      });
+    }
   });
 });
 

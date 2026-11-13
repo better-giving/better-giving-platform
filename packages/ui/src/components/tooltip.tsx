@@ -39,7 +39,7 @@ const INTERACTIVE = "button, a[href], input, select, textarea, [tabindex]";
 
 // the ring goes on the glyph, not the button: a glyph positioned `absolute`
 // leaves its wrapping button with no box to outline.
-// the `::after` overlays a 24px hit area (WCAG 2.5.8) centred on the button
+// the `::after` overlays a 24px hit area (the minimum target) centred on the button
 // without growing the line it sits in. it needs the button positioned, which
 // would re-anchor an `absolute` glyph — so that glyph keeps its own box.
 const wrap_trigger = [

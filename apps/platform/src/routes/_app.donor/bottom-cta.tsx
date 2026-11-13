@@ -5,7 +5,7 @@ import laira_waiving from "#/assets/laira/laira-waiving.webp";
 export function BottomCta({ classes = "" }) {
   return (
     <div
-      className={`${classes} grid @5xl:grid-cols-2 surface-primary rounded @5xl:rounded ring-8 @md:ring-[1rem] ring-blue-6 px-10 py-12 @5xl:px-16 @5xl:py-20`}
+      className={`${classes} grid @5xl:grid-cols-2 surface-primary rounded @5xl:rounded ring-8 @md:ring-[1rem] ring-accent-6 px-10 py-12 @5xl:px-16 @5xl:py-20`}
     >
       <div className="grid order-2 @5xl:order-1">
         <h4 className="text-center @5xl:text-left @md:text-lg leading-normal mb-6">

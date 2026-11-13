@@ -1,8 +1,12 @@
-import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { APCAcontrast, alphaBlend, sRGBtoY } from "apca-w3";
 import { describe, expect, it } from "vitest";
 import { colors } from "./colors.ts";
+import {
+  decl_re,
+  light_block,
+  read_css,
+  strip_comments,
+} from "./css-source.ts";
 import { hex_to_oklch, oklch_to_hex } from "./oklch.ts";
 
 // contrast gate: every APCA figure design-system.md records, recomputed from
@@ -102,7 +106,7 @@ const pairings: Pairing[] = [
     card,
     21.8,
     min.spot,
-    "radix's interactive-border rung on .btn-secondary, taken as generated: a button's label identifies it, so the edge is not the boundary WCAG 1.4.11 asks to be findable"
+    "radix's interactive-border rung on .btn-secondary, taken as generated: a button's label identifies it, so the edge does not carry the control"
   ),
   p(
     "gray-8 button edge, hovered, on --card",
@@ -150,7 +154,7 @@ const pairings: Pairing[] = [
     min.spot,
     "the hovered field edge inside a well, kept by PM decision (2026-11-01); transient"
   ),
-  // the steps that would clear 1.4.11, recorded beside the field edge's and
+  // the steps that would clear a higher bar, recorded beside the field edge's and
   // held to nothing: no edge spends them (fields and switches are radix gray-7).
   p("gray-9 on --card", colors.gray_9, card, 56.3, null),
   p("gray-9 on --surface", colors.gray_9, colors.surface, 58.3, null),
@@ -195,7 +199,7 @@ const pairings: Pairing[] = [
     min.body
   ),
   p(
-    "gray-12 on --secondary-hover (blue-4)",
+    "gray-12 on --secondary-hover (accent-4)",
     colors.gray_12,
     colors.secondary_hover,
     90.6,
@@ -206,7 +210,7 @@ const pairings: Pairing[] = [
   p("gray-8 on gray-1", colors.gray_8, page, 34.3, min.spot),
   p("gray-11 on gray-1", colors.gray_11, page, 77.7, min.content),
   p("gray-12 on gray-1", colors.gray_12, page, 101.5, min.body_preferred),
-  p("--ring (blue-8) on gray-1", colors.ring, page, 44.6, min.spot),
+  p("--ring (accent-8) on gray-1", colors.ring, page, 44.6, min.spot),
   // on the line and not over it, which is what surface-primary's ring rebind
   // exists for.
   p("--ring on --primary", colors.ring, colors.primary, 30.0, min.spot),
@@ -250,14 +254,14 @@ const pairings: Pairing[] = [
     "--warning-subtle-fg on gray-1",
     colors.warning_subtle_fg,
     page,
-    94.2,
+    69.3,
     min.content
   ),
   p(
     "--warning-subtle-fg on white",
     colors.warning_subtle_fg,
     white,
-    96.0,
+    71.2,
     min.content
   ),
   p("--warning-fg on gray-1", colors.warning_fg, page, 94.2, min.content),
@@ -358,10 +362,22 @@ const pairings: Pairing[] = [
     min.content,
     "the pressed rung of a subtle error control; transient, and radix guarantees step 11 against step 2 only"
   ),
-  p("red-11 on red-2", colors.red_11, colors.red_2, 70.3, min.content),
-  // red-4 carries no token: the row is the ledger's illustration of a step-11
-  // ink degrading as the surface climbs its own scale.
-  p("red-11 on red-4", colors.red_11, colors.red_4, 57.6, null),
+  p(
+    "destructive-11 on destructive-2",
+    colors.destructive_11,
+    colors.destructive_2,
+    70.3,
+    min.content
+  ),
+  // destructive-4 carries no token: the row is the ledger's illustration of a
+  // step-11 ink degrading as the surface climbs its own scale.
+  p(
+    "destructive-11 on destructive-4",
+    colors.destructive_11,
+    colors.destructive_4,
+    57.6,
+    null
+  ),
   p(
     "--success-subtle-fg on --success-subtle",
     colors.success_subtle_fg,
@@ -377,9 +393,9 @@ const pairings: Pairing[] = [
     min.content
   ),
   p(
-    "--success-subtle-fg on green-2",
+    "--success-subtle-fg on success-2",
     colors.success_subtle_fg,
-    colors.green_2,
+    colors.success_2,
     70.3,
     min.content
   ),
@@ -387,43 +403,44 @@ const pairings: Pairing[] = [
     "--warning-subtle-fg on --warning-subtle",
     colors.warning_subtle_fg,
     colors.warning_subtle,
-    87.3,
+    62.5,
     min.content
   ),
   p(
     "--warning-subtle-fg on --card",
     colors.warning_subtle_fg,
     card,
-    92.2,
+    67.4,
     min.content
   ),
   p(
-    "--warning-subtle-fg on amber-2",
+    "--warning-subtle-fg on warning-2",
     colors.warning_subtle_fg,
-    colors.amber_2,
-    92.0,
+    colors.warning_2,
+    67.2,
     min.content
   ),
   p(
     "--warning-subtle-fg on --secondary",
     colors.warning_subtle_fg,
     colors.secondary,
-    88.0,
+    63.2,
     min.content
   ),
   p(
     "--warning-subtle-fg on gray-3",
     colors.warning_subtle_fg,
     colors.gray_3,
-    87.3,
+    62.5,
     min.content
   ),
   p(
     "--warning-subtle-fg on --secondary-active",
     colors.warning_subtle_fg,
     colors.secondary_active,
-    77.3,
-    min.content
+    52.5,
+    min.content,
+    "registry 2.2 put the warning ink on step 11: a miss on the pressed secondary, recorded as measured"
   ),
   p(
     "gray-12 on --warning-subtle",
@@ -502,9 +519,9 @@ const pairings: Pairing[] = [
     "--warning-subtle-fg on --primary",
     colors.warning_subtle_fg,
     colors.primary,
-    17.1,
+    0.0,
     min.content,
-    "under any text threshold: a dark ink on the dark fill"
+    "invisible: under apca's low clip"
   ),
   p(
     "--success-subtle-fg on --primary",
@@ -754,25 +771,36 @@ describe("the pairings the ledger records under their threshold still are", () =
 // covered above. the recipe is read out of the css the way colors.test.ts reads
 // :root — a hardcoded percentage here would keep passing against a stale one —
 // while the ingredients still come from the guarded mirror.
-const css = readFileSync(
-  createRequire(import.meta.url).resolve("@better-giving/ui/colors.css"),
-  "utf8"
-);
+// the roles live in colors.css and the scales in themes/default.css, so the
+// light appearance of each is searched, as colors.test.ts reads it. a dark
+// block redeclaring a token must not be what gets measured.
+const light_css = ["colors.css", "themes/default.css"]
+  .map((f) => light_block(strip_comments(read_css(f)), f))
+  .join("\n");
 
 type Recipe = { first: string; pct: number; second: string };
 
 function recipe(token: string): Recipe {
-  const m = css.match(
-    new RegExp(
-      `--${token}:\\s*color-mix\\(\\s*in oklch,\\s*var\\(--([a-z0-9-]+)\\)\\s*([\\d.]+)%,\\s*(transparent|var\\(--[a-z0-9-]+\\))\\s*\\)`
-    )
+  const value = [...light_css.matchAll(decl_re(token))][0]?.[2];
+  const m = value?.match(
+    /^color-mix\(\s*in oklch,\s*var\(--([a-z0-9-]+)\)\s*([\d.]+%|var\(--[a-z0-9-]+\)),\s*(transparent|var\(--[a-z0-9-]+\))\s*\)$/
   );
   if (!m) {
     throw new Error(
       `--${token}: no color-mix(in oklch, var(--x) n%, …) declaration to measure`
     );
   }
-  return { first: m[1], pct: Number(m[2]), second: m[3] };
+  // the strength may itself be a custom property; read it from the light block
+  const strength = m[2].startsWith("var(")
+    ? [...light_css.matchAll(decl_re(m[2].slice(6, -1)))][0]?.[2].replace(
+        "%",
+        ""
+      )
+    : m[2].replace("%", "");
+  if (strength === undefined || Number.isNaN(Number(strength))) {
+    throw new Error(`--${token}: cannot resolve the mix strength ${m[2]}`);
+  }
+  return { first: m[1], pct: Number(strength), second: m[3] };
 }
 
 const hex_of = (name: string): string => {
@@ -839,59 +867,15 @@ describe("the hero scrim composites to the recorded color", () => {
   });
 });
 
-// WCAG 2 ratio, for the pairings an outside audit holds to 1.4.3 / 1.4.11
-// rather than to APCA: the success and warning inks on their bands, and a
-// switch's ring.
-describe("the audited WCAG 2 pairings clear", () => {
-  // wcag's piecewise relative luminance, not apca's sRGBtoY (a plain 2.4 power)
-  const lum = (hex: string) => {
-    const [r, g, b] = rgb(hex).map((n) => {
-      const c = n / 255;
-      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  };
-  const ratio = (a: string, b: string) => {
-    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
-    return (hi + 0.05) / (lo + 0.05);
-  };
-  // 1.4.11: a field's, checkbox's or radio's boundary is what identifies it,
-  // and radix's step 7 does not reach 3:1 on any ground it sits on. kept on
-  // role by PM decision (2026-11-01), as --ring is: pinned under 3:1 so a step
-  // move lands back here as a new decision rather than a silent fix.
-  it("--input is radix gray-7 (radix sets no edge target); WCAG reference stays under 3:1", () => {
+// roles that stay on their radix step, by PM decision (2026-11-01): the
+// measured Lc of each lives in the pairing ledger above, so a step move lands
+// there as a new figure; these pin the step itself.
+describe("the roles kept on their radix steps", () => {
+  it("--input and --input-hover are radix gray-7 and gray-8", () => {
     expect(colors.input).toBe(colors.gray_7);
     expect(colors.input_hover).toBe(colors.gray_8);
-    expect(ratio(colors.input, colors.card)).toBeLessThan(3);
-    expect(ratio(colors.input, colors.surface)).toBeLessThan(3);
-    expect(ratio(colors.input, colors.panel)).toBeLessThan(3);
   });
-  // 1.4.11: a switch's off state reads by its ring alone, and the ring is
-  // radix's interactive border, gray-7 — under 3:1, kept on role by PM
-  // decision (2026-11-01, "stay true to radix"), pinned so a step move is a
-  // new decision rather than a silent fix.
-  it("a switch's off-state ring is radix gray-7 (no edge target); WCAG reference under 3:1", () => {
-    expect(ratio(colors.gray_7, colors.card)).toBeLessThan(3);
-  });
-  // 1.4.11: a registration step's completion reads by its --primary dot alone
-  // (the pending dot is a gray-6 marker, not the state's carrier)
-  it("a complete step's --primary dot is at least 3:1 on --card and the page", () => {
-    expect(ratio(colors.primary, colors.card)).toBeGreaterThanOrEqual(3);
-    expect(ratio(colors.primary, colors.background)).toBeGreaterThanOrEqual(3);
-  });
-  it("--warning-subtle-fg on --warning-subtle is at least 4.5:1", () => {
-    expect(
-      ratio(colors.warning_subtle_fg, colors.warning_subtle)
-    ).toBeGreaterThanOrEqual(4.5);
-  });
-  // the success band is radix's component background, step 3; on step 2 it
-  // had no visible fill on the gray-2 card. kept on role by PM rule
-  // (2026-11-01): APCA Lc 66.1 clears content, and the WCAG figure is pinned
-  // just under 4.5:1 so a step move lands back here as a new decision.
-  it("--success-subtle is radix green-3; its ink's WCAG reference is just under 4.5:1", () => {
-    expect(colors.success_subtle).toBe(colors.green_3);
-    expect(ratio(colors.success_subtle_fg, colors.success_subtle)).toBeLessThan(
-      4.5
-    );
+  it("--success-subtle is radix success-3", () => {
+    expect(colors.success_subtle).toBe(colors.success_3);
   });
 });

@@ -14,7 +14,7 @@ import {
    band's plot colour doubles as its label ink unless it is overridden here.
    they are different rungs and have to stay different: the band is drawn with
    a fill and a border step, the label is step 11, the scale's text rung. the
-   pdf sibling splits them the same way. hex is hand-copied from packages/ui/src/styles/colors.css,
+   pdf sibling splits them the same way. hex is hand-copied from packages/ui/src/styles/themes/default.css,
    as everywhere a chart is drawn from js — nothing guards that drift. */
 const series = {
   savings: { label: "Donation Processing Savings", ink: "#008057" },

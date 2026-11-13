@@ -49,6 +49,13 @@ type Props<T extends InputType> = Omit<
    * id has to be handed in — notes sitting below a field built at the call
    * site, say. a `sub` needs none of this: it is described either way. */
   describedby?: string;
+  /** a button or buttons beside the control. the row is [control][action]:
+   * the error and the `tooltip` text render under the control, in its
+   * column, never under the row. give each `<Button>` `size="field"` (the
+   * control's height; `btn-field` on a plain button). when the row is under
+   * 384px (the field's own width, not the viewport's) the action wraps under
+   * the control. */
+  action?: ReactNode;
   type?: T;
 };
 
@@ -59,10 +66,11 @@ export function Field<T extends InputType = InputType>({
   tooltip,
   sub,
   describedby,
+  action,
   required, //extract from props to disable native validation
-  // off by default: most fields here are somebody else's data (a nonprofit's
-  // details, a donation's recipient), which the browser must not prefill from
-  // the visitor's own saved values
+  // off by default: most fields here are somebody else's data (a contact's
+  // details, a delivery address), which the browser must not prefill from
+  // the user's own saved values
   autoComplete = "off",
   error,
   ref,
@@ -93,29 +101,11 @@ export function Field<T extends InputType = InputType>({
       .filter(Boolean)
       .join(" ") || undefined;
 
-  return (
-    <div className={`${style.container} min-w-0`}>
-      <Label
-        className={`${style.label} label ${has_sub ? "" : "mb-1"}`}
-        required={required}
-        htmlFor={id}
-      >
-        {label}
-      </Label>
-      {has_sub ? (
-        typeof sub === "string" ? (
-          <p id={subId} className="text-gray-11 text-sm mb-2 break-words">
-            {sub}
-          </p>
-        ) : (
-          // `sub` is a ReactNode and callers pass a paragraph, so the wrapper
-          // has to hold block markup — inside a span that is invalid nesting
-          // the browser is free to restructure, carrying the content out from
-          // under the id
-          <div id={subId}>{sub}</div>
-        )
-      ) : null}
-
+  // the control and its messages as one column: with an `action` this is the
+  // control column of the row, so the error and the tooltip text stay under
+  // the control
+  const control = (
+    <>
       {createElement(type === textarea ? textarea : "input", {
         ref,
         ...props,
@@ -147,10 +137,10 @@ export function Field<T extends InputType = InputType>({
       })}
 
       {(tooltip && ( //tooltip in normal flow
-        <p className={`${style.error} text-left mt-1 left-0 text-xs`}>
+        <p className={`${style.error} text-start mt-1 left-0 text-xs`}>
           {/* the id sits on the tooltip alone, not the paragraph around it:
-              the paragraph also holds the error span, and describing the
-              control by both would read the message out twice. */}
+            the paragraph also holds the error span, and describing the
+            control by both would read the message out twice. */}
           <span
             id={tooltipId}
             className={typeof tooltip === "string" ? "text-gray-11" : ""}
@@ -171,6 +161,40 @@ export function Field<T extends InputType = InputType>({
         >
           {error}
         </p>
+      )}
+    </>
+  );
+
+  return (
+    <div className={`${style.container} min-w-0`}>
+      <Label
+        className={`${style.label} label ${has_sub ? "" : "mb-1"}`}
+        required={required}
+        htmlFor={id}
+      >
+        {label}
+      </Label>
+      {has_sub ? (
+        typeof sub === "string" ? (
+          <p id={subId} className="text-gray-11 text-sm mb-2 break-words">
+            {sub}
+          </p>
+        ) : (
+          // `sub` is a ReactNode and callers pass a paragraph, so the wrapper
+          // has to hold block markup: inside a span that is invalid nesting, and
+          // the browser is free to restructure it, carrying the content out
+          // from under the id
+          <div id={subId}>{sub}</div>
+        )
+      ) : null}
+
+      {action ? (
+        <div className="field-row">
+          <div className="field-control">{control}</div>
+          <div className="field-action">{action}</div>
+        </div>
+      ) : (
+        control
       )}
     </div>
   );

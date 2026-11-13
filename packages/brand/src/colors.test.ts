@@ -1,7 +1,12 @@
-import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { colors } from "./colors.ts";
+import {
+  count_decls,
+  decls_in,
+  light_block,
+  read_css,
+  strip_comments,
+} from "./css-source.ts";
 import { oklch_to_hex } from "./oklch.ts";
 
 // drift guard: colors.ts must always agree with colors.css, which the design
@@ -9,32 +14,16 @@ import { oklch_to_hex } from "./oklch.ts";
 // parses :root the same way a human eye would — a literal oklch() token, or a
 // var() alias followed to the literal it points at. color-mix() and --radius
 // fall out on their own: neither has one literal behind it.
-const css = readFileSync(
-  createRequire(import.meta.url).resolve("@better-giving/ui/colors.css"),
-  "utf8"
-);
+const COLORS = "colors.css";
+const THEME = "themes/default.css";
 
-function sole_block(selector: string): string {
-  const matches = [
-    ...css.matchAll(new RegExp(`${selector}\\s*{([^}]*)}`, "gs")),
-  ];
-  if (matches.length !== 1) {
-    throw new Error(
-      `expected exactly one ${selector} block, found ${matches.length}`
-    );
-  }
-  return matches[0][1];
-}
+// the roles (colors.css) alias the scales (themes/default.css); both are the
+// registry's.
+const root_block = [COLORS, THEME]
+  .map((f) => light_block(read_css(f), f))
+  .join("\n");
 
-const root_block = sole_block(":root");
-
-// comments go before the split so a trailing /* #hex */ can't be read as part
-// of the next declaration.
-const decls = new Map<string, string>();
-for (const decl of root_block.replace(/\/\*[\s\S]*?\*\//g, "").split(";")) {
-  const m = decl.match(/^\s*--([a-z0-9-]+)\s*:\s*([\s\S]+)$/i);
-  if (m) decls.set(m[1], m[2].trim().replace(/\s+/g, " "));
-}
+const decls = new Map<string, string>(decls_in(root_block));
 
 const key_of = (name: string) => name.replace(/-/g, "_");
 
@@ -44,6 +33,10 @@ for (const [name, value] of decls) {
   const m = value.match(/^var\(\s*--([a-z0-9-]+)\s*\)$/);
   if (m) aliases.set(name, m[1]);
 }
+
+// the display-p3 alpha and surface steps: wide-gamut, no sRGB hex to mirror.
+// named, so a color() on any other token still throws instead of dropping out.
+const P3_TOKEN = /^(accent|gray)-(a\d+|surface)$/;
 
 function hex_of(name: string, seen: readonly string[] = []): string | null {
   if (seen.includes(name)) {
@@ -65,6 +58,7 @@ function hex_of(name: string, seen: readonly string[] = []): string | null {
     // has to fail, not the comparison.
     const excluded =
       value.startsWith("color-mix(") ||
+      (value.startsWith("color(") && P3_TOKEN.test(name)) ||
       /^-?[\d.]+(rem|px|em|%|s|ms)?$/.test(value);
     if (excluded) return null;
     throw new Error(
@@ -92,6 +86,27 @@ for (const name of decls.keys()) {
 }
 
 describe("colors.ts matches colors.css", () => {
+  // a second :root block, or a stray `}` ending one early, would drop tokens
+  // from both sides of the comparison below without failing it. every
+  // declaration in the file must sit inside some block — and the light half
+  // must have its share.
+  it.each([COLORS, THEME])("reads every declaration of %s", (f) => {
+    const whole = strip_comments(read_css(f));
+    const in_blocks = [...whole.matchAll(/{([^}]*)}/g)].reduce(
+      (n, m) => n + count_decls(m[1]),
+      0
+    );
+    expect(in_blocks).toBeGreaterThan(0);
+    expect(in_blocks).toBe(count_decls(whole));
+    expect(count_decls(light_block(whole, f))).toBeGreaterThan(0);
+  });
+
+  it("excludes only the display-p3 steps from the hex mirror", () => {
+    const p3 = [...decls].filter(([, v]) => v.startsWith("color("));
+    expect(p3.length).toBeGreaterThan(0);
+    expect(p3.every(([n]) => P3_TOKEN.test(n))).toBe(true);
+  });
+
   it("has the same token set", () => {
     expect(Object.keys(colors).sort()).toEqual([...css_tokens.keys()].sort());
   });
@@ -129,7 +144,7 @@ describe("var() aliases mirror their target", () => {
 // still be the sRGB hex the palette tool emitted, recorded beside it.
 const ramp_steps = [
   ...root_block.matchAll(
-    /--((?:blue|red|green|amber|gray)-\d+):\s*(oklch\([^)]+\));\s*\/\* (#[0-9a-f]{6}) \*\//g
+    /--((?:accent|destructive|success|warning|gray)-\d+):\s*(oklch\([^)]+\));\s*\/\* (#[0-9a-f]{6}) \*\//g
   ),
 ];
 

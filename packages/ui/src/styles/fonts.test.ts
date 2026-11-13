@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import fonts_css from "./fonts.css?raw";
-import theme_css from "./theme.css?raw";
+import variables_css from "./variables.css?raw";
 
 // the suite runs in a browser, which has no node:fs: the glob's keys are the
 // font files that exist on disk, resolved by vite at transform time.
@@ -63,7 +63,7 @@ describe("fonts.css", () => {
     expect(wrong).toEqual([]);
   });
 
-  test("every family theme.css names has a face", () => {
+  test("every family the --font-* stacks name has a face", () => {
     const system = new Set([
       "sans-serif",
       "serif",
@@ -77,7 +77,7 @@ describe("fonts.css", () => {
       "liberation mono",
     ]);
     const stacks = [
-      ...theme_css.matchAll(/--font-(?:display|body|mono|gochi):([^;]+);/g),
+      ...variables_css.matchAll(/--font-(?:display|body|mono|gochi):([^;]+);/g),
     ].map(([, v]) => v!);
     const named = stacks
       .flatMap((v) => v.split(","))

@@ -1,30 +1,34 @@
 {
   "schemaVersion": 1,
   "dir": "src",
-  "registryVersion": "1.0.0",
+  "registryVersion": "2.2.1",
   "items": {
     "button": {
-      "version": "1.0.0",
+      "version": "1.2.0",
       "files": {
-        "components/button.tsx": "20f52bc5b1658be23c5028c73bbe21ea46c5793809394941f80a2bc34bf11cb1",
+        "components/button.tsx": "a905297ee9af07843aa4301af0a97b7147f162ddfa66154596956fbf3552013c",
+        "components/button.usage.md": "ab6f4053c1d402d2ff15b5818644f195609f562635e0fe402c94c4b76e3637a3",
         "components/load-text.tsx": "6b1a8ee327cf48751a72663f5922e4f8f946a889c919468d71e2c85d0021f2d4"
       }
     },
     "dialog": {
-      "version": "1.0.0",
+      "version": "1.1.0",
       "files": {
+        "components/dialog.usage.md": "404c8a25a39d2f6137e11816329b6f65fd6a771e26663db8364b7b28e00fa842",
         "components/modal.tsx": "988b89ee87c6c7b21f2cef4c0cb32c384df5a46339c979fb86ed4159c931ce1e",
-        "components/stripe-challenge.ts": "2d64019b955b9f262f4441646abd1ca1e664bfcddcdbbaf44e9d149031cb0ea1",
+        "components/stripe-challenge.ts": "f12cba57903f587cd18efe896023ea5706d749cac45f78f1f69183964fe3439f",
         "helpers/dialog-name.ts": "472363b572bc28d66efbea740a9e4f609a2a67f0c2a39156296b902f8481f051",
         "helpers/ejected-focus.ts": "1f38ad0c0988da6b5c412ae9b41c76b518f5adbfdff8550e6dd4407d50eef609",
-        "helpers/modal-box.ts": "747fa23170446519c8bafb445920378bba8219cbf2615749565ee7b8950fc07f"
+        "helpers/modal-box.ts": "8454afe2fc3d5a39b2ed1c00ada23fcd422396fe338d7f8d73644a5a089fd769"
       }
     },
     "fonts": {
-      "version": "1.0.0",
+      "version": "1.2.0",
       "files": {
-        "styles/fonts.css": "3b6f62f6565456cbecef29251b242ee116efbbcfcbd06261fd09add857852185",
-        "styles/fonts/gochi-hand-latin-400-normal.woff2": "a8b59207e7dfe4da71585bd2beed7f1a7d2c66c33fc5e5c6c5293e9a2c010e8b",
+        "styles/fonts.css": "068ed24b904b607d3bb76bdc9e52dc975c08b64e1ff3f3209d18aa36dbc8b0ab",
+        "styles/fonts.usage.md": "e378c63aa142e95d420ca0e99a4a9fdbdd15a93e9ef01fe5bb9e914bcacfecab",
+        "styles/fonts/gochi-hand-400-normal.woff2": "d384305c44ced32de561fac36e22143b2aeb61fd35d2a410f7f69cfe73561c55",
+        "styles/fonts/gochi-hand-OFL.txt": "b36cb03d6ddc163452d9935ce6f325741434272d3889acf42cc23584f31a85bf",
         "styles/fonts/red-hat-round-OFL.txt": "4f1417e27511207cd217656c964f1b0d8b0c4a30156a1a699cf16dc5eba0dff6",
         "styles/fonts/RedHatRoundDisplay-Black.woff2": "71c876b62055a2ab539678a488256f652f053a36f552255726f2a2825696901f",
         "styles/fonts/RedHatRoundDisplay-BlackItalic.woff2": "7c8c163e04dd35e0926d861576464bead1940dc0e6290d00d6b68af4370b988f",
@@ -63,31 +67,42 @@
       }
     },
     "input": {
-      "version": "1.0.0",
+      "version": "1.2.0",
       "files": {
-        "components/form/field.tsx": "5e61709000e52cddf6519bfbf92ff07564f52a981410a459fc66d60b985d8016",
+        "components/form/field.tsx": "92a53d24113d725884d44fa3696f10c6ff8f4d1f1a66e01e3c2daee56ed31d82",
         "components/form/input.tsx": "2bd2fc5cd471210074e8ae92f6661dea185133e6db5a06c00677d315dedcdd81",
         "components/form/label.tsx": "3bf5d3e341b33c34d92193c5921b4509d020f0d408ec7de41f7800d2bbba2344",
         "components/form/types.ts": "1c231a757323c8a0953a063ac00535ab2082e0e7292bcd3e9bdf1388407b356e",
+        "components/input.usage.md": "a8d58ebbc687bf5ddf239a8e47ed3b507bb43e681fc47f8260bddb09ee3508fb",
         "helpers/unpack.ts": "759629a17a2c02c617a7e7f1ab3421c430347fc9d48e708e374375bbf8db4408"
       }
     },
     "tokens": {
-      "version": "1.0.0",
+      "version": "2.1.0",
       "files": {
-        "styles/base.css": "272e3ae80e77edad8670a774540055730f3fb9e843584f1ea4444f85bd82d332",
-        "styles/colors.css": "f00253ff3b874c05f9f62a548ff1839861e098c9600868970fc380b9577f110e",
-        "styles/components.css": "1a3e97b228733f6ef624237d32936cb7f9bf79710d03d2fd246b21fc84558cdd",
-        "styles/index.css": "ebad83595c103f66b2c71e9f03ce184e26413fb6dd9949fce2e549c3362feb42",
-        "styles/theme.css": "00ad2eef365c3ae0723e1239fe978c6a4e303d041ceeeda886c221674cbdf559",
-        "styles/utilities.css": "890b47e031f5fda16c8a3874526a9edec063203a9093c5db5cea9376da8b3223"
+        "styles/base.css": "63e59d05ae0287232f2d822d6c482a17c25c5afd519cf55c0023b095ceca3ee8",
+        "styles/components.css": "ad4fc8b2a3daa03c82f3f4f354fd8fcde1416a07ccbb8380e677006474923496",
+        "styles/index.css": "f450924c19f01fc7b32b86af2e693aeb7e27ee1fc7e5b88da3782ef961813b93",
+        "styles/theme.css": "d3a96400169be17b8a81501e25d15057ef312fe90ce24f281d535c52f727a932",
+        "styles/tokens.usage.md": "c980cea63cecf53b82b9e5c214fad09126878f3a22f1fd769a009b313a0b33d5",
+        "styles/utilities.css": "3fa9391d6caae9844cbfa37167b33f86abf025f60b429899b191a3b3a2d0de7a"
       }
     },
     "tooltip": {
-      "version": "1.0.0",
+      "version": "1.2.0",
       "files": {
         "components/popup.ts": "8e23e8f3304d70ed128d684008f10597fae3011fc81d7451a72ed97e03f07bb9",
-        "components/tooltip.tsx": "a9e62b4503bf44a7cfa40620632232d0f912f931608695ea09253e226ea22966"
+        "components/tooltip.tsx": "4f8f21b8fe2236761314c0a0f04eea89b4ded613ecc4836588bb366bfb8bf60b",
+        "components/tooltip.usage.md": "113592d6d822c039b4b2d106cece593e37abcdbaac88996d738a0dcda0cd0ac1"
+      }
+    },
+    "variables": {
+      "version": "1.1.0",
+      "files": {
+        "styles/colors.css": "092f1bd986929b2416f92cee21c3fef87323d95e129eff82bb81ebf8d9d63f7b",
+        "styles/themes/default.css": "a823dc572937a1a4112eb0943ec085a1a8c83a2fd420eee60278763e1e6f17a6",
+        "styles/variables.css": "a1cadd8be4cfc52cd94c5947179d642db259c631335d07b3a05b658c083c3808",
+        "styles/variables.usage.md": "796271bce2dc0ae64acc340783753eabfba1fa87fb95e94b27fd650b236b1803"
       }
     }
   }
