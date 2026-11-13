@@ -1,4 +1,3 @@
-import { eq } from "drizzle-orm";
 import {
   afterAll,
   afterEach,
@@ -215,19 +214,6 @@ const dedupe_keys = (kind: string) =>
   new Set(enqueued.filter((m) => m.id === kind).map((m) => m.dedupe));
 
 describe("approve", () => {
-  test("files the bank as the npo's default with the holder wise names", async () => {
-    await verdict("approved");
-
-    const npo_id = (await reg_get(RID))?.status_approved_npo_id;
-    const banks = await test_db
-      .current!.db.select()
-      .from(banking_apps)
-      .where(eq(banking_apps.npo_id, npo_id!));
-    expect(banks.map((b) => [b.id, b.status, b.account_holder])).toEqual([
-      ["999", "default", "Test Bank"],
-    ]);
-  });
-
   describe("a bank that may be Better Giving's own", () => {
     /** refused whole: no npo, no bank, the registration still in review */
     const refused = async (res: Response, why: RegExp) => {

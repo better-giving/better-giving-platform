@@ -7,7 +7,6 @@ import { redirectWithSuccess } from "#/.server/toast";
 import { report_degraded, report_degraded_null } from "#/errors/report";
 import { is_approvable } from "#/routes/platform.banking-applications_.$id/approvable";
 import type { IBapp, IUpdate } from "@/banking";
-import { holder_match, type THolderMatch } from "@/banking/holder-match";
 import { update } from "@/banking/schema";
 import { resp } from "@/helpers/https";
 import { msg } from "@/queue";
@@ -25,7 +24,6 @@ import {
   bapp_approve,
   bapp_get,
   bapp_update_status,
-  npo_legal_names,
 } from "$/pg/queries/banking";
 import { npos_batch_get } from "$/pg/queries/npo";
 
@@ -38,11 +36,6 @@ export type LoaderData = Partial<V2RecipientAccount> & {
   wacc_unavailable: boolean;
   /** absent when the npo row is gone */
   npo_name?: string;
-  /** stored when the application was filed, else wise's name for the account */
-  account_holder: string | null;
-  /** the name the npo registered under; absent when the npo row is gone */
-  legal_name?: string;
-  holder_match: THolderMatch;
   /** the account is one of Better Giving's own wise balances; false when
    * that couldn't be checked, which the approve action refuses on */
   own_account: boolean;
@@ -60,10 +53,9 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
   // row, the uploaded bank statement and Reject are all ours. approving one the
   // reviewer cannot see is the actual defect, so `loaded.tsx` gates Approve on
   // this flag — same split as `platform.applications_.$id`.
-  const [y, [npo], legal] = await Promise.all([
+  const [y, [npo]] = await Promise.all([
     wise.v2_account(bank_id).catch(report_degraded_null),
     npos_batch_get([x.npo_id]),
-    npo_legal_names([x.npo_id]),
   ]);
   const own_account = y
     ? await is_own_recipient(y).catch((err) => {
@@ -71,17 +63,12 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
         return false;
       })
     : false;
-  const account_holder = x.account_holder ?? y?.name?.fullName ?? null;
-  const legal_name = legal.get(x.npo_id);
   return {
     ba: x,
     id: bank_id,
     ...(y ?? {}),
     wacc_unavailable: !y,
     npo_name: npo?.name,
-    account_holder,
-    legal_name,
-    holder_match: holder_match(account_holder, legal_name),
     own_account,
   } satisfies LoaderData;
 };
@@ -112,21 +99,6 @@ export const action: ActionFunction = async ({ params, request }) => {
     if (own === null) throw resp.status(409, OWN_LOOKUP_REFUSAL);
     if (own) throw resp.status(409, OWN_ACCOUNT_REFUSAL);
 
-    const holder = x.account_holder ?? wacc.name?.fullName ?? null;
-    const legal = (await npo_legal_names([x.npo_id])).get(x.npo_id);
-    const matched = holder_match(holder, legal);
-    if (matched === "mismatch" && !fv.data.confirm_holder) {
-      throw resp.refuse(
-        `The account holder, ${holder}, doesn't match the nonprofit's legal name, ${legal}. Confirm the account holder to approve this account.`,
-        409
-      );
-    }
-    if (matched === "no_legal_name" && !fv.data.confirm_holder) {
-      throw resp.refuse(
-        `The nonprofit has no legal name on file to check the account holder, ${holder}, against. Confirm the account holder to approve this account.`,
-        409
-      );
-    }
     // a held npo's old default is the account that bounced: the replacement
     // has to be the one the grants run pays, or `banking-approved` releases
     // nothing. read before the write, which is safe: the hold keys on the

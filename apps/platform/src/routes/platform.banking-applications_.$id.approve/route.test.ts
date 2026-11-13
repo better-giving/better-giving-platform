@@ -7,7 +7,6 @@ const q = vi.hoisted(() => ({
   bapp_set_default: vi.fn(),
   bapp_update_status: vi.fn(),
   npo_default_bapp: vi.fn(),
-  npo_legal_names: vi.fn(),
 }));
 const wise = vi.hoisted(() => ({ v2_account: vi.fn() }));
 const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
@@ -25,35 +24,22 @@ vi.mock("$/payouts/resend-returned", () => hold);
 vi.mock("$/kit/queue", () => queue);
 vi.mock("#/.server/toast", () => ({ redirectWithSuccess: vi.fn() }));
 vi.mock("#/errors/report", () => ({ report_degraded_null: () => null }));
-/** `real` sends the request through remix-hook-form's own parse */
 const form = vi.hoisted(() => ({
   data: { type: "approved" } as Record<string, unknown>,
-  real: false,
 }));
-vi.mock("remix-hook-form", async (io) => {
-  const actual = await io<typeof import("remix-hook-form")>();
-  return {
-    getValidatedFormData: (
-      ...a: Parameters<typeof actual.getValidatedFormData>
-    ) =>
-      form.real
-        ? actual.getValidatedFormData(...a)
-        : Promise.resolve({ data: form.data }),
-  };
-});
+vi.mock("remix-hook-form", () => ({
+  getValidatedFormData: async () => ({ data: form.data }),
+}));
 
 import { action, loader } from "./route";
 
 const BAPP_ID = 40001;
 const DETAIL = `/platform/banking-applications/${BAPP_ID}`;
 
-const LEGAL = "Harbor Light Food Pantry";
-
-const bapp = (status: string, account_holder: string | null = LEGAL) => ({
+const bapp = (status: string) => ({
   id: String(BAPP_ID),
   npo_id: 7,
   status,
-  account_holder,
   bank_statement_url: "https://example.com/statement.pdf",
   date_created: "2026-10-01T00:00:00.000Z",
   updated_at: "2026-10-01T00:00:00.000Z",
@@ -78,16 +64,10 @@ const redirected_to = async () => {
 beforeEach(() => {
   for (const f of Object.values(q)) f.mockReset();
   wise.v2_account.mockReset();
-  wise.v2_account.mockResolvedValue({
-    id: BAPP_ID,
-    currency: "USD",
-    name: { fullName: "Harbor Light Food Pantry Inc." },
-  });
-  q.npo_legal_names.mockResolvedValue(new Map([[7, LEGAL]]));
+  wise.v2_account.mockResolvedValue({ id: BAPP_ID, currency: "USD" });
   own.is_own_recipient.mockReset().mockResolvedValue(false);
   hold.npo_return_hold.mockReset().mockResolvedValue(null);
   queue.enqueue.mockReset();
-  form.real = false;
 });
 
 describe("the approve prompt opened by URL", () => {
@@ -114,8 +94,8 @@ describe("the approve prompt opened by URL", () => {
   });
 });
 
-const submit = (type: "approved" | "rejected", extra = {}) => {
-  form.data = type === "approved" ? { type, ...extra } : { type, reason: "no" };
+const submit = (type: "approved" | "rejected") => {
+  form.data = type === "approved" ? { type } : { type, reason: "no" };
   const request = new Request(`http://x${DETAIL}/approve`, { method: "POST" });
   return (action as any)({ request, params: { id: String(BAPP_ID) } });
 };
@@ -183,81 +163,6 @@ describe("the approve submit, posted around the page", () => {
     expect((r as Response).status).toBe(409);
     expect(q.bapp_approve).not.toHaveBeenCalled();
   });
-
-  it("refuses a holder name that isn't the nonprofit's legal name without confirmation", async () => {
-    q.bapp_get.mockResolvedValue(bapp("under-review", "Dana Whitfield"));
-
-    const r: unknown = await submit("approved").catch((e: unknown) => e);
-
-    expect((r as Response).status).toBe(409);
-    expect(await (r as Response).text()).toMatch(/Dana Whitfield/);
-    expect(q.bapp_approve).not.toHaveBeenCalled();
-  });
-
-  it("approves a holder name that isn't the legal name once the reviewer confirms it", async () => {
-    q.bapp_get.mockResolvedValue(bapp("under-review", "Dana Whitfield"));
-    q.bapp_approve.mockResolvedValue({ status: "under-review" });
-
-    await submit("approved", { confirm_holder: true });
-
-    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7, {
-      as_default: false,
-    });
-  });
-
-  it("reads the holder from wise when none is stored, and holds a mismatch to confirmation", async () => {
-    q.bapp_get.mockResolvedValue(bapp("under-review", null));
-    wise.v2_account.mockResolvedValue({
-      id: BAPP_ID,
-      currency: "USD",
-      name: { fullName: "Dana Whitfield" },
-    });
-
-    const r: unknown = await submit("approved").catch((e: unknown) => e);
-
-    expect((r as Response).status).toBe(409);
-    expect(q.bapp_approve).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["without confirmation is refused", false],
-    ["once the reviewer confirms it is approved", true],
-  ])(
-    "an account of a nonprofit with no legal name on file %s",
-    async (_, confirm_holder) => {
-      q.bapp_get.mockResolvedValue(bapp("under-review", "Dana Whitfield"));
-      q.npo_legal_names.mockResolvedValue(new Map());
-      q.bapp_approve.mockResolvedValue({ status: "under-review" });
-
-      const r: unknown = await submit("approved", { confirm_holder }).catch(
-        (e: unknown) => e
-      );
-
-      if (confirm_holder) {
-        expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7, {
-          as_default: false,
-        });
-      } else {
-        expect((r as Response).status).toBe(409);
-        expect(await (r as Response).text()).toMatch(
-          /no legal name on file.*Dana Whitfield/
-        );
-        expect(q.bapp_approve).not.toHaveBeenCalled();
-      }
-    }
-  );
-
-  it("approves without confirmation when no holder is known at all", async () => {
-    q.bapp_get.mockResolvedValue(bapp("under-review", null));
-    wise.v2_account.mockResolvedValue({ id: BAPP_ID, currency: "USD" });
-    q.bapp_approve.mockResolvedValue({ status: "under-review" });
-
-    await submit("approved");
-
-    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7, {
-      as_default: false,
-    });
-  });
 });
 
 describe("approving a replacement account", () => {
@@ -297,26 +202,5 @@ describe("approving a replacement account", () => {
     });
     expect(q.bapp_set_default).not.toHaveBeenCalled();
     expect(queue.enqueue).toHaveBeenCalled();
-  });
-});
-
-describe("the posted confirmation, through the real form parse", () => {
-  it("reads confirm_holder=true from the prompt as the reviewer's confirmation", async () => {
-    form.real = true;
-    q.bapp_get.mockResolvedValue(bapp("under-review", "Dana Whitfield"));
-    q.bapp_approve.mockResolvedValue({ status: "under-review" });
-    const body = new FormData();
-    body.set("type", "approved");
-    body.set("confirm_holder", "true");
-    const request = new Request(`http://x${DETAIL}/approve`, {
-      method: "POST",
-      body,
-    });
-
-    await (action as any)({ request, params: { id: String(BAPP_ID) } });
-
-    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7, {
-      as_default: false,
-    });
   });
 });

@@ -12,12 +12,6 @@ export function Loaded(props: LoaderData) {
     props.ba.status === "approved" || props.ba.status === "default";
   const is_rejected = props.ba.status === "rejected";
   const prev_verdict = is_approved || is_rejected;
-  // the holder callouts ask for a decision; the row badges stay true after
-  // one. the own-account callout stays after one too: whatever the verdict,
-  // it says why this account must never carry the nonprofit's payouts
-  const awaits_verdict = props.ba.status === "under-review";
-  // our own account can't be approved, so there's no approval to confirm
-  const asks_holder_check = awaits_verdict && !props.own_account;
 
   return (
     <>
@@ -58,47 +52,15 @@ export function Loaded(props: LoaderData) {
             : "Payouts to it never reach the nonprofit, so it can't be approved."}
         </WarningCallout>
       )}
-      {asks_holder_check && props.holder_match === "mismatch" && (
-        <WarningCallout title="The account holder doesn't match the legal name">
-          This account is held by {closed(props.account_holder ?? "")} The
-          nonprofit's legal name is {closed(props.legal_name ?? "")} Approving
-          sends its payouts to an account held by someone else, so confirm with
-          the nonprofit first.
-        </WarningCallout>
-      )}
-      {asks_holder_check && props.holder_match === "no_legal_name" && (
-        <WarningCallout title="No legal name on file">
-          We can't check this account's holder against the nonprofit's name.
-          Confirm the account holder with the nonprofit first.
-        </WarningCallout>
-      )}
 
       <dl className="grid sm:grid-cols-[auto_auto_1fr] bg-card rounded-card border border-hairline">
         {/* the wise half of the record; the rows below it are our own and
             outlive an outage */}
         {!props.wacc_unavailable && (
           <>
-            <Row label="Account holder">
-              {props.account_holder}
-              {props.holder_match === "match" && (
-                <Badge tone="success">Matches legal name</Badge>
-              )}
-              {props.holder_match === "mismatch" && (
-                <Badge tone="warning">Name mismatch</Badge>
-              )}
-              {props.holder_match === "no_legal_name" && (
-                <Badge tone="warning">No legal name on file</Badge>
-              )}
-            </Row>
-            <Row label="Nonprofit legal name">
-              {props.holder_match === "no_legal_name" ? (
-                <span className="text-gray-11">No legal name on file</span>
-              ) : (
-                props.legal_name
-              )}
-            </Row>
             <Row label="Currency">{props.currency}</Row>
             <Row label="Country">{props.country}</Row>
+            <Row label="Recipient name">{props.name?.fullName}</Row>
             <Row label="Account type">{props.type}</Row>
             <Row label="Legal entity type">{props.legalEntityType}</Row>
             {props.displayFields?.map(({ label, value, key }) => (
@@ -167,7 +129,7 @@ function Row(props: Props) {
         aria-hidden={true}
         className="max-sm:hidden w-px border-r border-hairline last:border-none"
       />
-      <dd className="px-3 max-sm:pb-3 sm:p-3 flex items-center gap-2 flex-wrap text-sm">
+      <dd className="px-3 max-sm:pb-3 sm:p-3 flex items-center text-sm">
         {props.children}
       </dd>
       <div
@@ -177,6 +139,3 @@ function Row(props: Props) {
     </>
   );
 }
-
-/** a name ending a sentence: "Acme Inc." takes no second period */
-const closed = (name: string) => (name.endsWith(".") ? name : `${name}.`);

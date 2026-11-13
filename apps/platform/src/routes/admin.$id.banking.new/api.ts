@@ -26,8 +26,7 @@ export const action: ActionFunction = async (args) => {
       "A payout method can only be added to your own nonprofit"
     );
 
-  // read from wise, never the body: the holder is what the reviewer and the
-  // name check trust. unreachable files it holderless; approval reads it again
+  // read from wise, never the body
   const wacc = await wise
     .v2_account(+x.wiseRecipientID)
     .catch(report_degraded_null);
@@ -46,7 +45,6 @@ export const action: ActionFunction = async (args) => {
       id: x.wiseRecipientID,
       npo_id,
       bank_summary: x.bankSummary,
-      account_holder: wacc?.name?.fullName ?? null,
       bank_statement_url: x.bankStatementFile.publicUrl,
       rejection_reason: "",
       status: "under-review",

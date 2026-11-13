@@ -15,8 +15,6 @@ export const banking_apps = pgTable(
       .default("under-review")
       .$type<"default" | "under-review" | "approved" | "rejected">(),
     bank_summary: text("bank_summary").notNull().default(""),
-    /** `accountHolderName` wise returned when the recipient was created; null before it was stored */
-    account_holder: text("account_holder"),
     bank_statement_url: text("bank_statement_url").notNull().default(""),
     rejection_reason: text("rejection_reason").notNull().default(""),
     date_created: timestamptz("date_created").notNull().default(sql`now()`),

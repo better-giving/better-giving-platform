@@ -34,7 +34,9 @@ describe("grants table — a returned grant", () => {
       .element(screen.getByText("Returned", { exact: true }))
       .toBeVisible();
     expect(screen.getByRole("tooltip").query()).toBeNull();
-    await screen.getByRole("button", { name: "What Returned means" }).click();
+    await screen
+      .getByRole("button", { name: "What this returned grant means" })
+      .click();
     await expect
       .element(screen.getByRole("tooltip", { name: WHY }))
       .toBeVisible();

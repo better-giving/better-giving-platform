@@ -719,12 +719,6 @@
           "notNull": true,
           "default": "''"
         },
-        "account_holder": {
-          "name": "account_holder",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "bank_statement_url": {
           "name": "bank_statement_url",
           "type": "text",

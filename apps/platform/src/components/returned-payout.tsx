@@ -14,7 +14,7 @@ const TIPS = {
 const NAMES = {
   returned: "What Returned means",
   void: "What Void means",
-  grant: "What Returned means",
+  grant: "What this returned grant means",
 } as const;
 
 interface IStatusTip {

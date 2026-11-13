@@ -1,24 +1,14 @@
-import { Actions, Badge, CheckField } from "@better-giving/ui";
+import { Actions, Badge } from "@better-giving/ui";
 import { ChevronRight, X } from "lucide-react";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef } from "react";
 import { Link, useFetcher } from "react-router";
 import { useRemixForm } from "remix-hook-form";
 import { RouteModal } from "#/components/route-modal";
 import type { TStatus } from "@/banking";
 import type { IUpdate } from "@/banking/schema";
 
-interface IConfirmHolder {
-  holder: string;
-  /** "" when the npo has no legal name on file */
-  legal_name: string;
-}
-
 type Props = {
   verdict: Extract<TStatus, "approved" | "rejected">;
-  /** the account's holder isn't the npo's legal name, or there is no legal
-   * name to check it against: approving takes a tick that the reviewer
-   * confirmed it, which the action refuses without */
-  confirm_holder?: IConfirmHolder;
 };
 
 const fetcher_key = (verdict: Props["verdict"]) =>
@@ -34,7 +24,7 @@ export function Prompt(props: Props) {
   );
 }
 
-function Content({ verdict, confirm_holder }: Props) {
+function Content({ verdict }: Props) {
   const fetcher = useFetcher({ key: fetcher_key(verdict) });
   const {
     register,
@@ -46,8 +36,6 @@ function Content({ verdict, confirm_holder }: Props) {
   const reason_id = "reject-reason";
   // held, not `disabled`: disabling Submit would blur it onto <body>
   const busy = fetcher.state !== "idle";
-  const [confirmed, set_confirmed] = useState(false);
-  const unconfirmed = !!confirm_holder && !confirmed;
   // `busy` lags the submit by a render, so in that gap a second press would
   // send again and Close/Cancel would leave; the latch closes on the press itself
   const sent = useRef(false);
@@ -58,7 +46,7 @@ function Content({ verdict, confirm_holder }: Props) {
     if (busy || sent.current) e.preventDefault();
   };
   const submit_once = (e: FormEvent) => {
-    if (busy || sent.current || unconfirmed) return e.preventDefault();
+    if (busy || sent.current) return e.preventDefault();
     sent.current = true;
   };
 
@@ -120,31 +108,6 @@ function Content({ verdict, confirm_holder }: Props) {
         </div>
       )}
 
-      {confirm_holder && (
-        <div className="px-6 pb-6 grid gap-3 w-full">
-          <dl className="bg-warning-subtle border border-amber-6 rounded-card px-4 py-3 text-sm text-warning-subtle-fg">
-            <div className="flex gap-2 flex-wrap">
-              <dt className="font-bold">Account holder</dt>
-              <dd>{confirm_holder.holder}</dd>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <dt className="font-bold">Legal name</dt>
-              <dd>{confirm_holder.legal_name || "No legal name on file"}</dd>
-            </div>
-          </dl>
-          <CheckField
-            name="confirm_holder"
-            value="true"
-            checked={confirmed}
-            onChange={(e) => set_confirmed(e.target.checked)}
-            classes={{ input: "self-start mt-0.5", label: "text-sm" }}
-          >
-            I've confirmed with the nonprofit that its payouts should go to the
-            account held by {confirm_holder.holder}.
-          </CheckField>
-        </div>
-      )}
-
       <Actions band>
         <Link
           replace
@@ -157,13 +120,10 @@ function Content({ verdict, confirm_holder }: Props) {
           Cancel
         </Link>
         <button
-          aria-disabled={busy || unconfirmed}
+          aria-disabled={busy}
           aria-busy={busy}
           type="submit"
-          onClick={(e) => {
-            if (unconfirmed) e.preventDefault();
-          }}
-          className={`btn btn-primary aria-disabled:bg-gray-3 aria-disabled:text-gray-11 ${busy ? "pending" : ""}`}
+          className={`btn btn-primary ${busy ? "pending" : ""}`}
         >
           {busy ? "Submitting…" : "Submit"}
         </button>

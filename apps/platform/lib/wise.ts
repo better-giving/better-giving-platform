@@ -11,7 +11,6 @@ export interface Name {
 /** https://docs.wise.com/api-reference/recipient/recipientget */
 export interface V2RecipientAccount {
   id: number;
-  /** `fullName` is the account holder: v1's `accountHolderName` */
   name: Name;
   accountNumber?: number;
   longAccountSummary: string;

@@ -104,8 +104,7 @@ let counter = 0;
 
 const NPO_SEED: Omit<typeof npos.$inferInsert, "id"> = {
   registration_number: "EIN-TEST",
-  // the fixture account is held by Jane Doe, so approving it matches
-  name: "Jane Doe",
+  name: "Test NPO",
   endow_designation: "Charity",
   overview_pt: "[]",
   hq_country: "United States",
@@ -199,9 +198,6 @@ const WISE_FIXTURE = {
   currency: "USD",
   country: "US",
   name: { fullName: "Jane Doe" },
-  account_holder: "Jane Doe",
-  legal_name: "Jane Doe Foundation",
-  holder_match: "match" as const,
   own_account: false,
   type: "checking",
   legalEntityType: "PERSON" as const,
@@ -305,15 +301,7 @@ describe("application detail", () => {
     await expect
       .element(screen.getByText("US", { exact: true }))
       .toBeInTheDocument();
-    // the badge sits inside the holder's definition, so match the pair
-    await expect
-      .element(
-        screen.getByRole("definition").filter({ hasText: "Matches legal name" })
-      )
-      .toHaveTextContent("Jane DoeMatches legal name");
-    await expect
-      .element(screen.getByText("Jane Doe Foundation"))
-      .toBeInTheDocument();
+    await expect.element(screen.getByText("Jane Doe")).toBeInTheDocument();
 
     await expect
       .element(screen.getByRole("link", { name: /approve/i }))
@@ -397,11 +385,6 @@ describe("approve flow", () => {
             path: "approve",
             Component: ApprovePage,
             ErrorBoundary: ErrorModal,
-            loader: () => ({
-              account_holder: "Jane Doe",
-              legal_name: "Jane Doe",
-              holder_match: "match",
-            }),
             action,
           },
           {

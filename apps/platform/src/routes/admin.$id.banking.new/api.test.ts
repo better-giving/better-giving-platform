@@ -59,10 +59,7 @@ beforeEach(() => {
   for (const f of Object.values(q)) f.mockReset();
   q.npo_bapp_count.mockResolvedValue(0);
   q.bapp_put.mockResolvedValue(true);
-  wise.v2_account.mockReset().mockResolvedValue({
-    id: 40000001,
-    name: { fullName: "Harbor Light Food Pantry Inc." },
-  });
+  wise.v2_account.mockReset().mockResolvedValue({ id: 40000001 });
   own.is_own_recipient.mockReset().mockResolvedValue(false);
 });
 
@@ -169,34 +166,6 @@ describe("new banking application", () => {
     expect(res.status).toBe(403);
     expect(q.bapp_put).not.toHaveBeenCalled();
     expect(q.enqueue).not.toHaveBeenCalled();
-  });
-
-  it("stores the holder name wise returns for the recipient, never one from the body", async () => {
-    const res: Response = await call({
-      ...body(OWN_NPO),
-      accountHolderName: "Someone Else",
-    });
-
-    expect(res.status).toBe(302);
-    expect(wise.v2_account).toHaveBeenCalledWith(40000001);
-    expect(q.bapp_put).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        account_holder: "Harbor Light Food Pantry Inc.",
-      })
-    );
-  });
-
-  it("files the application with no holder when wise can't be reached", async () => {
-    wise.v2_account.mockRejectedValue(new Error("wise down"));
-
-    const res: Response = await call(body(OWN_NPO));
-
-    expect(res.status).toBe(302);
-    expect(q.bapp_put).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ account_holder: null })
-    );
   });
 
   it("refuses with 409 an account that is one of Better Giving's own, and files nothing", async () => {

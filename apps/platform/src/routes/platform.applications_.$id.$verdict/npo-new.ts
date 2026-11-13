@@ -183,7 +183,6 @@ export const npo_new = async (r: NonNullable<Progress["banking"]>) => {
         npo_id: id,
         bank_statement_url: bank.statement,
         bank_summary: bank.wacc.longAccountSummary,
-        account_holder: bank.wacc.name?.fullName ?? null,
         rejection_reason: "",
         status: "default",
         date_created: now,
