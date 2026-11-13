@@ -647,7 +647,7 @@ const open_stripe = and(
 );
 
 /** gifts that keep a campaign, for the page: everything that was or may yet be
- * paid, except what a delete can close: an open stripe payment, whose intent
+ * paid, except what a delete can close — an open stripe payment, whose intent
  * it cancels. any other provider's open payment can't be closed, so it
  * counts. */
 export async function campaign_gift_count(
@@ -681,8 +681,8 @@ export type ClosePayments = (
  * otherwise fail on them, and detaching keeps the rows (nothing cascades
  * through the donor and payment rows hanging off them). a closed checkout
  * (`expired`, `failed`, `cancelled`) is one. an open stripe payment is made one
- * first, by `close_payments` (run before the transaction, because it calls
- * stripe), and then marked `cancelled`. an open payment of any other provider
+ * first, by `close_payments` — run before the transaction, because it calls
+ * stripe — and then marked `cancelled`. an open payment of any other provider
  * can't be closed from here, so it keeps the campaign, as does any payment
  * `close_payments` couldn't close. the transaction re-reads the statuses, so a
  * payment that settles in between still blocks the delete. */

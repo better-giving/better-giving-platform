@@ -89,7 +89,7 @@ const not_ready = (prog: Progress, routing_on: boolean) => {
 };
 
 /** the submit of a registration holding `acct`, under the claim lock, or the
- * applicant's reason it could not be; nothing is written in that case. a claim
+ * applicant's reason it could not be — nothing is written in that case. a claim
  * elsewhere skips a rejected holder in `held_elsewhere`, and its
  * `release_rejected` skips one already back in review, so a resubmit racing
  * that claim would leave both holding the account: only the resubmit, holding
