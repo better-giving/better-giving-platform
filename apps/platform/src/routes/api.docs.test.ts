@@ -19,6 +19,11 @@ vi.mock("#/.server/auth", async () => {
 });
 vi.mock("$/blob-upload", () => ({ DOC_PREFIX: "docs/", read_doc }));
 vi.mock("$/pg/queries/doc-holders", () => holders);
+// a token names its store: `vercel_blob_rw_<store id>_<secret>`
+vi.mock("$/env", () => ({
+  blob: { read_write_token: "vercel_blob_rw_Legacy1_secret" },
+  blob_private: { read_write_token: "vercel_blob_rw_Store1_secret" },
+}));
 
 import { doc_href } from "@/docs";
 import { loader } from "./api.docs";
@@ -31,7 +36,7 @@ const MEMBER = { id: "u-member", email: "member@example.com" };
 const PRIVATE =
   "https://store1.private.blob.vercel-storage.com/docs/u-x/id-abc.pdf";
 const LEGACY =
-  "https://store1.public.blob.vercel-storage.com/u/statement-abc.pdf";
+  "https://legacy1.public.blob.vercel-storage.com/u/statement-abc.pdf";
 
 /** the records that name a document: a registration owned by OWNER, and a
  * banking application of nonprofit 7 */
@@ -106,6 +111,7 @@ describe("a private document", () => {
     expect(res.headers.get("cache-control")).toBe("private, no-store");
     expect(res.headers.get("content-type")).toBe("application/pdf");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("content-security-policy")).toBe("sandbox");
   });
 
   test("opens for staff when a record holds it", async () => {
@@ -148,16 +154,31 @@ describe("a private document", () => {
     expect((await open(PRIVATE)).status).toBe(200);
   });
 
+  test("opens for staff their own upload before any record holds it", async () => {
+    session.user = STAFF;
+    hold(PRIVATE, "none");
+    const own = `https://store1.private.blob.vercel-storage.com/docs/${STAFF.id}/statement-abc.pdf`;
+    expect((await open(own)).status).toBe(200);
+  });
+
   test("is a 404 for someone else's unsaved upload", async () => {
     session.user = OTHER;
     hold(PRIVATE, "none");
     expect((await open(PRIVATE)).status).toBe(404);
   });
 
-  test("cannot reach another uploader's folder with an encoded dot segment", async () => {
+  // a bare `%2e%2e` segment never reaches `doc_source`: the url parser folds it
+  // away, leaving the victim's own path for the folder check to refuse. an
+  // encoded slash keeps the dots inside one segment, so the parser leaves it
+  // and it only decodes to `docs/<own id>/../<victim id>/…` in `doc_source`.
+  test.each([
+    ["dots and an encoded slash", "%2e%2e%2fu-x"],
+    ["plain dots and an encoded slash", "..%2fu-x"],
+    ["an encoded dot segment", "%2e%2e/u-x"],
+  ])("cannot reach another uploader's folder through %s", async (_, hop) => {
     session.user = OTHER;
     hold(PRIVATE, "none");
-    const sneaky = `https://store1.private.blob.vercel-storage.com/docs/${OTHER.id}/%2e%2e/u-x/id-abc.pdf`;
+    const sneaky = `https://store1.private.blob.vercel-storage.com/docs/${OTHER.id}/${hop}/id-abc.pdf`;
     expect((await open(sneaky)).status).toBe(404);
     expect(read_doc).not.toHaveBeenCalled();
   });
@@ -176,13 +197,35 @@ describe("a private document", () => {
     expect((await open(PRIVATE)).status).toBe(404);
   });
 
-  test("downloads, never displays, a type a browser could run", async () => {
+  test.each([
+    ["html", "text/html"],
+    ["svg, which carries script", "image/svg+xml"],
+    ["svg with a charset", "Image/SVG+XML; charset=utf-8"],
+    ["no type at all", ""],
+  ])("downloads, never displays: %s", async (_, type) => {
     session.user = OWNER;
     hold(PRIVATE, "reg");
-    read_doc.mockResolvedValue(found("text/html"));
+    read_doc.mockResolvedValue(found(type));
     const res = await open(PRIVATE);
     expect(res.headers.get("content-type")).toBe("application/octet-stream");
     expect(res.headers.get("content-disposition")).toBe("attachment");
+  });
+
+  test.each([
+    ["application/pdf", "application/pdf"],
+    ["image/png", "image/png"],
+    ["image/jpeg", "image/jpeg"],
+    ["image/webp", "image/webp"],
+    ["a pdf with parameters", "Application/PDF; charset=binary"],
+  ])("displays inline: %s", async (type, sent) => {
+    session.user = OWNER;
+    hold(PRIVATE, "reg");
+    read_doc.mockResolvedValue(found(sent));
+    const res = await open(PRIVATE);
+    expect(res.headers.get("content-type")).toBe(
+      type.startsWith("a pdf") ? "application/pdf" : type
+    );
+    expect(res.headers.get("content-disposition")).toBe("inline");
   });
 });
 
@@ -192,8 +235,58 @@ describe("a reference that names nothing", () => {
     ["not a url", "N/A"],
     ["a url off our stores", "https://evil.example/docs/u-owner/x.pdf"],
     ["a file url", "file:///etc/passwd"],
+    [
+      "a malformed escape",
+      "https://legacy1.public.blob.vercel-storage.com/u/%E0.pdf",
+    ],
+    [
+      "another private store",
+      "https://other.private.blob.vercel-storage.com/docs/u-owner/x.pdf",
+    ],
+    [
+      "another public store",
+      "https://other.public.blob.vercel-storage.com/u/x.pdf",
+    ],
+    [
+      "a host that only starts like our private store",
+      "https://evil-store1.private.blob.vercel-storage.com/docs/u-owner/x.pdf",
+    ],
+    [
+      "our private store's host as a subdomain of another",
+      "https://store1.private.blob.vercel-storage.com.evil.example/docs/u-owner/x.pdf",
+    ],
+    [
+      "a host that only starts like our public store",
+      "https://evil-legacy1.public.blob.vercel-storage.com/u/x.pdf",
+    ],
+    [
+      "our public store's host as a subdomain of another",
+      "https://legacy1.public.blob.vercel-storage.com.evil.example/u/x.pdf",
+    ],
+    [
+      "the app's own public store's host as a subdomain of another",
+      "https://cnfc6hjkztdschkg.public.blob.vercel-storage.com.evil.example/u/x.pdf",
+    ],
+    [
+      "our private store over http",
+      "http://store1.private.blob.vercel-storage.com/docs/u-owner/x.pdf",
+    ],
+    [
+      "a legacy store over http",
+      "http://legacy1.public.blob.vercel-storage.com/u/x.pdf",
+    ],
+    [
+      "a private-store path outside docs/",
+      "https://store1.private.blob.vercel-storage.com/u/u-owner/x.pdf",
+    ],
+    [
+      "a private-store path that only starts like docs/",
+      "https://store1.private.blob.vercel-storage.com/docs-x/u-owner/x.pdf",
+    ],
   ])("is a 404: %s", async (_, ref) => {
     session.user = OWNER;
+    // held by the caller's own record, so only the reference itself refuses
+    if (ref) hold(ref, "reg");
     expect((await open(ref)).status).toBe(404);
     expect(read_doc).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
@@ -233,6 +326,26 @@ describe("a row still holding an older stored url", () => {
     hold(LEGACY, "none");
     expect((await open(LEGACY)).status).toBe(404);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test("opens from the app's own public store too", async () => {
+    session.user = OWNER;
+    const own =
+      "https://cnfc6hjkztdschkg.public.blob.vercel-storage.com/u/a.pdf";
+    hold(own, "reg");
+    expect((await open(own)).status).toBe(200);
+  });
+
+  test("is a 404 when the old store can't be reached", async () => {
+    session.user = OWNER;
+    hold(LEGACY, "reg");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      })
+    );
+    expect((await open(LEGACY)).status).toBe(404);
   });
 
   test("is a 404 when the old file is gone", async () => {

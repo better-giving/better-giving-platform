@@ -103,6 +103,7 @@ describe("FileDropzone", () => {
       <FileDropzone
         dropzone_name="Supporting document"
         value="https://example.com/annual%20report.pdf"
+        view_href={(v) => `/docs?ref=${encodeURIComponent(v)}`}
         onChange={on_change}
         specs={specs}
         upload={upload_mock}
@@ -116,7 +117,7 @@ describe("FileDropzone", () => {
     expect(dropzone).not.toMatchTextContent("https://");
 
     const link = screen.container.querySelector(
-      "a[href='https://example.com/annual%20report.pdf']"
+      "a[href='/docs?ref=https%3A%2F%2Fexample.com%2Fannual%2520report.pdf']"
     );
     expect(link).not.toBeNull();
     expect(link).toMatchTextContent("View uploaded file");
@@ -124,22 +125,71 @@ describe("FileDropzone", () => {
     expect(dropzone?.contains(link!)).toBe(false);
   });
 
-  test("links to where the app serves the stored value when view_href is given", async () => {
+  test("renders the upload prompt while a form controller's value is still undefined", async () => {
     const screen = await render(
       <FileDropzone
         dropzone_name="Supporting document"
-        value="https://example.com/a.pdf"
-        view_href={(v) => `/docs?ref=${encodeURIComponent(v)}`}
+        value={undefined}
         onChange={vi.fn()}
         specs={specs}
         upload={upload_mock}
         report_error={report_error_mock}
       />
     );
-    const link = screen.container.querySelector("a");
-    expect(link?.getAttribute("href")).toBe(
-      "/docs?ref=https%3A%2F%2Fexample.com%2Fa.pdf"
+    await expect.element(screen.getByText("Upload file")).toBeVisible();
+    expect(screen.container.querySelector("a")).toBeNull();
+  });
+
+  test("never links the raw stored value: no view_href, no link", async () => {
+    const screen = await render(
+      <FileDropzone
+        dropzone_name="Supporting document"
+        value="https://example.com/a.pdf"
+        onChange={vi.fn()}
+        specs={specs}
+        upload={upload_mock}
+        report_error={report_error_mock}
+      />
     );
+    const dropzone = screen.container.querySelector("[data-part='dropzone']");
+    expect(dropzone).toMatchTextContent("a.pdf");
+    expect(screen.container.querySelector("a")).toBeNull();
+  });
+
+  test("drops the picked file's name once the value resets", async () => {
+    function Resettable() {
+      const [value, set_value] = useState<FileOutput>("");
+      return (
+        <>
+          <FileDropzone
+            dropzone_name="Supporting document"
+            value={value}
+            onChange={set_value}
+            specs={specs}
+            upload={upload_mock}
+            report_error={report_error_mock}
+          />
+          <button type="button" onClick={() => set_value("")}>
+            Reset
+          </button>
+        </>
+      );
+    }
+    upload_mock.mockResolvedValue("https://example.com/statement.pdf");
+    const screen = await render(<Resettable />);
+    const dropzone = () =>
+      screen.container.querySelector("[data-part='dropzone']");
+
+    picker(screen.container)();
+    await vi.waitFor(() =>
+      expect(dropzone()).toMatchTextContent("statement.pdf")
+    );
+
+    await screen.getByRole("button", { name: "Reset" }).click();
+    await vi.waitFor(() =>
+      expect(dropzone()).toMatchTextContent("Upload file")
+    );
+    expect(dropzone()).not.toMatchTextContent("statement.pdf");
   });
 
   test("shows error message when error prop is set", async () => {

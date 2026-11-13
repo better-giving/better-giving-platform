@@ -102,7 +102,11 @@ export default function Loaded(
               </Row>
             ))}
             <Row label="Bank statement document">
-              <DocLink url={props.o_bank_statement ?? "N/A"} />
+              {props.o_bank_statement ? (
+                <DocLink url={props.o_bank_statement} />
+              ) : (
+                "N/A"
+              )}
             </Row>
           </dl>
         </Container>
@@ -132,7 +136,11 @@ export default function Loaded(
           <dl className="grid sm:grid-cols-[auto_auto_1fr]">
             {/* our own registration data — it outlives a wise outage */}
             <Row label="Bank statement document">
-              <DocLink url={props.o_bank_statement ?? "N/A"} />
+              {props.o_bank_statement ? (
+                <DocLink url={props.o_bank_statement} />
+              ) : (
+                "N/A"
+              )}
             </Row>
           </dl>
           <p className="p-3 text-sm text-gray-11">

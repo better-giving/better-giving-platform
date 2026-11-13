@@ -39,8 +39,8 @@ export const loader: LoaderFunction = async ({ request, url }) => {
   } else {
     // a file from before documents went private: read here, for a caller
     // already checked, rather than redirected to
-    const r = await fetch(ref, { redirect: "error" });
-    if (!r.ok) return not_found();
+    const r = await fetch(ref, { redirect: "error" }).catch(() => null);
+    if (!r?.ok) return not_found();
     body = r.body;
     type = r.headers.get("content-type");
   }
@@ -52,6 +52,8 @@ export const loader: LoaderFunction = async ({ request, url }) => {
       "content-type": inline ? mime : "application/octet-stream",
       "content-disposition": inline ? "inline" : "attachment",
       "x-content-type-options": "nosniff",
+      // a file a user wrote renders on our origin: no script, no same-origin
+      "content-security-policy": "sandbox",
       "cache-control": "private, no-store",
       vary: "cookie",
     },

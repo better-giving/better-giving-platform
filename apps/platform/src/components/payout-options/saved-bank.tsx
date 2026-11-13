@@ -6,7 +6,9 @@ import { doc_href } from "@/docs";
 export interface ISavedBank {
   /** the recipient account's id at the payout provider */
   account_id: string;
-  statement_href: string;
+  /** the statement as the record stores it; this card turns it into the
+   * `/api/docs` link. empty means no statement on file, and no link. */
+  statement_ref: string;
   onChange: () => void;
   /** focus lands here once a save replaces the form this card stands in for */
   heading_ref?: Ref<HTMLHeadingElement>;
@@ -17,7 +19,7 @@ export interface ISavedBank {
 /** registration step 4's saved bank payout, under the Bank option */
 export function SavedBank({
   account_id,
-  statement_href,
+  statement_ref,
   onChange,
   heading_ref,
   classes = "",
@@ -56,13 +58,15 @@ export function SavedBank({
         <span className="font-semibold">Account ID:</span>{" "}
         <span className="text-gray-11">{account_id}</span>
       </p>
-      <ExtLink
-        href={doc_href(statement_href)}
-        className="flex items-center gap-2 link justify-self-start"
-      >
-        <SquareArrowOutUpRight aria-hidden className="icon-md" />
-        <span>Bank statement</span>
-      </ExtLink>
+      {statement_ref && (
+        <ExtLink
+          href={doc_href(statement_ref)}
+          className="flex items-center gap-2 link justify-self-start"
+        >
+          <SquareArrowOutUpRight aria-hidden className="icon-md" />
+          <span>Bank statement</span>
+        </ExtLink>
+      )}
     </section>
   );
 }

@@ -76,17 +76,17 @@ describe("upload kinds", () => {
     expect(put).not.toHaveBeenCalled();
   });
 
-  test.each<[string | undefined, string]>([
-    [undefined, "missing"],
-    ["public", "unknown"],
-  ])(
-    "refuses an upload whose kind is %s (%s), storing nothing",
-    async (kind) => {
-      const res: Response = await upload(PDF(), "id.pdf", kind);
-      expect(res.status).toBe(400);
-      expect(put).not.toHaveBeenCalled();
-    }
-  );
+  test("a page that names no kind is refused, never defaulted to the public path", async () => {
+    const res: Response = await upload(PDF(), "id.pdf");
+    expect(res.status).toBe(400);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test("refuses an unknown kind, storing nothing", async () => {
+    const res: Response = await upload(PDF(), "id.pdf", "public");
+    expect(res.status).toBe(400);
+    expect(put).not.toHaveBeenCalled();
+  });
 
   test("a document still has its bytes checked against its type", async () => {
     const res: Response = await upload(

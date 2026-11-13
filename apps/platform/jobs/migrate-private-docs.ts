@@ -6,6 +6,7 @@ import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DOC_PREFIX } from "../.server/blob-upload";
 import { db } from "../.server/pg/db";
 import { banking_apps } from "../.server/pg/schema/banking";
+import { doc_url_aliases } from "../.server/pg/schema/doc-alias";
 import { registrations } from "../.server/pg/schema/registration";
 
 /**
@@ -14,10 +15,13 @@ import { registrations } from "../.server/pg/schema/registration";
  *
  * for every row whose document column still holds a url in the original store:
  * copy the file into the private store under `docs/migrated/`, point the row at
- * the copy, and append `old → new` to a local file. nothing in the original
- * store is deleted. rows whose file is already gone are only reported, so they
- * can be nulled by hand. rows already pointing at the private store are left
- * alone, so a rerun does the rest of what an interrupted run did.
+ * the copy, record `old → new` in `doc_url_aliases` in the same transaction (so
+ * an `/api/docs?ref=<old>` link already handed out keeps opening), and append
+ * it to a local file. a row edited after it was read is left as it is. nothing
+ * in the original store is deleted. rows whose file is already gone are only
+ * reported, so they can be nulled by hand. rows already pointing at the
+ * private store are left alone, so a rerun does the rest of what an
+ * interrupted run did.
  *
  * ## Running
  *
@@ -35,8 +39,9 @@ import { registrations } from "../.server/pg/schema/registration";
  * 3. verify — run the dry run again: it should report 0 rows to move. Open a
  *    document through `/api/docs` as a reviewer, and as the applicant.
  *
- * one transaction per batch of rows (`--batch <n>`, default 50). the log holds
- * row ids and counts only.
+ * one transaction per batch of rows (`--batch <n>`, default 50); a batch whose
+ * write fails is rolled back, logged and counted as failed, and the run goes on
+ * to the next. the log holds row ids and counts only.
  */
 
 interface ITarget {
@@ -105,10 +110,18 @@ export interface ISummary {
   moved: number;
   gone: number;
   failed: number;
+  /** edited after it was read, so left as it is */
+  changed: number;
 }
 
 export async function run(opts: IOpts, deps: IDeps): Promise<ISummary> {
-  const sum: ISummary = { to_move: 0, moved: 0, gone: 0, failed: 0 };
+  const sum: ISummary = {
+    to_move: 0,
+    moved: 0,
+    gone: 0,
+    failed: 0,
+    changed: 0,
+  };
   // a document copied to a banking application's row is the same file the
   // registration holds; one copy serves both
   const copied = new Map(opts.known);
@@ -166,8 +179,9 @@ export async function run(opts: IOpts, deps: IDeps): Promise<ISummary> {
             if (!opts.commit) continue;
 
             const name =
-              decodeURIComponent(new URL(old).pathname.split("/").pop() ?? "") ||
-              "file";
+              decodeURIComponent(
+                new URL(old).pathname.split("/").pop() ?? ""
+              ) || "file";
             const stored = await deps
               .put(
                 `${DOC_PREFIX}migrated/${t.name}/${row.id}/${name}`,
@@ -196,24 +210,53 @@ export async function run(opts: IOpts, deps: IDeps): Promise<ISummary> {
       }
 
       if (opts.commit && edits.length) {
-        await db.transaction(async (tx) => {
-          for (const e of edits) {
-            const col = t.columns[e.column]!;
-            // only while it still holds the url that was copied: a row edited
-            // since is not overwritten
-            await tx
-              .update(t.table)
-              .set({ [e.column]: e.next })
-              .where(and(eq(t.table.id, e.id), eq(col, e.old)));
-          }
-        });
-        sum.moved += edits.length;
-        deps.log(`${t.name}: rewrote ${edits.length} document refs`);
+        const ids = [...new Set(edits.map((e) => e.id))].join(",");
+        const stale: typeof edits = [];
+        const moved = await db
+          .transaction(async (tx) => {
+            let n = 0;
+            for (const e of edits) {
+              const col = t.columns[e.column]!;
+              // only while it still holds the url that was copied: a row
+              // edited since is not overwritten
+              const hit = await tx
+                .update(t.table)
+                .set({ [e.column]: e.next })
+                .where(and(eq(t.table.id, e.id), eq(col, e.old)))
+                .returning({ id: t.table.id });
+              if (hit.length === 0) {
+                stale.push(e);
+                continue;
+              }
+              n++;
+              await tx
+                .insert(doc_url_aliases)
+                .values({ old_url: e.old, new_url: e.next })
+                .onConflictDoNothing();
+            }
+            return n;
+          })
+          .catch((err: unknown) => {
+            // the code only: a query error's message carries its params, urls
+            const code = (err as { cause?: { code?: string } }).cause?.code;
+            deps.log(`${t.name}: batch ${ids} failed (${code ?? "error"})`);
+            return null;
+          });
+        if (moved === null) {
+          sum.failed += edits.length;
+          continue;
+        }
+        for (const e of stale) {
+          deps.log(`${t.name} ${e.id} ${e.column}: changed since read`);
+        }
+        sum.changed += stale.length;
+        sum.moved += moved;
+        deps.log(`${t.name}: rewrote ${moved} document refs`);
       }
     }
   }
   deps.log(
-    `${opts.commit ? "commit" : "dry run"}: ${sum.to_move} to move, ${sum.moved} moved, ${sum.gone} gone, ${sum.failed} failed`
+    `${opts.commit ? "commit" : "dry run"}: ${sum.to_move} to move, ${sum.moved} moved, ${sum.gone} gone, ${sum.failed} failed, ${sum.changed} changed since read`
   );
   return sum;
 }
@@ -230,7 +273,8 @@ if (import.meta.main) {
   if (commit) {
     if (!out) throw new Error("--commit needs --out <file outside the repo>");
     const rel = relative(repo, resolve(out));
-    if (!rel.startsWith("..")) throw new Error("--out must be outside the repo");
+    if (!rel.startsWith(".."))
+      throw new Error("--out must be outside the repo");
   }
 
   const known = new Map<string, string>();
@@ -243,7 +287,8 @@ if (import.meta.main) {
   }
 
   const token = process.env.BLOB_PRIVATE_READ_WRITE_TOKEN;
-  if (commit && !token) throw new Error("BLOB_PRIVATE_READ_WRITE_TOKEN is not set");
+  if (commit && !token)
+    throw new Error("BLOB_PRIVATE_READ_WRITE_TOKEN is not set");
 
   await run(
     { commit, batch: Number(arg("--batch") ?? 50), known, token },

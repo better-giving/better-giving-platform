@@ -1,4 +1,12 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
@@ -21,7 +29,9 @@ const { create_test_db } = await import("$/pg/test-utils/pglite");
 const { registrations } = await import("$/pg/schema/registration");
 const { banking_apps } = await import("$/pg/schema/banking");
 const { npos } = await import("$/pg/schema/npo");
-const { eq } = await import("drizzle-orm");
+const { doc_url_aliases } = await import("$/pg/schema/doc-alias");
+const { doc_holders } = await import("$/pg/queries/doc-holders");
+const { asc, eq } = await import("drizzle-orm");
 
 const OLD_ID = "https://s.public.blob.vercel-storage.com/u/id-aaa.pdf";
 const OLD_BANK = "https://s.public.blob.vercel-storage.com/bank-bbb.pdf";
@@ -54,7 +64,7 @@ const db = () => test_db.current!.db;
 
 beforeEach(async () => {
   await test_db.current!.client.exec(
-    "truncate registrations; truncate banking_apps"
+    "truncate registrations; truncate banking_apps; truncate doc_url_aliases"
   );
   await db()
     .insert(registrations)
@@ -105,6 +115,9 @@ const make = () => {
   };
 };
 
+const reg = async (id: string) =>
+  (await db().select().from(registrations).where(eq(registrations.id, id)))[0]!;
+
 const opts = (commit: boolean, known = new Map<string, string>()) => ({
   commit,
   batch: 1,
@@ -119,6 +132,16 @@ describe("is_public_url", () => {
     expect(is_public_url(null)).toBe(false);
     expect(is_public_url("N/A")).toBe(false);
   });
+
+  it.each([
+    ["a public store's host as a subdomain of another", "https://s.public.blob.vercel-storage.com.evil.example/u/a.pdf"],
+    ["a host that only ends like a public store", "https://s.xpublic.blob.vercel-storage.com/u/a.pdf"],
+    ["a public store over http", "http://s.public.blob.vercel-storage.com/u/a.pdf"],
+    ["the host in the path", "https://evil.example/s.public.blob.vercel-storage.com/u/a.pdf"],
+    ["the host in the userinfo", "https://s.public.blob.vercel-storage.com@evil.example/u/a.pdf"],
+  ])("is false for %s", (_, url) => {
+    expect(is_public_url(url)).toBe(false);
+  });
 });
 
 describe("dry run", () => {
@@ -128,12 +151,18 @@ describe("dry run", () => {
 
     // the identity and bank statement on the registration, the statement on
     // the banking application, and the registration proof that is gone
-    expect(sum).toEqual({ to_move: 4, moved: 0, gone: 1, failed: 0 });
+    expect(sum).toEqual({
+      to_move: 4,
+      moved: 0,
+      gone: 1,
+      failed: 0,
+      changed: 0,
+    });
     expect(m.put).not.toHaveBeenCalled();
     expect(m.records).toEqual([]);
-    expect(m.fetch.mock.calls.every(([, init]: any) => init.method === "HEAD")).toBe(
-      true
-    );
+    expect(
+      m.fetch.mock.calls.every(([, init]: any) => init.method === "HEAD")
+    ).toBe(true);
     const [row] = await db()
       .select()
       .from(registrations)
@@ -154,7 +183,13 @@ describe("commit", () => {
   it("copies each file to private storage and rewrites the rows", async () => {
     const m = make();
     const sum = await run(opts(true), m.deps);
-    expect(sum).toEqual({ to_move: 4, moved: 3, gone: 1, failed: 0 });
+    expect(sum).toEqual({
+      to_move: 4,
+      moved: 3,
+      gone: 1,
+      failed: 0,
+      changed: 0,
+    });
 
     const [a] = await db()
       .select()
@@ -197,16 +232,22 @@ describe("commit", () => {
         token: "tok",
       });
     }
-    expect(m.fetch.mock.calls.every(([, init]: any) => init.method === "GET")).toBe(
-      true
-    );
+    expect(
+      m.fetch.mock.calls.every(([, init]: any) => init.method === "GET")
+    ).toBe(true);
   });
 
   it("is idempotent: a rerun finds nothing left but the gone file", async () => {
     await run(opts(true), make().deps);
     const again = make();
     const sum = await run(opts(true), again.deps);
-    expect(sum).toEqual({ to_move: 1, moved: 0, gone: 1, failed: 0 });
+    expect(sum).toEqual({
+      to_move: 1,
+      moved: 0,
+      gone: 1,
+      failed: 0,
+      changed: 0,
+    });
     expect(again.put).not.toHaveBeenCalled();
   });
 
@@ -233,5 +274,119 @@ describe("commit", () => {
       .from(registrations)
       .where(eq(registrations.id, "reg-a"));
     expect(a!.r_proof_of_identity).toBe(OLD_ID);
+  });
+
+  it("keeps a link to the old url opening, through an alias written with the row", async () => {
+    await run(opts(true), make().deps);
+    const a = await reg("reg-a");
+    expect(
+      await db()
+        .select()
+        .from(doc_url_aliases)
+        .orderBy(asc(doc_url_aliases.old_url))
+    ).toEqual([
+      { old_url: OLD_BANK, new_url: a.o_bank_statement },
+      { old_url: OLD_ID, new_url: a.r_proof_of_identity },
+    ]);
+    expect(await doc_holders(OLD_ID)).toEqual({
+      reg_owners: ["a@example.com"],
+      npo_ids: [],
+    });
+    expect(await doc_holders(OLD_BANK)).toEqual({
+      reg_owners: ["a@example.com"],
+      npo_ids: [npo_id],
+    });
+  });
+
+  it("neither overwrites nor counts a row edited while its file was copied", async () => {
+    const m = make();
+    m.put.mockImplementation(async (pathname: string) => {
+      if (pathname.endsWith("id-aaa.pdf")) {
+        await db()
+          .update(registrations)
+          .set({ r_proof_of_identity: "edited" })
+          .where(eq(registrations.id, "reg-a"));
+      }
+      return {
+        url: `https://s.private.blob.vercel-storage.com/${pathname}-sfx`,
+      };
+    });
+    const sum = await run(opts(true), m.deps);
+    expect(sum).toEqual({
+      to_move: 4,
+      moved: 2,
+      gone: 1,
+      failed: 0,
+      changed: 1,
+    });
+    expect((await reg("reg-a")).r_proof_of_identity).toBe("edited");
+    // no alias to a copy nothing holds
+    expect(await doc_holders(OLD_ID)).toEqual({ reg_owners: [], npo_ids: [] });
+    expect(m.logs.join("\n")).toContain(
+      "registrations reg-a r_proof_of_identity: changed since read"
+    );
+  });
+
+  it("pages through every row, one batch at a time", async () => {
+    const more = ["reg-c", "reg-d", "reg-e"];
+    await db()
+      .insert(registrations)
+      .values(
+        more.map((id) => ({
+          id,
+          r_id: `${id}@example.com`,
+          r_proof_of_identity: `https://s.public.blob.vercel-storage.com/u/${id}.pdf`,
+        }))
+      );
+    const m = make();
+    const sum = await run(opts(true), m.deps);
+    expect(sum).toEqual({
+      to_move: 7,
+      moved: 6,
+      gone: 1,
+      failed: 0,
+      changed: 0,
+    });
+    for (const id of more) {
+      expect((await reg(id)).r_proof_of_identity).toMatch(
+        new RegExp(
+          `^https://s\\.private\\..*/docs/migrated/registrations/${id}/`
+        )
+      );
+    }
+    expect(
+      m.logs.filter((l) => l.startsWith("registrations: rewrote")).length
+    ).toBe(4);
+  });
+
+  it("reports a batch whose write failed and carries on with the rest", async () => {
+    await db().insert(registrations).values({
+      id: "reg-c",
+      r_id: "c@example.com",
+      r_proof_of_identity:
+        "https://s.public.blob.vercel-storage.com/u/reg-c.pdf",
+    });
+    const m = make();
+    // a copy at the same url fails the alias's own check, rolling the batch back
+    m.put.mockImplementation(async (pathname: string) => ({
+      url: pathname.endsWith("reg-c.pdf")
+        ? "https://s.public.blob.vercel-storage.com/u/reg-c.pdf"
+        : `https://s.private.blob.vercel-storage.com/${pathname}-sfx`,
+    }));
+    const sum = await run(opts(true), m.deps);
+    expect(sum).toEqual({
+      to_move: 5,
+      moved: 3,
+      gone: 1,
+      failed: 1,
+      changed: 0,
+    });
+    expect((await reg("reg-c")).r_proof_of_identity).toBe(
+      "https://s.public.blob.vercel-storage.com/u/reg-c.pdf"
+    );
+    const text = m.logs.join("\n");
+    expect(text).toContain("registrations: batch reg-c failed");
+    expect(text).toMatch(/commit: 5 to move, 3 moved, .*1 failed/);
+    expect(text).not.toMatch(/blob\.vercel-storage|\.pdf/);
   });
 });

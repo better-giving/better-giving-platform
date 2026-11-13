@@ -549,6 +549,20 @@ describe("wise outage", () => {
       .toBeInTheDocument();
   });
 
+  it("links no bank statement when none is on file", async () => {
+    const id = await seed_reg({ ...ALL_FIELDS, o_bank_statement: null });
+    vi.mocked(wise.v2_account).mockRejectedValueOnce("wise is down");
+
+    const screen = await render_review_live(id);
+
+    await expect
+      .element(screen.getByText("Bank statement document"))
+      .toBeInTheDocument();
+    expect(
+      screen.container.querySelector('a[href*="/api/docs"][href*="N%2FA"]')
+    ).toBeNull();
+  });
+
   it("disables Approve, since approval reads the account", async () => {
     const id = await seed_reg(ALL_FIELDS);
     vi.mocked(wise.v2_account).mockRejectedValueOnce("wise is down");

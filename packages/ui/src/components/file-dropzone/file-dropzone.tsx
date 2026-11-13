@@ -11,7 +11,8 @@ interface Props {
    * call site. required: zag's generic "dropzone" only reads unambiguously
    * when the form holds a single one. */
   dropzone_name: string;
-  value: FileOutput;
+  /** undefined until set: a form controller with no default starts here */
+  value: FileOutput | undefined;
   onChange: (val: FileOutput) => void;
   disabled?: boolean;
   classes?: string;
@@ -20,9 +21,10 @@ interface Props {
   /** hands the accepted file to the app's upload endpoint and resolves to the
    * stored url. injected: the endpoint is the app's, not the design system's. */
   upload: (file: File) => Promise<string>;
-  /** the link the stored value opens at, when the stored value is not itself
-   * openable. injected for the same reason as `upload`: where a stored file is
-   * served from is the app's. */
+  /** the link the stored value opens at. injected for the same reason as
+   * `upload`: where a stored file is served from is the app's. without it no
+   * link renders — a stored value may be a private-store url, which opens
+   * nothing on its own. */
   view_href?: (value: string) => string;
   /** where a failed upload goes (sentry, a logger). required: `onChange("failure")`
    * is the user-visible outcome, so without this a failed upload is silent to
@@ -36,7 +38,8 @@ type El = Pick<HTMLElement, "focus">;
 
 const states = ["loading", "invalid-type", "exceeds-size", "failure"];
 /** a `value` that is a stored url rather than one of the machine's own states */
-const is_url = (v: FileOutput) => !!v && !states.includes(v);
+const is_url = (v: FileOutput | undefined): v is string =>
+  !!v && !states.includes(v);
 
 export function FileDropzone({ ref, ...props }: Props & { ref?: Ref<El> }) {
   const [file, setFile] = useState<File>();
@@ -173,18 +176,15 @@ export function FileDropzone({ ref, ...props }: Props & { ref?: Ref<El> }) {
           `}
       >
         <FileUpload.HiddenInput />
-        <DropzoneText
-          value={props.value || file}
-          mbLimit={props.specs.mbLimit}
-        />
+        <DropzoneText value={props.value} mbLimit={props.specs.mbLimit} />
       </FileUpload.Dropzone>
 
       {/* outside the drop area on purpose: nested inside, this anchor was a
           focusable link inside a role="button" — in the tab order, and folded
           into the button's accessible name, so the button announced a url. */}
-      {is_url(props.value) && (
+      {is_url(props.value) && props.view_href && (
         <ExtLink
-          href={props.view_href ? props.view_href(props.value) : props.value}
+          href={props.view_href(props.value)}
           className="text-sm link mt-1 inline-block"
         >
           View uploaded file

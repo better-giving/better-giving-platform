@@ -69,7 +69,7 @@ vi.mock("$/env", async (importOriginal) => {
 // own — the wiring under test is what the step does with the result, so the
 // form itself stands in as a button that fires the callback.
 const bank_statement = vi.hoisted(() => ({
-  url: "https://example.com/bank.pdf",
+  url: "https://testprivate.private.blob.vercel-storage.com/docs/test-user-id/bank.pdf",
 }));
 
 vi.mock("#/components/bank-details", () => ({
@@ -114,7 +114,8 @@ afterAll(async () => {
 beforeEach(async () => {
   await cleanup();
   await test_db.current!.db.delete(registrations);
-  bank_statement.url = "https://example.com/bank.pdf";
+  bank_statement.url =
+    "https://testprivate.private.blob.vercel-storage.com/docs/test-user-id/bank.pdf";
   account_status_live.mockReset();
   routing.on = true;
   mock_get_session.mockReset();
@@ -170,7 +171,8 @@ async function save_bank(
     .current!.db.update(registrations)
     .set({
       o_bank_id: "999",
-      o_bank_statement: "https://example.com/bank.pdf",
+      o_bank_statement:
+        "https://testprivate.private.blob.vercel-storage.com/docs/test-user-id/bank.pdf",
       ...extra,
     })
     .where(eq(registrations.id, id));
@@ -277,7 +279,12 @@ describe("registration step 4: choose how you get paid", () => {
     await expect.element(bank.getByText("999", { exact: true })).toBeVisible();
     await expect
       .element(bank.getByRole("link", { name: "Bank statement" }))
-      .toHaveAttribute("href", doc_href("https://example.com/bank.pdf"));
+      .toHaveAttribute(
+        "href",
+        doc_href(
+          "https://testprivate.private.blob.vercel-storage.com/docs/test-user-id/bank.pdf"
+        )
+      );
     await expect
       .element(
         screen.getByRole("heading", { name: "Bank payout", exact: true })
@@ -485,7 +492,8 @@ describe("registration step 4: choose how you get paid", () => {
     it("comes back to the saved bank with focus on it once a change lands", async () => {
       const id = await seed_step_4();
       await save_bank(id);
-      bank_statement.url = "https://example.com/new.pdf";
+      bank_statement.url =
+        "https://testprivate.private.blob.vercel-storage.com/docs/test-user-id/new.pdf";
       const screen = await render_step_4(id);
 
       await saved_bank(screen).getByRole("button", { name: "Change" }).click();
@@ -495,7 +503,12 @@ describe("registration step 4: choose how you get paid", () => {
         .element(
           saved_bank(screen).getByRole("link", { name: "Bank statement" })
         )
-        .toHaveAttribute("href", doc_href("https://example.com/new.pdf"));
+        .toHaveAttribute(
+          "href",
+          doc_href(
+            "https://testprivate.private.blob.vercel-storage.com/docs/test-user-id/new.pdf"
+          )
+        );
       await expect
         .element(
           screen.getByRole("heading", { name: "Bank payout", exact: true })
@@ -552,15 +565,23 @@ describe("registration step 4: choose how you get paid", () => {
         .current!.db.select()
         .from(registrations)
         .where(eq(registrations.id, id));
-      expect(row.o_bank_statement).toBe("https://example.com/bank.pdf");
+      expect(row.o_bank_statement).toBe(
+        "https://testprivate.private.blob.vercel-storage.com/docs/test-user-id/bank.pdf"
+      );
 
-      bank_statement.url = "https://example.com/new.pdf";
+      bank_statement.url =
+        "https://testprivate.private.blob.vercel-storage.com/docs/test-user-id/new.pdf";
       await submit_bank(screen).click();
       await expect
         .element(
           saved_bank(screen).getByRole("link", { name: "Bank statement" })
         )
-        .toHaveAttribute("href", doc_href("https://example.com/new.pdf"));
+        .toHaveAttribute(
+          "href",
+          doc_href(
+            "https://testprivate.private.blob.vercel-storage.com/docs/test-user-id/new.pdf"
+          )
+        );
     }, 30_000);
   });
 

@@ -1,12 +1,15 @@
 import { and, eq, inArray, or } from "drizzle-orm";
+import type { PgColumn } from "drizzle-orm/pg-core";
 import { db } from "../db";
 import { banking_apps } from "../schema/banking";
+import { doc_url_aliases } from "../schema/doc-alias";
 import { registrations } from "../schema/registration";
 import { user_npo_memberships } from "../schema/user";
 
 /** who holds an uploaded document: the owners of the registrations that name
  * it, and the nonprofits whose banking applications do. both empty means no
- * record points at it. */
+ * record points at it. a url a record held before its document moved names
+ * whoever holds the copy now. */
 export interface IDocHolders {
   /** `registrations.r_id` of each registration naming the document */
   reg_owners: string[];
@@ -15,21 +18,32 @@ export interface IDocHolders {
 }
 
 export async function doc_holders(ref: string): Promise<IDocHolders> {
+  const holds = (col: PgColumn) =>
+    or(
+      eq(col, ref),
+      inArray(
+        col,
+        db
+          .select({ url: doc_url_aliases.new_url })
+          .from(doc_url_aliases)
+          .where(eq(doc_url_aliases.old_url, ref))
+      )
+    );
   const [regs, apps] = await Promise.all([
     db
       .select({ r_id: registrations.r_id })
       .from(registrations)
       .where(
         or(
-          eq(registrations.r_proof_of_identity, ref),
-          eq(registrations.o_proof_of_reg, ref),
-          eq(registrations.o_bank_statement, ref)
+          holds(registrations.r_proof_of_identity),
+          holds(registrations.o_proof_of_reg),
+          holds(registrations.o_bank_statement)
         )
       ),
     db
       .select({ npo_id: banking_apps.npo_id })
       .from(banking_apps)
-      .where(eq(banking_apps.bank_statement_url, ref)),
+      .where(holds(banking_apps.bank_statement_url)),
   ]);
   return {
     reg_owners: regs.map((r) => r.r_id),

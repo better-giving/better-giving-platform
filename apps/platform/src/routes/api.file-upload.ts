@@ -14,8 +14,8 @@ import {
 } from "$/blob-upload";
 
 /** what the caller says it is uploading. it picks the allowed types and the
- * store, so it is the one thing the caller is never trusted past: a document
- * is private whatever it looks like, and an image route takes no pdf. */
+ * store, so it is the one thing the caller is never trusted past: a `document`
+ * is private whatever it looks like, and an `image` takes no pdf. */
 const kinds = ["document", "image"] as const;
 
 export const action: ActionFunction = async ({ request, url }) => {
@@ -26,6 +26,8 @@ export const action: ActionFunction = async ({ request, url }) => {
   if (!user) return resp.fail(401, "Sign in to continue");
 
   const { filename, kind } = search(url);
+  // no default: a page from before kinds existed can't say what it is
+  // uploading, and guessing public could put a document there
   const k = safeParse(picklist(kinds), kind);
   if (k.issues) return resp.status(400, "unknown upload kind");
 
