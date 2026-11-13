@@ -236,7 +236,7 @@ const earlier_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
 const where_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
   screen.getByRole("region", { name: "Where your money shows" });
 const BANK_SUBHEAD =
-  "Sent to your bank every 3 days once your balance reaches your payout minimum.";
+  "We send a payout to your bank account every 3 days once your balance reaches your payout minimum.";
 const held_region = (screen: Awaited<ReturnType<typeof render_page>>) =>
   screen.getByRole("region", { name: "On hold until you add a bank account" });
 const no_wise = (screen: Awaited<ReturnType<typeof render_page>>) =>
@@ -305,7 +305,7 @@ describe("the payouts page", () => {
     await expect
       .element(
         region.getByText(
-          "Each donation paid through Stripe is sent here as its own transfer, after fees. What Stripe has paid on to your bank is in your Stripe dashboard."
+          "Card, bank and wallet donations are sent to your Stripe account, each as its own transfer, after fees. What Stripe has paid on to the bank on your Stripe account is in your Stripe dashboard."
         )
       )
       .toBeVisible();
@@ -431,14 +431,14 @@ describe("the payouts page", () => {
     await expect
       .element(
         where.getByText(
-          "Donations paid through Stripe (cards, digital wallets and bank debits), each sent as its own transfer, after fees."
+          "Card, bank and wallet donations, each sent as its own transfer, after fees."
         )
       )
       .toBeVisible();
     await expect
       .element(
         where.getByText(
-          "PayPal, DAF grants, crypto, stocks, cheques, and any Stripe donations from before you connected Stripe: the Grant share of each, sent to your bank."
+          "PayPal, DAF grants, crypto, stocks, cheques, and any card, bank and wallet donations from before Stripe was ready: the Grant share of each, sent to your bank. Savings and Investments withdrawals are sent there too."
         )
       )
       .toBeVisible();
@@ -541,6 +541,9 @@ describe("the payouts page", () => {
     await expect.element(table.getByText("$77.00")).toBeVisible();
     expect(table.getByText("Pending").query()).toBeNull();
     expect(table.getByRole("row").elements()).toHaveLength(2);
+    // no bank on file: the heading stays over the paid history, the lead
+    // promising a bank payout does not
+    expect(screen.getByText(BANK_SUBHEAD).query()).toBeNull();
   });
 
   test("a stripe-only nonprofit with nothing waiting has no held card", async () => {
@@ -607,7 +610,7 @@ describe("the payouts page", () => {
       await expect
         .element(
           earlier.getByText(
-            "Stripe donations sent to your Stripe account before. New Stripe donations pay out to your bank. What Stripe has paid on to your bank is in your Stripe dashboard."
+            "Your Stripe account is connected but no longer receives card, bank and wallet donations, so new ones pay out to your bank. These were made while it received them. What Stripe has paid on to the bank on your Stripe account is in your Stripe dashboard."
           )
         )
         .toBeVisible();
@@ -615,19 +618,19 @@ describe("the payouts page", () => {
       await expect
         .element(
           where.getByText(
-            "Stripe donations sent to your Stripe account before. New ones are not sent there."
+            "Card, bank and wallet donations made while your Stripe account received them. New ones are not sent there."
           )
         )
         .toBeVisible();
       await expect
         .element(
           where.getByText(
-            "Everything sent to your bank, new Stripe donations included."
+            "Everything sent to your bank, including new card, bank and wallet donations."
           )
         )
         .toBeVisible();
       expect(where.getByText(/its own transfer/).query()).toBeNull();
-      expect(where.getByText(/before you connected/).query()).toBeNull();
+      expect(where.getByText(/before Stripe was ready/).query()).toBeNull();
       await expect
         .element(
           screen.getByRole("heading", {
@@ -674,7 +677,7 @@ describe("the payouts page", () => {
     await expect
       .element(
         earlier_region(screen).getByText(
-          /New Stripe donations wait in your Better Giving balance until you add a bank account\./
+          /new ones wait in your Better Giving balance until you add a bank account\./
         )
       )
       .toBeVisible();
@@ -690,21 +693,21 @@ describe("the payouts page", () => {
     await expect
       .element(
         earlier_region(screen).getByText(
-          /New Stripe donations wait in your Better Giving balance until your bank account is approved\./
+          /new ones wait in your Better Giving balance until your bank account is approved\./
         )
       )
       .toBeVisible();
     await expect
       .element(
         where_region(screen).getByText(
-          /New donations, Stripe donations included, wait in your Better Giving balance until your bank account is approved\./
+          /New donations, including card, bank and wallet donations, wait in your Better Giving balance until your bank account is approved\./
         )
       )
       .toBeVisible();
     expect(screen.container.textContent).not.toMatch(/add a bank account/);
   });
 
-  test("a disconnected nonprofit is told new Stripe donations pay out to its bank", async () => {
+  test("a disconnected nonprofit is told new card, bank and wallet donations pay out to its bank", async () => {
     await npo("acct_sent", {
       stripe_deauthorized_at: "2026-08-01T00:00:00.000Z",
     });
@@ -719,7 +722,7 @@ describe("the payouts page", () => {
     await expect
       .element(
         earlier.getByText(
-          "Your Stripe account is disconnected, so new Stripe donations pay out to your bank. These were sent to it while it was connected."
+          "Your Stripe account is disconnected, so new card, bank and wallet donations pay out to your bank. These were sent to it while it was connected."
         )
       )
       .toBeVisible();
@@ -727,18 +730,18 @@ describe("the payouts page", () => {
     await expect
       .element(
         where.getByText(
-          "Stripe donations sent to your Stripe account while it was connected."
+          "Card, bank and wallet donations sent to your Stripe account while it was connected."
         )
       )
       .toBeVisible();
     await expect
       .element(
         where.getByText(
-          "Everything sent to your bank. Your Stripe account is disconnected, so new Stripe donations are here too."
+          "Everything sent to your bank. Your Stripe account is disconnected, so new card, bank and wallet donations are here too."
         )
       )
       .toBeVisible();
-    expect(where.getByText(/before you connected/).query()).toBeNull();
+    expect(where.getByText(/before Stripe was ready/).query()).toBeNull();
     await expect.element(screen.getByText("$12.50")).toBeVisible();
   });
 });
@@ -768,7 +771,7 @@ describe("SentToStripe", () => {
     await expect
       .element(
         screen.getByText(
-          /^Showing the most recent\. Each donation paid through Stripe is sent here/
+          /^Showing the most recent\. Card, bank and wallet donations are sent to your Stripe account/
         )
       )
       .toBeVisible();

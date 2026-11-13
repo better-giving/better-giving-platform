@@ -39,14 +39,15 @@ export interface ISentTransfers {
 }
 
 /** the payouts page's stripe part: the routed transfers, and where the
- * nonprofit's next card gift goes */
+ * nonprofit's next card, bank or wallet donation goes */
 export interface INpoSent extends ISentTransfers {
   /** routed donations with no transfer yet: on their way, or never going */
   unsent: IUnsentTransfer[];
   /** older routed donations with no transfer exist than `unsent` holds */
   unsent_truncated: boolean;
-  /** a card gift made now settles to the connected account: routing's own
-   * answer (`is_routable`), so false whenever banking says not available */
+  /** a card, bank or wallet donation made now settles to the connected
+   * account: routing's own answer (`is_routable`), so false whenever banking
+   * says not available */
   on_stripe: boolean;
   /** an account is linked and the nonprofit has not disconnected it */
   connected: boolean;

@@ -109,6 +109,48 @@ describe("held card, net of what is owed", () => {
       .toBeVisible();
   });
 
+  test.each<[string, typeof HeldMoneyCard, boolean, string]>([
+    [
+      "Banking",
+      HeldMoneyCard,
+      false,
+      "Stripe is disconnected and you have no bank account, so every donation is held in your Better Giving balance. Nothing is lost.",
+    ],
+    [
+      "Payouts",
+      PayoutsHeldCard,
+      true,
+      "Stripe is disconnected and your bank account is still under review, so every donation is held in your Better Giving balance. Nothing is lost.",
+    ],
+  ])(
+    "%s, Stripe disconnected, owing all of it: the lead promises no payout either",
+    async (_, Card, bank_pending, lead) => {
+      const screen = await in_router(
+        <Card
+          {...base}
+          rails="none"
+          bank_pending={bank_pending}
+          held={{ ...HELD, net: 0 }}
+        />
+      );
+      const region = screen.getByRole("region");
+      await expect
+        .element(
+          region.getByText(
+            "What you owe Better Giving covers all of it, so none of it will pay out to you."
+          )
+        )
+        .toBeVisible();
+      await expect
+        .element(region.getByText(lead, { exact: true }))
+        .toBeVisible();
+      // the heading's "No way to get paid" is a fact, not a promise
+      expect(region.element().textContent).not.toMatch(
+        /pays out once|again to get paid/
+      );
+    }
+  );
+
   test("owed money back: the foot adds it, and the headline says so", async () => {
     const screen = await in_router(
       <PayoutsHeldCard {...base} held={{ ...HELD, net: 1800 }} />
@@ -161,7 +203,7 @@ describe("HeldMoneyCard: Banking", () => {
     await expect
       .element(
         card.getByText(
-          "Stripe can only receive Stripe donations. These can't go to Stripe, so they stay in your Better Giving balance until you add a bank account. Nothing is lost."
+          "Stripe can only receive card, bank and wallet donations. The rest can't go to Stripe, so they stay in your Better Giving balance until you add a bank account. Nothing is lost."
         )
       )
       .toBeVisible();
@@ -222,7 +264,10 @@ describe("HeldMoneyCard: Banking", () => {
     await expect
       .element(card.getByText("$2,310.00", { exact: true }))
       .toBeVisible();
-    expect(body_rows(card)[0]).toEqual(["Stripe donations", "$525.50"]);
+    expect(body_rows(card)[0]).toEqual([
+      "Card, bank and wallet donations",
+      "$525.50",
+    ]);
     await expect
       .element(card.getByRole("link", { name: "Add bank account" }))
       .toHaveAttribute("href", "/admin/42/banking/new");
@@ -252,7 +297,7 @@ describe("HeldMoneyCard: Banking", () => {
 // and a gift held then still waits once Stripe is ready: the lead follows the
 // table, whatever the status
 const STRIPE_LEAD =
-  "Stripe donations that arrive before your Stripe account is ready wait here, along with the donations Stripe can't receive. They stay in your Better Giving balance until you add a bank account. Nothing is lost.";
+  "Card, bank and wallet donations that arrive before your Stripe account is ready wait here, along with the donations Stripe can't receive. They stay in your Better Giving balance until you add a bank account. Nothing is lost.";
 
 const WITH_STRIPE: IHeldMoney = {
   total: 2310,
@@ -264,8 +309,8 @@ const WITH_STRIPE: IHeldMoney = {
   ],
 };
 
-describe("Stripe linked, Stripe donations held", () => {
-  test("Banking: the lead says Stripe donations wait too, and the table lists them", async () => {
+describe("Stripe linked, card, bank and wallet donations held", () => {
+  test("Banking: the lead says card, bank and wallet donations wait too, and the table lists them", async () => {
     const screen = await in_router(
       <HeldMoneyCard {...base} held={WITH_STRIPE} />
     );
@@ -273,14 +318,17 @@ describe("Stripe linked, Stripe donations held", () => {
       name: "Waiting for a bank account",
     });
     await expect.element(card.getByText(STRIPE_LEAD)).toBeVisible();
-    expect(card.getByText(/These can't go to Stripe/).query()).toBeNull();
-    expect(body_rows(card)[0]).toEqual(["Stripe donations", "$525.50"]);
+    expect(card.getByText(/The rest can't go to Stripe/).query()).toBeNull();
+    expect(body_rows(card)[0]).toEqual([
+      "Card, bank and wallet donations",
+      "$525.50",
+    ]);
     await expect
       .element(card.getByText("$2,310.00", { exact: true }))
       .toBeVisible();
   });
 
-  test("Payouts: the lead says Stripe donations wait too, and the table lists them", async () => {
+  test("Payouts: the lead says card, bank and wallet donations wait too, and the table lists them", async () => {
     const screen = await in_router(
       <PayoutsHeldCard {...base} held={WITH_STRIPE} />
     );
@@ -290,7 +338,7 @@ describe("Stripe linked, Stripe donations held", () => {
     await expect.element(card.getByText(STRIPE_LEAD)).toBeVisible();
     expect(card.getByText(/everything else waits/).query()).toBeNull();
     expect(body_rows(card)[0]).toEqual([
-      "Stripe donation",
+      "Card, bank or wallet donation",
       "Oct 31, 2026",
       "$525.50",
     ]);
@@ -307,7 +355,7 @@ describe("PayoutsHeldCard: Payouts", () => {
     await expect
       .element(
         card.getByText(
-          "Stripe can only receive Stripe donations, so everything else waits in your Better Giving balance. Nothing is lost."
+          "Stripe can only receive card, bank and wallet donations, so everything else waits in your Better Giving balance. Nothing is lost."
         )
       )
       .toBeVisible();
@@ -317,7 +365,7 @@ describe("PayoutsHeldCard: Payouts", () => {
     expect(body_rows(card)).toEqual([
       ["PayPal donation", "Oct 30, 2026", "$640.00"],
       ["DAF grant", "Oct 28, 2026", "$420.00"],
-      ["Savings withdrawal", "Oct 27, 2026", "$500.00"],
+      ["Savings or Investments withdrawal", "Oct 27, 2026", "$500.00"],
       ["Crypto donation", "Oct 25, 2026", "$150.50"],
       ["Stock or cheque donation", "Oct 22, 2026", "$74.00"],
     ]);
@@ -378,13 +426,13 @@ describe("a bank account under review", () => {
       "Banking",
       HeldMoneyCard,
       "Waiting for your bank account to be approved",
-      "Stripe can only receive Stripe donations. These can't go to Stripe, so they stay in your Better Giving balance until your bank account is approved. Nothing is lost.",
+      "Stripe can only receive card, bank and wallet donations. The rest can't go to Stripe, so they stay in your Better Giving balance until your bank account is approved. Nothing is lost.",
     ],
     [
       "Payouts",
       PayoutsHeldCard,
       "On hold until your bank account is approved",
-      "Stripe can only receive Stripe donations, so everything else waits in your Better Giving balance until your bank account is approved. Nothing is lost.",
+      "Stripe can only receive card, bank and wallet donations, so everything else waits in your Better Giving balance until your bank account is approved. Nothing is lost.",
     ],
   ])(
     "%s, Stripe linked: the money waits for the review, and no bank is asked for",
@@ -431,6 +479,7 @@ describe("a bank account under review", () => {
       <BankPayoutSection
         add_href="new"
         table={<p>accounts table</p>}
+        has_bank={false}
         stripe_status="incomplete"
         holds_money={false}
         bank_pending
@@ -453,13 +502,19 @@ describe("BankPayoutSection: Banking", () => {
   const TABLE = <p>accounts table</p>;
   const render_section = (p: {
     table?: ReactNode;
+    has_bank?: boolean;
+    bank_pending?: boolean;
     stripe_status: TConnectStatus;
     holds_money: boolean;
-  }) => in_router(<BankPayoutSection add_href="new" {...p} />);
+  }) =>
+    in_router(
+      <BankPayoutSection add_href="new" {...p} has_bank={p.has_bank ?? false} />
+    );
 
   test("bank only: the payout line, the accounts, and Add bank account", async () => {
     const screen = await render_section({
       table: TABLE,
+      has_bank: true,
       stripe_status: "not_connected",
       holds_money: false,
     });
@@ -482,22 +537,70 @@ describe("BankPayoutSection: Banking", () => {
   test("bank and Stripe ready: says what the bank no longer gets", async () => {
     const screen = await render_section({
       table: TABLE,
+      has_bank: true,
       stripe_status: "ready",
       holds_money: false,
     });
     await expect
       .element(
-        screen.getByText("Everything except Stripe donations pays out here.")
+        screen.getByText(
+          "Everything except card, bank and wallet donations pays out here."
+        )
       )
       .toBeVisible();
   });
+
+  // rejected, under review, or approved with none set as default
+  test("accounts listed but no default bank, Stripe ready: nothing says it pays out here", async () => {
+    const screen = await render_section({
+      table: TABLE,
+      has_bank: false,
+      stripe_status: "ready",
+      holds_money: true,
+    });
+    const section = screen.getByRole("region", { name: "Bank payout" });
+    await expect.element(section.getByText("accounts table")).toBeVisible();
+    expect(
+      section
+        .getByText(
+          "Everything except card, bank and wallet donations pays out here."
+        )
+        .query()
+    ).toBeNull();
+  });
+
+  test.each<TConnectStatus>([
+    "incomplete",
+    "pending",
+    "not_connected",
+    "disconnected",
+  ])(
+    "bank on file, Stripe %s: card, bank and wallet donations still wait, so nothing says everything else pays out here",
+    async (stripe_status) => {
+      const screen = await render_section({
+        table: TABLE,
+        has_bank: true,
+        stripe_status,
+        holds_money: false,
+      });
+      const section = screen.getByRole("region", { name: "Bank payout" });
+      await expect.element(section.getByText("accounts table")).toBeVisible();
+      expect(
+        section
+          .getByText(
+            "Everything except card, bank and wallet donations pays out here."
+          )
+          .query()
+      ).toBeNull();
+    }
+  );
 
   test.each<[TConnectStatus, string]>([
     [
       "ready",
       "Add one to release held money and have everything else pay out to your bank.",
     ],
-    // before ready, Stripe donations wait for a bank too
+    // before ready, card, bank and wallet donations wait for a bank too
     [
       "incomplete",
       "Add one to release held money and get everything paid out to your bank.",
@@ -508,6 +611,10 @@ describe("BankPayoutSection: Banking", () => {
     ],
     [
       "disconnected",
+      "Add one to release held money and get everything paid out to your bank.",
+    ],
+    [
+      "not_connected",
       "Add one to release held money and get everything paid out to your bank.",
     ],
   ])(
@@ -522,12 +629,84 @@ describe("BankPayoutSection: Banking", () => {
       expect(section.getByRole("link").query()).toBeNull();
       expect(
         section
-          .getByText("Everything except Stripe donations pays out here.")
+          .getByText(
+            "Everything except card, bank and wallet donations pays out here."
+          )
           .query()
       ).toBeNull();
       no_wise(section);
     }
   );
+
+  test.each<TConnectStatus>([
+    "incomplete",
+    "pending",
+    "not_connected",
+    "disconnected",
+  ])(
+    "no bank, Stripe %s, nothing held: the empty state asks for a bank and the section keeps its own Add",
+    async (stripe_status) => {
+      const screen = await render_section({
+        stripe_status,
+        holds_money: false,
+      });
+      const section = screen.getByRole("region", { name: "Bank payout" });
+      await expect
+        .element(
+          section.getByText(
+            "Add one to get everything paid out to your bank.",
+            {
+              exact: true,
+            }
+          )
+        )
+        .toBeVisible();
+      await expect
+        .element(section.getByRole("link", { name: "Add bank account" }))
+        .toBeVisible();
+    }
+  );
+
+  test("bank on file and a second under review, Stripe ready: both sentences, and no Add", async () => {
+    const screen = await render_section({
+      table: TABLE,
+      has_bank: true,
+      bank_pending: true,
+      stripe_status: "ready",
+      holds_money: false,
+    });
+    const section = screen.getByRole("region", { name: "Bank payout" });
+    await expect
+      .element(
+        section.getByText(
+          /Everything except card, bank and wallet donations pays out here\. Your bank account is under review\. Bank payouts start once it's approved\./
+        )
+      )
+      .toBeVisible();
+    expect(section.getByRole("link").query()).toBeNull();
+  });
+
+  test("bank on file, Stripe ready, none under review: no review sentence, and the section keeps its Add", async () => {
+    const screen = await render_section({
+      table: TABLE,
+      has_bank: true,
+      bank_pending: false,
+      stripe_status: "ready",
+      holds_money: false,
+    });
+    const section = screen.getByRole("region", { name: "Bank payout" });
+    await expect
+      .element(
+        section.getByText(
+          "Everything except card, bank and wallet donations pays out here."
+        )
+      )
+      .toBeVisible();
+    expect(section.element().textContent).not.toMatch(/under review/);
+    await expect
+      .element(section.getByRole("link", { name: "Add bank account" }))
+      .toBeVisible();
+  });
 
   test("no bank, nothing held: the section keeps its own Add", async () => {
     const screen = await render_section({
@@ -538,7 +717,7 @@ describe("BankPayoutSection: Banking", () => {
     await expect
       .element(
         section.getByText(
-          "Add one to have everything else pay out to your bank."
+          "Only card, bank and wallet donations go to Stripe. Add a bank account to have everything else paid out."
         )
       )
       .toBeVisible();

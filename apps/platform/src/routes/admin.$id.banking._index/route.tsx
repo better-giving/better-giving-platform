@@ -4,7 +4,6 @@ import {
   BankPayoutSection,
   HeldMoneyCard,
   is_linked,
-  PayoutOptions,
 } from "#/components/payout-options";
 import { StripeConnectCard } from "#/components/stripe-connect/connect-card";
 import { use_strip_connect_params } from "#/hooks/use-strip-connect-params";
@@ -27,7 +26,6 @@ function Page({ loaderData, params }: Route.ComponentProps) {
   const { methods, stripe, connect_routing, has_bank, bank_pending, held } =
     loaderData;
   use_strip_connect_params(connect_routing && !!stripe.notice);
-  const offers_stripe = connect_routing && !stripe.ineligible;
   const stripe_linked = is_linked(stripe.status);
   const holds_money = !!held && held.total > 0;
 
@@ -40,11 +38,8 @@ function Page({ loaderData, params }: Route.ComponentProps) {
           rails={stripe_linked ? "stripe" : "none"}
           bank_pending={bank_pending}
           add_bank_href="new"
-          {...(offers_stripe && { connect_href: stripe.start_href })}
+          connect_href={stripe.start_href}
         />
-      )}
-      {offers_stripe && (
-        <PayoutOptions current={{ bank: has_bank, stripe: stripe_linked }} />
       )}
 
       <BankPayoutSection
@@ -55,6 +50,7 @@ function Page({ loaderData, params }: Route.ComponentProps) {
             </div>
           ) : undefined
         }
+        has_bank={has_bank}
         stripe_status={stripe.status}
         holds_money={holds_money}
         bank_pending={bank_pending}
@@ -66,7 +62,7 @@ function Page({ loaderData, params }: Route.ComponentProps) {
           {...stripe}
           has_bank={has_bank}
           bank_pending={bank_pending}
-          add_bank_href="new"
+          holds_money={holds_money}
           payouts_href={href("/admin/:id/dashboard/payouts", { id: params.id })}
         />
       )}

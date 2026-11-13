@@ -7,6 +7,9 @@ import { BANK_PAYOUT_SENTENCE } from "./rows";
 export interface IBankPayoutSection {
   /** the bank accounts table; absent while none is on file */
   table?: ReactNode;
+  /** a default bank is on file and takes payouts. a non-empty table alone
+   *  doesn't mean so: it lists rejected and under-review accounts too */
+  has_bank: boolean;
   /** the nonprofit's Stripe account */
   stripe_status: TConnectStatus;
   /** the held-money card shows above, carrying its own Add bank account, so
@@ -25,6 +28,7 @@ export interface IBankPayoutSection {
  *  one */
 export function BankPayoutSection({
   table,
+  has_bank,
   stripe_status,
   holds_money,
   bank_pending = false,
@@ -32,8 +36,8 @@ export function BankPayoutSection({
   classes = "",
 }: IBankPayoutSection) {
   const heading_id = useId();
-  // only a ready account takes Stripe donations off the bank; before ready
-  // (incomplete, pending) they wait for a bank like everything else
+  // only a ready account takes card, bank and wallet donations off the bank;
+  // before ready (incomplete, pending) they wait for a bank like everything else
   const stripe_ready = stripe_status === "ready";
   return (
     <section aria-labelledby={heading_id} className={`${classes} grid gap-3`}>
@@ -44,8 +48,11 @@ export function BankPayoutSection({
           </h2>
           <p className="text-sm text-gray-11 max-w-3xl">
             {BANK_PAYOUT_SENTENCE}
-            {table && stripe_ready && (
-              <> Everything except Stripe donations pays out here.</>
+            {has_bank && stripe_ready && (
+              <>
+                {" "}
+                Everything except card, bank and wallet donations pays out here.
+              </>
             )}
             {bank_pending && (
               <>
@@ -82,7 +89,7 @@ const empty_line = (stripe_ready: boolean, holds_money: boolean) => {
   if (stripe_ready)
     return holds_money
       ? "Add one to release held money and have everything else pay out to your bank."
-      : "Add one to have everything else pay out to your bank.";
+      : "Only card, bank and wallet donations go to Stripe. Add a bank account to have everything else paid out.";
   return holds_money
     ? "Add one to release held money and get everything paid out to your bank."
     : "Add one to get everything paid out to your bank.";

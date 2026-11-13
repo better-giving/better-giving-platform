@@ -101,21 +101,22 @@ function Held({ to, bank_pending }: IHeld) {
       </p>
     );
   }
-  // a stripe gift that lands before ready stays held after ready too, per the
-  // held cards' STRIPE_HELD_LEAD (components/payout-options/held-money.tsx)
   if (!to.ready) {
     return (
       <p className="text-sm">
-        Stripe donations that arrive before your Stripe account is ready wait in
-        your Better Giving balance, along with everything else, until {add_bank}
-        . Nothing is lost.
+        Card, bank and wallet donations that arrive before your Stripe account
+        is ready wait in your Better Giving balance, along with everything else,
+        until {add_bank}. Nothing is lost.
       </p>
     );
   }
+  // a stripe gift that lands before ready stays held after ready too, per the
+  // held card's stripe_held_lead (components/payout-options/held-money.tsx)
   return (
     <p className="text-sm">
-      Stripe donations go straight to your Stripe account. Everything else waits
-      in your Better Giving balance until {add_bank}.
+      New card, bank and wallet donations go straight to your Stripe account.
+      Any that arrived before it was ready, and everything else, wait in your
+      Better Giving balance until {add_bank}.
     </p>
   );
 }

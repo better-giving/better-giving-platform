@@ -323,7 +323,11 @@ describe("registration step 4: choose how you get paid", () => {
       )
       .toBeVisible();
     await expect
-      .element(stripe_card(screen).getByText(/Stripe donations are held too/))
+      .element(
+        stripe_card(screen).getByText(
+          /card, bank and wallet donations are held too/
+        )
+      )
       .toBeVisible();
     expect(account_status_live).toHaveBeenCalledWith("acct_123");
     expect_no_wise(screen);
@@ -340,18 +344,46 @@ describe("registration step 4: choose how you get paid", () => {
     await expect.element(radio(screen, "Stripe")).toBeChecked();
     await expect
       .element(
-        stripe_card(screen).getByText("Ready to receive Stripe donations")
+        stripe_card(screen).getByText(
+          "Ready to receive card, bank and wallet donations"
+        )
       )
       .toBeVisible();
-    await expect
-      .element(
-        stripe_card(screen).getByText("Your Stripe account is connected.")
-      )
-      .toBeVisible();
+    // no standing band: only a connect that just landed says it
+    expect(
+      stripe_card(screen).getByText("Your Stripe account is connected.").query()
+    ).toBeNull();
+    // `brief`: the option row above says where donations go, so the card
+    // repeats none of the full-body paragraph
+    expect(stripe_card(screen).element().textContent).not.toMatch(
+      /Apple Pay|as each donation's own transfer|What Stripe pays on/
+    );
     await expect
       .element(continue_link(screen))
       .not.toHaveAttribute("aria-disabled", "true");
     expect_no_wise(screen);
+  }, 30_000);
+
+  it("an unfinished stripe account beside a saved bank: no standing band, only the finish-setup line", async () => {
+    account_status_live.mockResolvedValue("incomplete");
+    const id = await seed_step_4();
+    await save_bank(id, { o_stripe_account_id: "acct_123" });
+    const screen = await render_step_4(id);
+
+    await expect.element(radio(screen, "Bank")).toBeChecked();
+    await screen.getByText("Stripe", { exact: true }).click();
+    await expect
+      .element(
+        stripe_card(screen).getByText(
+          "Stripe needs a few more details before it can receive donations. Finish setup on Stripe, in your Stripe dashboard.",
+          { exact: true }
+        )
+      )
+      .toBeVisible();
+    // the band's wording is for a nonprofit with no bank to fall back on
+    expect(stripe_card(screen).element().textContent).not.toMatch(
+      /are held too|Stripe hasn't finished setting it up/
+    );
   }, 30_000);
 
   it("shows the bank as chosen when both are saved, with stripe a press away", async () => {
@@ -365,7 +397,9 @@ describe("registration step 4: choose how you get paid", () => {
     await screen.getByText("Stripe", { exact: true }).click();
     await expect
       .element(
-        stripe_card(screen).getByText("Ready to receive Stripe donations")
+        stripe_card(screen).getByText(
+          "Ready to receive card, bank and wallet donations"
+        )
       )
       .toBeVisible();
   }, 30_000);
@@ -383,7 +417,55 @@ describe("registration step 4: choose how you get paid", () => {
     await expect
       .element(continue_link(screen))
       .toHaveAttribute("aria-disabled", "true");
+    await expect
+      .element(screen.getByText("Connect Stripe to continue."))
+      .toBeVisible();
   }, 30_000);
+
+  describe("stripe connected, no bank", () => {
+    it("lets the applicant finish without a bank, nudges toward one, and offers the skip only once the bank form is open", async () => {
+      account_status_live.mockResolvedValue("ready");
+      const id = await seed_step_4();
+      await link_stripe(id);
+      const screen = await render_step_4(id);
+
+      await expect.element(radio(screen, "Stripe")).toBeChecked();
+      await expect
+        .element(continue_link(screen))
+        .not.toHaveAttribute("aria-disabled", "true");
+      await expect
+        .element(screen.getByText(/want everything to pay out/i))
+        .toBeVisible();
+      expect(
+        screen.getByText("Connect Stripe to continue.").query()
+      ).toBeNull();
+
+      // the skip link shows only while the bank form is open and none is saved
+      expect(
+        screen.getByRole("link", { name: /without a bank account/i }).query()
+      ).toBeNull();
+
+      // Bank opens its form; the link is then the way on that skips it
+      await screen.getByText("Bank", { exact: true }).click();
+      await expect.element(submit_bank(screen)).toBeVisible();
+      await screen
+        .getByRole("link", { name: /continue without a bank account/i })
+        .click();
+      await expect.element(screen.getByText(/summary/i)).toBeVisible();
+    }, 30_000);
+
+    it("a connected account that is not ready finishes the step too", async () => {
+      account_status_live.mockResolvedValue("incomplete");
+      const id = await seed_step_4();
+      await link_stripe(id);
+      const screen = await render_step_4(id);
+
+      await screen.getByText("Stripe", { exact: true }).click();
+      await expect
+        .element(continue_link(screen))
+        .not.toHaveAttribute("aria-disabled", "true");
+    }, 30_000);
+  });
 
   it("lands back on the stripe option after connecting, a saved bank or not", async () => {
     account_status_live.mockResolvedValue("ready");

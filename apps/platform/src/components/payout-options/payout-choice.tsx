@@ -1,17 +1,20 @@
 import { RadioGroup as Ark } from "@ark-ui/react/radio-group";
-import { Actions, Button } from "@better-giving/ui";
+import { Actions, Badge, Button } from "@better-giving/ui";
 import { type ReactNode, useId } from "react";
 import { Link } from "react-router";
 import { TRANSFER_COUNTRIES_COPY } from "@/stripe-connect/eligibility";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
-import { Cell } from "./payout-options";
 import {
   BANK_PAYOUT_LINE,
+  BANK_SUMMARY_WITH_STRIPE,
+  type ICell,
+  type IRow,
   is_linked,
   option_names,
   option_summaries,
   options,
   rows,
+  STRIPE_SUMMARY_READY,
   type TPayoutOption,
 } from "./rows";
 
@@ -97,6 +100,7 @@ export function PayoutChoice({
             key={o}
             option={o}
             expanded={!selected || selected === o}
+            stripe_linked={stripe_linked}
             stripe_ready={stripe_ready}
             bank_saved={bank_saved}
           />
@@ -162,10 +166,17 @@ function intro(
   stripe_status: TConnectStatus
 ) {
   const linked = is_linked(stripe_status);
-  if (selected === "bank" && bank_saved)
-    return bank_form_shown
-      ? "Your saved bank payout stays in place until you save a new one."
+  if (selected === "bank" && bank_saved) {
+    if (bank_form_shown)
+      return "Your saved bank payout stays in place until you save a new one.";
+    if (stripe_status === "ready")
+      return "Your bank payout is saved and your Stripe account is ready. You can continue now.";
+    if (linked)
+      return "Your bank payout is saved and your Stripe account is connected. You can continue now.";
+    return stripe_status === "disconnected"
+      ? "Your bank payout is saved. You can continue now, and connect Stripe again here, or any time from Banking."
       : "Your bank payout is saved. You can continue now, and add Stripe here too, or any time from Banking.";
+  }
   // the line under the Stripe card offers the bank while none is saved
   if (selected === "stripe" && linked)
     return stripe_status === "ready"
@@ -174,8 +185,10 @@ function intro(
   // the other option is the one set up
   if (linked)
     return "Your Stripe account is connected, so you can continue now. Add a bank account here too, or any time from Banking.";
-  if (bank_saved)
-    return "Your bank payout is saved, so you can continue now. Connect Stripe here too, or any time from Banking.";
+  if (bank_saved) {
+    const again = stripe_status === "disconnected";
+    return `Your bank payout is saved, so you can continue now. Connect Stripe ${again ? "again here" : "here too"}, or any time from Banking.`;
+  }
   return "We need one to finish onboarding. You can add the other later from Banking.";
 }
 
@@ -183,7 +196,10 @@ interface IOptionCard {
   option: TPayoutOption;
   /** the chosen card, or both while neither is */
   expanded: boolean;
-  /** the Stripe card's first row drops its until-ready clause */
+  /** the Bank card's first row says what Stripe will take off it */
+  stripe_linked: boolean;
+  /** the Stripe card's summary and first row drop their until-ready clause,
+   *  and the Bank card's summary and first row say Stripe receives it */
   stripe_ready: boolean;
   /** the Stripe card sends what it can't receive to the bank, not to held */
   bank_saved: boolean;
@@ -196,10 +212,16 @@ const radio_control =
 function OptionCard({
   option,
   expanded,
+  stripe_linked,
   stripe_ready,
   bank_saved,
 }: IOptionCard) {
   const desc_id = useId();
+  const summary = !stripe_ready
+    ? option_summaries[option]
+    : option === "bank"
+      ? BANK_SUMMARY_WITH_STRIPE
+      : STRIPE_SUMMARY_READY;
   return (
     // the label (Ark's Item) holds the radio, the option's name and its
     // summary; the rows sit beside it, since a label holds phrasing content
@@ -219,7 +241,7 @@ function OptionCard({
             {option_names[option]}
           </Ark.ItemText>
           <span id={desc_id} className="text-sm text-gray-11">
-            {option_summaries[option]}
+            {summary}
           </span>
         </span>
         <Ark.ItemHiddenInput aria-describedby={desc_id} />
@@ -228,10 +250,9 @@ function OptionCard({
         <div className="@container ml-8 border-t border-hairline pt-3">
           <dl className="grid gap-2 text-sm @lg:grid-cols-3 @lg:gap-x-4">
             {rows.map((r) => {
-              if (!r.card) return null;
               const cell =
                 option === "bank"
-                  ? r.card.bank
+                  ? bank_cell(r, stripe_linked, stripe_ready)
                   : stripe_ready && r.card_stripe_ready
                     ? { text: r.card_stripe_ready }
                     : bank_saved
@@ -253,5 +274,27 @@ function OptionCard({
         </div>
       )}
     </div>
+  );
+}
+
+const bank_cell = (r: IRow, stripe_linked: boolean, stripe_ready: boolean) =>
+  stripe_linked && r.bank_with_stripe
+    ? r.bank_with_stripe[stripe_ready ? "ready" : "linked"]
+    : r.card.bank;
+
+interface ICellView {
+  cell: ICell;
+}
+
+/** a cell's sentence, the Held badge leading it when the money waits */
+function Cell({ cell }: ICellView) {
+  if (!cell.held) return <span className="text-gray-11">{cell.text}</span>;
+  return (
+    <span className="inline-flex items-start gap-2">
+      <Badge tone="warning" className="shrink-0">
+        Held
+      </Badge>
+      <span className="text-gray-11">{cell.text}</span>
+    </span>
   );
 }

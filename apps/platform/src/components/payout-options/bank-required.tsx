@@ -20,7 +20,7 @@ export interface IBankRequired {
 const reasons = (i: TConnectIneligibility) =>
   i.reason === "fiscal_sponsored"
     ? "Stripe isn't available to fiscally sponsored nonprofits."
-    : `Stripe isn't available for nonprofits headquartered in ${i.hq_country}. We can send Stripe donations to nonprofits headquartered in ${TRANSFER_COUNTRIES_COPY}.`;
+    : `Stripe isn't available for nonprofits headquartered in ${i.hq_country}. We can send card, bank and wallet donations to a Stripe account for nonprofits headquartered in ${TRANSFER_COUNTRIES_COPY}.`;
 
 /** registration step 4 when the bank payout is the only way to get paid:
  *  for a nonprofit that can't use Stripe, or while Stripe isn't offered */
@@ -45,8 +45,9 @@ export function BankRequired({
               <p className="font-medium">{reasons(ineligible)}</p>
               <p className="text-gray-11">
                 Your bank payout is how you get paid, so it's required. Every
-                donation, Stripe donations included, pays out to your bank,
-                every 3 days once your balance reaches your payout minimum.
+                donation, including card, bank and wallet donations, pays out to
+                your bank, every 3 days once your balance reaches your payout
+                minimum.
               </p>
             </>
           ) : (
