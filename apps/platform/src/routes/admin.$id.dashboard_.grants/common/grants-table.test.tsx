@@ -33,16 +33,17 @@ describe("grants table — a returned grant", () => {
     await expect
       .element(screen.getByText("Returned", { exact: true }))
       .toBeVisible();
-    expect(screen.getByText(WHY).query()).toBeNull();
+    expect(screen.getByRole("tooltip").query()).toBeNull();
     await screen.getByRole("button", { name: "What Returned means" }).click();
-    await expect.element(screen.getByText(WHY, { exact: true })).toBeVisible();
+    await expect
+      .element(screen.getByRole("tooltip", { name: WHY }))
+      .toBeVisible();
   });
 
   test("gives any other grant nothing extra", async () => {
     const screen = await render(<GrantsTable items={[grant("g2", 960.4)]} />);
     await expect.element(screen.getByText("$960.40")).toBeVisible();
     expect(screen.getByText("Returned").query()).toBeNull();
-    expect(screen.getByText(WHY).query()).toBeNull();
     expect(screen.getByRole("button").query()).toBeNull();
   });
 

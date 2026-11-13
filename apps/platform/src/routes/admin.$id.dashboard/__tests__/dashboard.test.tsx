@@ -886,7 +886,9 @@ describe("dashboard — returned payout notice", () => {
       .toBeVisible();
     await screen.getByRole("button", { name: "What Returned means" }).click();
     await expect
-      .element(screen.getByText(/Your bank sent this back/))
+      .element(
+        screen.getByRole("tooltip", { name: /Your bank sent this back/ })
+      )
       .toBeVisible();
   });
 

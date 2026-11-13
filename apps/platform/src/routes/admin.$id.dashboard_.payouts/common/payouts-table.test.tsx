@@ -1,5 +1,6 @@
 import { createRoutesStub } from "react-router";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
+import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import type { IPayout, PayoutStatus } from "@/payouts";
 import { PayoutsTable } from "./payouts-table";
@@ -30,9 +31,16 @@ const render_table = (items: IPayout[]) => {
 };
 
 describe("payouts table — returned and void", () => {
+  // an open tooltip is portaled out of the render and would cover the next test's button
+  afterEach(async () => {
+    await userEvent.keyboard("{Escape}");
+  });
+
   test("a returned and a void payout each get a (!) button, and no other row does", async () => {
     const screen = await render_table(ITEMS);
-    await expect.element(screen.getByText("Returned")).toBeVisible();
+    await expect
+      .element(screen.getByText("Returned", { exact: true }))
+      .toBeVisible();
     // four payouts, no explanation rows
     expect(screen.container.querySelectorAll("tbody tr")).toHaveLength(4);
     await expect
@@ -49,10 +57,9 @@ describe("payouts table — returned and void", () => {
     await screen.getByRole("button", { name: "What Returned means" }).click();
     await expect
       .element(
-        screen.getByText(
-          "Your bank sent this back, and the money is in your balance. Update your bank details; it goes out again once the new ones are approved.",
-          { exact: true }
-        )
+        screen.getByRole("tooltip", {
+          name: "Your bank sent this back, and the money is in your balance. Update your bank details; it goes out again once the new ones are approved.",
+        })
       )
       .toBeVisible();
   });
@@ -61,7 +68,7 @@ describe("payouts table — returned and void", () => {
     const screen = await render_table(ITEMS);
     await screen.getByRole("button", { name: "What Void means" }).click();
     await expect
-      .element(screen.getByText("Not counted as a grant.", { exact: true }))
+      .element(screen.getByRole("tooltip", { name: "Not counted as a grant." }))
       .toBeVisible();
   });
 
