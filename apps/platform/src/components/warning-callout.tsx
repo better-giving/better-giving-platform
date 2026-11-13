@@ -30,12 +30,7 @@ export function WarningCallout({
         <h2 id={title_id} className="text-base">
           {title}
         </h2>
-        {/* a shorter measure beside an action, which takes the row's end */}
-        <p
-          className={`text-sm mt-0.5 ${action ? "max-w-[70ch]" : "max-w-[80ch]"}`}
-        >
-          {children}
-        </p>
+        <p className="text-sm mt-0.5 max-w-[70ch]">{children}</p>
       </div>
       {action && (
         <div className="shrink-0 md:self-center max-md:col-start-2 max-md:justify-self-start max-md:mt-2">

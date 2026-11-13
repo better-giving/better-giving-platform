@@ -136,6 +136,71 @@ describe("banking application review — account holder", () => {
       .toHaveAttribute("aria-disabled", "true");
   });
 
+  test("an under-review application with a mismatch shows both the badge and the callout", async () => {
+    const screen = await render_page(
+      data({ holder_match: "mismatch", own_account: true })
+    );
+    await expect
+      .element(screen.getByText("Doesn't match", { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByRole("region", { name: MISMATCH_TITLE }))
+      .toBeVisible();
+    await expect
+      .element(
+        screen.getByRole("region", {
+          name: "This is Better Giving's own bank account",
+        })
+      )
+      .toBeVisible();
+  });
+
+  test.each([
+    "approved",
+    "default",
+    "rejected",
+  ] as const)("a %s application keeps the badge and drops the holder callout", async (status) => {
+    const d = data({ holder_match: "mismatch", own_account: false });
+    const screen = await render_page({ ...d, ba: { ...d.ba, status } });
+    await expect
+      .element(screen.getByText("Doesn't match", { exact: true }))
+      .toBeVisible();
+    expect(screen.getByRole("region").query()).toBeNull();
+  });
+
+  test("an approved application on Better Giving's own account still calls it out", async () => {
+    const d = data({ holder_match: "mismatch", own_account: true });
+    const screen = await render_page({
+      ...d,
+      ba: { ...d.ba, status: "approved" },
+    });
+    await expect
+      .element(
+        screen.getByRole("region", {
+          name: "This is Better Giving's own bank account",
+        })
+      )
+      .toBeVisible();
+    expect(
+      screen.getByRole("region", { name: MISMATCH_TITLE }).query()
+    ).toBeNull();
+  });
+
+  test("a decided application with no legal name keeps the badge and drops the callout", async () => {
+    const d = data({ legal_name: "", holder_match: "no_legal_name" });
+    const screen = await render_page({
+      ...d,
+      ba: { ...d.ba, status: "approved" },
+    });
+    expect(
+      screen
+        .getByRole("definition")
+        .getByText("No legal name on file", { exact: true })
+        .all()
+    ).toHaveLength(2);
+    expect(screen.getByRole("region").query()).toBeNull();
+  });
+
   test("no holder rows while wise is unreachable", async () => {
     const screen = await render_page(data({ wacc_unavailable: true }));
     await expect
