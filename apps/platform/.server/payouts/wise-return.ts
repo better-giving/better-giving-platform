@@ -1,10 +1,11 @@
 /**
  * a grants run's wise transfer that came back (`funds_refunded`): the npo was
  * never paid, so its books go back to where the run found them, and its
- * payouts wait in `returned` for its next approved bank account
- * (`./resend-returned`). what each record becomes, for a run that claimed
- * payouts P (gross G = payout_total(P)), withheld R it owed and paid Q it was
- * due back (net N = G - R + Q, the settlement's amount and what wise sent):
+ * payouts wait in `returned` until its grants are no longer held
+ * (`./resend-returned`, asked again once the return commits, for an account
+ * that changed while the transfer was out). what each record becomes, for a
+ * run that claimed payouts P (gross G = payout_total(P)), withheld R it owed
+ * and paid Q it was due back (net N = G - R + Q, the settlement's amount and what wise sent):
  *
  * - settlement: `status` 'returned', which ends polling and makes a second
  *   detection change nothing. amount, date and sources stay, so the grants page
@@ -58,6 +59,7 @@ import {
 } from "../pg/queries/payout";
 import { reverse_unfunded_payout_loss } from "../refund/unfunded";
 import { lock_run } from "./owed-run";
+import { resend_returned } from "./resend-returned";
 import { payout_cents, payout_total } from "./transfer";
 
 /** the state a settlement takes once its money is back in the npo's books */
@@ -115,7 +117,29 @@ export async function return_settlement(id: string): Promise<ReturnResult> {
     return { status: "failed" };
   }
   await announce(out.res, out.s, out.npo_name);
+  if (out.res.status === "returned" && out.s?.npo_id != null) {
+    await resend_after_return(out.s.npo_id);
+  }
   return out.res;
+}
+
+/** an account approved or made default after the transfer was sent found
+ * nothing returned to re-send then, so the payouts just returned go out
+ * again now unless the npo is held. reported, never thrown past the return
+ * that already committed */
+async function resend_after_return(npo_id: number) {
+  try {
+    const res = await resend_returned(npo_id);
+    if (res.status !== "resent") return;
+    await alert({
+      type: "NOTICE",
+      title: `Returned payouts re-sent for npo:${npo_id}`,
+      body: "the npo's account that grants pay was approved or made default after the returned transfer was sent: these payouts are pending again and go out with the next grants run",
+      fields: [{ name: "payout_ids", value: res.ids.join(", ") }],
+    });
+  } catch (err) {
+    report_error(err, { npo_id });
+  }
 }
 
 async function take_back(
@@ -267,9 +291,10 @@ async function announce(
 /** a transfer's wise state by its id */
 export type TransferState = (transfer_id: number) => Promise<string>;
 
-/** stored states nothing polls again: ours once the money is back, and wise's
- * ends for a transfer that never paid out */
-const FINAL = [RETURNED, "charged_back", "cancelled"] as const;
+/** stored states nothing polls again: ours once the money is back, and
+ * `charged_back`. not `cancelled`: every polled transfer was funded, and a
+ * funded one passes through `cancelled` on its way to `funds_refunded` */
+const FINAL = [RETURNED, "charged_back"] as const;
 const WINDOW_DAYS = 90;
 
 /**
@@ -323,12 +348,13 @@ export async function poll_wise_returns(state_of: TransferState) {
   }
 }
 
-/** an alert that fails to send is reported, never thrown past the money */
-export async function alert(a: Omit<Alert, "from" | "type">) {
+/** an alert that fails to send is reported, never thrown past the money;
+ * an `ERROR` unless `type` says otherwise */
+export async function alert(a: Omit<Alert, "from">) {
   try {
     await aws_monitor.send_alert({
-      ...a,
       type: "ERROR",
+      ...a,
       from: `wise-returns:${stage}`,
     });
   } catch (err) {

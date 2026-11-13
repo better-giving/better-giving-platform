@@ -339,9 +339,10 @@ export async function settlements_to_poll(
 
 /** the npo's latest settlement whose transfer came back; null when none did */
 export async function npo_last_return(
-  npo_id: number
+  npo_id: number,
+  db_: DbOrTx = db
 ): Promise<Pick<SettlementRow, "id" | "date"> | null> {
-  const [row] = await db
+  const [row] = await db_
     .select({ id: settlements.id, date: settlements.date })
     .from(settlements)
     .where(

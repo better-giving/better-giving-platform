@@ -74,6 +74,7 @@ const { owed_amounts, owed_entries, owed_notices } = await import(
   "../pg/schema/owed"
 );
 const { create_test_db } = await import("../pg/test-utils/pglite");
+const { banking_apps } = await import("../pg/schema/banking");
 const { npos } = await import("../pg/schema/npo");
 const { payouts, settlements } = await import("../pg/schema/payout");
 
@@ -101,6 +102,7 @@ beforeEach(async () => {
   await db().delete(dists);
   await db().delete(donations);
   await db().delete(settlements);
+  await db().delete(banking_apps);
   await db().delete(npos);
 });
 
@@ -659,18 +661,82 @@ describe("poll_wise_returns", () => {
     await seed_settlement(npo.id, "1002", { status: "outgoing_payment_sent" });
     await seed_settlement(npo.id, "1003", { status: "returned" });
     await seed_settlement(npo.id, "1004", { status: "charged_back" });
+    // funded, so on wise's way to `funds_refunded`
     await seed_settlement(npo.id, "1005", { status: "cancelled" });
     await seed_settlement(npo.id, "1006", { date: "2026-08-13T00:00:00.000Z" });
     await seed_settlement(npo.id, "1007", { date: "2026-08-14T12:00:00.000Z" });
-    // a recovered run: no transfer behind it
-    await seed_settlement(npo.id, "ref-0", { other_id: null, amount: 0 });
+    // one per guard on a row with no transfer behind it: no ref, nothing sent
+    await seed_settlement(npo.id, "1008", { other_id: null });
+    await seed_settlement(npo.id, "1009", { amount: 0 });
     const lookup = vi.fn(async (_: number) => "outgoing_payment_sent");
 
     await poll_wise_returns(lookup);
 
     expect(lookup.mock.calls.map(([id]) => id).sort()).toEqual([
-      1001, 1002, 1007,
+      1001, 1002, 1005, 1007,
     ]);
+  });
+
+  test("a transfer seen cancelled is polled on, and its money coming back takes the run back", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    const transfer = await sent(npo, ["p-1"]);
+
+    await poll_wise_returns(async () => "cancelled");
+    expect(await status_of(transfer)).toBe("cancelled");
+    await poll_wise_returns(async () => "funds_refunded");
+
+    expect(await status_of(transfer)).toBe("returned");
+    expect(await payout_types()).toEqual({ "p-1": "returned" });
+    expect(await npo_cash(npo.id)).toBe(500);
+    expect(send_alert.mock.calls.map(([a]) => a.title)).toEqual([
+      `Wise transfer cancelled: npo:${npo.id}`,
+      `Wise transfer returned for npo:${npo.id}`,
+    ]);
+  });
+
+  /** the npo's account the grants run pays, approved or made default at `at` */
+  const seed_default_bank = (npo_id: number, at: string) =>
+    db()
+      .insert(banking_apps)
+      .values({
+        id: "bank-1",
+        npo_id,
+        status: "default",
+        date_created: at,
+        updated_at: at,
+      });
+
+  test("a return found after the npo's account changed re-sends its payouts, and tells ops", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    const transfer = await sent(npo, ["p-1"]);
+    await seed_default_bank(npo.id, "2026-11-12T13:00:00.000Z");
+
+    await poll_wise_returns(async () => "funds_refunded");
+
+    expect(await status_of(transfer)).toBe("returned");
+    expect(await payout_types()).toEqual({ "p-1": "pending" });
+    expect(await npo_cash(npo.id)).toBe(500);
+    const notice = send_alert.mock.calls
+      .map(([a]) => a)
+      .find((a) => a.title === `Returned payouts re-sent for npo:${npo.id}`);
+    expect(notice).toMatchObject({
+      type: "NOTICE",
+      fields: [{ name: "payout_ids", value: "p-1" }],
+    });
+  });
+
+  test("a return found while the npo still pays the account it was sent to keeps its payouts returned", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    await seed_default_bank(npo.id, "2026-11-01T00:00:00.000Z");
+    await sent(npo, ["p-1"]);
+
+    await poll_wise_returns(async () => "funds_refunded");
+
+    expect(await payout_types()).toEqual({ "p-1": "returned" });
+    expect(send_alert).toHaveBeenCalledOnce();
   });
 
   test("stores each observed state that changed, and tells no one of an ordinary one", async () => {
