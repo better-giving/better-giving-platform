@@ -3,6 +3,7 @@ import { render } from "vitest-browser-react";
 
 vi.mock("#/helpers/upload-file", () => ({
   uploadFile: vi.fn(),
+  upload_document: vi.fn(),
 }));
 
 import { createRoutesStub } from "react-router";

@@ -124,6 +124,24 @@ describe("FileDropzone", () => {
     expect(dropzone?.contains(link!)).toBe(false);
   });
 
+  test("links to where the app serves the stored value when view_href is given", async () => {
+    const screen = await render(
+      <FileDropzone
+        dropzone_name="Supporting document"
+        value="https://example.com/a.pdf"
+        view_href={(v) => `/docs?ref=${encodeURIComponent(v)}`}
+        onChange={vi.fn()}
+        specs={specs}
+        upload={upload_mock}
+        report_error={report_error_mock}
+      />
+    );
+    const link = screen.container.querySelector("a");
+    expect(link?.getAttribute("href")).toBe(
+      "/docs?ref=https%3A%2F%2Fexample.com%2Fa.pdf"
+    );
+  });
+
   test("shows error message when error prop is set", async () => {
     const on_change = vi.fn();
     const screen = await render(

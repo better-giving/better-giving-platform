@@ -93,6 +93,7 @@ vi.mock("#/components/bank-details", () => ({
 // --- imports (after mocks hoisted) ---
 
 import { get_session } from "#/.server/auth";
+import { doc_href } from "@/docs";
 import { reg_put } from "$/pg/queries/registration";
 import { create_test_db } from "$/pg/test-utils/pglite";
 import Banking, { action, loader } from "./route";
@@ -276,7 +277,7 @@ describe("registration step 4: choose how you get paid", () => {
     await expect.element(bank.getByText("999", { exact: true })).toBeVisible();
     await expect
       .element(bank.getByRole("link", { name: "Bank statement" }))
-      .toHaveAttribute("href", "https://example.com/bank.pdf");
+      .toHaveAttribute("href", doc_href("https://example.com/bank.pdf"));
     await expect
       .element(
         screen.getByRole("heading", { name: "Bank payout", exact: true })
@@ -494,7 +495,7 @@ describe("registration step 4: choose how you get paid", () => {
         .element(
           saved_bank(screen).getByRole("link", { name: "Bank statement" })
         )
-        .toHaveAttribute("href", "https://example.com/new.pdf");
+        .toHaveAttribute("href", doc_href("https://example.com/new.pdf"));
       await expect
         .element(
           screen.getByRole("heading", { name: "Bank payout", exact: true })
@@ -559,7 +560,7 @@ describe("registration step 4: choose how you get paid", () => {
         .element(
           saved_bank(screen).getByRole("link", { name: "Bank statement" })
         )
-        .toHaveAttribute("href", "https://example.com/new.pdf");
+        .toHaveAttribute("href", doc_href("https://example.com/new.pdf"));
     }, 30_000);
   });
 
