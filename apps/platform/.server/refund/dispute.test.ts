@@ -67,6 +67,7 @@ import {
 } from "../pg/queries/owed";
 import { create_test_db } from "../pg/test-utils/pglite";
 import { dispute_opened, dispute_won } from "./dispute";
+import { enqueue } from "../kit/queue";
 import { reverse_charge } from "./reverse";
 
 // --- setup ---
@@ -1228,6 +1229,24 @@ describe("a gift whose grant transfer came back", () => {
     };
   };
 
+  /** the gift's loss logs, the figures the platform took */
+  const losses_of = async (id: string) => {
+    const db = test_db.current!.db;
+    const rows = await db
+      .select()
+      .from(loss_logs)
+      .where(eq(loss_logs.donation_id, id));
+    return rows.map((l) => ({
+      id: l.id,
+      npo_id: l.npo_id,
+      type: l.type,
+      amount: l.amount,
+      npo_amount: l.npo_amount,
+      fees_bg: l.fees_bg,
+      fees_processing: l.fees_processing,
+    }));
+  };
+
   test.each(["pending", "returned"] as const)(
     "a full refund of a %s payout cancels it and takes its cash back, owing nothing",
     async (payout) => {
@@ -1320,7 +1339,7 @@ describe("a gift whose grant transfer came back", () => {
     }
   );
 
-  test("a full refund of a void payout leaves it void, taking and owing nothing of its cash share", async () => {
+  test("a full refund of a void payout leaves it void, owing nothing, and books the platform's loss", async () => {
     const { id, npo_ids } = await seed({ ...PAID_GRANT, payout: "void" });
     const npo_id = npo_ids[0]!;
 
@@ -1328,11 +1347,22 @@ describe("a gift whose grant transfer came back", () => {
 
     expect(await books_of(id, npo_id)).toEqual({
       npo: { cash: 0, liq: 0, lock_units: 0 },
-      dist: { status: "refunded", refund_status: "completed" },
+      dist: { status: "refunded", refund_status: "loss" },
       payout: "void",
-      donation: "refunded",
+      donation: "refunded_loss",
       owed: [],
     });
+    expect(await losses_of(id)).toEqual([
+      {
+        id: `void:dist-${id}-0`,
+        npo_id,
+        type: "payout",
+        amount: expect.closeTo(100, 6),
+        npo_amount: 90,
+        fees_bg: 6.8,
+        fees_processing: 3.2,
+      },
+    ]);
   });
 
   test("a partial refund of a void payout records nothing owed and says why", async () => {
@@ -1343,6 +1373,9 @@ describe("a gift whose grant transfer came back", () => {
     expect(res).toMatchObject({ status: "partial_pending" });
     expect(await owed_of(id)).toEqual([]);
     expect(await balance_of(test_db.current!.db, npo_ids[0]!)).toBe(0);
+    expect(JSON.stringify(vi.mocked(enqueue).mock.calls)).toMatch(
+      /not owed: dist [^"]* its grant payout is void, so nothing of it is recorded as owed/
+    );
   });
 
   /** a void payout's cash share was never a grant: the platform takes its
@@ -1369,12 +1402,23 @@ describe("a gift whose grant transfer came back", () => {
         end === "lost"
           ? {
               npo: { cash: 0, liq: 0, lock_units: 0 },
-              dist: { status: "refunded", refund_status: "completed" },
+              dist: { status: "refunded", refund_status: "loss" },
               payout: "void",
-              donation: "refunded",
+              donation: "refunded_loss",
               owed: [],
             }
           : at_open
+      );
+      expect(await losses_of(id)).toEqual(
+        end === "lost"
+          ? [
+              expect.objectContaining({
+                id: `void:dist-${id}-0`,
+                type: "payout",
+                npo_amount: 90,
+              }),
+            ]
+          : []
       );
     }
   );
@@ -1386,7 +1430,7 @@ describe("a gift whose grant transfer came back", () => {
       savings: 50,
     };
 
-    test("a full refund takes the savings share back, and nothing of the void cash share", async () => {
+    test("a full refund takes the savings share back, and books the void cash share as the platform's loss", async () => {
       const { id, npo_ids } = await seed(HALF_SAVED);
       const npo_id = npo_ids[0]!;
       expect((await books_of(id, npo_id)).npo).toEqual({
@@ -1399,11 +1443,22 @@ describe("a gift whose grant transfer came back", () => {
 
       expect(await books_of(id, npo_id)).toEqual({
         npo: { cash: 0, liq: 0, lock_units: 0 },
-        dist: { status: "refunded", refund_status: "completed" },
+        dist: { status: "refunded", refund_status: "loss" },
         payout: "void",
-        donation: "refunded",
+        donation: "refunded_loss",
         owed: [],
       });
+      expect(await losses_of(id)).toEqual([
+        {
+          id: `void:dist-${id}-0`,
+          npo_id,
+          type: "payout",
+          amount: expect.closeTo(50, 6),
+          npo_amount: 45,
+          fees_bg: 3.4,
+          fees_processing: 1.6,
+        },
+      ]);
     });
 
     test("a partial refund leaves its books and records nothing owed", async () => {
@@ -1441,13 +1496,16 @@ describe("a gift whose grant transfer came back", () => {
       });
       expect(await books_of(id, npo_id)).toEqual({
         npo: { cash: 0, liq: 0, lock_units: 0 },
-        dist: { status: "refunded", refund_status: "completed" },
+        dist: { status: "refunded", refund_status: "loss" },
         payout: "void",
-        donation: "refunded",
+        donation: "refunded_loss",
         owed: [
           expect.objectContaining({ received_usd: 45, outstanding_usd: 9.1 }),
         ],
       });
+      expect(await losses_of(id)).toEqual([
+        expect.objectContaining({ type: "payout", npo_amount: 45 }),
+      ]);
     });
 
     test("a dispute won leaves the savings and owes nothing", async () => {

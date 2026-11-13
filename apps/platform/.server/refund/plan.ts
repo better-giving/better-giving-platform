@@ -1,6 +1,7 @@
 import type { IBalanceTx } from "@/balance-txs";
 import { humanize } from "@/helpers/decimal";
 import { is_unsent } from "@/payouts";
+import type { ILossLog } from "@/revenue/interfaces";
 import type { IBalanceDeltas } from "@/types/donation";
 import type { IOwedRecord, OwedParty } from "../pg/queries/owed";
 
@@ -115,7 +116,8 @@ export type RefundEffect =
   | { kind: "form_decrement"; form_id: string; net: number }
   | { kind: "program_decrement"; program_id: string; net: number }
   | { kind: "donation_message_del"; donation_id: string }
-  | { kind: "owed"; owed: OwedFigure };
+  | { kind: "owed"; owed: OwedFigure }
+  | { kind: "loss_log"; loss: ILossLog };
 
 /** what a party owes back on the dist; the refund or dispute behind it is the caller's */
 export type OwedFigure = Omit<IOwedRecord, "source" | "source_ref">;
@@ -127,6 +129,8 @@ export interface RefundPreview {
 }
 
 export interface RefundPlan {
+  /** the refund ends `refunded_loss`: the npo is short of what it received
+   * (and owes it), or its payout is void (and the platform takes the loss) */
   is_loss: boolean;
   loss_reasons: string[];
   /** what each party owes in usd, as the plan sees it. the npo's — on the loss
@@ -221,10 +225,13 @@ export function calc_refund_plan(
         cash: (alloc.cash / 100) * net,
       };
   // a void payout is not a grant, and its cash left the npo's balance when
-  // it settled: the cash share is neither there to take back nor owed
-  let cash_void = 0;
-  if (payout?.type === "void") {
-    cash_void = bd.cash;
+  // it settled: the cash share is neither there to take back nor owed, so
+  // the platform takes its loss, its part of the card fee included
+  const void_payout = payout?.type === "void" ? payout : null;
+  const cash_void = void_payout ? bd.cash : 0;
+  // the part of the dist its npo can owe for: `owable_part` in ./share
+  const owable = void_payout ? 1 - alloc.cash / 100 : 1;
+  if (void_payout) {
     bd.cash = 0;
     payout = null;
   }
@@ -289,7 +296,7 @@ export function calc_refund_plan(
     preview.effects.push({
       label: "Grant payout",
       pass: true,
-      reason: `$${humanize(cash_void)} payout is void, so nothing of it is taken back or owed`,
+      reason: `$${humanize(cash_void)} payout is void: the platform takes its loss, and nothing of it is taken back or owed`,
     });
   }
 
@@ -359,6 +366,11 @@ export function calc_refund_plan(
     preview.effects.push({ label: "No balance changes", pass: true });
   }
 
+  // the npo can't reverse what it received, so it owes it
+  const npo_short = loss_reasons.length > 0;
+  if (void_payout && cash_void > 0) {
+    loss_reasons.push(`payout ${void_payout.id} is void`);
+  }
   const is_loss = loss_reasons.length > 0;
   const status: "refunded" | "refunded_loss" = is_loss
     ? "refunded_loss"
@@ -374,7 +386,7 @@ export function calc_refund_plan(
     received_usd: net - cash_recovered - cash_void,
     fee_processing_usd: scaled(
       fee_processing_usd(dist),
-      past_cut(dist.refunds_cut_share, 1)
+      past_cut(dist.refunds_cut_share, 1) * owable
     ),
     now,
   };
@@ -391,7 +403,7 @@ export function calc_refund_plan(
     });
   }
 
-  if (is_loss && cash_recovered > 0) {
+  if (npo_short && cash_recovered > 0) {
     effects.push({
       kind: "balance_update",
       npo_id: dist.to_id,
@@ -401,7 +413,7 @@ export function calc_refund_plan(
 
   // balance/NAV writes — only when fully reversible, and only for a gift
   // the revised terms let us take ungranted funds back from
-  if (!is_loss && !dist.routed && recovery_applies) {
+  if (!npo_short && !dist.routed && recovery_applies) {
     const refund_deltas: IBalanceDeltas = {
       liq: bd.liq,
       lock: bd.lock,
@@ -514,10 +526,39 @@ export function calc_refund_plan(
     donation_id: dist.donation_id,
   });
 
-  if (is_loss) effects.push({ kind: "owed", owed });
+  if (npo_short) effects.push({ kind: "owed", owed });
+
+  if (void_payout && cash_void > 0) {
+    const void_share = 1 - owable;
+    const fees_bg = scaled(dist.fee_base + dist.fee_fsa, void_share);
+    const fees_processing = scaled(
+      fee_processing_usd(dist),
+      past_cut(dist.refunds_cut_share, 1) * void_share
+    );
+    effects.push({
+      kind: "loss_log",
+      loss: {
+        // one per dist: a retried reversal books nothing more
+        id: `void:${dist.id}`,
+        date: now,
+        donation_id: dist.donation_id,
+        dist_id: dist.id,
+        npo_id: dist.to_id,
+        referrer_user: null,
+        referrer_npo: null,
+        type: "payout",
+        amount: cash_void + fees_bg + fees_processing,
+        npo_amount: cash_void,
+        fees_bg,
+        fees_processing,
+        reason: `payout ${void_payout.id} is void`,
+        actor: null,
+      },
+    });
+  }
 
   const amount: RefundPlan["amount"] = [];
-  if (is_loss) {
+  if (npo_short) {
     const usd = owed.received_usd + owed.fee_processing_usd;
     amount.push({ party: owed.party, usd });
   }

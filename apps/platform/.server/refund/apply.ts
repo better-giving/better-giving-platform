@@ -16,6 +16,7 @@ import { commission_refund } from "../pg/queries/referrer";
 import { rev_log_update_status } from "../pg/queries/revenue";
 import { dists } from "../pg/schema/dist";
 import { referrer_commissions } from "../pg/schema/referrer";
+import { loss_logs } from "../pg/schema/revenue";
 import type { OwedFigure, ReferrerParty, RefundPlan } from "./plan";
 
 /** another writer moved the plan's payout since: out of `pending`/`returned`
@@ -108,6 +109,12 @@ export async function apply_refund_plan(
         break;
       case "owed":
         res.owed.push(await record_owed(tx, { ...e.owed, ...src }));
+        break;
+      case "loss_log":
+        await tx
+          .insert(loss_logs)
+          .values(e.loss)
+          .onConflictDoNothing({ target: loss_logs.id });
         break;
     }
   }
