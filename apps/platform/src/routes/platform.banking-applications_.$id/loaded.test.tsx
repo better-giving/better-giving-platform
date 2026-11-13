@@ -138,7 +138,7 @@ describe("banking application review — account holder", () => {
 
   test("an under-review application with a mismatch shows both the badge and the callout", async () => {
     const screen = await render_page(
-      data({ holder_match: "mismatch", own_account: true })
+      data({ holder_match: "mismatch", own_account: false })
     );
     await expect
       .element(screen.getByText("Doesn't match", { exact: true }))
@@ -146,6 +146,16 @@ describe("banking application review — account holder", () => {
     await expect
       .element(screen.getByRole("region", { name: MISMATCH_TITLE }))
       .toBeVisible();
+  });
+
+  test("an under-review application on Better Giving's own account with a mismatch shows only the own-account callout", async () => {
+    const screen = await render_page(
+      data({
+        account_holder: "Better Giving",
+        holder_match: "mismatch",
+        own_account: true,
+      })
+    );
     await expect
       .element(
         screen.getByRole("region", {
@@ -153,6 +163,12 @@ describe("banking application review — account holder", () => {
         })
       )
       .toBeVisible();
+    await expect
+      .element(screen.getByText("Doesn't match", { exact: true }))
+      .toBeVisible();
+    expect(
+      screen.getByRole("region", { name: MISMATCH_TITLE }).query()
+    ).toBeNull();
   });
 
   test.each(["approved", "default", "rejected"] as const)(

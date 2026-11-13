@@ -13,8 +13,11 @@ export function Loaded(props: LoaderData) {
   const is_rejected = props.ba.status === "rejected";
   const prev_verdict = is_approved || is_rejected;
   // the holder callouts ask for a decision; the row badges stay true after
-  // one. the own-account callout stays: an approved one still pays us
+  // one. the own-account callout stays after one too: whatever the verdict,
+  // it says why this account must never carry the nonprofit's payouts
   const awaits_verdict = props.ba.status === "under-review";
+  // our own account can't be approved, so there's no approval to confirm
+  const asks_holder_check = awaits_verdict && !props.own_account;
 
   return (
     <>
@@ -55,7 +58,7 @@ export function Loaded(props: LoaderData) {
             : "Payouts to it never reach the nonprofit, so it can't be approved."}
         </WarningCallout>
       )}
-      {awaits_verdict && props.holder_match === "mismatch" && (
+      {asks_holder_check && props.holder_match === "mismatch" && (
         <WarningCallout title="The account holder doesn't match the legal name">
           This account is held by {closed(props.account_holder ?? "")} The
           nonprofit's legal name is {closed(props.legal_name ?? "")} Approving
@@ -63,7 +66,7 @@ export function Loaded(props: LoaderData) {
           the nonprofit first.
         </WarningCallout>
       )}
-      {awaits_verdict && props.holder_match === "no_legal_name" && (
+      {asks_holder_check && props.holder_match === "no_legal_name" && (
         <WarningCallout title="No legal name on file">
           We can't check this account's holder against the nonprofit's name.
           Confirm the account holder with the nonprofit first.
