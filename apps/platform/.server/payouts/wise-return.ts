@@ -256,7 +256,7 @@ async function announce(
   const ids = (xs: string[]) => xs.join(", ");
   await alert({
     title: `Wise transfer returned for npo:${s.npo_id}`,
-    body: "the npo's cash is credited back and its payouts wait as returned until a new bank account is approved, then go out with the next grants run",
+    body: "the npo's cash is credited back and its payouts wait as returned until a newer approved account is the one grants pay, then go out with the next grants run (at once, if that account was already approved or made default while the transfer was out)",
     fields: [
       ...base,
       { name: "amount", value: res.credited.toString() },
