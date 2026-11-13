@@ -296,7 +296,7 @@ export function calc_refund_plan(
     preview.effects.push({
       label: "Grant payout",
       pass: true,
-      reason: `$${humanize(cash_void)} payout is void: the platform takes its loss, and nothing of it is taken back or owed`,
+      reason: `$${humanize(cash_void)} payout is void: nothing of it is taken back or owed, and the platform takes the loss`,
     });
   }
 
@@ -366,7 +366,8 @@ export function calc_refund_plan(
     preview.effects.push({ label: "No balance changes", pass: true });
   }
 
-  // the npo can't reverse what it received, so it owes it
+  // read before the void reason joins: the reasons so far are the npo's,
+  // which can't reverse what it received and so owes it
   const npo_short = loss_reasons.length > 0;
   if (void_payout && cash_void > 0) {
     loss_reasons.push(`payout ${void_payout.id} is void`);
