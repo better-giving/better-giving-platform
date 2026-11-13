@@ -4,6 +4,7 @@ import { put } from "@vercel/blob";
 import { and, asc, eq, gt, like, or } from "drizzle-orm";
 import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DOC_PREFIX } from "../.server/blob-upload";
+import { doc_source } from "../.server/doc-access";
 import { db } from "../.server/pg/db";
 import { banking_apps } from "../.server/pg/schema/banking";
 import { doc_url_aliases } from "../.server/pg/schema/doc-alias";
@@ -73,15 +74,10 @@ const targets: ITarget[] = [
 
 const PUBLIC_HOST = ".public.blob.vercel-storage.com";
 
-export const is_public_url = (v: string | null | undefined): v is string => {
-  if (!v) return false;
-  try {
-    const u = new URL(v);
-    return u.protocol === "https:" && u.hostname.endsWith(PUBLIC_HOST);
-  } catch {
-    return false;
-  }
-};
+/** a url in one of our own public stores: the only kind `/api/docs` reads, so
+ * the only kind worth copying */
+export const is_public_url = (v: string | null | undefined): v is string =>
+  !!v && doc_source(v)?.source === "legacy";
 
 export interface IDeps {
   fetch: typeof fetch;

@@ -243,6 +243,14 @@ describe("a reference that names nothing", () => {
     ["a url off our stores", "https://evil.example/docs/u-owner/x.pdf"],
     ["a file url", "file:///etc/passwd"],
     [
+      "a held url with a fragment added",
+      "https://store1.private.blob.vercel-storage.com/docs/u-owner/id-abc.pdf#a",
+    ],
+    [
+      "a held url with a query added",
+      "https://store1.private.blob.vercel-storage.com/docs/u-owner/id-abc.pdf?a=1",
+    ],
+    [
       "a malformed escape",
       "https://legacy1.public.blob.vercel-storage.com/u/%E0.pdf",
     ],

@@ -32,6 +32,9 @@ export const doc_source = (
     return undefined;
   }
   if (u.protocol !== "https:" && u.protocol !== "http:") return undefined;
+  // records hold the bare url, and holders are matched on the exact string: a
+  // query or fragment would pass the folder check below with no holder found
+  if (u.search || u.hash) return undefined;
   // an encoded dot segment decodes past the url parser's own normalising
   if (path.split("/").some((s) => s === "." || s === "..")) return undefined;
   // the local blob emulator the verification stub runs stands in for the store

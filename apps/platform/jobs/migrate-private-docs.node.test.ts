@@ -33,9 +33,9 @@ const { doc_url_aliases } = await import("$/pg/schema/doc-alias");
 const { doc_holders } = await import("$/pg/queries/doc-holders");
 const { asc, eq } = await import("drizzle-orm");
 
-const OLD_ID = "https://s.public.blob.vercel-storage.com/u/id-aaa.pdf";
-const OLD_BANK = "https://s.public.blob.vercel-storage.com/bank-bbb.pdf";
-const GONE = "https://s.public.blob.vercel-storage.com/u/gone-ccc.pdf";
+const OLD_ID = "https://testpublic.public.blob.vercel-storage.com/u/id-aaa.pdf";
+const OLD_BANK = "https://testpublic.public.blob.vercel-storage.com/bank-bbb.pdf";
+const GONE = "https://testpublic.public.blob.vercel-storage.com/u/gone-ccc.pdf";
 const PRIVATE = "https://s.private.blob.vercel-storage.com/docs/u1/new-ddd.pdf";
 
 let npo_id = 0;
@@ -134,11 +134,11 @@ describe("is_public_url", () => {
   });
 
   it.each([
-    ["a public store's host as a subdomain of another", "https://s.public.blob.vercel-storage.com.evil.example/u/a.pdf"],
+    ["a public store's host as a subdomain of another", "https://testpublic.public.blob.vercel-storage.com.evil.example/u/a.pdf"],
     ["a host that only ends like a public store", "https://s.xpublic.blob.vercel-storage.com/u/a.pdf"],
-    ["a public store over http", "http://s.public.blob.vercel-storage.com/u/a.pdf"],
-    ["the host in the path", "https://evil.example/s.public.blob.vercel-storage.com/u/a.pdf"],
-    ["the host in the userinfo", "https://s.public.blob.vercel-storage.com@evil.example/u/a.pdf"],
+    ["a public store over http", "http://testpublic.public.blob.vercel-storage.com/u/a.pdf"],
+    ["the host in the path", "https://evil.example/testpublic.public.blob.vercel-storage.com/u/a.pdf"],
+    ["the host in the userinfo", "https://testpublic.public.blob.vercel-storage.com@evil.example/u/a.pdf"],
   ])("is false for %s", (_, url) => {
     expect(is_public_url(url)).toBe(false);
   });
@@ -335,7 +335,7 @@ describe("commit", () => {
         more.map((id) => ({
           id,
           r_id: `${id}@example.com`,
-          r_proof_of_identity: `https://s.public.blob.vercel-storage.com/u/${id}.pdf`,
+          r_proof_of_identity: `https://testpublic.public.blob.vercel-storage.com/u/${id}.pdf`,
         }))
       );
     const m = make();
@@ -364,13 +364,13 @@ describe("commit", () => {
       id: "reg-c",
       r_id: "c@example.com",
       r_proof_of_identity:
-        "https://s.public.blob.vercel-storage.com/u/reg-c.pdf",
+        "https://testpublic.public.blob.vercel-storage.com/u/reg-c.pdf",
     });
     const m = make();
     // a copy at the same url fails the alias's own check, rolling the batch back
     m.put.mockImplementation(async (pathname: string) => ({
       url: pathname.endsWith("reg-c.pdf")
-        ? "https://s.public.blob.vercel-storage.com/u/reg-c.pdf"
+        ? "https://testpublic.public.blob.vercel-storage.com/u/reg-c.pdf"
         : `https://s.private.blob.vercel-storage.com/${pathname}-sfx`,
     }));
     const sum = await run(opts(true), m.deps);
@@ -382,7 +382,7 @@ describe("commit", () => {
       changed: 0,
     });
     expect((await reg("reg-c")).r_proof_of_identity).toBe(
-      "https://s.public.blob.vercel-storage.com/u/reg-c.pdf"
+      "https://testpublic.public.blob.vercel-storage.com/u/reg-c.pdf"
     );
     const text = m.logs.join("\n");
     expect(text).toContain("registrations: batch reg-c failed");
