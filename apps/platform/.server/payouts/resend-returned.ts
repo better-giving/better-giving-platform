@@ -1,6 +1,8 @@
 import { db } from "../pg/db";
 import { npo_default_bapp } from "../pg/queries/banking";
+import type { DbOrTx } from "../pg/queries/helpers";
 import { npo_last_return, returned_payouts_resend } from "../pg/queries/payout";
+import { lock_run } from "./owed-run";
 
 export interface IReturnHold {
   /** the npo's latest returned settlement: the hold alert dedupes on it */
@@ -16,11 +18,12 @@ export interface IReturnHold {
  * the returned payouts leaves it held. null when not held
  */
 export async function npo_return_hold(
-  npo_id: number
+  npo_id: number,
+  db_: DbOrTx = db
 ): Promise<IReturnHold | null> {
-  const last = await npo_last_return(npo_id);
+  const last = await npo_last_return(npo_id, db_);
   if (!last) return null;
-  const pays_to = await npo_default_bapp(npo_id);
+  const pays_to = await npo_default_bapp(npo_id, db_);
   if (!pays_to) {
     return { settlement_id: last.id, reason: "no approved account" };
   }
@@ -42,11 +45,18 @@ export type ResendResult =
 /**
  * an npo's payouts whose transfer came back go out again once its grants are
  * no longer held (`npo_return_hold`); until then they stay `returned`. called
- * when an account is approved or made default; a repeat moves nothing
+ * when an account is approved or made default, and after a return is taken
+ * back; a repeat moves nothing. under the npo's run lock, which
+ * `return_settlement` takes too: a return committing between the hold read
+ * and the move would otherwise have its fresh `returned` payouts re-sent to
+ * the account that bounced them
  */
 export async function resend_returned(npo_id: number): Promise<ResendResult> {
-  const hold = await npo_return_hold(npo_id);
-  if (hold) return { status: "held", reason: hold.reason };
-  const ids = await returned_payouts_resend(db, npo_id);
-  return ids.length > 0 ? { status: "resent", ids } : { status: "none" };
+  return db.transaction(async (tx): Promise<ResendResult> => {
+    await lock_run(tx, `grant_run:npo:${npo_id}`);
+    const hold = await npo_return_hold(npo_id, tx);
+    if (hold) return { status: "held", reason: hold.reason };
+    const ids = await returned_payouts_resend(tx, npo_id);
+    return ids.length > 0 ? { status: "resent", ids } : { status: "none" };
+  });
 }

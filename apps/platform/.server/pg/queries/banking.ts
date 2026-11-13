@@ -83,8 +83,8 @@ export async function npo_bapp_count(npo_id: number) {
  * the choice does not hang on the order postgres returns rows in. `id` breaks
  * a tie. `updated_at` is NOT NULL; the `date_created` fallback is belt and braces
  */
-export async function npo_default_bapp(npo_id: number) {
-  const rows = await db
+export async function npo_default_bapp(npo_id: number, db_: DbOrTx = db) {
+  const rows = await db_
     .select()
     .from(banking_apps)
     .where(

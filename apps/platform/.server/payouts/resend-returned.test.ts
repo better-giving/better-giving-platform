@@ -13,6 +13,7 @@ import type { TestDb } from "../pg/test-utils/pglite";
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
 const sent_mail = vi.hoisted(() => [] as unknown[]);
 const send_alert = vi.hoisted(() => vi.fn());
+const locks = vi.hoisted(() => [] as string[]);
 vi.mock("../pg/db", () => ({
   db: new Proxy({} as any, {
     get(_, prop) {
@@ -22,6 +23,18 @@ vi.mock("../pg/db", () => ({
 }));
 
 vi.mock("$/env", () => ({ base_url: "https://bg.test", stage: "test" }));
+// the real lock, its key recorded: pglite is one connection, so a return
+// racing the re-send can't be interleaved here
+vi.mock("./owed-run", async (io) => {
+  const real = await io<typeof import("./owed-run")>();
+  return {
+    ...real,
+    lock_run: async (...args: Parameters<typeof real.lock_run>) => {
+      locks.push(args[1]);
+      return real.lock_run(...args);
+    },
+  };
+});
 vi.mock("$/pg/queries/user", () => ({
   npo_admins: async () => [{ email: "a@bg.test" }],
 }));
@@ -72,6 +85,7 @@ const npo = (registration_number: string) => ({
 
 beforeEach(async () => {
   sent_mail.length = 0;
+  locks.length = 0;
   send_alert.mockReset();
   await db().delete(payouts);
   await db().delete(settlements);
@@ -204,6 +218,17 @@ describe("resend_returned", () => {
       status: "resent",
       ids: ["p-1"],
     });
+  });
+
+  test("reads the hold and re-sends under the npo's run lock, the one a return takes", async () => {
+    await seed_returned("p-1");
+    await seed_bapp("new", "default", "2026-11-05T00:00:00.000Z");
+
+    expect(await resend_returned(npo_id)).toEqual({
+      status: "resent",
+      ids: ["p-1"],
+    });
+    expect(locks).toEqual([`grant_run:npo:${npo_id}`]);
   });
 
   test("an npo with no account to pay keeps them returned", async () => {
