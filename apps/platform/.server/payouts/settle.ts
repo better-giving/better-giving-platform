@@ -212,8 +212,9 @@ export async function settle_npo_payouts(
       // a loss refund may take a payout in flight; the npo keeps that money
       const moved_on = ids.filter((id) => !settled.includes(id));
       const loss_refunded = await payouts_in(tx, moved_on, "refunded_loss");
-      // the run owns them too: a return finds its payouts by `settled_id`, and
-      // a copy of the run sharing its sources must never take them
+      // stamp these with the run too: a return finds its payouts by
+      // `settled_id`, and a copy of the run sharing its sources must never
+      // take them
       await payouts_own_loss(tx, loss_refunded, transfer_id);
       return moved_on.filter((id) => !loss_refunded.includes(id));
     });
@@ -227,7 +228,7 @@ export async function settle_npo_payouts(
     // the commit may have landed with its reply lost, so the alert says check first
     await alert({
       title: `funded, not recorded for npo:${npo.id}`,
-      body: `do not reset these payouts to pending or pay them again; Wise transfer ${transfer_id} (customerTransactionId ${ref}) was funded. if the payouts are still processing, record the settlement by hand: its settlement amount is the net, ${total}; debit the npo's cash by the gross, ${gross}`,
+      body: `do not reset these payouts to pending or pay them again; Wise transfer ${transfer_id} (customerTransactionId ${ref}) was funded. if the payouts are still processing, record the settlement by hand: its settlement amount is the net, ${total}; debit the npo's cash by the gross, ${gross}; also set settled_id to ${transfer_id} on any of these payouts a refund moved to refunded_loss while the transfer was in flight, or a return of the transfer will not find them`,
       fields: [...fields, { name: "gross", value: gross.toString() }],
     });
     return { status: "unrecorded", ref, transfer_id };
