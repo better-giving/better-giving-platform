@@ -171,6 +171,27 @@ describe("banking application review — account holder", () => {
     ).toBeNull();
   });
 
+  test("an under-review application on Better Giving's own account with no legal name shows only the own-account callout", async () => {
+    const screen = await render_page(
+      data({
+        account_holder: "Better Giving",
+        legal_name: undefined,
+        holder_match: "no_legal_name",
+        own_account: true,
+      })
+    );
+    await expect
+      .element(
+        screen.getByRole("region", {
+          name: "This is Better Giving's own bank account",
+        })
+      )
+      .toBeVisible();
+    expect(
+      screen.getByRole("region", { name: "No legal name on file" }).query()
+    ).toBeNull();
+  });
+
   test.each(["approved", "default", "rejected"] as const)(
     "a %s application keeps the badge and drops the holder callout",
     async (status) => {
