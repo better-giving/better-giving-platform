@@ -66,7 +66,7 @@ vi.mock("remix-client-cache", () => ({
 }));
 
 vi.mock("$/kit/wise", () => ({
-  wise: { v2_account: vi.fn() },
+  wise: { v2_account: vi.fn(), account_details: vi.fn() },
 }));
 
 vi.mock("#/.server/toast", async () => {
@@ -101,7 +101,8 @@ let counter = 0;
 
 const NPO_SEED: Omit<typeof npos.$inferInsert, "id"> = {
   registration_number: "EIN-TEST",
-  name: "Test NPO",
+  // the fixture account is held by Jane Doe, so approving it matches
+  name: "Jane Doe",
   endow_designation: "Charity",
   overview_pt: "[]",
   hq_country: "United States",
@@ -122,6 +123,8 @@ beforeEach(async () => {
   // wise answers by default; the outage cases override it once. the approve
   // action re-checks the account before writing, so it needs one too.
   vi.mocked(wise.v2_account).mockResolvedValue(WISE_FIXTURE as never);
+  // none of the balances we hold shares the fixture's account number
+  vi.mocked(wise.account_details).mockResolvedValue([]);
 });
 
 // --- helpers ---
@@ -297,14 +300,14 @@ describe("application detail", () => {
     await expect
       .element(screen.getByText("US", { exact: true }))
       .toBeInTheDocument();
+    // the badge sits inside the holder's definition, so match the pair
     await expect
-      .element(screen.getByText("Jane Doe", { exact: true }))
-      .toBeInTheDocument();
+      .element(
+        screen.getByRole("definition").filter({ hasText: "Matches legal name" })
+      )
+      .toHaveTextContent("Jane DoeMatches legal name");
     await expect
       .element(screen.getByText("Jane Doe Foundation"))
-      .toBeInTheDocument();
-    await expect
-      .element(screen.getByText("Matches legal name"))
       .toBeInTheDocument();
 
     await expect
@@ -385,7 +388,16 @@ describe("approve flow", () => {
         loader: () => ({ ...WISE_FIXTURE, ba }),
         action,
         children: [
-          { path: "approve", Component: ApprovePage, action },
+          {
+            path: "approve",
+            Component: ApprovePage,
+            loader: () => ({
+              account_holder: "Jane Doe",
+              legal_name: "Jane Doe",
+              holder_match: "match",
+            }),
+            action,
+          },
           {
             path: "success",
             Component: () => <div data-testid="success">OK</div>,
