@@ -406,8 +406,8 @@ describe("verdict dialog", () => {
 });
 
 describe("approval", () => {
-  // first in the block: a successful own-account lookup is held for an hour
-  // per module, so a later failure would never reach the wise call
+  // runs before anything else in this file reads our own accounts: a good read
+  // is held for an hour per module, so a later failure would never reach wise
   it("shows the refusal in the dialog when our own accounts can't be checked", async () => {
     await seed_user();
     const id = await seed_reg(ALL_FIELDS);
