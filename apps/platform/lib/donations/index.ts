@@ -18,6 +18,7 @@ export type {
 } from "./schema";
 export {
   calc_donation_settle,
+  is_cancelled_duplicate,
   is_reversed,
   reversed_statuses,
   type SettleInputs,

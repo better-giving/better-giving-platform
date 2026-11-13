@@ -109,3 +109,52 @@ describe("my donations — a refunded gift's amount", () => {
     expect(struck(amount.element())).toBe(false);
   });
 });
+
+describe("my donations — a cancelled duplicate", () => {
+  test("strikes its amount and tells the donor no refund was made", async () => {
+    const screen = await render_table([
+      row({ status: "cancelled", dist_status: "refunded" }),
+    ]);
+    const cells = screen.getByRole("row").nth(1).getByRole("cell");
+    await expect.element(cells.nth(4)).toBeVisible();
+    expect(cells.nth(4).element().firstElementChild?.textContent).toBe(
+      "Cancelled"
+    );
+    const figure = cells.nth(2).element().querySelector("*") as Element;
+    const struck = [figure, ...figure.querySelectorAll("*")].some((el) =>
+      getComputedStyle(el).textDecorationLine.includes("line-through")
+    );
+    expect(struck).toBe(true);
+    const tip = cells.nth(4).getByRole("button", { name: "More info" });
+    await expect.element(tip).toHaveAccessibleDescription(/Recorded twice/);
+    await expect.element(tip).toHaveAccessibleDescription(/No refund was made/);
+  });
+
+  // a canceled DAF grant or a checkout a campaign's close shut has no dist;
+  // a refunded_loss dist did refund
+  test.each([null, "refunded_loss"] as const)(
+    "a cancelled donation with dist %s reads plain Cancelled: no note, no strike",
+    async (dist_status) => {
+      const screen = await render_table([
+        row({ status: "cancelled", dist_status }),
+      ]);
+      const cells = screen.getByRole("row").nth(1).getByRole("cell");
+      await expect.element(cells.nth(4)).toBeVisible();
+      expect(cells.nth(4).element().textContent).toBe("Cancelled");
+      expect(cells.nth(4).element().querySelector("svg")).toBeNull();
+      const figure = cells.nth(2).element().querySelector("*") as Element;
+      const struck = [figure, ...figure.querySelectorAll("*")].some((el) =>
+        getComputedStyle(el).textDecorationLine.includes("line-through")
+      );
+      expect(struck).toBe(false);
+    }
+  );
+
+  test("a refunded row still says Refunded, with no cancelled note", async () => {
+    const screen = await render_table([row({ status: "refunded" })]);
+    const status = screen.getByRole("row").nth(1).getByRole("cell").nth(4);
+    await expect.element(status).toBeVisible();
+    expect(status.element().firstElementChild?.textContent).toBe("Refunded");
+    expect(status.element().querySelector("svg")).toBeNull();
+  });
+});

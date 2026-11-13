@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 import type { IDonation, IDonationSettled, ISettlement } from "./interfaces";
-import { calc_donation_settle, type SettleResult } from "./settle";
+import {
+  calc_donation_settle,
+  is_cancelled_duplicate,
+  type SettleResult,
+} from "./settle";
 
 const sttl = (overrides: Partial<ISettlement> = {}): ISettlement => ({
   id: "sttl-1",
@@ -385,5 +389,18 @@ describe("calc_donation_settle - rebill", () => {
     });
     expect(r.msgs[0].dedupe).toBe("don.sttl-dist_new-uuid");
     expect(r.msgs[1].dedupe).toBe("don.sttl-receipt_new-uuid");
+  });
+});
+
+describe("is_cancelled_duplicate", () => {
+  test.each([
+    ["cancelled", "refunded", true],
+    ["cancelled", "refunded_loss", false],
+    ["cancelled", "settled", false],
+    ["cancelled", null, false],
+    ["cancelled", undefined, false],
+    ["refunded", "refunded", false],
+  ] as const)("%s donation, %s dist: %s", (donation, dist, expected) => {
+    expect(is_cancelled_duplicate(donation, dist)).toBe(expected);
   });
 });

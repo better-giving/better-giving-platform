@@ -1,10 +1,12 @@
 import { Button, EmptyRow, ExtLink, LoadMoreRow } from "@better-giving/ui";
-import { ArrowDownToLine } from "lucide-react";
+import { Arrow, Content, Tooltip } from "@better-giving/ui/tooltip";
+import { ArrowDownToLine, InfoIcon } from "lucide-react";
 import { href, Link } from "react-router";
+import { cancelled_note } from "#/components/cancelled-note";
 import { Money } from "#/components/money";
 import { PaymentResumer } from "#/pages/user-dashboard/donations/payment-resumer";
 import type { IPaginator } from "#/types/components";
-import { is_reversed, type TStatus } from "@/donations";
+import { is_cancelled_duplicate, is_reversed, type TStatus } from "@/donations";
 import { toPP } from "@/helpers/date";
 import { type IRow, status_label, status_text_color } from "./helpers";
 
@@ -56,6 +58,10 @@ export function Table({
             )
           ) : (
             items.map((row) => {
+              const duplicate = is_cancelled_duplicate(
+                row.status,
+                row.dist_status
+              );
               return (
                 <tr key={row.id}>
                   <td className="whitespace-nowrap">
@@ -100,7 +106,7 @@ export function Table({
                   <td>
                     <Money
                       classes={
-                        is_reversed(row.status)
+                        is_reversed(row.status) || duplicate
                           ? "line-through text-destructive-subtle-fg"
                           : ""
                       }
@@ -119,6 +125,18 @@ export function Table({
                     >
                       {status_label(row.status)}
                     </span>
+                    {duplicate && (
+                      <Tooltip
+                        tip={
+                          <Content className="max-w-xs text-xs">
+                            <Arrow />
+                            {cancelled_note("donor")}
+                          </Content>
+                        }
+                      >
+                        <InfoIcon className="inline ml-1 text-gray-11 icon-sm" />
+                      </Tooltip>
+                    )}
                   </td>
                   <td>
                     <RowAction row={row} />

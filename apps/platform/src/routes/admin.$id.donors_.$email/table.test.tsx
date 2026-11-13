@@ -20,6 +20,7 @@ const dist = (id: string, amount: number, o: Partial<ISubDist>): ISubDist => ({
   fee_processing: 0,
   fee_allowance: 0,
   status: "settled",
+  donation_status: "settled",
   sttl_date: null,
   ...o,
 });
@@ -57,4 +58,54 @@ describe("a donor's gifts", () => {
       [false, false, false], // settled
     ]);
   });
+});
+
+describe("a donor's reversed gifts' note", () => {
+  async function note_of(o: Partial<ISubDist>) {
+    const Stub = createRoutesStub([
+      {
+        path: "/",
+        Component: () => <GiftsTable dists={[dist("d-1", 11, o)]} subs={[]} />,
+      },
+    ]);
+    const screen = await render(<Stub initialEntries={["/"]} />);
+    await expect.element(screen.getByText("$10.00")).toBeVisible();
+    // the net cell's tooltip is the row's last, past the fees one
+    return screen
+      .getByRole("button", { name: "More info", exact: true })
+      .last();
+  }
+
+  test("a cancelled duplicate says Cancelled, not Refunded", async () => {
+    const tip = await note_of({
+      status: "refunded",
+      donation_status: "cancelled",
+    });
+    await expect.element(tip).toHaveAccessibleDescription(/^Cancelled/);
+    await expect.element(tip).toHaveAccessibleDescription(/No refund was made/);
+  });
+
+  test.each([
+    ["refunded", "refunded"],
+    ["refunded_loss", "cancelled"],
+    ["settled", "cancelled"],
+  ] as const)(
+    "a %s dist under a %s donation has no cancelled note",
+    async (status, donation_status) => {
+      const Stub = createRoutesStub([
+        {
+          path: "/",
+          Component: () => (
+            <GiftsTable
+              dists={[dist("d-1", 11, { status, donation_status })]}
+              subs={[]}
+            />
+          ),
+        },
+      ]);
+      const screen = await render(<Stub initialEntries={["/"]} />);
+      await expect.element(screen.getByText("$10.00")).toBeVisible();
+      expect(screen.container.textContent).not.toMatch(/Cancelled/);
+    }
+  );
 });
