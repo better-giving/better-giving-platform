@@ -15,6 +15,7 @@ import {
 import { reverse_unfunded_payout_loss } from "../refund/unfunded";
 import { net_owed } from "./net-owed";
 import { deduct, lock_run, owed_netting_on, undo_deductions } from "./owed-run";
+import { type IReturnHold, npo_return_hold } from "./resend-returned";
 import {
   NotFundedError,
   PayRefused,
@@ -33,6 +34,9 @@ export type Pay = (ref: string, total: number) => Promise<number | string>;
 export type SettleResult =
   | { status: "none_pending" }
   | { status: "under_minimum"; total: number; minimum: number }
+  /** a returned transfer holds the npo's payouts: read under the run lock, so
+   * a return committing after the cron's eligibility read stops the claim */
+  | { status: "held"; hold: IReturnHold }
   | { status: "released"; ref: string }
   | { status: "unreleased"; ref: string }
   | { status: "fund_unknown"; ref: string }
@@ -64,7 +68,11 @@ export async function settle_npo_payouts(
 ): Promise<SettleResult> {
   const nets = await owed_netting_on();
   const claim = await db.transaction(async (tx) => {
-    if (nets) await lock_npo_run(tx, npo.id);
+    // the lock `return_settlement` and `resend_returned` take: the hold read
+    // and the claim below happen with no return or re-send in between
+    await lock_npo_run(tx, npo.id);
+    const hold = await npo_return_hold(npo.id, tx);
+    if (hold) return { status: "held", hold } as const;
     const locked = await pending_payouts_locked(tx, payout_ids);
     if (locked.length === 0) return { status: "none_pending" } as const;
     // a refund locks payout, then npo, then owed row; the claim does too

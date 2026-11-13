@@ -368,6 +368,35 @@ describe("settle_npo_payouts", () => {
     expect(await npo_cash(npo.id)).toBe(500);
   });
 
+  test.each([false, true])(
+    "an npo held on a returned transfer is not claimed or paid, whatever eligibility read before (deductions on: %s)",
+    async (on) => {
+      deductions.on = on;
+      const npo = await seed_npo({ cash: 500, payout_minimum: 0 });
+      await seed_payout(npo.id, "p-1", 60);
+      // the return committed after the cron's eligibility read, before this claim
+      await db().insert(settlements).values({
+        id: "sttl-returned",
+        other_id: "ref-returned",
+        npo_id: npo.id,
+        date: "2026-10-01T00:00:00.000Z",
+        amount: 100,
+        status: "returned",
+      });
+      const pay = vi.fn<Pay>(async () => TRANSFER_ID);
+
+      const res = await settle_npo_payouts(npo, ["p-1"], {
+        ref_key: RECIPIENT,
+        pay,
+      });
+
+      expect(res).toMatchObject({ status: "held" });
+      expect(pay).not.toHaveBeenCalled();
+      expect(await payout_types()).toEqual({ "p-1": "pending" });
+      expect(await npo_cash(npo.id)).toBe(500);
+    }
+  );
+
   test("claims and pays nothing when the pending total is under the npo's minimum", async () => {
     const npo = await seed_npo({ cash: 500, payout_minimum: 80 });
     await seed_payout(npo.id, "p-1", 30);

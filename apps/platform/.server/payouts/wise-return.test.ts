@@ -401,6 +401,45 @@ describe("return_settlement", () => {
     });
   });
 
+  test("a run whose every payout was loss-refunded in flight still takes them back, and owns them once", async () => {
+    const npo = await seed_npo(500);
+    const { don } = await seed_donation_payout(npo.id, "p-1", 100);
+    const transfer = await sent(npo, ["p-1"], () => refund(don));
+    expect(await payout_types()).toEqual({ "p-1": "refunded_loss" });
+    expect(await npo_cash(npo.id)).toBe(400);
+
+    const res = await return_settlement(transfer);
+
+    expect(res).toMatchObject({
+      status: "returned",
+      credited: 100,
+      returned: [],
+      loss_reversed: ["p-1"],
+    });
+    expect(await payout_types()).toEqual({ "p-1": "refunded" });
+    // the run's 100 back, less the refunded gift's 100 its refund now takes
+    expect(await npo_cash(npo.id)).toBe(400);
+    const [row] = await owed_for_donation(don, db() as never);
+    expect([row?.credited_back_usd, row?.outstanding_usd]).toEqual([100, 0]);
+    expect(await status_of(transfer)).toBe("returned");
+  });
+
+  test("a hand-sent copy of an all-loss run, returned after it, credits nothing again", async () => {
+    const npo = await seed_npo(500);
+    const { don } = await seed_donation_payout(npo.id, "p-1", 100);
+    const run = await sent(npo, ["p-1"], () => refund(don));
+    const [first] = await db().select().from(settlements);
+    await db()
+      .insert(settlements)
+      .values({ ...first!, id: "hand-sent-1", other_id: "hand-ref" });
+
+    await return_settlement(run);
+    const res = await return_settlement("hand-sent-1");
+
+    expect(res).toEqual({ status: "nothing_to_return" });
+    expect(await npo_cash(npo.id)).toBe(400);
+  });
+
   test("a payout loss-refunded after it settled is refunded as if pending once the money is back", async () => {
     const npo = await seed_npo(500);
     await seed_payout(npo.id, "p-1", 60);

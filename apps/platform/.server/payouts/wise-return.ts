@@ -50,12 +50,14 @@ import { npo_balance_update, npo_get_locked } from "../pg/queries/npo";
 import { run_netted_usd, unrecover_owed } from "../pg/queries/owed";
 import {
   payouts_move,
+  payouts_own_in_flight_loss,
   run_payouts_locked,
   type SettlementRow,
   settlement_locked,
   settlement_npo_id,
   settlement_status_set,
   settlements_to_poll,
+  sources_owned_elsewhere,
 } from "../pg/queries/payout";
 import { reverse_unfunded_payout_loss } from "../refund/unfunded";
 import { lock_run } from "./owed-run";
@@ -149,9 +151,15 @@ async function take_back(
   const run = await run_payouts_locked(tx, s);
   // `settled_id` names one settlement: a second one sharing these sources
   // (a run sent again by hand) owns no payout, and taking any back would
-  // credit the npo twice
+  // credit the npo twice. a run whose every payout was loss-refunded in flight
+  // settled none, so it owns its in-flight losses unless another settlement
+  // already owns a payout of these sources
   const npo_id = s.npo_id;
-  if (npo_id === null || !run.some((p) => p.settled_id === s.id)) {
+  const owns =
+    run.some((p) => p.settled_id === s.id) ||
+    (run.some((p) => p.settled_id === null) &&
+      !(await sources_owned_elsewhere(tx, s)));
+  if (npo_id === null || !owns) {
     await settlement_status_set(tx, s.id, s.status, RETURNED);
     return { res: { status: "nothing_to_return" }, s };
   }
@@ -169,6 +177,13 @@ async function take_back(
     type: "returned",
   });
   const losses = run.filter((p) => p.type === "refunded_loss").map((p) => p.id);
+  // a loss-refunded payout still in flight is this run's now: a copy of the
+  // run returned later finds it owned
+  await payouts_own_in_flight_loss(
+    tx,
+    run.filter((p) => p.settled_id === null).map((p) => p.id),
+    s.id
+  );
   const taken = new Set([...returned, ...losses]);
   const moved_on = run.map((p) => p.id).filter((id) => !taken.has(id));
   await settlement_status_set(tx, s.id, s.status, RETURNED);

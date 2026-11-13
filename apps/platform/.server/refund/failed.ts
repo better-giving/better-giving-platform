@@ -29,6 +29,7 @@ import {
   gift_dists_locked,
   grant_went_out,
   type LockedDist,
+  owable_part,
 } from "./share";
 import { move_owed, type OwedMove, taken_of } from "./takes";
 
@@ -162,9 +163,15 @@ async function credit_failed(
         });
     // with no take left the donor got nothing back, so the platform lost
     // nothing on the payout; a take still active, such as a lost dispute's
-    // reversal, keeps the loss it booked
-    for (const d of taken_of(after) > 0 ? [] : ds.filter(is_void_loss)) {
-      await tx.delete(loss_logs).where(eq(loss_logs.id, void_loss_id(d.id)));
+    // reversal or the other half of two half-refunds, keeps the loss it
+    // booked, cut to the share the donor still got back
+    const [was_taken, now_taken] = [taken_of(before), taken_of(after)];
+    for (const d of ds.filter(is_void_loss)) {
+      if (now_taken > 0) {
+        await shrink_void_loss(tx, d, now_taken / was_taken);
+      } else {
+        await tx.delete(loss_logs).where(eq(loss_logs.id, void_loss_id(d.id)));
+      }
     }
     const owing = new Set(
       moves.flatMap((m) =>
@@ -200,6 +207,28 @@ async function credit_failed(
       ? { status: "by_hand", donation_status, credited, by_hand }
       : { status: "credited", donation_status, credited };
   });
+}
+
+/** a void payout's loss, booked for the whole gift, cut to `ratio` of itself
+ * once part of the refunds that reversed it failed: the donor got back only
+ * that much of the cash share and fees the loss counted */
+async function shrink_void_loss(tx: DbOrTx, d: LockedDist, ratio: number) {
+  if (ratio >= 1) return;
+  const id = void_loss_id(d.id);
+  const [log] = await tx.select().from(loss_logs).where(eq(loss_logs.id, id));
+  if (!log) return;
+  const npo_amount = scaled(log.npo_amount, ratio);
+  const fees_bg = scaled(log.fees_bg, ratio);
+  const fees_processing = scaled(log.fees_processing, ratio);
+  await tx
+    .update(loss_logs)
+    .set({
+      npo_amount,
+      fees_bg,
+      fees_processing,
+      amount: npo_amount + fees_bg + fees_processing,
+    })
+    .where(eq(loss_logs.id, id));
 }
 
 /** the loss logs the party's write-offs of its row on the gift booked */
@@ -288,7 +317,12 @@ function reversed_parts(ds: LockedDist[], from: number, to: number): Part[] {
           share_of_net(cut, f),
           share_of_net(cut, t)
         ),
-        fee: fall(fee_processing_usd(d), f, t),
+        // a void payout's cash share owes no part of the card fee
+        fee: fall(
+          fee_processing_usd(d),
+          f * owable_part(d),
+          t * owable_part(d)
+        ),
       });
     }
     const c = d.commission;
