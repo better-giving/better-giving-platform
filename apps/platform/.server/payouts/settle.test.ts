@@ -87,7 +87,7 @@ vi.mock("../pg/db", () => ({
 }));
 
 const { settle_npo_payouts } = await import("./settle");
-const { NotFundedError } = await import("./transfer");
+const { NotFundedError, PayRefused } = await import("./transfer");
 const { processing_payouts } = await import("../pg/queries/payout");
 const { dists_for_refund } = await import("../pg/queries/dist");
 const { process_refund } = await import("../refund/process");
@@ -413,6 +413,55 @@ describe("settle_npo_payouts", () => {
       quote_failed,
       expect.objectContaining({ npo_id: npo.id, ref: pay.mock.calls[0]![0] })
     );
+  });
+
+  test("a payout refused before funding, as to our own account, settles nothing, goes back to pending and alerts ops", async () => {
+    const npo = await seed_npo({ cash: 500 });
+    await seed_payout(npo.id, "p-1", 72.82);
+    const refused = new PayRefused(
+      "recipient 881063184 is one of Better Giving's own Wise accounts"
+    );
+    const pay = vi.fn<Pay>(async () => {
+      throw new NotFundedError(refused);
+    });
+
+    const res = await settle_npo_payouts(npo, ["p-1"], {
+      ref_key: "881063184",
+      pay,
+    });
+
+    expect(res).toMatchObject({ status: "released" });
+    expect(await payout_types()).toEqual({ "p-1": "pending" });
+    expect(await db().select().from(settlements)).toEqual([]);
+    expect(await npo_cash(npo.id)).toBe(500);
+    expect(send_alert).toHaveBeenCalledOnce();
+    const [alert] = send_alert.mock.calls[0]!;
+    expect(alert.type).toBe("ERROR");
+    expect(alert.title).toBe(`payout refused for npo:${npo.id}`);
+    expect(alert.body).toContain("one of Better Giving's own Wise accounts");
+    expect(alert.fields).toEqual(
+      expect.arrayContaining([
+        { name: "npo", value: `${npo.id}: ${npo.name}` },
+        { name: "recipient", value: "881063184" },
+      ])
+    );
+  });
+
+  test("a refused payout whose alert fails to send is still released", async () => {
+    const npo = await seed_npo({ cash: 500 });
+    await seed_payout(npo.id, "p-1", 60);
+    send_alert.mockRejectedValue(new Error("slack down"));
+    const pay = vi.fn<Pay>(async () => {
+      throw new NotFundedError(new PayRefused("quote debits 97.07"));
+    });
+
+    const res = await settle_npo_payouts(npo, ["p-1"], {
+      ref_key: RECIPIENT,
+      pay,
+    });
+
+    expect(res).toMatchObject({ status: "released" });
+    expect(await payout_types()).toEqual({ "p-1": "pending" });
   });
 
   test("a claim stores its transfer ref on every claimed payout, where processing_payouts reads it", async () => {

@@ -593,10 +593,8 @@ describe("calc_refund_plan", () => {
     expect(plan.preview.effects).toEqual([
       { label: "No balance changes", pass: true },
     ]);
-    expect(kinds(plan.effects)).toEqual([
-      "balance_update",
-      "donation_message_del",
-    ]);
+    // a zero balance update would set nothing, which drizzle refuses
+    expect(kinds(plan.effects)).toEqual(["donation_message_del"]);
   });
 
   test("dist alloc missing a share → that share is 0, deltas stay finite", () => {
@@ -640,13 +638,7 @@ describe("calc_refund_plan", () => {
       }),
       make_ctx()
     );
-    const bu = plan.effects.find((e) => e.kind === "balance_update");
-    expect(bu && bu.kind === "balance_update" && bu.deltas).toEqual({
-      liq: 0,
-      lock: 0,
-      lock_units: 0,
-      cash: 0,
-    });
+    expect(kinds(plan.effects)).not.toContain("balance_update");
   });
 
   test("the owed figure is recorded at ctx.now", () => {
@@ -769,12 +761,7 @@ describe("calc_refund_plan", () => {
       }),
       make_ctx()
     );
-    expect(plan.effects).toContainEqual(
-      expect.objectContaining({
-        kind: "balance_update",
-        deltas: { liq: 0, lock: 0, lock_units: 0, cash: 0 },
-      })
-    );
+    expect(kinds(plan.effects)).not.toContain("balance_update");
     expect(plan.is_loss).toBe(false);
   });
 

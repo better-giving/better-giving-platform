@@ -1,8 +1,9 @@
 import { safeParse } from "valibot";
 import type { TStatus } from "@/banking";
+import { holder_match, type THolderMatch } from "@/banking/holder-match";
 import { resp, search } from "@/helpers/https";
 import { $int_gte1 } from "@/schemas";
-import { bapps_by_status } from "$/pg/queries/banking";
+import { bapps_by_status, npo_legal_names } from "$/pg/queries/banking";
 import { npos_batch_get } from "$/pg/queries/npo";
 import type { Route } from "./+types/route";
 import type { IBappRow } from "./table";
@@ -32,13 +33,17 @@ export const loader = async ({ url }: Route.LoaderArgs) => {
     npo_id,
   });
   const ids = [...new Set(page.items.map((b) => b.npo_id))];
-  const names = new Map(
-    (await npos_batch_get(ids)).map((npo) => [npo.id, npo.name])
-  );
+  const [npos, legal] = await Promise.all([
+    npos_batch_get(ids),
+    npo_legal_names(ids),
+  ]);
+  const names = new Map(npos.map((npo) => [npo.id, npo.name]));
   return {
     ...page,
-    items: page.items.map(
-      (b): IBappRow => ({ ...b, npo_name: names.get(b.npo_id) })
-    ),
+    items: page.items.map((b): IBappRow & { holder_match: THolderMatch } => ({
+      ...b,
+      npo_name: names.get(b.npo_id),
+      holder_match: holder_match(b.account_holder, legal.get(b.npo_id) ?? ""),
+    })),
   };
 };

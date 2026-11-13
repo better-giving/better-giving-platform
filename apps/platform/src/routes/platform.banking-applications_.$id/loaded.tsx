@@ -2,6 +2,7 @@ import { Actions, Badge, ExtLink } from "@better-giving/ui";
 import { SquareArrowOutUpRight } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { href, NavLink } from "react-router";
+import { WarningCallout } from "#/components/warning-callout";
 import type { LoaderData } from "#/pages/platform-admin/banking-applications/api";
 import { is_approvable } from "./approvable";
 
@@ -44,14 +45,37 @@ export function Loaded(props: LoaderData) {
         </span>
       </div>
 
+      {props.own_account && (
+        <WarningCallout title="This is Better Giving's own bank account">
+          Payouts to it never reach the nonprofit, so it can't be approved.
+        </WarningCallout>
+      )}
+      {props.holder_match === "mismatch" && (
+        <WarningCallout title="The account holder doesn't match the legal name">
+          This account is held by {closed(props.account_holder ?? "")} The
+          nonprofit's legal name is {closed(props.legal_name ?? "")} Approving
+          sends its payouts to an account held by someone else, so confirm with
+          the nonprofit first.
+        </WarningCallout>
+      )}
+
       <dl className="grid sm:grid-cols-[auto_auto_1fr] bg-card rounded-card border border-hairline">
         {/* the wise half of the record; the rows below it are our own and
             outlive an outage */}
         {!props.wacc_unavailable && (
           <>
+            <Row label="Account holder">
+              {props.account_holder}
+              {props.holder_match === "match" && (
+                <Badge tone="success">Matches legal name</Badge>
+              )}
+              {props.holder_match === "mismatch" && (
+                <Badge tone="warning">Doesn't match</Badge>
+              )}
+            </Row>
+            <Row label="Nonprofit legal name">{props.legal_name}</Row>
             <Row label="Currency">{props.currency}</Row>
             <Row label="Country">{props.country}</Row>
-            <Row label="Recipient name">{props.name?.fullName}</Row>
             <Row label="Account type">{props.type}</Row>
             <Row label="Legal entity type">{props.legalEntityType}</Row>
             {props.displayFields?.map(({ label, value, key }) => (
@@ -120,7 +144,7 @@ function Row(props: Props) {
         aria-hidden={true}
         className="max-sm:hidden w-px border-r border-hairline last:border-none"
       />
-      <dd className="px-3 max-sm:pb-3 sm:p-3 flex items-center text-sm">
+      <dd className="px-3 max-sm:pb-3 sm:p-3 flex items-center gap-2 flex-wrap text-sm">
         {props.children}
       </dd>
       <div
@@ -130,3 +154,6 @@ function Row(props: Props) {
     </>
   );
 }
+
+/** a name ending a sentence: "Acme Inc." takes no second period */
+const closed = (name: string) => (name.endsWith(".") ? name : `${name}.`);

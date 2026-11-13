@@ -22,6 +22,7 @@ import { GrantsTable } from "./common/grants-table";
 import { PayoutsTable } from "./common/payouts-table";
 import { Figure } from "./figure";
 import { Payout } from "./payout";
+import { ReturnedNotice } from "./returned-notice";
 
 interface Props extends DashboardData {
   classes?: string;
@@ -33,6 +34,9 @@ export function Loaded({ classes = "", ...props }: Props) {
 
   return (
     <div className={classes}>
+      {props.returned && (
+        <ReturnedNotice returned={props.returned} classes="mb-4" />
+      )}
       <div className="grid gap-4 @lg:grid-cols-2">
         <Figure
           title="Savings"

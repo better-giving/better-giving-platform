@@ -1,11 +1,26 @@
-import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
-import type {
-  INpoPayoutsOptions,
-  INpoSettlementsOptions,
-  IPayout,
-  IPendingStatus,
-  IProcessingStatus,
-  PayoutStatus,
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  notInArray,
+  or,
+  sql,
+} from "drizzle-orm";
+import {
+  type INpoPayoutsOptions,
+  type INpoSettlementsOptions,
+  type IPayout,
+  type IPendingStatus,
+  type IProcessingStatus,
+  type PayoutStatus,
+  UNSENT_TYPES,
 } from "@/payouts";
 import { db } from "../db";
 import { payouts, settlements } from "../schema/payout";
@@ -94,14 +109,26 @@ export async function processing_payouts(): Promise<
 }
 
 /**
- * no pending guard: a loss refund marks the payout whatever state it reached,
- * settled included — the loss log records what the npo kept.
+ * compare-and-set out of every state a grant has gone out in, settled
+ * included — the loss log records what the npo kept. false when the payout's
+ * money is in the npo's cash again (unsent), or it was voided: the caller's
+ * snapshot is stale.
  */
-export async function payout_mark_refunded_loss(db: DbOrTx, id: string) {
-  await db
+export async function payout_mark_refunded_loss(
+  db: DbOrTx,
+  id: string
+): Promise<boolean> {
+  const rows = await db
     .update(payouts)
     .set(from_payout_update({ type: "refunded_loss" }))
-    .where(eq(payouts.id, id));
+    .where(
+      and(
+        eq(payouts.id, id),
+        notInArray(payouts.type, [...UNSENT_TYPES, "void"])
+      )
+    )
+    .returning({ id: payouts.id });
+  return rows.length > 0;
 }
 
 /**
@@ -127,10 +154,12 @@ export async function payout_put(db: DbOrTx, data: IPayout) {
 }
 
 /**
- * compare-and-set out of `pending`: false when the payout was already moved on
- * (claimed by the grants cron, refunded, …) — the caller's snapshot is stale.
+ * compare-and-set out of `pending` or `returned` (`UNSENT_TYPES`): false when
+ * the payout was already moved on (claimed by the grants cron, refunded, …) —
+ * the caller's snapshot is stale. a re-send moving `returned` to `pending`
+ * keeps it movable.
  */
-export async function payout_move_from_pending(
+export async function payout_move_from_unsent(
   db: DbOrTx,
   id: string,
   upd: Partial<Omit<IPayout, "id">>
@@ -138,7 +167,7 @@ export async function payout_move_from_pending(
   const rows = await db
     .update(payouts)
     .set(from_payout_update(upd))
-    .where(and(eq(payouts.id, id), eq(payouts.type, "pending")))
+    .where(and(eq(payouts.id, id), inArray(payouts.type, [...UNSENT_TYPES])))
     .returning({ id: payouts.id });
   return rows.length > 0;
 }
@@ -173,6 +202,49 @@ export async function payouts_in(
     .from(payouts)
     .where(and(inArray(payouts.id, ids), eq(payouts.type, type)));
   return rows.map((r) => r.id);
+}
+
+export interface IReturnedPayouts {
+  count: number;
+  total: number;
+  /** the latest returned payout's own `date`, iso */
+  latest_date: string;
+}
+
+/** the npo's payouts whose transfer came back, waiting for a new bank account
+ * (`resend_returned` moves them back to pending); null when none */
+export async function npo_returned_payouts(
+  npo_id: number
+): Promise<IReturnedPayouts | null> {
+  const [row] = await db
+    .select({
+      count: sql<number>`count(*)::int`,
+      total: sql<number>`sum(${payouts.amount})`.mapWith(payouts.amount),
+      latest_date: sql<string>`max(${payouts.date})`.mapWith(payouts.date),
+    })
+    .from(payouts)
+    .where(and(eq(payouts.npo_id, npo_id), eq(payouts.type, "returned")));
+  return row && row.count > 0 ? row : null;
+}
+
+/** the npo's returned payouts back to pending, for the next grants run to
+ * pay; returns the ids moved. their settlement is cleared with them: a
+ * pending payout names none, and the run that pays them names its own */
+export async function returned_payouts_resend(
+  db_: DbOrTx,
+  npo_id: number
+): Promise<string[]> {
+  const rows = await db_
+    .update(payouts)
+    .set({
+      type: "pending",
+      message: null,
+      settled_id: null,
+      settled_date: null,
+    })
+    .where(and(eq(payouts.npo_id, npo_id), eq(payouts.type, "returned")))
+    .returning({ id: payouts.id });
+  return rows.map((r) => r.id).sort();
 }
 
 // -- settlements --
@@ -211,4 +283,154 @@ export async function npo_settlements(
 
 export async function settlement_put(db: DbOrTx, data: SettlementInsert) {
   await db.insert(settlements).values(data);
+}
+
+/** the settlement, row-locked until `tx` ends */
+export async function settlement_locked(
+  tx: DbOrTx,
+  id: string
+): Promise<SettlementRow | undefined> {
+  const [row] = await tx
+    .select()
+    .from(settlements)
+    .where(eq(settlements.id, id))
+    .for("update");
+  return row;
+}
+
+/** compare-and-set of the stored wise state; false when another writer moved
+ * it first */
+export async function settlement_status_set(
+  db_: DbOrTx,
+  id: string,
+  from: string,
+  to: string
+): Promise<boolean> {
+  const rows = await db_
+    .update(settlements)
+    .set({ status: to })
+    .where(and(eq(settlements.id, id), eq(settlements.status, from)))
+    .returning({ id: settlements.id });
+  return rows.length > 0;
+}
+
+/**
+ * the settlements of a real wise transfer (a grants run's: `other_id` is its
+ * ref, the amount what it sent) dated since `since`, whose stored state is
+ * not one of `final`
+ */
+export async function settlements_to_poll(
+  since: string,
+  final: readonly string[]
+): Promise<SettlementRow[]> {
+  return db
+    .select()
+    .from(settlements)
+    .where(
+      and(
+        isNotNull(settlements.other_id),
+        gt(settlements.amount, 0),
+        gte(settlements.date, since),
+        notInArray(settlements.status, [...final])
+      )
+    )
+    .orderBy(asc(settlements.date), asc(settlements.id));
+}
+
+/** when the npo's latest transfer that came back was sent; null when none did */
+export async function npo_last_return_sent(
+  npo_id: number
+): Promise<string | null> {
+  const [row] = await db
+    .select({
+      date: sql<string | null>`max(${settlements.date})`.mapWith(
+        settlements.date
+      ),
+    })
+    .from(settlements)
+    .where(
+      and(eq(settlements.npo_id, npo_id), eq(settlements.status, "returned"))
+    );
+  return row?.date ?? null;
+}
+
+/** marks the npo's latest returned settlement as the one ops was told holds
+ * its grants; its id, or null when ops was already told of it (or there is
+ * none). the marker is the dedupe: one alert per returned settlement */
+export async function hold_alert_claim(npo_id: number): Promise<string | null> {
+  const latest = db
+    .select({ id: settlements.id })
+    .from(settlements)
+    .where(
+      and(eq(settlements.npo_id, npo_id), eq(settlements.status, "returned"))
+    )
+    .orderBy(desc(settlements.date), desc(settlements.id))
+    .limit(1);
+  const [row] = await db
+    .update(settlements)
+    .set({ hold_alerted_at: new Date().toISOString() })
+    .where(
+      and(inArray(settlements.id, latest), isNull(settlements.hold_alerted_at))
+    )
+    .returning({ id: settlements.id });
+  return row?.id ?? null;
+}
+
+/** a hold alert that did not go out: the next run claims it again */
+export async function hold_alert_unclaim(id: string) {
+  await db
+    .update(settlements)
+    .set({ hold_alerted_at: null })
+    .where(eq(settlements.id, id));
+}
+
+/** the settlement's npo, unlocked: undefined when there is no such settlement */
+export async function settlement_npo_id(
+  db_: DbOrTx,
+  id: string
+): Promise<number | null | undefined> {
+  const [row] = await db_
+    .select({ npo_id: settlements.npo_id })
+    .from(settlements)
+    .where(eq(settlements.id, id));
+  return row ? row.npo_id : undefined;
+}
+
+export interface IRunPayout {
+  id: string;
+  amount: number;
+  type: PayoutStatus["type"];
+  settled_id: string | null;
+}
+
+/**
+ * every payout of the run behind `s`, row-locked in id order: those it
+ * settled (`settled_id`), whatever they are now, and those of its claimed
+ * sources loss-refunded while its transfer was in flight, which never got a
+ * `settled_id`
+ */
+export async function run_payouts_locked(
+  tx: DbOrTx,
+  s: Pick<SettlementRow, "id" | "npo_id" | "sources">
+): Promise<IRunPayout[]> {
+  const in_flight_loss =
+    s.npo_id !== null && s.sources && s.sources.length > 0
+      ? and(
+          eq(payouts.npo_id, s.npo_id),
+          isNull(payouts.settled_id),
+          eq(payouts.type, "refunded_loss"),
+          inArray(payouts.source_id, s.sources)
+        )
+      : undefined;
+  return tx
+    .select({
+      id: payouts.id,
+      amount: payouts.amount,
+      type: payouts.type,
+      settled_id: payouts.settled_id,
+    })
+    .from(payouts)
+    .where(or(eq(payouts.settled_id, s.id), in_flight_loss))
+    .orderBy(asc(payouts.id))
+    .for("update");
 }

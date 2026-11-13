@@ -1,5 +1,6 @@
 import type { IBalanceTx } from "@/balance-txs";
 import { humanize } from "@/helpers/decimal";
+import { is_unsent } from "@/payouts";
 import type { IBalanceDeltas } from "@/types/donation";
 import type { IOwedRecord, OwedParty } from "../pg/queries/owed";
 
@@ -129,8 +130,9 @@ export interface RefundPlan {
   is_loss: boolean;
   loss_reasons: string[];
   /** what each party owes in usd, as the plan sees it. the npo's — on the loss
-   * path — is its settled net less the cash share a cancelled payout recovers,
-   * plus the processing fee; bg's own fees are forgone, not owed. the
+   * path — is its settled net less the cash share a cancelled payout recovers
+   * or a void one never paid, plus the processing fee; bg's own fees are
+   * forgone, not owed. the
    * referrer's is a commission paid or claimed for a transfer, which apply
    * re-reads under its lock */
   amount: { party: OwedParty; usd: number }[];
@@ -218,12 +220,20 @@ export function calc_refund_plan(
         lock: (alloc.lock / 100) * net,
         cash: (alloc.cash / 100) * net,
       };
+  // a void payout is not a grant, and its cash left the npo's balance when
+  // it settled: the cash share is neither there to take back nor owed
+  let cash_void = 0;
+  if (payout?.type === "void") {
+    cash_void = bd.cash;
+    bd.cash = 0;
+    payout = null;
+  }
   // an older donation keeps what has not been granted. a grant already paid
   // still follows the loss path below; the owed ledger withholds it
   if (!recovery_applies) {
     bd.liq = 0;
     bd.lock = 0;
-    if (payout?.type === "pending") {
+    if (is_unsent(payout?.type)) {
       bd.cash = 0;
       payout = null;
     }
@@ -275,13 +285,21 @@ export function calc_refund_plan(
     }
   }
 
+  if (cash_void > 0) {
+    preview.effects.push({
+      label: "Grant payout",
+      pass: true,
+      reason: `$${humanize(cash_void)} payout is void, so nothing of it is taken back or owed`,
+    });
+  }
+
   // cash/payout check
   if (bd.cash > 0 && payout) {
-    if (payout.type === "pending") {
+    if (is_unsent(payout.type)) {
       preview.effects.push({
         label: "Grant payout",
         pass: true,
-        reason: `$${humanize(bd.cash)} pending payout will be cancelled`,
+        reason: `$${humanize(bd.cash)} ${payout.type} payout will be cancelled`,
       });
     } else {
       preview.warnings.push({
@@ -346,14 +364,14 @@ export function calc_refund_plan(
     ? "refunded_loss"
     : "refunded";
 
-  // a pending payout hasn't paid out its cash, so it is cancelled and its cash
+  // an unsent payout hasn't paid out its cash, so it is cancelled and its cash
   // reversed even when a savings/investment shortfall makes the refund a loss
-  const payout_cancelled = payout?.type === "pending";
+  const payout_cancelled = is_unsent(payout?.type);
   const cash_recovered = payout_cancelled ? bd.cash : 0;
   const owed: OwedFigure = {
     donation_id: dist.donation_id,
     party: { npo_id: dist.to_id },
-    received_usd: net - cash_recovered,
+    received_usd: net - cash_recovered - cash_void,
     fee_processing_usd: scaled(
       fee_processing_usd(dist),
       past_cut(dist.refunds_cut_share, 1)
@@ -390,11 +408,15 @@ export function calc_refund_plan(
       lock_units: refund_lock_units,
       cash: bd.cash,
     };
-    effects.push({
-      kind: "balance_update",
-      npo_id: dist.to_id,
-      deltas: refund_deltas,
-    });
+    // all zero — nothing credited, a total cut, a void payout's cash share
+    // alone — sets no column, which drizzle refuses
+    if (refund_deltas.liq || refund_deltas.lock_units || refund_deltas.cash) {
+      effects.push({
+        kind: "balance_update",
+        npo_id: dist.to_id,
+        deltas: refund_deltas,
+      });
+    }
 
     if (bd.liq > 0) {
       effects.push({

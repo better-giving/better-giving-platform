@@ -25,22 +25,48 @@ const deductions = vi.hoisted(() => ({ on: false }));
  * so a reused ref answers with the original transfer, funded or not
  */
 const wise = vi.hoisted(() => {
-  const by_ref = new Map<string, { id: number; status: string }>();
-  const by_id = new Map<number, { id: number; status: string }>();
+  const by_ref = new Map<
+    string,
+    { id: number; status: string; sourceValue?: number }
+  >();
+  const by_id = new Map<
+    number,
+    { id: number; status: string; sourceValue?: number }
+  >();
   return {
     by_ref,
     by_id,
     v2_account: vi.fn(async () => ({ currency: "USD" })),
+    // fee-free balance option: the transfer sends the whole quoted amount
     quote: vi.fn(async (_: string, q: { sourceAmount: number }) => ({
       id: `q-${q.sourceAmount}`,
+      sourceAmount: q.sourceAmount,
+      sourceCurrency: "USD",
+      payOut: "BANK_TRANSFER",
+      paymentOptions: [
+        {
+          disabled: false,
+          payIn: "BALANCE",
+          payOut: "BANK_TRANSFER",
+          sourceAmount: q.sourceAmount,
+          fee: { total: 0 },
+        },
+      ],
     })),
+    // none of ours: no recipient here is one of our own balances
+    account_details: vi.fn(async () => []),
     transfer: vi.fn(
-      async (t: { customerTransactionId: string; targetAccount: string }) => {
+      async (t: {
+        customerTransactionId: string;
+        targetAccount: string;
+        quoteUuid: string;
+      }) => {
         const seen = by_ref.get(t.customerTransactionId);
         if (seen) return { ...seen };
         const created = {
           id: 9000 + by_ref.size,
           status: "incoming_payment_waiting",
+          sourceValue: Number(t.quoteUuid.slice(2)),
         };
         by_ref.set(t.customerTransactionId, created);
         by_id.set(created.id, created);

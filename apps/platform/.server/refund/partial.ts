@@ -75,9 +75,18 @@ export async function record_takes(s: TakesPut): Promise<TakesRecorded> {
           .filter((d) => !d.routed && !grant_went_out(d))
           .map(
             (d) =>
-              `dist ${d.id} to ${d.to_name || "its npo"} (npo ${d.to_id}): ${d.payout_type === "pending" ? "its grant payout is still pending" : "its share is still in the npo's balances"}, so nothing of it is recorded as owed`
+              `dist ${d.id} to ${d.to_name || "its npo"} (npo ${d.to_id}): ${not_out_why(d.payout_type)}, so nothing of it is recorded as owed`
           )
       : [];
     return { status: "share", taken, owed_msgs, pending };
   });
 }
+
+const not_out_why = (payout_type: string | null) => {
+  if (payout_type === "pending") return "its grant payout is still pending";
+  if (payout_type === "returned") {
+    return "its grant payout came back and is not yet re-sent";
+  }
+  if (payout_type === "void") return "its grant payout is void";
+  return "its share is still in the npo's balances";
+};

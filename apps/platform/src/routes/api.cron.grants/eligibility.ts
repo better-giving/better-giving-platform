@@ -2,6 +2,10 @@ import { min_payout_amount } from "@/npo/schema";
 import { payout_total } from "$/payouts/transfer";
 import { npo_default_bapp } from "$/pg/queries/banking";
 import { npo_get } from "$/pg/queries/npo";
+import {
+  type IReturnedPayouts,
+  npo_returned_payouts,
+} from "$/pg/queries/payout";
 
 type Npo = NonNullable<Awaited<ReturnType<typeof npo_get>>>;
 
@@ -13,6 +17,15 @@ export type GrantEligibility =
       minimum: number;
       total: number;
       reason: string;
+    }
+  /** a transfer came back and no new account is approved yet: sending more
+   * would bounce it too */
+  | {
+      status: "held";
+      npo: Npo;
+      minimum: number;
+      total: number;
+      returned: IReturnedPayouts;
     }
   | {
       status: "pass";
@@ -49,6 +62,8 @@ export async function grant_eligibility(
     ({ status: "skipped", npo, minimum, total, reason }) as const;
 
   if (npo.active === false) return skip("inactive");
+  const returned = await npo_returned_payouts(npo.id);
+  if (returned) return { status: "held", npo, minimum, total, returned };
   const wise_id = await npo_default_bapp(npo.id).then((x) => x?.id);
   if (nets_owed) {
     const recipient = wise_id ? String(wise_id) : null;

@@ -9,10 +9,13 @@ const internal_module =
   /(^|\/)refund\/(process|plan|apply|unfunded|partial|share)(\.tsx?)?$/;
 const internal_name = /\b(dists_for_refund|load_refund_plan|process_refund)\b/;
 // payout settlement rewrites the loss a refund recorded once that payout's
-// transfer goes unfunded: no charge goes back to a donor there
+// transfer goes unfunded, and a return once the bank sends it back: no charge
+// goes back to a donor there
+const UNFUNDED_USERS = ["settle.ts", "wise-return.ts"].map(
+  (f) => `${platform}/.server/payouts/${f}`
+);
 const exempt = (file: string, from: string) =>
-  file === `${platform}/.server/payouts/settle.ts` &&
-  /refund\/unfunded$/.test(from);
+  UNFUNDED_USERS.includes(file) && /refund\/unfunded$/.test(from);
 
 // blanked, not deleted, so a wrapped import stays one statement
 const uncommented = (text: string) =>

@@ -1,4 +1,5 @@
 import { and, asc, eq, type SQL, sql } from "drizzle-orm";
+import { is_unsent } from "@/payouts";
 import type { DbOrTx } from "../pg/queries/helpers";
 import {
   credit_owed,
@@ -151,10 +152,13 @@ export const taken_from_npo = (plan: RefundPlan): number =>
     0
   );
 
-/** whether the dist's grant has gone out: a payout of its cash share no
- * longer pending, as the refund plan judges it a loss */
+/** whether the dist's grant has gone out: a payout of its cash share neither
+ * unsent (`is_unsent`) nor void, as the refund plan judges it a loss */
 export const grant_went_out = (d: LockedDist) =>
-  d.cash_pct > 0 && d.payout_type !== null && d.payout_type !== "pending";
+  d.cash_pct > 0 &&
+  d.payout_type !== null &&
+  !is_unsent(d.payout_type) &&
+  d.payout_type !== "void";
 
 export type OwedShare = Pick<
   IOwedRecord,

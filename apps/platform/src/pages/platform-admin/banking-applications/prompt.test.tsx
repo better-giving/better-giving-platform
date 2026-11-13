@@ -21,7 +21,12 @@ const held_action = () => {
   return { action, release };
 };
 
-const stub = (action: (args: ActionFunctionArgs) => Promise<null>) =>
+const HOLDER = { holder: "Dana Whitfield", legal_name: "Riverbend Inc." };
+
+const stub = (
+  action: (args: ActionFunctionArgs) => Promise<null>,
+  confirm_holder?: typeof HOLDER
+) =>
   createRoutesStub([
     {
       path: "/applications/:id",
@@ -34,7 +39,9 @@ const stub = (action: (args: ActionFunctionArgs) => Promise<null>) =>
       children: [
         {
           path: "approve",
-          Component: () => <Prompt verdict="approved" />,
+          Component: () => (
+            <Prompt verdict="approved" confirm_holder={confirm_holder} />
+          ),
           action,
         },
       ],
@@ -84,4 +91,47 @@ describe("banking application verdict prompt", () => {
         .toBeVisible();
     }
   );
+
+  test("a mismatched holder holds Submit until the reviewer ticks the confirmation, then posts it", async () => {
+    const posted: FormData[] = [];
+    const action = vi.fn(async ({ request }: ActionFunctionArgs) => {
+      posted.push(await request.formData());
+      return null;
+    });
+    const Stub = stub(action, HOLDER);
+    const screen = await render(
+      <Stub initialEntries={["/applications/app-1/approve"]} />
+    );
+    await expect.element(screen.getByText("Riverbend Inc.")).toBeVisible();
+    const submit = screen.getByRole("button", { name: "Submit" });
+    await expect.element(submit).toHaveAttribute("aria-disabled", "true");
+
+    press(submit.element());
+    await new Promise((r) => setTimeout(r, 100));
+    expect(action).not.toHaveBeenCalled();
+
+    const box = screen.getByRole("checkbox", {
+      name: "I've confirmed with the nonprofit that its payouts should go to Dana Whitfield's account.",
+    });
+    press(box.element());
+    await expect.element(box).toBeChecked();
+    await expect.element(submit).toHaveAttribute("aria-disabled", "false");
+
+    press(submit.element());
+    await vi.waitFor(() => expect(posted).toHaveLength(1));
+    expect(action).toHaveBeenCalledOnce();
+    expect(posted[0]?.get("confirm_holder")).toBe("true");
+    expect(posted[0]?.get("type")).toBe("approved");
+  });
+
+  test("a matching holder's prompt has no confirmation step", async () => {
+    const { action } = held_action();
+    const Stub = stub(action);
+    const screen = await render(
+      <Stub initialEntries={["/applications/app-1/approve"]} />
+    );
+    const submit = screen.getByRole("button", { name: "Submit" });
+    await expect.element(submit).toHaveAttribute("aria-disabled", "false");
+    expect(screen.getByRole("checkbox").query()).toBeNull();
+  });
 });

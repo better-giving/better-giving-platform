@@ -25,6 +25,7 @@ import { deduct, lock_run, owed_netting_on, undo_deductions } from "./owed-run";
 import type { Pay } from "./settle";
 import {
   NotFundedError,
+  PayRefused,
   payout_total,
   recovered_run_ref,
   transfer_ref,
@@ -95,10 +96,11 @@ export async function settle_referrer_commissions(
   }
 
   const { ref, commissions, gross } = claimed;
-  const { total, pay } = claimed.send;
+  const { total, to: recipient } = claimed.send;
   const ids = commissions.map((c) => c.donation_id);
   const fields = [
     { name: "referrer", value: referrer.id },
+    { name: "recipient", value: String(recipient.pay_id) },
     { name: "amount", value: total.toString() },
     { name: "donation_ids", value: ids.join(", ") },
   ];
@@ -106,7 +108,7 @@ export async function settle_referrer_commissions(
 
   let transfer_id: string;
   try {
-    transfer_id = String(await pay(ref, total));
+    transfer_id = String(await recipient.pay(ref, total));
   } catch (err) {
     await error_row(referrer.id, total);
     if (err instanceof NotFundedError) {
@@ -159,6 +161,13 @@ export async function settle_referrer_commissions(
           fields,
         });
         return { status: "unreleased", ref };
+      }
+      if (err.cause instanceof PayRefused) {
+        await alert({
+          title: `commission payout refused for ${referrer.id}`,
+          body: `${err.cause.message}. no money moved; the commissions are back to pending. customerTransactionId ${ref}`,
+          fields,
+        });
       }
       if (not_released.length > 0) {
         await alert({
@@ -256,7 +265,7 @@ async function claim(
     if (nets) await lock_referrer_run(tx, referrer.id);
     let gross = 0;
     /** set when the claim sends a transfer: the net and who it goes to */
-    let send: { total: number; pay: Pay } | undefined;
+    let send: { total: number; to: IReferrerRecipient } | undefined;
     const claimed = await commissions_claim(
       tx,
       referrer.id,
@@ -279,7 +288,7 @@ async function claim(
         } else {
           const key = `referrer-commission:${to.pay_id}`;
           ref = transfer_ref(key, plan.net, ids);
-          send = { total: plan.net, pay: to.pay };
+          send = { total: plan.net, to };
         }
         await deduct(sp, party, "commission_run", plan, ref);
         return ref;

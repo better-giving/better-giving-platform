@@ -488,6 +488,28 @@ export async function unrecover_owed(
     .where(and(of_party, or(isNotNull(recovery.id), isNotNull(repayment.id))));
 }
 
+/** what the run under `ref` withheld from the party's transfer: its
+ * recoveries less its due-back payments, as the run itself wrote them (the
+ * undo entries `unrecover_owed` writes are under `unfunded:<ref>`) */
+export async function run_netted_usd(
+  tx: DbOrTx,
+  party: OwedParty,
+  ref: string
+): Promise<number> {
+  const [row] = await tx
+    .select({
+      usd: sql<number>`COALESCE(SUM(CASE ${owed_entries.kind}
+        WHEN 'recover' THEN ${owed_entries.usd}
+        WHEN 'repay' THEN -${owed_entries.usd} END), 0)`.mapWith(
+        owed_entries.usd
+      ),
+    })
+    .from(owed_entries)
+    .innerJoin(owed_amounts, eq(owed_amounts.id, owed_entries.owed_id))
+    .where(and(party_is(party), eq(owed_entries.ref, ref)));
+  return row?.usd ?? 0;
+}
+
 async function with_entry(
   tx: DbOrTx,
   row: IOwed,

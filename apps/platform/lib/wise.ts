@@ -8,9 +8,10 @@ export interface Name {
   fullName: string;
 }
 
-/** https://docs.wise.com/api-docs/api-reference/recipient#object */
+/** https://docs.wise.com/api-reference/recipient/recipientget */
 export interface V2RecipientAccount {
   id: number;
+  /** `fullName` is the account holder: v1's `accountHolderName` */
   name: Name;
   accountNumber?: number;
   longAccountSummary: string;
@@ -21,6 +22,24 @@ export interface V2RecipientAccount {
   country: string; //country code
   type: string;
   legalEntityType: "PERSON" | "BUSINESS";
+  /** which `details` keys hold the account number and the bank code */
+  commonFieldMap?: { accountNumberField?: string; bankCodeField?: string };
+  /** the recipient is the profile owner's own account */
+  ownedByCustomer?: boolean;
+}
+
+/** one currency's account details on our own profile
+ * @link https://docs.wise.com/api-reference/bank-account-details/bankaccountdetailsget */
+export interface AccountDetails {
+  /** null for preview details not yet issued */
+  id: number | null;
+  currency: { code: string; name: string };
+  status: "AVAILABLE" | "ACTIVE";
+  receiveOptions: {
+    type: "LOCAL" | "INTERNATIONAL";
+    /** varies by currency: ACCOUNT_NUMBER, IBAN, ROUTING_NUMBER, SWIFT_CODE, ... */
+    details: { type: string; title: string; body: string }[];
+  }[];
 }
 
 export interface Config {
@@ -47,7 +66,9 @@ namespace Req {
     sourceAmount: number;
     targetAmount: null;
     payOut: null;
-    preferredPayIn: null;
+    /** without it wise prices the fee for a bank transfer, and funding from
+     * the balance then debits a different total than the quote */
+    preferredPayIn: "BALANCE";
     targetAccount: string;
   }
 
@@ -76,6 +97,20 @@ namespace Res {
    */
   export interface Quote {
     id: string;
+    /** for a quote fixed on the source side: what is debited, fee included */
+    sourceAmount: number;
+    sourceCurrency: string;
+    payOut: string;
+    paymentOptions: PaymentOption[];
+  }
+
+  /** @link https://docs.wise.com/api-reference/quote/quoteget */
+  export interface PaymentOption {
+    disabled: boolean;
+    payIn: string;
+    payOut: string;
+    sourceAmount: number;
+    fee: { total: number };
   }
 
   /**
@@ -91,6 +126,9 @@ namespace Res {
      * @link https://docs.wise.com/api-docs/api-reference/transfer#object
      */
     status?: string;
+    /** the amount sent: the quote's source amount less its fee */
+    sourceValue?: number;
+    sourceCurrency?: string;
     /** Optional but present when a transfer error occurs */
     errors?: any;
   }
@@ -164,6 +202,28 @@ export class Wise {
     return this.to_json(res);
   }
 
+  /** only an `incoming_payment_waiting` transfer can be cancelled
+   * @link https://docs.wise.com/api-reference/transfer/transfercancel */
+  async cancel_transfer(transfer_id: number): Promise<Res.Transfer> {
+    const url = `${this.base_url}/v1/transfers/${transfer_id}/cancel`;
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: this.headers,
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    return this.to_json(res);
+  }
+
+  /** the receiving details of the profile's own balances */
+  async account_details(profile_id: string): Promise<AccountDetails[]> {
+    const url = `${this.base_url}/v1/profiles/${profile_id}/account-details`;
+    const res = await fetch(url, {
+      headers: this.headers,
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    return this.to_json(res);
+  }
+
   async fund_transfer(
     transfer_id: number,
     profile_id: number,
@@ -177,6 +237,15 @@ export class Wise {
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw await res.text();
+    return this.to_json(res);
+  }
+
+  /** @link https://docs.wise.com/api-reference/transfer — get by id */
+  async transfer_get(id: number): Promise<Res.Transfer> {
+    const res = await fetch(`${this.base_url}/v1/transfers/${id}`, {
+      headers: this.headers,
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
     return this.to_json(res);
   }
 }

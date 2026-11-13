@@ -5,25 +5,60 @@ const wise = vi.hoisted(() => ({
   quote: vi.fn(),
   transfer: vi.fn(),
   fund_transfer: vi.fn(),
+  cancel_transfer: vi.fn(),
 }));
+const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
 
 vi.mock("../env", () => ({ wise: { profile_id: "42" } }));
 vi.mock("../kit/wise", () => ({ wise }));
+vi.mock("./own-accounts", () => own);
 
 const { wise_pay } = await import("./wise-pay");
-const { NotFundedError } = await import("./transfer");
+const { NotFundedError, PayRefused } = await import("./transfer");
 
 const TRANSFER_ID = 9001;
 const REF = "0d3c1b52-7a4e-5c1f-9a2b-3c4d5e6f7a8b";
 const quote_expired = [{ code: "error.quote.expired" }];
 
+/** balance-funded: the quote's $100 debits $1.13 fee + $98.87 sent */
+const quote = (o: { sourceAmount?: number; fee?: number } = {}) => ({
+  id: "quote-1",
+  sourceAmount: o.sourceAmount ?? 100,
+  sourceCurrency: "USD",
+  payOut: "BANK_TRANSFER",
+  paymentOptions: [
+    {
+      disabled: false,
+      payIn: "BANK_TRANSFER",
+      payOut: "BANK_TRANSFER",
+      sourceAmount: 100,
+      fee: { total: 1.65 },
+    },
+    {
+      disabled: false,
+      payIn: "BALANCE",
+      payOut: "BANK_TRANSFER",
+      sourceAmount: o.sourceAmount ?? 100,
+      fee: { total: o.fee ?? 1.13 },
+    },
+  ],
+});
+const waiting = (sourceValue = 98.87) => ({
+  id: TRANSFER_ID,
+  status: "incoming_payment_waiting",
+  sourceValue,
+  sourceCurrency: "USD",
+});
+
 beforeEach(() => {
   wise.v2_account.mockReset().mockResolvedValue({ currency: "EUR" });
-  wise.quote.mockReset().mockResolvedValue({ id: "quote-1" });
-  wise.transfer
-    .mockReset()
-    .mockResolvedValue({ id: TRANSFER_ID, status: "incoming_payment_waiting" });
+  wise.quote.mockReset().mockResolvedValue(quote());
+  wise.transfer.mockReset().mockResolvedValue(waiting());
   wise.fund_transfer.mockReset().mockResolvedValue({ status: "COMPLETED" });
+  wise.cancel_transfer
+    .mockReset()
+    .mockResolvedValue({ id: TRANSFER_ID, status: "cancelled" });
+  own.is_own_recipient.mockReset().mockResolvedValue(false);
 });
 
 describe("wise_pay", () => {
@@ -122,5 +157,89 @@ describe("wise_pay", () => {
 
     expect(err).not.toBeInstanceOf(NotFundedError);
     expect(err).toBe("fetch failed");
+  });
+
+  test("the quote is priced for funding from the balance", async () => {
+    await wise_pay(777, 100, REF);
+    expect(wise.quote).toHaveBeenCalledWith(
+      "42",
+      expect.objectContaining({ sourceAmount: 100, preferredPayIn: "BALANCE" })
+    );
+  });
+
+  test("a quote whose source amount is not the run's total is refused before any transfer exists", async () => {
+    wise.quote.mockResolvedValue(quote({ sourceAmount: 97.07 }));
+
+    const err = await wise_pay(777, 77.76, REF).catch((e) => e);
+
+    expect(err).toBeInstanceOf(NotFundedError);
+    expect(err.cause).toBeInstanceOf(PayRefused);
+    expect(String(err.cause)).toContain("97.07");
+    expect(wise.transfer).not.toHaveBeenCalled();
+    expect(wise.fund_transfer).not.toHaveBeenCalled();
+  });
+
+  test("a transfer sending less than the total less the balance fee is cancelled, never funded", async () => {
+    // the quote priced a $1.65 bank-transfer fee; the balance takes $1.13
+    wise.transfer.mockResolvedValue(waiting(98.35));
+
+    const err = await wise_pay(777, 100, REF).catch((e) => e);
+
+    expect(err).toBeInstanceOf(NotFundedError);
+    expect(err.cause).toBeInstanceOf(PayRefused);
+    expect(String(err.cause)).toContain("99.48");
+    expect(wise.cancel_transfer).toHaveBeenCalledWith(TRANSFER_ID);
+    expect(wise.fund_transfer).not.toHaveBeenCalled();
+  });
+
+  test("a transfer whose cancel fails is still unfunded, and says to cancel it by hand", async () => {
+    wise.transfer.mockResolvedValue(waiting(98.35));
+    wise.cancel_transfer.mockRejectedValue("cancel 500");
+
+    const err = await wise_pay(777, 100, REF).catch((e) => e);
+
+    expect(err).toBeInstanceOf(NotFundedError);
+    expect(String(err.cause)).toContain(
+      `cancel transfer ${TRANSFER_ID} by hand`
+    );
+    expect(wise.fund_transfer).not.toHaveBeenCalled();
+  });
+
+  test("a quote with no balance payment option is refused, never funded", async () => {
+    wise.quote.mockResolvedValue({
+      ...quote(),
+      paymentOptions: quote().paymentOptions.filter(
+        (o) => o.payIn !== "BALANCE"
+      ),
+    });
+
+    const err = await wise_pay(777, 100, REF).catch((e) => e);
+
+    expect(err).toBeInstanceOf(NotFundedError);
+    expect(err.cause).toBeInstanceOf(PayRefused);
+    expect(wise.fund_transfer).not.toHaveBeenCalled();
+  });
+
+  test("a recipient that is one of our own wise accounts is refused before any quote", async () => {
+    own.is_own_recipient.mockResolvedValue(true);
+
+    const err = await wise_pay(881063184, 72.82, REF).catch((e) => e);
+
+    expect(err).toBeInstanceOf(NotFundedError);
+    expect(err.cause).toBeInstanceOf(PayRefused);
+    expect(String(err.cause)).toContain("881063184");
+    expect(wise.quote).not.toHaveBeenCalled();
+    expect(wise.fund_transfer).not.toHaveBeenCalled();
+  });
+
+  test("a failed lookup of our own accounts refuses the payout", async () => {
+    own.is_own_recipient.mockRejectedValue("account-details 503");
+
+    const err = await wise_pay(777, 100, REF).catch((e) => e);
+
+    expect(err).toBeInstanceOf(NotFundedError);
+    expect(err.cause).toBeInstanceOf(PayRefused);
+    expect(String(err.cause)).toContain("account-details 503");
+    expect(wise.quote).not.toHaveBeenCalled();
   });
 });

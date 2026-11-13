@@ -8,6 +8,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { page } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import type { IComposition } from "@/nav/interfaces";
 import { user } from "$/pg/schema/auth";
@@ -833,5 +834,98 @@ describe("dashboard loader — where payouts go", () => {
 
     expect(data.payout_to).toEqual({ kind: "none" });
     expect(data.bank_pending).toBe(false);
+  });
+});
+
+describe("dashboard — returned payout notice", () => {
+  const seed_payout = (
+    npo_id: number,
+    id: string,
+    o: { type: "returned" | "settled"; amount: number; date: string }
+  ) =>
+    test_db.current!.db.insert(payouts).values({
+      id,
+      source_id: `don-${id}`,
+      npo_id,
+      source: "donation",
+      ...o,
+    });
+  const notice = (screen: Awaited<ReturnType<typeof render_dashboard>>) =>
+    screen.getByRole("region", { name: "Your bank sent a payout back" });
+
+  it("names the one returned payout's amount and date, and links to the bank details", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await seed_payout(npo.id, "p-ret", {
+      type: "returned",
+      amount: 250,
+      date: "2026-11-09T15:00:00.000Z",
+    });
+
+    const screen = await render_dashboard(npo.id);
+
+    await expect.element(notice(screen)).toBeVisible();
+    await expect
+      .element(
+        page
+          .elementLocator(notice(screen).element())
+          .getByText(
+            "$250.00 from Nov 9 didn't reach your bank account, so it's back in your balance. Check your bank details and it goes out again.",
+            { exact: true }
+          )
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        screen.getByRole("link", { name: "Check bank details", exact: true })
+      )
+      .toHaveAttribute("href", `/admin/${npo.id}/banking`);
+    // the grant items card shows the same payout with its explanation row
+    await expect
+      .element(screen.getByText("Returned", { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText(/Your bank sent this back/))
+      .toBeVisible();
+  });
+
+  it("counts several returned payouts and sums them", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    for (const [id, amount, date] of [
+      ["p-1", 250, "2026-11-09T15:00:00.000Z"],
+      ["p-2", 400, "2026-11-04T15:00:00.000Z"],
+      ["p-3", 80, "2026-10-30T15:00:00.000Z"],
+    ] as const) {
+      await seed_payout(npo.id, id, { type: "returned", amount, date });
+    }
+
+    const screen = await render_dashboard(npo.id);
+
+    await expect
+      .element(
+        page
+          .elementLocator(notice(screen).element())
+          .getByText(
+            "3 payouts ($730.00) didn't reach your bank account, so they're back in your balance. Check your bank details and they go out again.",
+            { exact: true }
+          )
+      )
+      .toBeVisible();
+  });
+
+  it("is absent when no payout was returned", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await seed_payout(npo.id, "p-ok", {
+      type: "settled",
+      amount: 250,
+      date: "2026-11-09T15:00:00.000Z",
+    });
+
+    const screen = await render_dashboard(npo.id);
+
+    await expect.element(screen.getByText("Savings")).toBeVisible();
+    expect(screen.getByText("Your bank sent a payout back").query()).toBeNull();
   });
 });

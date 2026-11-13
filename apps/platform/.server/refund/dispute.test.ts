@@ -1196,3 +1196,152 @@ describe("a dispute lost after it opened", () => {
     expect(await db.select().from(loss_logs)).toEqual([]);
   });
 });
+
+/** a returned payout's money is back in the npo's cash and not yet re-sent,
+ * so every refund and dispute of its gift runs as on a pending payout */
+describe("a gift whose grant transfer came back", () => {
+  /** every balance the gift's reversal can move */
+  const books_of = async (id: string, npo_id: number) => {
+    const db = test_db.current!.db;
+    const [npo] = await db
+      .select({ cash: npos.cash, liq: npos.liq, lock_units: npos.lock_units })
+      .from(npos)
+      .where(eq(npos.id, npo_id));
+    const [dist] = await db
+      .select({ status: dists.status, refund_status: dists.refund_status })
+      .from(dists)
+      .where(eq(dists.donation_id, id));
+    const [po] = await db
+      .select({ type: payouts.type })
+      .from(payouts)
+      .where(eq(payouts.source_id, `dist-${id}-0`));
+    const [don] = await db
+      .select({ status: donations.status })
+      .from(donations)
+      .where(eq(donations.id, id));
+    return {
+      npo,
+      dist,
+      payout: po?.type,
+      donation: don?.status,
+      owed: await owed_of(id),
+    };
+  };
+
+  test.each(["pending", "returned"] as const)(
+    "a full refund of a %s payout cancels it and takes its cash back, owing nothing",
+    async (payout) => {
+      const { id, npo_ids } = await seed({ ...PAID_GRANT, payout });
+      const npo_id = npo_ids[0]!;
+      expect((await books_of(id, npo_id)).npo).toEqual({
+        cash: 90,
+        liq: 0,
+        lock_units: 0,
+      });
+
+      expect((await refund(id, "refund")).status).toBe("reversed");
+
+      expect(await books_of(id, npo_id)).toEqual({
+        npo: { cash: 0, liq: 0, lock_units: 0 },
+        dist: { status: "refunded", refund_status: "completed" },
+        payout: "refunded",
+        donation: "refunded",
+        owed: [],
+      });
+    }
+  );
+
+  test.each(["pending", "returned"] as const)(
+    "a partial refund of a %s payout leaves its books and records nothing owed",
+    async (payout) => {
+      const { id, npo_ids } = await seed({ ...PAID_GRANT, payout });
+      const npo_id = npo_ids[0]!;
+
+      const res = await refund(id, "refund", 30);
+
+      expect(res.status).toBe("partial_pending");
+      expect(await books_of(id, npo_id)).toEqual({
+        npo: { cash: 90, liq: 0, lock_units: 0 },
+        dist: { status: "settled", refund_status: null },
+        payout,
+        donation: "settled",
+        owed: [],
+      });
+    }
+  );
+
+  test.each(["pending", "returned"] as const)(
+    "a dispute open on a %s payout owes its share and fees, and its loss cancels the payout and credits the cash taken",
+    async (payout) => {
+      const { id, npo_ids } = await seed({ ...PAID_GRANT, payout });
+      const npo_id = npo_ids[0]!;
+
+      await dispute_opened(opened_on(id));
+      const at_open = await books_of(id, npo_id);
+      expect((await lose(id)).status).toBe("reversed");
+
+      expect(at_open).toMatchObject({
+        npo: { cash: 90, liq: 0, lock_units: 0 },
+        payout,
+        owed: [{ received_usd: 90, outstanding_usd: 108.2 }],
+      });
+      expect(await books_of(id, npo_id)).toEqual({
+        npo: { cash: 0, liq: 0, lock_units: 0 },
+        dist: { status: "refunded", refund_status: "completed" },
+        payout: "refunded",
+        donation: "refunded",
+        owed: [
+          expect.objectContaining({
+            received_usd: 90,
+            fee_dispute_usd: 15,
+            outstanding_usd: 18.2,
+          }),
+        ],
+      });
+    }
+  );
+
+  test.each(["pending", "returned"] as const)(
+    "a dispute won on a %s payout leaves its cash and owes nothing",
+    async (payout) => {
+      const { id, npo_ids } = await seed({ ...PAID_GRANT, payout });
+      const npo_id = npo_ids[0]!;
+      await dispute_opened(opened_on(id));
+
+      await dispute_won(won_on(id));
+
+      expect(await books_of(id, npo_id)).toMatchObject({
+        npo: { cash: 90, liq: 0, lock_units: 0 },
+        dist: { status: "settled", refund_status: null },
+        payout,
+        donation: "settled",
+        owed: [expect.objectContaining({ outstanding_usd: 0 })],
+      });
+    }
+  );
+
+  test("a full refund of a void payout leaves it void, taking and owing nothing of its cash share", async () => {
+    const { id, npo_ids } = await seed({ ...PAID_GRANT, payout: "void" });
+    const npo_id = npo_ids[0]!;
+
+    expect((await refund(id, "refund")).status).toBe("reversed");
+
+    expect(await books_of(id, npo_id)).toEqual({
+      npo: { cash: 0, liq: 0, lock_units: 0 },
+      dist: { status: "refunded", refund_status: "completed" },
+      payout: "void",
+      donation: "refunded",
+      owed: [],
+    });
+  });
+
+  test("a partial refund of a void payout records nothing owed and says why", async () => {
+    const { id, npo_ids } = await seed({ ...PAID_GRANT, payout: "void" });
+
+    const res = await refund(id, "refund", 30);
+
+    expect(res).toMatchObject({ status: "partial_pending" });
+    expect(await owed_of(id)).toEqual([]);
+    expect(await balance_of(test_db.current!.db, npo_ids[0]!)).toBe(0);
+  });
+});

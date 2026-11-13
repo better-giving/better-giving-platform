@@ -1,14 +1,18 @@
-import { EmptyRow, HeaderButton, LoadMoreRow } from "@better-giving/ui";
+import { Badge, EmptyRow, HeaderButton, LoadMoreRow } from "@better-giving/ui";
 import { Folder } from "lucide-react";
 import { href, NavLink } from "react-router";
 import { use_sort } from "#/hooks/use-sort";
 import type { IPaginator } from "#/types/components";
 import type { IBapp, TStatus } from "@/banking";
+import type { THolderMatch } from "@/banking/holder-match";
 import { toPP } from "@/helpers/date";
 
 export interface IBappRow extends IBapp {
   /** absent when the npo row is gone */
   npo_name?: string;
+  /** the holder name stored when the application was filed */
+  account_holder: string | null;
+  holder_match: THolderMatch;
 }
 
 interface Props extends IPaginator<IBappRow> {
@@ -74,7 +78,17 @@ export function Table({
                     </span>
                   )}
                 </td>
-                <td>{row.bank_summary}</td>
+                <td>
+                  {row.bank_summary}
+                  {row.account_holder && (
+                    <div className="flex items-center gap-2 flex-wrap text-xs text-gray-11 mt-0.5">
+                      {row.account_holder}
+                      {row.holder_match === "mismatch" && (
+                        <Badge tone="warning">Name mismatch</Badge>
+                      )}
+                    </div>
+                  )}
+                </td>
                 <td>
                   <Status status={row.status} />
                 </td>

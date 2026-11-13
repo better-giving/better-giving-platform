@@ -52,6 +52,16 @@ export type PayoutStatus =
   | IReturnedStatus
   | IVoidStatus;
 
+/** the types whose money is in the npo's cash, not sent: a refund cancels the
+ * payout and takes its cash back */
+export const UNSENT_TYPES = [
+  "pending",
+  "returned",
+] as const satisfies readonly PayoutStatus["type"][];
+
+export const is_unsent = (type: string | null | undefined): boolean =>
+  UNSENT_TYPES.some((t) => t === type);
+
 /**
  * donation - a payout from a donation
  * liq - withdraw from savings

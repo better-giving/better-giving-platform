@@ -1,9 +1,23 @@
-import { and, count, desc, eq, exists, inArray, not, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  exists,
+  gt,
+  inArray,
+  isNull,
+  not,
+  sql,
+} from "drizzle-orm";
 import { alias, type PgColumn } from "drizzle-orm/pg-core";
 import type { IBappsOpts } from "@/banking";
 import type { TStatus } from "@/banking/schema";
 import { db } from "../db";
 import { banking_apps } from "../schema/banking";
+import { npos } from "../schema/npo";
+import { registrations } from "../schema/registration";
 import type { DbOrTx, IPage } from "./helpers";
 import { decode_date_cursor, encode_date_cursor } from "./helpers";
 
@@ -357,4 +371,57 @@ export async function bapp_delete_guarded(
       .returning({ id: banking_apps.id });
     return deleted.length > 0 ? "deleted" : "refused";
   });
+}
+
+/**
+ * each npo's legal name: the name it registered under (`registrations.o_name`,
+ * filed with its proof of registration and frozen at approval), else its
+ * `name`, which starts as that and is the page name its admins edit since
+ */
+export async function npo_legal_names(
+  npo_ids: number[]
+): Promise<Map<number, string>> {
+  if (npo_ids.length === 0) return new Map();
+  const rows = await db
+    .select({
+      id: npos.id,
+      name: npos.name,
+      registered: sql<string | null>`nullif(trim(${registrations.o_name}), '')`,
+    })
+    .from(npos)
+    .leftJoin(registrations, eq(registrations.status_approved_npo_id, npos.id))
+    .where(inArray(npos.id, npo_ids));
+  const names = new Map<number, string>();
+  for (const r of rows) {
+    if (r.registered || !names.has(r.id)) {
+      names.set(r.id, r.registered ?? r.name);
+    }
+  }
+  return names;
+}
+
+/** approved and default applications with no holder stored, by id after `after` */
+export async function bapps_missing_holder(limit: number, after?: string) {
+  return db
+    .select({ id: banking_apps.id, npo_id: banking_apps.npo_id })
+    .from(banking_apps)
+    .where(
+      and(
+        inArray(banking_apps.status, ["approved", "default"]),
+        isNull(banking_apps.account_holder),
+        after === undefined ? undefined : gt(banking_apps.id, after)
+      )
+    )
+    .orderBy(asc(banking_apps.id))
+    .limit(limit);
+}
+
+/** false, and nothing written, when the application already has a holder */
+export async function bapp_set_holder(id: string, holder: string) {
+  const set = await db
+    .update(banking_apps)
+    .set({ account_holder: holder })
+    .where(and(eq(banking_apps.id, id), isNull(banking_apps.account_holder)))
+    .returning({ id: banking_apps.id });
+  return set.length > 0;
 }

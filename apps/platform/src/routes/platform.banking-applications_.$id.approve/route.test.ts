@@ -6,12 +6,15 @@ const q = vi.hoisted(() => ({
   bapp_get: vi.fn(),
   bapp_update_status: vi.fn(),
   npo_default_bapp: vi.fn(),
+  npo_legal_names: vi.fn(),
 }));
 const wise = vi.hoisted(() => ({ v2_account: vi.fn() }));
+const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
 
 vi.mock("$/pg/queries/banking", () => q);
 vi.mock("$/pg/queries/npo", () => ({ npos_batch_get: async () => [] }));
 vi.mock("$/kit/wise", () => ({ wise }));
+vi.mock("$/payouts/own-accounts", () => own);
 vi.mock("$/kit/queue", () => ({ enqueue: vi.fn() }));
 vi.mock("#/.server/toast", () => ({ redirectWithSuccess: vi.fn() }));
 vi.mock("#/errors/report", () => ({ report_degraded_null: () => null }));
@@ -27,10 +30,13 @@ import { action, loader } from "./route";
 const BAPP_ID = 40001;
 const DETAIL = `/platform/banking-applications/${BAPP_ID}`;
 
-const bapp = (status: string) => ({
+const LEGAL = "Harbor Light Food Pantry";
+
+const bapp = (status: string, account_holder: string | null = LEGAL) => ({
   id: String(BAPP_ID),
   npo_id: 7,
   status,
+  account_holder,
   bank_statement_url: "https://example.com/statement.pdf",
   date_created: "2026-10-01T00:00:00.000Z",
   updated_at: "2026-10-01T00:00:00.000Z",
@@ -55,7 +61,13 @@ const redirected_to = async () => {
 beforeEach(() => {
   for (const f of Object.values(q)) f.mockReset();
   wise.v2_account.mockReset();
-  wise.v2_account.mockResolvedValue({ id: BAPP_ID, currency: "USD" });
+  wise.v2_account.mockResolvedValue({
+    id: BAPP_ID,
+    currency: "USD",
+    name: { fullName: "Harbor Light Food Pantry Inc." },
+  });
+  q.npo_legal_names.mockResolvedValue(new Map([[7, LEGAL]]));
+  own.is_own_recipient.mockReset().mockResolvedValue(false);
 });
 
 describe("the approve prompt opened by URL", () => {
@@ -82,8 +94,8 @@ describe("the approve prompt opened by URL", () => {
   });
 });
 
-const submit = (type: "approved" | "rejected") => {
-  form.data = type === "approved" ? { type } : { type, reason: "no" };
+const submit = (type: "approved" | "rejected", extra = {}) => {
+  form.data = type === "approved" ? { type, ...extra } : { type, reason: "no" };
   const request = new Request(`http://x${DETAIL}/approve`, { method: "POST" });
   return (action as any)({ request, params: { id: String(BAPP_ID) } });
 };
@@ -127,5 +139,69 @@ describe("the approve submit, posted around the page", () => {
     await submit("rejected");
 
     expect(q.bapp_update_status).toHaveBeenCalled();
+  });
+
+  it("refuses with 409 and writes nothing when the account is one of Better Giving's own", async () => {
+    q.bapp_get.mockResolvedValue(bapp("under-review"));
+    own.is_own_recipient.mockResolvedValue(true);
+
+    const r: unknown = await submit("approved").catch((e: unknown) => e);
+
+    expect((r as Response).status).toBe(409);
+    expect(await (r as Response).text()).toMatch(/belongs to Better Giving/);
+    expect(q.bapp_approve).not.toHaveBeenCalled();
+  });
+
+  it("refuses with 409 and writes nothing when our own accounts can't be read", async () => {
+    q.bapp_get.mockResolvedValue(bapp("under-review"));
+    own.is_own_recipient.mockRejectedValue(new Error("account-details 503"));
+
+    const r: unknown = await submit("approved").catch((e: unknown) => e);
+
+    expect((r as Response).status).toBe(409);
+    expect(q.bapp_approve).not.toHaveBeenCalled();
+  });
+
+  it("refuses a holder name that isn't the nonprofit's legal name without confirmation", async () => {
+    q.bapp_get.mockResolvedValue(bapp("under-review", "Dana Whitfield"));
+
+    const r: unknown = await submit("approved").catch((e: unknown) => e);
+
+    expect((r as Response).status).toBe(409);
+    expect(await (r as Response).text()).toMatch(/Dana Whitfield/);
+    expect(q.bapp_approve).not.toHaveBeenCalled();
+  });
+
+  it("approves a holder name that isn't the legal name once the reviewer confirms it", async () => {
+    q.bapp_get.mockResolvedValue(bapp("under-review", "Dana Whitfield"));
+    q.bapp_approve.mockResolvedValue({ status: "under-review" });
+
+    await submit("approved", { confirm_holder: true });
+
+    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7);
+  });
+
+  it("reads the holder from wise when none is stored, and holds a mismatch to confirmation", async () => {
+    q.bapp_get.mockResolvedValue(bapp("under-review", null));
+    wise.v2_account.mockResolvedValue({
+      id: BAPP_ID,
+      currency: "USD",
+      name: { fullName: "Dana Whitfield" },
+    });
+
+    const r: unknown = await submit("approved").catch((e: unknown) => e);
+
+    expect((r as Response).status).toBe(409);
+    expect(q.bapp_approve).not.toHaveBeenCalled();
+  });
+
+  it("approves without confirmation when no holder is known at all", async () => {
+    q.bapp_get.mockResolvedValue(bapp("under-review", null));
+    wise.v2_account.mockResolvedValue({ id: BAPP_ID, currency: "USD" });
+    q.bapp_approve.mockResolvedValue({ status: "under-review" });
+
+    await submit("approved");
+
+    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7);
   });
 });

@@ -9,7 +9,7 @@ import { npo_balance_update } from "../pg/queries/npo";
 import { type IOwed, type IOwedRecord, record_owed } from "../pg/queries/owed";
 import {
   payout_mark_refunded_loss,
-  payout_move_from_pending,
+  payout_move_from_unsent,
 } from "../pg/queries/payout";
 import { npo_prog_contrib } from "../pg/queries/program";
 import { commission_refund } from "../pg/queries/referrer";
@@ -18,10 +18,15 @@ import { dists } from "../pg/schema/dist";
 import { referrer_commissions } from "../pg/schema/referrer";
 import type { OwedFigure, ReferrerParty, RefundPlan } from "./plan";
 
-/** the plan refunds a payout that another writer moved out of `pending` since */
+/** another writer moved the plan's payout since: out of `pending`/`returned`
+ * for a cancel, or back into the npo's cash (or void) for a loss */
 export class StalePayoutError extends Error {
-  constructor(payout_id: string) {
-    super(`payout:${payout_id} is no longer pending`);
+  constructor(payout_id: string, planned: "unsent" | "sent") {
+    super(
+      planned === "unsent"
+        ? `payout:${payout_id} is no longer pending or returned`
+        : `payout:${payout_id} is no longer a grant that went out`
+    );
     this.name = "StalePayoutError";
   }
 }
@@ -57,13 +62,14 @@ export async function apply_refund_plan(
         break;
       case "payout_status": {
         if (e.status === "refunded_loss") {
-          await payout_mark_refunded_loss(tx, e.payout_id);
+          const marked = await payout_mark_refunded_loss(tx, e.payout_id);
+          if (!marked) throw new StalePayoutError(e.payout_id, "sent");
           break;
         }
-        const changed = await payout_move_from_pending(tx, e.payout_id, {
+        const changed = await payout_move_from_unsent(tx, e.payout_id, {
           type: "refunded",
         } as IRefundedStatus);
-        if (!changed) throw new StalePayoutError(e.payout_id);
+        if (!changed) throw new StalePayoutError(e.payout_id, "unsent");
         break;
       }
       case "rev_log_status":

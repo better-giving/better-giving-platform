@@ -17,6 +17,7 @@ import { net_owed } from "./net-owed";
 import { deduct, lock_run, owed_netting_on, undo_deductions } from "./owed-run";
 import {
   NotFundedError,
+  PayRefused,
   payout_total,
   recovered_run_ref,
   transfer_ref,
@@ -96,21 +97,22 @@ export async function settle_npo_payouts(
       gross,
       total,
       ref,
-      pay: to.pay,
+      to,
     } as const;
   });
   if (claim.status !== "claimed") return claim;
-  const { payouts: claimed, ids, gross, total, ref, pay } = claim;
+  const { payouts: claimed, ids, gross, total, ref, to: recipient } = claim;
 
   const fields = [
     { name: "npo", value: `${npo.id}: ${npo.name}` },
+    { name: "recipient", value: recipient.ref_key },
     { name: "amount", value: total.toString() },
     { name: "payout_ids", value: ids.join(", ") },
   ];
 
   let transfer_id: string;
   try {
-    transfer_id = String(await pay(ref, total));
+    transfer_id = String(await recipient.pay(ref, total));
   } catch (err) {
     const ctx = { npo_id: npo.id, ref, payout_ids: ids };
     if (err instanceof NotFundedError) {
@@ -137,6 +139,13 @@ export async function settle_npo_payouts(
         ...ctx,
         ...(not_released.length > 0 && { not_released }),
       });
+      if (err.cause instanceof PayRefused) {
+        await alert({
+          title: `payout refused for npo:${npo.id}`,
+          body: `${err.cause.message}. no money moved; the payouts are back to pending. customerTransactionId ${ref}`,
+          fields,
+        });
+      }
       // ops undoes a refund from before the owed ledger another way
       for (const pre_ledger of [true, false]) {
         const payouts = kept.filter((k) => k.pre_ledger === pre_ledger);

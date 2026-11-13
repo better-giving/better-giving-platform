@@ -4,9 +4,10 @@ import { getValidatedFormData } from "remix-hook-form";
 import * as v from "valibot";
 import { safeParse } from "valibot";
 import { redirectWithSuccess } from "#/.server/toast";
-import { report_degraded_null } from "#/errors/report";
+import { report_degraded, report_degraded_null } from "#/errors/report";
 import { is_approvable } from "#/routes/platform.banking-applications_.$id/approvable";
 import type { IBapp, IUpdate } from "@/banking";
+import { holder_match, type THolderMatch } from "@/banking/holder-match";
 import { update } from "@/banking/schema";
 import { resp } from "@/helpers/https";
 import { msg } from "@/queue";
@@ -14,10 +15,12 @@ import { $int_gte1 } from "@/schemas";
 import type { V2RecipientAccount } from "@/wise";
 import { enqueue } from "$/kit/queue";
 import { wise } from "$/kit/wise";
+import { is_own_recipient } from "$/payouts/own-accounts";
 import {
   bapp_approve,
   bapp_get,
   bapp_update_status,
+  npo_legal_names,
 } from "$/pg/queries/banking";
 import { npos_batch_get } from "$/pg/queries/npo";
 
@@ -30,7 +33,18 @@ export type LoaderData = Partial<V2RecipientAccount> & {
   wacc_unavailable: boolean;
   /** absent when the npo row is gone */
   npo_name?: string;
+  /** stored when the application was filed, else wise's name for the account */
+  account_holder: string | null;
+  /** the name the npo registered under; absent when the npo row is gone */
+  legal_name?: string;
+  holder_match: THolderMatch;
+  /** the account is one of Better Giving's own wise balances; false when
+   * that couldn't be checked, which the approve action refuses on */
+  own_account: boolean;
 };
+
+const OWN_ACCOUNT_REFUSAL =
+  "This bank account belongs to Better Giving, so it can't receive the nonprofit's payouts.";
 
 export const loader = async ({ params }: LoaderFunctionArgs) => {
   const p = safeParse($int_gte1, params.id);
@@ -44,16 +58,29 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
   // row, the uploaded bank statement and Reject are all ours. approving one the
   // reviewer cannot see is the actual defect, so `loaded.tsx` gates Approve on
   // this flag — same split as `platform.applications_.$id`.
-  const [y, [npo]] = await Promise.all([
+  const [y, [npo], legal] = await Promise.all([
     wise.v2_account(bank_id).catch(report_degraded_null),
     npos_batch_get([x.npo_id]),
+    npo_legal_names([x.npo_id]),
   ]);
+  const own_account = y
+    ? await is_own_recipient(y).catch((err) => {
+        report_degraded(err);
+        return false;
+      })
+    : false;
+  const account_holder = x.account_holder ?? y?.name?.fullName ?? null;
+  const legal_name = legal.get(x.npo_id);
   return {
     ba: x,
     id: bank_id,
     ...(y ?? {}),
     wacc_unavailable: !y,
     npo_name: npo?.name,
+    account_holder,
+    legal_name,
+    holder_match: holder_match(account_holder, legal_name ?? ""),
+    own_account,
   } satisfies LoaderData;
 };
 
@@ -75,8 +102,26 @@ export const action: ActionFunction = async ({ params, request }) => {
     // the detail page disables Approve and the approve route redirects when
     // the application isn't approvable; a POST sent around both must not land
     const wacc = await wise.v2_account(bank_id).catch(report_degraded_null);
-    if (!is_approvable({ ba: x, wacc_unavailable: !wacc })) {
+    if (!wacc || !is_approvable({ ba: x, wacc_unavailable: false })) {
       throw resp.status(409);
+    }
+    // fail closed: a payout to our own balance is the money never reaching the npo
+    const own = await is_own_recipient(wacc).catch(report_degraded_null);
+    if (own === null) {
+      throw resp.refuse(
+        "We couldn't check this bank account against Better Giving's own accounts. Try again in a few minutes.",
+        409
+      );
+    }
+    if (own) throw resp.refuse(OWN_ACCOUNT_REFUSAL, 409);
+
+    const holder = x.account_holder ?? wacc.name?.fullName ?? null;
+    const legal = (await npo_legal_names([x.npo_id])).get(x.npo_id) ?? "";
+    if (holder_match(holder, legal) === "mismatch" && !fv.data.confirm_holder) {
+      throw resp.refuse(
+        `The account holder, ${holder}, doesn't match the nonprofit's legal name, ${legal}. Confirm the account holder to approve this account.`,
+        409
+      );
     }
     // auto-default when nothing pays out yet: rejected and pending rows don't count
     const prev = await bapp_approve(bank_id.toString(), x.npo_id);

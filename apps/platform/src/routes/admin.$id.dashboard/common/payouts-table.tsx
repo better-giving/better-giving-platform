@@ -1,6 +1,13 @@
-import { EmptyRow, LoadMoreRow, PayoutStatus } from "@better-giving/ui";
+import { EmptyRow, LoadMoreRow } from "@better-giving/ui";
 import { format } from "date-fns";
 import { ArrowRightIcon } from "lucide-react";
+import { Fragment } from "react";
+import { PayoutStatus } from "#/components/payout-status";
+import {
+  amount_cls,
+  arrow_cls,
+  PayoutNote,
+} from "#/components/returned-payout";
 import type { IPaginator } from "#/types/components";
 import { humanize } from "@/helpers/decimal";
 import type { IPayout } from "@/payouts";
@@ -32,27 +39,26 @@ export function PayoutsTable({
             <EmptyRow col_span={5}>No payouts yet</EmptyRow>
           )}
           {items.map((payout, idx) => (
-            <tr key={idx}>
-              <td className="w-8">
-                <ArrowRightIcon className="inline stroke-success icon-sm" />
-              </td>
-              <td>
-                <span
-                  className={
-                    payout.type === "refunded"
-                      ? "line-through text-destructive-subtle-fg"
-                      : ""
-                  }
-                >
-                  ${humanize(payout.amount)}
-                </span>
-              </td>
-              <td>{desc(payout)}</td>
-              <td>{format(payout.date, "PP")}</td>
-              <td>
-                <PayoutStatus type={payout.type} />
-              </td>
-            </tr>
+            <Fragment key={idx}>
+              <tr>
+                <td className="w-8">
+                  <ArrowRightIcon
+                    className={`inline ${arrow_cls(payout)} icon-sm`}
+                  />
+                </td>
+                <td>
+                  <span className={amount_cls(payout)}>
+                    ${humanize(payout.amount)}
+                  </span>
+                </td>
+                <td>{desc(payout)}</td>
+                <td>{format(payout.date, "PP")}</td>
+                <td>
+                  <PayoutStatus type={payout.type} />
+                </td>
+              </tr>
+              <PayoutNote payout={payout} />
+            </Fragment>
           ))}
         </tbody>
         {load_next && (

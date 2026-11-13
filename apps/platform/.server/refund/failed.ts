@@ -306,10 +306,11 @@ const party_name = (p: OwedParty, ds: LockedDist[]) => {
   return d ? dist_npo(d) : `npo ${p.npo_id}`;
 };
 
-/** the cash share a reversal took back by cancelling the dist's pending
- * payout, the rest of it owed for a shortfall */
+/** the cash share a loss reversal left off the owed row: taken back by
+ * cancelling the dist's unsent payout, or never paid by its void one */
 const cash_recovered = (d: LockedDist) =>
-  d.refund_status === "loss" && d.payout_type === "refunded"
+  d.refund_status === "loss" &&
+  (d.payout_type === "refunded" || d.payout_type === "void")
     ? (d.cash_pct / 100) * d.net
     : 0;
 
@@ -346,7 +347,7 @@ function taken_by_hand(d: LockedDist): string | null {
   if (d.refund_status === "completed") {
     return "its reversal took it back from the npo's balances or pending payout; re-settle it by hand";
   }
-  return cash_recovered(d) > 0
-    ? "its reversal cancelled its pending payout; re-settle that by hand"
+  return d.payout_type === "refunded" && cash_recovered(d) > 0
+    ? "its reversal cancelled its unsent payout; re-settle that by hand"
     : null;
 }

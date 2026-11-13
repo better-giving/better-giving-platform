@@ -17,6 +17,8 @@ export const update = v.pipe(
   v.object({
     type: v.picklist(["approved", "rejected"]),
     reason: v.optional(v.pipe(v.string(), v.trim())),
+    /** the reviewer saw the holder name differ from the legal name and approves anyway */
+    confirm_holder: v.optional(v.boolean()),
   }),
   v.forward(
     v.partialCheck(

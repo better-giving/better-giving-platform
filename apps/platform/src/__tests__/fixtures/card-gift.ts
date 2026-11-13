@@ -26,8 +26,10 @@ export interface IDistSeed {
   /** the grant run's payout of the dist's cash, or `savings` for a dist
    * credited whole to the npo's savings balance, which has no payout, or
    * `routed` for one settled to the npo's connected account and paid by the
-   * stripe transfer `transfer_of` names, which has neither */
-  payout: "pending" | "settled" | "savings" | "routed";
+   * stripe transfer `transfer_of` names, which has neither. `returned`: its
+   * transfer came back, so the npo's cash holds it again; `void`: voided by
+   * ops after it settled, so the cash doesn't */
+  payout: "pending" | "settled" | "returned" | "void" | "savings" | "routed";
 }
 
 /** the stripe transfer that paid the routed dist `i` of `gift` */
@@ -100,7 +102,7 @@ export async function seed_card_gift(db: Db, ...ds: IDistSeed[]) {
     const npo = await seed_npo(db, {
       registration_number: `EIN-CARD-${counter}-${i}`,
       name: `NPO ${counter}-${i}`,
-      cash: d.payout === "pending" ? d.net : 0,
+      cash: d.payout === "pending" || d.payout === "returned" ? d.net : 0,
       liq: d.payout === "savings" ? d.net : 0,
       ...(d.payout === "routed" && {
         stripe_account_id: `acct_${counter}_${i}`,
@@ -140,7 +142,7 @@ export async function seed_card_gift(db: Db, ...ds: IDistSeed[]) {
       date: "2026-07-01T00:00:00.000Z",
       amount: d.net,
       type: d.payout,
-      ...(d.payout === "settled" && {
+      ...(d.payout !== "pending" && {
         settled_date: "2026-07-02T00:00:00.000Z",
       }),
     });
