@@ -160,8 +160,10 @@ async function credit_failed(
           src: { source: "refund", source_ref: take.ref },
           now,
         });
-    // the donor got nothing back, so the platform lost nothing on the payout
-    for (const d of ds.filter(is_void_loss)) {
+    // with no take left the donor got nothing back, so the platform lost
+    // nothing on the payout; a take still active, such as a lost dispute's
+    // reversal, keeps the loss it booked
+    for (const d of taken_of(after) > 0 ? [] : ds.filter(is_void_loss)) {
       await tx.delete(loss_logs).where(eq(loss_logs.id, void_loss_id(d.id)));
     }
     const owing = new Set(
