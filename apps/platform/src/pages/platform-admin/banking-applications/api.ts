@@ -24,7 +24,6 @@ import { npo_return_hold } from "$/payouts/resend-returned";
 import {
   bapp_approve,
   bapp_get,
-  bapp_set_default,
   bapp_update_status,
   npo_legal_names,
 } from "$/pg/queries/banking";
@@ -128,16 +127,18 @@ export const action: ActionFunction = async ({ params, request }) => {
         409
       );
     }
+    // a held npo's old default is the account that bounced: the replacement
+    // has to be the one the grants run pays, or `banking-approved` releases
+    // nothing. read before the write, and safe to: the hold keys on the current
+    // default, not on this application
+    const held = Boolean(await npo_return_hold(x.npo_id));
     // auto-default when nothing pays out yet: rejected and pending rows don't count
-    const prev = await bapp_approve(bank_id.toString(), x.npo_id);
+    const prev = await bapp_approve(bank_id.toString(), x.npo_id, {
+      as_default: held,
+    });
     // a verdict that landed after the read above stands, and nothing applied
     if (prev?.status !== "under-review") {
       throw resp.status(409, "This application is no longer under review.");
-    }
-    // a held npo's old default is the account that bounced: the replacement
-    // has to be the one the grants run pays, or `banking-approved` releases nothing
-    if (await npo_return_hold(x.npo_id)) {
-      await bapp_set_default(bank_id.toString(), x.npo_id);
     }
     await enqueue(msg("banking-approved", { npo_id: x.npo_id }));
   } else {

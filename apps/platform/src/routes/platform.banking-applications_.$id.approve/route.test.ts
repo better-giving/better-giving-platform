@@ -148,7 +148,9 @@ describe("the approve submit, posted around the page", () => {
 
     await submit("approved");
 
-    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7);
+    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7, {
+      as_default: false,
+    });
   });
 
   it("still lets a reject through while wise is down", async () => {
@@ -198,7 +200,9 @@ describe("the approve submit, posted around the page", () => {
 
     await submit("approved", { confirm_holder: true });
 
-    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7);
+    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7, {
+      as_default: false,
+    });
   });
 
   it("reads the holder from wise when none is stored, and holds a mismatch to confirmation", async () => {
@@ -230,7 +234,9 @@ describe("the approve submit, posted around the page", () => {
       );
 
       if (confirm_holder) {
-        expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7);
+        expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7, {
+          as_default: false,
+        });
       } else {
         expect((r as Response).status).toBe(409);
         expect(await (r as Response).text()).toMatch(
@@ -248,7 +254,9 @@ describe("the approve submit, posted around the page", () => {
 
     await submit("approved");
 
-    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7);
+    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7, {
+      as_default: false,
+    });
   });
 });
 
@@ -258,18 +266,25 @@ describe("approving a replacement account", () => {
     q.bapp_approve.mockResolvedValue({ status: "under-review" });
   });
 
-  it("makes it the default when the npo's grants are held on a returned transfer", async () => {
+  it("approves it as the default in the same write when the npo's grants are held on a returned transfer", async () => {
     hold.npo_return_hold.mockResolvedValue({
       settlement_id: "s1",
       reason: "the default account predates the returned transfer",
     });
-    q.bapp_set_default.mockResolvedValue(true);
 
     await submit("approved");
 
-    expect(q.bapp_set_default).toHaveBeenCalledWith(String(BAPP_ID), 7);
+    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7, {
+      as_default: true,
+    });
+    expect(q.bapp_set_default).not.toHaveBeenCalled();
+    // the hold is read before the approval commits, so nothing can fail
+    // between an approved account and its promotion
+    expect(hold.npo_return_hold.mock.invocationCallOrder[0]).toBeLessThan(
+      q.bapp_approve.mock.invocationCallOrder[0]
+    );
     // promoted before the release runs, so it sees the new default
-    expect(q.bapp_set_default.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(q.bapp_approve.mock.invocationCallOrder[0]).toBeLessThan(
       queue.enqueue.mock.invocationCallOrder[0]
     );
   });
@@ -277,7 +292,9 @@ describe("approving a replacement account", () => {
   it("leaves the existing default alone when the npo isn't held", async () => {
     await submit("approved");
 
-    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7);
+    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7, {
+      as_default: false,
+    });
     expect(q.bapp_set_default).not.toHaveBeenCalled();
     expect(queue.enqueue).toHaveBeenCalled();
   });
@@ -298,6 +315,8 @@ describe("the posted confirmation, through the real form parse", () => {
 
     await (action as any)({ request, params: { id: String(BAPP_ID) } });
 
-    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7);
+    expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7, {
+      as_default: false,
+    });
   });
 });
