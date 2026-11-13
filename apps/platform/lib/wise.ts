@@ -240,7 +240,7 @@ export class Wise {
     return this.to_json(res);
   }
 
-  /** @link https://docs.wise.com/api-reference/transfer — get by id */
+  /** @link https://docs.wise.com/api-reference/transfer (get by id) */
   async transfer_get(id: number): Promise<Res.Transfer> {
     const res = await fetch(`${this.base_url}/v1/transfers/${id}`, {
       headers: this.headers,

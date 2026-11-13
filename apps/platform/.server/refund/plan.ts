@@ -133,8 +133,8 @@ export interface RefundPlan {
    * (and owes it), or its payout is void (and the platform takes the loss) */
   is_loss: boolean;
   loss_reasons: string[];
-  /** what each party owes in usd, as the plan sees it. the npo's — on the loss
-   * path — is its settled net less the cash share a cancelled payout recovers
+  /** what each party owes in usd, as the plan sees it. the npo's, on the loss
+   * path, is its settled net less the cash share a cancelled payout recovers
    * or a void one never paid, plus the processing fee; bg's own fees are
    * forgone, not owed. the referrer's is a commission paid or claimed for a
    * transfer, which apply re-reads under its lock */

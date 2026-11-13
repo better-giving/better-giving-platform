@@ -110,7 +110,7 @@ export async function processing_payouts(): Promise<
 
 /**
  * compare-and-set out of every state a grant has gone out in, settled
- * included — the loss log records what the npo kept. false when the payout's
+ * included: the loss log records what the npo kept. false when the payout's
  * money is in the npo's cash again (unsent), or it was voided: the caller's
  * snapshot is stale.
  */
@@ -155,7 +155,7 @@ export async function payout_put(db: DbOrTx, data: IPayout) {
 
 /**
  * compare-and-set out of `pending` or `returned` (`UNSENT_TYPES`): false when
- * the payout was already moved on (claimed by the grants cron, refunded, …) —
+ * the payout was already moved on (claimed by the grants cron, refunded, …):
  * the caller's snapshot is stale. a re-send moving `returned` to `pending`
  * keeps it movable.
  */
