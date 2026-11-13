@@ -14,6 +14,7 @@ import { doc_args } from "#/__tests__/fixtures/route-args";
 import { get_qstash_events } from "#/setup-tests-browser";
 import { banking_apps } from "$/pg/schema/banking";
 import { npos } from "$/pg/schema/npo";
+import { payouts, settlements } from "$/pg/schema/payout";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 // --- mocks (hoisted) ---
@@ -88,6 +89,7 @@ import DetailPage from "#/routes/platform.banking-applications_.$id/route";
 import ApprovePage from "#/routes/platform.banking-applications_.$id.approve/route";
 import RejectPage from "#/routes/platform.banking-applications_.$id.reject/route";
 import { wise } from "$/kit/wise";
+import { npo_return_hold, resend_returned } from "$/payouts/resend-returned";
 import { bapps_by_status } from "$/pg/queries/banking";
 import { create_test_db } from "$/pg/test-utils/pglite";
 
@@ -117,6 +119,8 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  await test_db.current!.db.delete(payouts);
+  await test_db.current!.db.delete(settlements);
   await test_db.current!.db.delete(banking_apps);
   await test_db.current!.db.delete(npos);
   counter = 0;
@@ -687,6 +691,67 @@ describe("action edge cases", () => {
 
     const statuses = [(await get_bapp(a)).status, (await get_bapp(b)).status];
     expect(statuses.sort()).toEqual(["approved", "default"]);
+  });
+
+  it("approving a held nonprofit's replacement makes it the default, lifts the hold and lets the returned payouts re-send", async () => {
+    const npo = await seed_npo();
+    // the account the transfer bounced from, older than the return
+    const old_id = await seed_bapp(npo.id, {
+      status: "default",
+      date_created: "2024-01-01T00:00:00.000Z",
+      updated_at: "2024-01-01T00:00:00.000Z",
+    });
+    const new_id = await seed_bapp(npo.id);
+    const sent = "2025-01-01T00:00:00.000Z";
+    const db = test_db.current!.db;
+    await db.insert(settlements).values({
+      id: "sttl-held",
+      other_id: "ref-held",
+      npo_id: npo.id,
+      date: sent,
+      amount: 100,
+      status: "returned",
+    });
+    await db.insert(payouts).values(
+      ["p-1", "p-2"].map((id) => ({
+        id,
+        source_id: `dist-${id}`,
+        npo_id: npo.id,
+        source: "donation" as const,
+        date: "2024-12-01T00:00:00.000Z",
+        amount: 100,
+        type: "returned" as const,
+        settled_id: "sttl-held",
+        settled_date: sent,
+      }))
+    );
+
+    const form = new FormData();
+    form.set("type", "approved");
+    await (action as (...a: any[]) => any)({
+      params: { id: new_id },
+      ...doc_args(
+        new Request(`http://test/platform/banking-applications/${new_id}`, {
+          method: "POST",
+          body: form,
+        })
+      ),
+      context: {},
+    });
+
+    // approved beside the old default it would be `approved` and still held
+    expect((await get_bapp(new_id)).status).toBe("default");
+    expect((await get_bapp(old_id)).status).toBe("approved");
+    expect(await npo_return_hold(npo.id)).toBeNull();
+    expect(await resend_returned(npo.id)).toEqual({
+      status: "resent",
+      ids: ["p-1", "p-2"],
+    });
+    const after = await db.select().from(payouts);
+    expect(after.map((p) => [p.id, p.type]).sort()).toEqual([
+      ["p-1", "pending"],
+      ["p-2", "pending"],
+    ]);
   });
 
   it("throws 409 and applies nothing when a rejection lands during the approve", async () => {
