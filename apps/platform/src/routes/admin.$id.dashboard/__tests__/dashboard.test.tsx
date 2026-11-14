@@ -1097,8 +1097,14 @@ describe("dashboard — awaiting repair notice", () => {
   it("AwaitingNotice names the amount and date, says payouts are paused, and links to the bank details", async () => {
     const Stub = createRoutesStub([
       {
-        path: "/admin/:id/dashboard",
-        Component: () => <AwaitingNotice amount={1250} date={sent} />,
+        path: "/admin/:id",
+        Component: Outlet,
+        children: [
+          {
+            path: "dashboard",
+            Component: () => <AwaitingNotice amount={1250} date={sent} />,
+          },
+        ],
       },
     ]);
     const screen = await render(
