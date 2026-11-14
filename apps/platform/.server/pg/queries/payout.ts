@@ -397,8 +397,8 @@ export interface ILegacyLoss extends IRunPayout {
 }
 
 /**
- * payouts of the run behind `s` that a refund took in flight under the settle
- * from before it stamped them: `refunded_loss`, no `settled_id`, listed in
+ * payouts of the run behind `s` that a refund took in flight, back when the
+ * settle did not yet stamp them: `refunded_loss`, no `settled_id`, listed in
  * its `sources`. row-locked. `shared`: another settlement of the npo lists the
  * same source too, so which run they belong to is not decidable here
  */

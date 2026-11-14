@@ -21,7 +21,9 @@
  *   due it again), as entries under `unfunded:<ref>`, which owed history
  *   pairs off with the run's own.
  * - a payout of the run `refunded_loss`, in flight or
- *   after it settled: its refund found the grant gone and recorded the cash
+ *   after it settled (an older run's, with no `settled_id`, counts when no
+ *   other settlement lists it; else the return waits, see
+ *   `ownership_unclear`): its refund found the grant gone and recorded the cash
  *   share as owed (dist `refund_status` 'loss', donation 'refunded_loss'). the
  *   cash is back, so with the credit above the npo holds it as if the payout
  *   were pending, and `reverse_unfunded_payout_loss` redoes the refund that
@@ -274,7 +276,7 @@ async function announce(
     if (!res.first) return;
     await alert({
       title: `Wise transfer returned, payouts' owner unclear: npo:${s.npo_id}`,
-      body: `settlement ${s.id}'s transfer came back, but loss-refunded payouts listed in its sources carry no settlement and another settlement lists them too, so which run owns them can't be told. nothing was credited; the settlement is marked ${AWAITING_REPAIR} and each poll tries again. stamp settled_id on the payouts that belong to it by hand`,
+      body: `settlement ${s.id}'s transfer came back, but loss-refunded payouts listed in its sources carry no settlement and another settlement lists them too, so which run owns them can't be told. nothing was credited; the settlement is marked ${AWAITING_REPAIR} and each poll tries again. if this is the transfer that paid them, stamp settled_id on those payouts by hand; a hand-sent copy of another run owns none, so leave it`,
       fields: base,
     });
     return;
