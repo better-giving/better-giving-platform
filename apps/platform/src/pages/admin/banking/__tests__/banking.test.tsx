@@ -59,7 +59,7 @@ vi.mock("$/kit/queue", () => {
 });
 
 vi.mock("#/.server/auth", async () =>
-  (await import("$/auth/test-utils")).make_auth_mock()
+  (await import("$/auth/test-utils")).make_auth_mock({ user_ctx: true })
 );
 
 // init passes through: a status >= 400 skips revalidation, and the delete flow asserts on that
@@ -124,7 +124,7 @@ import {
 import PayoutMethodDetail from "#/routes/admin.$id.banking.$bank_id/route";
 import DeletePrompt from "#/routes/admin.$id.banking.$bank_id.delete/route";
 import { action as new_banking_action } from "#/routes/admin.$id.banking.new/api";
-import { admin_ctx } from "$/auth/test-utils";
+import { admin_ctx, user_ctx } from "$/auth/test-utils";
 import { wise } from "$/kit/wise";
 import { bapp_delete } from "$/pg/queries/banking";
 import { create_test_db } from "$/pg/test-utils/pglite";
@@ -397,6 +397,7 @@ describe("payout methods list", () => {
       .toHaveAttribute("href", `/admin/${npo.id}/banking/new`);
   });
 });
+const USER_ID = "npo-member-1";
 
 describe("new banking action", () => {
   const valid_payload = (npo_id: number) => ({
@@ -405,7 +406,7 @@ describe("new banking action", () => {
     bankSummary: "USD account ending in 5678",
     bankStatementFile: {
       name: "stmt.pdf",
-      publicUrl: "https://example.com/stmt.pdf",
+      publicUrl: `https://testprivate.private.blob.vercel-storage.com/docs/${USER_ID}/stmt.pdf`,
     },
   });
 
@@ -447,6 +448,7 @@ describe("new banking action", () => {
         middleware: [
           async ({ context }, next) => {
             context.set(admin_ctx, npo_id);
+            context.set(user_ctx, { id: USER_ID });
             return next();
           },
         ],

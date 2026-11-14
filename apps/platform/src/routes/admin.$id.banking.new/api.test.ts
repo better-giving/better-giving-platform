@@ -22,7 +22,7 @@ vi.mock("$/pg/queries/banking", () => ({
 }));
 vi.mock("$/kit/queue", () => ({ enqueue: q.enqueue }));
 vi.mock("#/.server/auth", async () =>
-  (await import("$/auth/test-utils")).make_auth_mock()
+  (await import("$/auth/test-utils")).make_auth_mock({ user_ctx: true })
 );
 vi.mock("#/.server/toast", async () => {
   const { redirect } = await import("react-router");
@@ -31,11 +31,15 @@ vi.mock("#/.server/toast", async () => {
 
 // --- imports (after mocks hoisted) ---
 
-import { admin_ctx } from "#/.server/auth";
+import { admin_ctx, user_ctx } from "#/.server/auth";
 import { action } from "./api";
 
 const OWN_NPO = 11;
 const OTHER_NPO = 22;
+const MEMBER = { id: "u-1", email: "member@test.com" };
+/** the private store `.env.test`'s token names */
+const STORE = "https://testprivate.private.blob.vercel-storage.com";
+const OWN_STATEMENT = `${STORE}/docs/u-1/statement-abc.pdf`;
 
 const call = (body: object) =>
   (action as any)({
@@ -45,14 +49,17 @@ const call = (body: object) =>
       body: JSON.stringify(body),
     }),
     params: { id: String(OWN_NPO) },
-    context: { get: (k: unknown) => (k === admin_ctx ? OWN_NPO : undefined) },
+    context: {
+      get: (k: unknown) =>
+        k === admin_ctx ? OWN_NPO : k === user_ctx ? MEMBER : undefined,
+    },
   });
 
-const body = (endowmentID: number) => ({
+const body = (endowmentID: number, publicUrl = OWN_STATEMENT) => ({
   wiseRecipientID: "40000001",
   endowmentID,
   bankSummary: "USD account ending in 1234",
-  bankStatementFile: { name: "s.pdf", publicUrl: "https://x.test/s.pdf" },
+  bankStatementFile: { name: "s.pdf", publicUrl },
 });
 
 beforeEach(() => {
@@ -159,6 +166,20 @@ describe("new banking application", () => {
     expect(res.status).toBe(409);
     expect(q.enqueue).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["another user's upload", `${STORE}/docs/u-2/statement-xyz.pdf`],
+    ["a url off our stores", "https://x.test/s.pdf"],
+  ])(
+    "refuses a statement that is %s with 400 and writes nothing",
+    async (_, url) => {
+      const res: Response = await call(body(OWN_NPO, url));
+
+      expect(res.status).toBe(400);
+      expect(q.bapp_put).not.toHaveBeenCalled();
+      expect(q.enqueue).not.toHaveBeenCalled();
+    }
+  );
 
   it("refuses a body naming another nonprofit with 403 and writes nothing", async () => {
     const res: Response = await call(body(OTHER_NPO));

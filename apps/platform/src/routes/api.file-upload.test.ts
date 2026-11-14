@@ -6,7 +6,10 @@ vi.mock("@vercel/blob", () => ({ put }));
 vi.mock("#/.server/auth", () => ({
   get_session: async () => ({ user: { id: "u1" } }),
 }));
-vi.mock("$/env", () => ({ blob: { read_write_token: "tok" } }));
+vi.mock("$/env", () => ({
+  blob: { read_write_token: "tok" },
+  blob_private: { read_write_token: "priv-tok" },
+}));
 
 import { sources_of } from "#/__tests__/conformance/walk";
 import { img_spec as funds_img_spec } from "#/pages/funds/common";
@@ -17,13 +20,24 @@ import { img_spec as program_img_spec } from "./admin.$id.program-editor.$progra
 import { action } from "./api.file-upload";
 import { avatar_spec } from "./dashboard.edit-profile/use-rhf";
 
-const upload = (body: Blob, filename = "photo.png") =>
+/** the kind a type is uploaded as: a pdf is only ever a document */
+const kind_of = (type: string) =>
+  type === "application/pdf" ? "document" : "image";
+
+const upload = (
+  body: Blob,
+  filename = "photo.png",
+  kind: string | undefined = "image"
+) =>
   action({
     ...doc_args(
-      new Request(`https://bg.test/api/file-upload?filename=${filename}`, {
-        method: "POST",
-        body,
-      })
+      new Request(
+        `https://bg.test/api/file-upload?${kind ? `kind=${kind}&` : ""}filename=${filename}`,
+        {
+          method: "POST",
+          body,
+        }
+      )
     ),
   } as any) as Promise<any>;
 
@@ -69,7 +83,8 @@ describe("file upload", () => {
     async (type) => {
       const res: Response = await upload(
         new Blob([new Uint8Array(upload_limits.max_bytes + 1)], { type }),
-        "big"
+        "big",
+        kind_of(type)
       );
       expect(res.status).toBe(413);
       expect(put).not.toHaveBeenCalled();
@@ -81,16 +96,21 @@ describe("file upload", () => {
       new Blob(["%PDF-1.7\n", new Uint8Array(4 * 1024 * 1024 - 9)], {
         type: "application/pdf",
       }),
-      "statement.pdf"
+      "statement.pdf",
+      "document"
     );
     expect(res.data).toEqual({ url: "https://blob.test/u/photo-abc.png" });
     const [path, , opts] = put.mock.calls[0]!;
-    expect(path).toBe("u/statement.pdf");
-    expect(opts).toMatchObject({ contentType: "application/pdf" });
+    expect(path).toBe("docs/u1/statement.pdf");
+    expect(opts).toMatchObject({
+      contentType: "application/pdf",
+      access: "private",
+      token: "priv-tok",
+    });
   });
 
   test("types an untyped file by its extension when it is one we accept", async () => {
-    await upload(new Blob(["%PDF-1.7"]), "statement.PDF");
+    await upload(new Blob(["%PDF-1.7"]), "statement.PDF", "document");
     expect(put.mock.calls[0]![2]).toMatchObject({
       contentType: "application/pdf",
     });
@@ -105,7 +125,7 @@ describe("file upload", () => {
   test.each(SIGNED)(
     "stores real %s bytes under that type",
     async (type, name, parts) => {
-      const res = await upload(new Blob(parts, { type }), name);
+      const res = await upload(new Blob(parts, { type }), name, kind_of(type));
       expect(res.data).toEqual({ url: "https://blob.test/u/photo-abc.png" });
       expect(put.mock.calls[0]![2]).toMatchObject({ contentType: type });
     }
@@ -121,7 +141,7 @@ describe("file upload", () => {
   });
 
   test("refuses html bytes named as a pdf with no declared type", async () => {
-    const res: Response = await upload(new Blob([HTML]), "x.pdf");
+    const res: Response = await upload(new Blob([HTML]), "x.pdf", "document");
     expect(res.status).toBe(415);
     expect(put).not.toHaveBeenCalled();
   });

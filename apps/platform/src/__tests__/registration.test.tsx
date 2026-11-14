@@ -221,6 +221,10 @@ import {
 } from "../routes/_app.register.$reg_id.identity/api";
 import ChangeIdentity from "../routes/_app.register.$reg_id.identity/route";
 
+/** a document the signed-in test user uploaded: the only kind a registration
+ * accepts in a document field */
+const doc = (name: string) =>
+  `https://testprivate.private.blob.vercel-storage.com/docs/test-user-id/${name}`;
 const mock_get_session = vi.mocked(get_session);
 const TEST_EMAIL = "test@example.com";
 
@@ -250,7 +254,7 @@ beforeEach(async () => {
       return Response.json({ id: 999, currency: "EUR", details: {} });
     if (url.includes("/api/file-upload"))
       return Response.json({
-        url: "https://example.com/bank-statement.pdf",
+        url: doc("bank-statement.pdf"),
         presigned_url: "https://s3.example.com/put",
         content_type: "application/pdf",
       });
@@ -350,13 +354,13 @@ const ORG_FIELDS = {
 const FSA_DOC_FIELDS = {
   o_legal_entity_type: "Nonprofit Corporation",
   o_project_description: "Providing humanitarian aid globally",
-  r_proof_of_identity: "https://example.com/passport.pdf",
-  o_proof_of_reg: "https://example.com/registration.pdf",
+  r_proof_of_identity: doc("passport.pdf"),
+  o_proof_of_reg: doc("registration.pdf"),
 } as const;
 
 const BANKING_FIELDS = {
   o_bank_id: "wise-recipient-123",
-  o_bank_statement: "https://example.com/bank.pdf",
+  o_bank_statement: doc("bank.pdf"),
 } as const;
 
 // --- sign-result loader (simulates anvil webhook) ---
@@ -526,7 +530,7 @@ describe("E2E: US path (501c3)", () => {
     const bank_stmt_input = page
       .elementLocator(bank_stmt_dropzone)
       .getByRole("textbox");
-    await bank_stmt_input.fill("https://example.com/bank.pdf");
+    await bank_stmt_input.fill(doc("bank.pdf"));
 
     await screen.getByRole("button", { name: /submit/i }).click();
 
@@ -547,7 +551,7 @@ describe("E2E: US path (501c3)", () => {
     expect(row.o_type).toBe("501c3");
     expect(row.o_ein).toBe("123456789");
     expect(row.o_bank_id).toBe("999");
-    expect(row.o_bank_statement).toBe("https://example.com/bank.pdf");
+    expect(row.o_bank_statement).toBe(doc("bank.pdf"));
     expect(row.status).toBe("01");
     expect(window.dataLayer).toEqual([]);
 
@@ -626,10 +630,10 @@ describe("E2E: non-US path (FSA)", () => {
     const dropzones = screen.getByTestId("file-dropzone");
     const poi_dropzone = dropzones.elements()[0];
     const poi_input = page.elementLocator(poi_dropzone).getByRole("textbox");
-    await poi_input.fill("https://example.com/passport.pdf");
+    await poi_input.fill(doc("passport.pdf"));
     const por_dropzone = dropzones.elements()[1];
     const por_input = page.elementLocator(por_dropzone).getByRole("textbox");
-    await por_input.fill("https://example.com/registration.pdf");
+    await por_input.fill(doc("registration.pdf"));
 
     // click Sign — triggers fsa-action
     await screen.getByRole("button", { name: /sign/i }).click();
@@ -679,7 +683,7 @@ describe("E2E: non-US path (FSA)", () => {
     const bank_stmt_input = page
       .elementLocator(bank_stmt_dropzone)
       .getByRole("textbox");
-    await bank_stmt_input.fill("https://example.com/bank.pdf");
+    await bank_stmt_input.fill(doc("bank.pdf"));
 
     await screen.getByRole("button", { name: /submit/i }).click();
 

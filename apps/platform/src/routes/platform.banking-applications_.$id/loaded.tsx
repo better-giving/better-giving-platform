@@ -4,6 +4,7 @@ import type { PropsWithChildren } from "react";
 import { href, NavLink } from "react-router";
 import { WarningCallout } from "#/components/warning-callout";
 import type { LoaderData } from "#/pages/platform-admin/banking-applications/api";
+import { doc_href } from "@/docs";
 import { is_approvable } from "./approvable";
 
 export function Loaded(props: LoaderData) {
@@ -71,7 +72,10 @@ export function Loaded(props: LoaderData) {
           </>
         )}
         <Row label="Bank statement">
-          <ExtLink href={props.ba.bank_statement_url} className="link">
+          <ExtLink
+            href={doc_href(props.ba.bank_statement_url)}
+            className="link"
+          >
             <span className="break-all">{props.ba.bank_statement_url}</span>
             <SquareArrowOutUpRight className="inline relative bottom-px ml-2 icon-md" />
           </ExtLink>

@@ -37,7 +37,7 @@ Preloads (verification scaffolding — **no product code is changed**):
 - `neon-local.mjs`: points the `@neondatabase/serverless` driver at local Postgres — HTTP queries via `fetchFunction` run through `pg`; transactions go over a ws→tcp pipe on `:5488`, which only dials `DATABASE_URL`'s own port and refuses any request carrying an `Origin` header (i.e. any browser).
 - `stripe-stub.mjs`: while `STRIPE_SECRET_KEY` is filler, server-side `api.stripe.com` calls hit an in-process stub: `GET /v1/country_specs/:cc` is answered, everything else gets a Stripe-shaped 400 and is logged. With real test keys it is inert.
 - `nonprofits-stub.mjs`: while `NONPROFITS_API_KEY` is the `.env.test` filler, `fetch` to `nonprofits.better.giving` is answered in-process (one eligible off-marketplace EIN, one revoked org, one search) and logged. Any other key leaves `fetch` alone.
-- `blob-stub.mjs`: while `BLOB_READ_WRITE_TOKEN` is filler, `@vercel/blob` `put()` is answered by a local server (the sdk honors `VERCEL_BLOB_API_URL`) and the stored URL is the app's `/logo.png`. A real token leaves the sdk pointed at Vercel. Logged to `blob-stub.log`.
+- `blob-stub.mjs`: while `BLOB_READ_WRITE_TOKEN` is filler, `@vercel/blob` `put()` is answered by a local server (the sdk honors `VERCEL_BLOB_API_URL`) and the stored URL is the app's `/logo.png`. A private put (documents) gets a url on that same server, and a GET of it returns a tiny pdf, so the document route reads back. A real token leaves the sdk pointed at Vercel. Logged to `blob-stub.log`.
 
 Full card flow: `VERIFY_STRIPE_SK=sk_test_… VERIFY_STRIPE_PK=pk_test_… scripts/run.sh donate-card` (live keys are refused). Never paste keys into files.
 

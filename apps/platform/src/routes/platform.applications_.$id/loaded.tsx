@@ -3,6 +3,7 @@ import { SquareArrowOutUpRight } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { href, NavLink, Outlet } from "react-router";
 import type { V2RecipientAccount } from "#/types/bank-details";
+import { doc_href } from "@/docs";
 import type { IReg } from "@/reg";
 import { is_stripe_only, lost_payout } from "./approvable";
 import { Container } from "./container";
@@ -87,7 +88,7 @@ export default function Loaded(
           )}
           {props.o_fsa_signed_doc_url && (
             <Row label="Fiscal sponsorship agreement">
-              <DocLink url={props.o_fsa_signed_doc_url} />
+              <DocLink url={props.o_fsa_signed_doc_url} direct />
             </Row>
           )}
         </div>
@@ -101,7 +102,11 @@ export default function Loaded(
               </Row>
             ))}
             <Row label="Bank statement document">
-              <DocLink url={props.o_bank_statement ?? "N/A"} />
+              {props.o_bank_statement ? (
+                <DocLink url={props.o_bank_statement} />
+              ) : (
+                "N/A"
+              )}
             </Row>
           </dl>
         </Container>
@@ -131,7 +136,11 @@ export default function Loaded(
           <dl className="grid sm:grid-cols-[auto_auto_1fr]">
             {/* our own registration data — it outlives a wise outage */}
             <Row label="Bank statement document">
-              <DocLink url={props.o_bank_statement ?? "N/A"} />
+              {props.o_bank_statement ? (
+                <DocLink url={props.o_bank_statement} />
+              ) : (
+                "N/A"
+              )}
             </Row>
           </dl>
           <p className="p-3 text-sm text-gray-11">
@@ -172,9 +181,10 @@ export default function Loaded(
   );
 }
 
-function DocLink({ url }: { url: string }) {
+/** `direct`: the signing provider hosts the file, so its own link is the link */
+function DocLink({ url, direct }: { url: string; direct?: boolean }) {
   return (
-    <ExtLink href={url} className="link">
+    <ExtLink href={direct ? url : doc_href(url)} className="link">
       <span className="break-all">{url}</span>
       <SquareArrowOutUpRight className="inline relative bottom-px ml-2 icon-md" />
     </ExtLink>

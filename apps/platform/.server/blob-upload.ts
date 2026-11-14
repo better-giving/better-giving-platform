@@ -1,6 +1,6 @@
-import { del, put } from "@vercel/blob";
+import { del, get, put } from "@vercel/blob";
 import { upload_limits, upload_signatures } from "@/constants/upload";
-import { blob as blob_env } from "./env";
+import { blob as blob_env, blob_private } from "./env";
 
 /** extensions per accepted type, the shape of `upload_limits.types` */
 export type UploadTypes = Record<string, readonly string[]>;
@@ -11,6 +11,17 @@ export const IMAGE_TYPES: UploadTypes = {
   "image/png": [".png"],
   "image/webp": [".webp"],
 };
+
+/** the document types: a pdf or a photo of one. no svg — it carries script */
+export const DOC_TYPES: UploadTypes = {
+  ...IMAGE_TYPES,
+  "application/pdf": [".pdf"],
+};
+
+/** the image types the img editor posts */
+export const PUBLIC_IMAGE_TYPES: UploadTypes = Object.fromEntries(
+  Object.entries(upload_limits.types).filter(([t]) => t.startsWith("image/"))
+);
 
 /** where user uploads live. The build mirrors content-hashed client assets into
  * the same blob store under `assets/` (`utils/upload-client-assets.ts`), and
@@ -94,6 +105,31 @@ export const store_upload = (name: string, file: Blob, type: string) =>
     allowOverwrite: false,
     token: blob_env.read_write_token,
   });
+
+/** where documents live in the private store, one folder per uploader so the
+ * uploader can open their own file before any record points at it */
+export const DOC_PREFIX = "docs/";
+
+/** stores a checked document in the private store; `type` is what `sniff`
+ * confirmed. the url it returns opens nothing without the store's token —
+ * `read_doc` is how it is read. */
+export const store_doc = (
+  user_id: string,
+  name: string,
+  file: Blob,
+  type: string
+) =>
+  put(`${DOC_PREFIX}${user_id}/${name}`, file, {
+    access: "private",
+    contentType: type,
+    addRandomSuffix: true,
+    allowOverwrite: false,
+    token: blob_private.read_write_token,
+  });
+
+/** a document's bytes from the private store, or null when it is gone */
+export const read_doc = (url: string) =>
+  get(url, { access: "private", token: blob_private.read_write_token });
 
 /** removes a stored upload nothing ended up pointing at */
 export const discard_upload = (url: string) =>

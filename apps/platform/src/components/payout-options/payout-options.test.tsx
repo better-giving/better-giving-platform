@@ -3,6 +3,7 @@ import { createRoutesStub } from "react-router";
 import { describe, expect, test, vi } from "vitest";
 import { type Locator, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { doc_href } from "@/docs";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
 import { BankRequired } from "./bank-required";
 import { type IPayoutChoice, PayoutChoice } from "./payout-choice";
@@ -527,7 +528,7 @@ describe("SavedBank", () => {
     const screen = await render(
       <SavedBank
         account_id="84720193"
-        statement_href="https://example.com/statement.pdf"
+        statement_ref="https://example.com/statement.pdf"
         onChange={on_change}
       />
     );
@@ -545,9 +546,18 @@ describe("SavedBank", () => {
     await expect.element(card.getByText("84720193")).toBeVisible();
     await expect
       .element(card.getByRole("link", { name: "Bank statement" }))
-      .toHaveAttribute("href", "https://example.com/statement.pdf");
+      .toHaveAttribute("href", doc_href("https://example.com/statement.pdf"));
     await card.getByRole("button", { name: "Change" }).click();
     expect(on_change).toHaveBeenCalledOnce();
     no_wise(card);
+  });
+
+  test("offers no statement link when none is on file", async () => {
+    const screen = await render(
+      <SavedBank account_id="84720193" statement_ref="" onChange={vi.fn()} />
+    );
+    const card = screen.getByRole("region", { name: "Bank payout" });
+    await expect.element(card.getByText("84720193")).toBeVisible();
+    await expect.element(card.getByRole("link")).not.toBeInTheDocument();
   });
 });

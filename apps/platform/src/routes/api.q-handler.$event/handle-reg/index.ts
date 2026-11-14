@@ -6,6 +6,7 @@ import {
 import { auth } from "#/.server/auth/auth";
 import { mint_resume_link } from "#/.server/auth/resume-link";
 import { report_error } from "#/errors/report";
+import { doc_href } from "@/docs";
 import type { CompanyProperties, ContactProperties } from "@/hubspot";
 import type { IRegCreatedPayload } from "@/queue";
 import { Progress } from "@/reg/progress";
@@ -111,11 +112,17 @@ export async function handle_reg_updated(reg: IReg) {
 
   const dfsa = prog.docs_fsa;
   if (dfsa && ctp) {
-    ctp.identification_documentation = dfsa.r_proof_of_identity;
+    ctp.identification_documentation = doc_href(
+      dfsa.r_proof_of_identity,
+      base_url
+    );
   }
 
   if (dfsa && cmp) {
-    cmp.proof_of_charity_registration_documentation = dfsa.o_proof_of_reg;
+    cmp.proof_of_charity_registration_documentation = doc_href(
+      dfsa.o_proof_of_reg,
+      base_url
+    );
     cmp.ein_or_charity_registration_number = dfsa.o_registration_number;
   }
 
@@ -218,7 +225,7 @@ export async function handle_reg_updated(reg: IReg) {
       details.bankCode ||
       details.swiftCode ||
       "not specified";
-    cmp.bank_statament = bnk.bos;
+    cmp.bank_statament = doc_href(bnk.bos, base_url);
   }
 
   if (ctp) {

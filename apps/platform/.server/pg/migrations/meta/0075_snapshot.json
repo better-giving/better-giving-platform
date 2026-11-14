@@ -1,5 +1,5 @@
 {
-  "id": "5805df3e-9e06-4e14-b838-72a6fb646d24",
+  "id": "c2093147-9f5d-46cc-96c2-a6ae6578741b",
   "prevId": "1388bd15-6403-4a87-b27b-5db030090217",
   "version": "7",
   "dialect": "postgresql",
@@ -2294,6 +2294,44 @@
         "dists_settled_net_cut_check": {
           "name": "dists_settled_net_cut_check",
           "value": "\"dists\".\"refunds_cut_share\" IS NULL OR \"dists\".\"settled_net\" IS NOT NULL"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.doc_url_aliases": {
+      "name": "doc_url_aliases",
+      "schema": "",
+      "columns": {
+        "old_url": {
+          "name": "old_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "new_url": {
+          "name": "new_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "doc_url_aliases_old_url_new_url_pk": {
+          "name": "doc_url_aliases_old_url_new_url_pk",
+          "columns": [
+            "old_url",
+            "new_url"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "doc_url_aliases_moved": {
+          "name": "doc_url_aliases_moved",
+          "value": "\"doc_url_aliases\".\"old_url\" <> \"doc_url_aliases\".\"new_url\""
         }
       },
       "isRLSEnabled": false
@@ -5930,7 +5968,7 @@
         },
         "type_check": {
           "name": "type_check",
-          "value": "\"payouts\".\"type\" IN ('pending','processing','settled','error','refunded','refunded_loss','cancelled','returned','void')"
+          "value": "\"payouts\".\"type\" IN ('pending','processing','settled','error','refunded','refunded_loss','cancelled')"
         }
       },
       "isRLSEnabled": false
@@ -5980,12 +6018,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "hold_alerted_at": {
-          "name": "hold_alerted_at",
-          "type": "timestamptz",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {

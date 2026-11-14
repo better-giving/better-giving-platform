@@ -46,6 +46,7 @@ export const EXCLUDED: Record<string, string> = {
   "api.cron.wise-returns": "cron",
   "api.crypto-intents.$id": "checkout",
   "api.donation-intents": "checkout",
+  "api.docs": "internal",
   "api.donation-notifications": "internal",
   "api.file-upload": "internal",
   "api.me": "session",

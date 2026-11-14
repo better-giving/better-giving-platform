@@ -1,12 +1,13 @@
 import type { ActionFunction } from "react-router";
 import * as v from "valibot";
-import { admin_ctx } from "#/.server/auth";
+import { admin_ctx, user_ctx } from "#/.server/auth";
 import { redirectWithSuccess } from "#/.server/toast";
 import { report_degraded_null } from "#/errors/report";
 import { routes } from "#/pages/admin/routes";
 import { new_bank as schema } from "@/banking/schema";
 import { resp } from "@/helpers/https";
 import { msg } from "@/queue";
+import { FOREIGN_DOC, may_store_doc } from "$/doc-access";
 import { enqueue } from "$/kit/queue";
 import { wise } from "$/kit/wise";
 import { is_own_recipient } from "$/payouts/own-accounts";
@@ -25,6 +26,11 @@ export const action: ActionFunction = async (args) => {
       403,
       "A payout method can only be added to your own nonprofit"
     );
+  // a new application holds nothing yet, so only the member's own upload goes
+  const statement = x.bankStatementFile.publicUrl;
+  if (!may_store_doc(args.context.get(user_ctx).id, statement, undefined)) {
+    return resp.fail(400, FOREIGN_DOC);
+  }
 
   // read from wise, never the body
   const wacc = await wise
@@ -45,7 +51,7 @@ export const action: ActionFunction = async (args) => {
       id: x.wiseRecipientID,
       npo_id,
       bank_summary: x.bankSummary,
-      bank_statement_url: x.bankStatementFile.publicUrl,
+      bank_statement_url: statement,
       rejection_reason: "",
       status: "under-review",
       date_created: new Date().toISOString(),

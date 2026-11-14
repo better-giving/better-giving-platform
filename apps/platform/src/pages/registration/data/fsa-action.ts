@@ -9,6 +9,7 @@ import { msg } from "@/queue";
 import type { IFsaSigner, IReg } from "@/reg";
 import { Progress } from "@/reg/progress";
 import { fsa_docs_or_signer, type IFsaDocs, reg_id } from "@/reg/schema";
+import { FOREIGN_DOC, may_store_doc } from "$/doc-access";
 import { stripe as stripe_env } from "$/env";
 import { enqueue } from "$/kit/queue";
 import { reg_fsa_packet, reg_get } from "$/pg/queries/registration";
@@ -87,6 +88,13 @@ export const action: ActionFunction = async ({ request, params, url }) => {
   if (!reg) throw resp.status(404, `registration not found: ${rid}`);
   if (reg.r_id !== user.email && user.role !== "admin") {
     throw resp.status(403);
+  }
+  if (typeof docs_or_eid !== "string") {
+    const { o_proof_of_reg: por, r_proof_of_identity: poi } = docs_or_eid;
+    const own =
+      may_store_doc(user.id, por, reg.o_proof_of_reg) &&
+      may_store_doc(user.id, poi, reg.r_proof_of_identity);
+    if (!own) throw resp.status(400, FOREIGN_DOC);
   }
 
   // read-side only, so nothing is written before anvil: a packet for an

@@ -6,6 +6,7 @@ export * from "./connector";
 export * from "./country";
 export * from "./dispute";
 export * from "./dist";
+export * from "./doc-alias";
 export * from "./donation";
 export * from "./donation-message";
 export * from "./form";
