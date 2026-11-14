@@ -15,6 +15,7 @@ vi.mock("#/.server/auth", () => ({
 vi.mock("$/env", () => ({
   app: { session_secret: "test-session-secret" },
   blob: { read_write_token: "blob-token" },
+  blob_private: { read_write_token: "private-blob-token" },
   wise: {
     api_url: "https://wise.test",
     api_token: "wise-token",
@@ -203,7 +204,7 @@ describe("file upload", () => {
     call_route(upload_action, {
       ...doc_args(
         new Request(
-          `https://app.test/api/file-upload?filename=${encodeURIComponent(filename)}`,
+          `https://app.test/api/file-upload?kind=document&filename=${encodeURIComponent(filename)}`,
           // a real pdf, typed as an uploader posts it: a bare string goes as
           // text/plain, and the route checks the bytes against the type
           {
@@ -228,15 +229,18 @@ describe("file upload", () => {
     await upload("../assets/index-AbC123.js");
 
     const [pathname, , opts] = vi.mocked(put).mock.calls[0];
-    expect(pathname).toBe("u/index-AbC123.js");
+    expect(pathname).toBe("docs/user-1/index-AbC123.js");
     expect(opts?.addRandomSuffix).toBe(true);
     expect(opts?.allowOverwrite).toBe(false);
   });
 
-  it("keeps a plain name under the upload prefix", async () => {
+  it("keeps a plain name under the uploader's private folder", async () => {
     await upload("statement.pdf");
 
     const [pathname] = vi.mocked(put).mock.calls[0];
-    expect(pathname).toBe("u/statement.pdf");
+    expect(pathname).toBe("docs/user-1/statement.pdf");
+    expect(vi.mocked(put).mock.calls[0]![2]).toMatchObject({
+      access: "private",
+    });
   });
 });

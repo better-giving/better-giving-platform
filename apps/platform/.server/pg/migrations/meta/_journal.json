@@ -526,6 +526,13 @@
       "when": 1793238355465,
       "tag": "0074_rate_limit_windows",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1794580910399,
+      "tag": "0075_doc_url_aliases",
+      "breakpoints": true
     }
   ]
 }

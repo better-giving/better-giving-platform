@@ -71,12 +71,15 @@ const READY = {
   o_registration_number: "before",
 } as const;
 
+/** the private store `.env.test`'s token names; u-1 is the registrant */
+const STORE = "https://testprivate.private.blob.vercel-storage.com";
+
 const DOCS: IFsaDocs = {
   o_registration_number: "after",
   o_legal_entity_type: "Nonprofit Corporation",
   o_project_description: "Providing humanitarian aid globally",
-  o_proof_of_reg: "https://example.com/registration.pdf",
-  r_proof_of_identity: "https://example.com/passport.pdf",
+  o_proof_of_reg: `${STORE}/docs/u-1/registration-abc.pdf`,
+  r_proof_of_identity: `${STORE}/docs/u-1/passport-abc.pdf`,
 };
 
 beforeAll(async () => {
@@ -98,7 +101,10 @@ beforeEach(async () => {
 
 const SEEN_AT = "2026-09-01T00:00:00.000Z";
 
-const seed = (status: TStatus | null, fields: Partial<typeof READY> = READY) =>
+const seed = (
+  status: TStatus | null,
+  fields: Partial<typeof registrations.$inferInsert> = READY
+) =>
   test_db.current!.db.insert(registrations).values({
     id: RID,
     r_id: EMAIL,
@@ -108,14 +114,14 @@ const seed = (status: TStatus | null, fields: Partial<typeof READY> = READY) =>
   });
 
 /** a thrown `Response` is the refusal; anything else is the action's answer */
-const post_docs = () =>
+const post_docs = (docs: IFsaDocs = DOCS) =>
   Promise.resolve(
     action({
       ...doc_args(
         new Request(`http://localhost/register/${RID}/3/fsa`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(DOCS),
+          body: JSON.stringify(docs),
         })
       ),
       params: { reg_id: RID },
@@ -172,7 +178,13 @@ describe("fsa action — documentation form", () => {
   // a step 3 tab left open past submit or approval: the draft status the
   // packet writes would pull the row out of review.
   test("an admin mints the packet in the registrant's name", async () => {
-    await seed("01");
+    // over the documents the registrant saved: an admin's own uploads would
+    // land in the admin's folder
+    await seed("01", {
+      ...READY,
+      o_proof_of_reg: DOCS.o_proof_of_reg,
+      r_proof_of_identity: DOCS.r_proof_of_identity,
+    });
     vi.mocked(get_session).mockResolvedValue({
       user: { id: "u-9", email: "ops@test.com", role: "admin" } as any,
     });
@@ -189,6 +201,31 @@ describe("fsa action — documentation form", () => {
       o_registration_number: "after",
       o_fsa_signing_url: "https://anvil.test/sign",
     });
+  });
+
+  test("refuses another user's upload with 400 and mints nothing", async () => {
+    await seed("01");
+
+    const res = await post_docs({
+      ...DOCS,
+      r_proof_of_identity: `${STORE}/docs/u-2/passport-xyz.pdf`,
+    });
+
+    expect(res.status).toBe(400);
+    expect(gen_fsa_signing_url).not.toHaveBeenCalled();
+    expect((await reg_get(RID))?.r_proof_of_identity).toBeNull();
+  });
+
+  test("takes the urls already on the row, from before documents went private", async () => {
+    const legacy = {
+      o_proof_of_reg: "https://example.com/registration.pdf",
+      r_proof_of_identity: "https://example.com/passport.pdf",
+    };
+    await seed("01", { ...READY, ...legacy });
+
+    const res = await post_docs({ ...DOCS, ...legacy });
+
+    expect(res.headers.get("location")).toBe("https://anvil.test/sign");
   });
 
   test.each<[TStatus, string]>([
