@@ -1,7 +1,7 @@
 // BGP-111: a settled dist with a grant part (`alloc.cash > 0`) that is not
 // routed to a connected account must own a pending payout row, on every path
-// that settles dists. 23 prod dists got a grant part and no payout, and no path
-// test said whether the fault was in one rail or in `settle_npo` itself.
+// that settles dists. a missing row could come from any one rail or from
+// `settle_npo` itself, so each path is driven on its own.
 //
 // each path runs from its entry as far as node tests allow, on pglite:
 //   provider webhook -> `don-sttl-dist` msg -> handle_don_sttl_dist ->
