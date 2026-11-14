@@ -3,10 +3,12 @@ import type { Alert } from "@/slack";
 import { stage } from "../env";
 import { aws_monitor } from "../kit/slack";
 import { db } from "../pg/db";
+import { npo_default_bapp } from "../pg/queries/banking";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { npo_balance_update, npo_get_locked } from "../pg/queries/npo";
 import { outstanding_for_npo, unrecover_owed } from "../pg/queries/owed";
 import {
+  npo_last_return,
   payouts_in,
   payouts_move,
   payouts_own_loss,
@@ -38,6 +40,10 @@ export type SettleResult =
   /** a returned transfer holds the npo's payouts: read under the run lock, so
    * a return committing after the cron's eligibility read stops the claim */
   | { status: "held"; hold: IReturnHold }
+  /** a return is on record and the account that cleared the hold is not the
+   * recipient the caller resolved earlier: nothing claimed, the next run pays
+   * the current one */
+  | { status: "recipient_changed"; ref_key: string }
   | { status: "released"; ref: string }
   | { status: "unreleased"; ref: string }
   | { status: "fund_unknown"; ref: string }
@@ -74,6 +80,15 @@ export async function settle_npo_payouts(
     await lock_npo_run(tx, npo.id);
     const hold = await npo_return_hold(npo.id, tx);
     if (hold) return { status: "held", hold } as const;
+    // eligibility resolved `to` before this lock: a return and a newer default
+    // account since then cleared the hold, but `to` is still the account that
+    // bounced
+    if (to !== null && (await npo_last_return(npo.id, tx))) {
+      const now = await npo_default_bapp(npo.id, tx);
+      if (String(now?.id) !== to.ref_key) {
+        return { status: "recipient_changed", ref_key: to.ref_key } as const;
+      }
+    }
     const locked = await pending_payouts_locked(tx, payout_ids);
     if (locked.length === 0) return { status: "none_pending" } as const;
     // a refund locks payout, then npo, then owed row; the claim does too

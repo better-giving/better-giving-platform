@@ -247,6 +247,15 @@ export async function returned_payouts_resend(
   return rows.map((r) => r.id).sort();
 }
 
+/** the npos with a `returned` payout waiting to be re-sent */
+export async function npos_with_returned_payouts(): Promise<number[]> {
+  const rows = await db
+    .selectDistinct({ npo_id: payouts.npo_id })
+    .from(payouts)
+    .where(eq(payouts.type, "returned"));
+  return rows.map((r) => r.npo_id);
+}
+
 // -- settlements --
 
 export type SettlementRow = typeof settlements.$inferSelect;

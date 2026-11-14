@@ -52,6 +52,7 @@ import { npo_balance_update, npo_get_locked } from "../pg/queries/npo";
 import { run_netted_usd, unrecover_owed } from "../pg/queries/owed";
 import {
   legacy_losses_locked,
+  npos_with_returned_payouts,
   payouts_move,
   payouts_own_loss,
   run_payouts_locked,
@@ -145,7 +146,7 @@ async function resend_after_return(npo_id: number) {
     await alert({
       type: "NOTICE",
       title: `Returned payouts re-sent for npo:${npo_id}`,
-      body: "the npo's account that grants pay was approved or made default after the returned transfer was sent: these payouts are pending again and go out with the next grants run",
+      body: "the npo's account that grants pay was approved or made default after the returned transfer was sent: these payouts are pending again and go out with the next grants run (found on the poll that retries a re-send that did not land, or right after the return)",
       fields: [{ name: "payout_ids", value: res.ids.join(", ") }],
     });
   } catch (err) {
@@ -359,6 +360,7 @@ const RETURNING: ReadonlySet<string> = new Set(["bounced_back", "cancelled"]);
  * (`return_settlement`); any other state off the ordinary path is told to ops
  */
 export async function poll_wise_returns(state_of: TransferState) {
+  await retry_resends();
   const since = new Date(
     Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000
   ).toISOString();
@@ -388,6 +390,21 @@ export async function poll_wise_returns(state_of: TransferState) {
     } catch (err) {
       report_error(err, { settlement_id: s.id });
     }
+  }
+}
+
+/** every npo still holding `returned` payouts is asked to re-send them again:
+ * the one call right after a return can fail, and the settlement is final by
+ * then, so nothing else would try. `resend_returned` moves nothing while the
+ * npo is held, so a repeat is safe. a failure is reported, and the payouts stay
+ * `returned` for the next poll */
+async function retry_resends() {
+  try {
+    for (const npo_id of await npos_with_returned_payouts()) {
+      await resend_after_return(npo_id);
+    }
+  } catch (err) {
+    report_error(err);
   }
 }
 

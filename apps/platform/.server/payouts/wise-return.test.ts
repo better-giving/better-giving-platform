@@ -810,6 +810,42 @@ describe("poll_wise_returns", () => {
       });
   }
 
+  describe("a re-send that did not land after a return", () => {
+    const stuck = async (npo_id: number, bank_updated: string) => {
+      await seed_settlement(npo_id, "2001", { status: "returned" });
+      await seed_payout(npo_id, "p-back", 100);
+      await db()
+        .update(payouts)
+        .set({ type: "returned", settled_id: "2001" })
+        .where(eq(payouts.id, "p-back"));
+      await db().insert(banking_apps).values({
+        id: RECIPIENT,
+        npo_id,
+        status: "default",
+        date_created: bank_updated,
+        updated_at: bank_updated,
+      });
+    };
+
+    test("the next poll moves the returned payouts back to pending once a newer default account holds", async () => {
+      const npo = await seed_npo(0);
+      await stuck(npo.id, "2026-11-10T00:00:00.000Z");
+
+      await poll_wise_returns(async () => "outgoing_payment_sent");
+
+      expect(await payout_types()).toEqual({ "p-back": "pending" });
+    });
+
+    test("moves nothing while the npo is still held", async () => {
+      const npo = await seed_npo(0);
+      await stuck(npo.id, "2026-10-01T00:00:00.000Z");
+
+      await poll_wise_returns(async () => "outgoing_payment_sent");
+
+      expect(await payout_types()).toEqual({ "p-back": "returned" });
+    });
+  });
+
   test("asks wise only of real transfers from the last 90 days whose stored state is not final", async () => {
     const npo = await seed_npo(0);
     await seed_settlement(npo.id, "1001");

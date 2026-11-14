@@ -101,6 +101,7 @@ const { owed_amounts, owed_entries, owed_notices } = await import(
 const { create_test_db } = await import("../pg/test-utils/pglite");
 const { owed_for_donation } = await import("../pg/queries/owed");
 const { npos } = await import("../pg/schema/npo");
+const { banking_apps } = await import("../pg/schema/banking");
 const { payouts, settlements } = await import("../pg/schema/payout");
 
 const db = () => test_db.current!.db;
@@ -130,6 +131,7 @@ beforeEach(async () => {
   await db().delete(dists);
   await db().delete(donations);
   await db().delete(settlements);
+  await db().delete(banking_apps);
   await db().delete(npos);
 });
 
@@ -396,6 +398,38 @@ describe("settle_npo_payouts", () => {
       expect(await npo_cash(npo.id)).toBe(500);
     }
   );
+
+  test("a return and a newer default account after eligibility read the old one: the claim does not pay it", async () => {
+    const npo = await seed_npo({ cash: 500, payout_minimum: 0 });
+    await seed_payout(npo.id, "p-1", 60);
+    await db().insert(settlements).values({
+      id: "sttl-returned",
+      other_id: "ref-returned",
+      npo_id: npo.id,
+      date: "2026-10-01T00:00:00.000Z",
+      amount: 100,
+      status: "returned",
+    });
+    // bank B cleared the hold; the caller still holds bank A's id, "777"
+    await db().insert(banking_apps).values({
+      id: "888",
+      npo_id: npo.id,
+      status: "default",
+      date_created: "2026-10-15T00:00:00.000Z",
+      updated_at: "2026-10-15T00:00:00.000Z",
+    });
+    const pay = vi.fn<Pay>(async () => TRANSFER_ID);
+
+    const res = await settle_npo_payouts(npo, ["p-1"], {
+      ref_key: RECIPIENT,
+      pay,
+    });
+
+    expect(res).toEqual({ status: "recipient_changed", ref_key: RECIPIENT });
+    expect(pay).not.toHaveBeenCalled();
+    expect(await payout_types()).toEqual({ "p-1": "pending" });
+    expect(await npo_cash(npo.id)).toBe(500);
+  });
 
   test("claims and pays nothing when the pending total is under the npo's minimum", async () => {
     const npo = await seed_npo({ cash: 500, payout_minimum: 80 });
