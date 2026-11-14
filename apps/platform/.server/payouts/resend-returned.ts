@@ -18,7 +18,7 @@ export interface IReturnHold {
 
 /**
  * whether the npo's grants are held: its latest transfer came back (returned,
- * or awaiting repair of which payouts are its own), and the
+ * or awaiting repair because which payouts are its own is unclear), and the
  * account the grants run pays (`npo_default_bapp`) was not approved or made
  * default since that transfer was sent, so a run would pay the account that
  * bounced. keyed on the settlement, not the payouts: refunding or cancelling

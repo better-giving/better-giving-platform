@@ -5,7 +5,8 @@
  * (`./resend-returned`, asked again once the return commits, for an account
  * that changed while the transfer was out). what each record becomes, for a
  * run that claimed payouts P (gross G = payout_total(P)), withheld R it owed
- * and paid Q it was due back (net N = G - R + Q, the settlement's amount and what wise sent):
+ * and paid Q it was due back (net N = G - R + Q, the settlement's amount and
+ * what wise sent):
  *
  * - settlement: `status` 'returned', which ends polling and makes a second
  *   detection change nothing. amount, date and sources stay, so the grants page
@@ -14,17 +15,16 @@
  *   `settled_date` stay, naming the run that returned them. one moved on any
  *   other way (reset by hand, voided) is left as it is and named to ops.
  * - npo cash: credited payout_total of the payouts this transaction takes back:
- *   the ones it moves to 'returned' and the run's loss-refunded ones, so G
- *   when nothing moved on. never a figure read off the settlement alone.
+ *   the ones it moves to 'returned' and the run's loss-refunded ones, which
+ *   is G when nothing moved on. never a figure read off the settlement alone.
  * - owed rows: `unrecover_owed` under the run's ref: each recovery taken back
  *   (the row owes it again) and each due-back payment taken back (the row is
  *   due it again), as entries under `unfunded:<ref>`, which owed history
  *   pairs off with the run's own.
- * - a payout of the run `refunded_loss`, in flight or
- *   after it settled (an older run's, with no `settled_id`, counts when no
- *   other settlement lists it; else the return waits, see
- *   `ownership_unclear`): its refund found the grant gone and recorded the cash
- *   share as owed (dist `refund_status` 'loss', donation 'refunded_loss'). the
+ * - a payout of the run `refunded_loss`, in flight or after it settled (an
+ *   older run's, with no `settled_id`, counts when no other settlement lists
+ *   it; else the return waits, see `ownership_unclear`): its refund found the
+ *   grant gone and recorded the cash share as owed (dist `refund_status` 'loss', donation 'refunded_loss'). the
  *   cash is back, so with the credit above the npo holds it as if the payout
  *   were pending, and `reverse_unfunded_payout_loss` redoes the refund that
  *   way: payout 'refunded'; a dist that can reverse in full takes the cash
