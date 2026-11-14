@@ -359,9 +359,9 @@ export async function npo_last_return(
   return row ?? null;
 }
 
-/** marks returned settlement `id` as the one ops was told holds its npo's
- * grants; false when ops was already told of it. the marker is the dedupe:
- * one alert per returned settlement */
+/** marks settlement `id`, whose transfer came back, as the one ops was told
+ * holds its npo's grants; false when ops was already told of it. the marker
+ * is the dedupe: one alert per such settlement */
 export async function hold_alert_claim(id: string): Promise<boolean> {
   const rows = await db
     .update(settlements)

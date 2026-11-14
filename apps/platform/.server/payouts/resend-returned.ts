@@ -5,13 +5,14 @@ import { npo_last_return, returned_payouts_resend } from "../pg/queries/payout";
 import { lock_run } from "./owed-run";
 
 export interface IReturnHold {
-  /** the npo's latest returned settlement: the hold alert dedupes on it */
+  /** the npo's latest returned or awaiting-repair settlement: the hold alert dedupes on it */
   settlement_id: string;
   reason: string;
 }
 
 /**
- * whether the npo's grants are held: its latest transfer came back, and the
+ * whether the npo's grants are held: its latest transfer came back (returned,
+ * or awaiting repair of which payouts are its own), and the
  * account the grants run pays (`npo_default_bapp`) was not approved or made
  * default since that transfer was sent, so a run would pay the account that
  * bounced. keyed on the settlement, not the payouts: refunding or cancelling
