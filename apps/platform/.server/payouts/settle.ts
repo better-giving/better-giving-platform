@@ -85,7 +85,7 @@ export async function settle_npo_payouts(
     // bounced
     if (to !== null && (await npo_last_return(npo.id, tx))) {
       const now = await npo_default_bapp(npo.id, tx);
-      if (String(now?.id) !== to.ref_key) {
+      if (now === undefined || String(now.id) !== to.ref_key) {
         return { status: "recipient_changed", ref_key: to.ref_key } as const;
       }
     }

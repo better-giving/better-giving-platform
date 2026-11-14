@@ -360,7 +360,6 @@ const RETURNING: ReadonlySet<string> = new Set(["bounced_back", "cancelled"]);
  * (`return_settlement`); any other state off the ordinary path is told to ops
  */
 export async function poll_wise_returns(state_of: TransferState) {
-  await retry_resends();
   const since = new Date(
     Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000
   ).toISOString();
@@ -391,6 +390,8 @@ export async function poll_wise_returns(state_of: TransferState) {
       report_error(err, { settlement_id: s.id });
     }
   }
+  // after the returns above, so a slow or large re-send backlog never delays finding them
+  await retry_resends();
 }
 
 /** every npo still holding `returned` payouts is asked to re-send them again:
