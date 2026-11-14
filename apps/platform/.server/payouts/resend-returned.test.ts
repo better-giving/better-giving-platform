@@ -284,6 +284,9 @@ describe("npo_return_hold", () => {
 
     expect(await npo_return_hold(npo_id)).toEqual({
       settlement_id: `sttl-${npo_id}`,
+      status: "returned",
+      amount: 100,
+      date: SENT,
       reason: "the default account predates the returned transfer",
     });
   });
@@ -310,6 +313,9 @@ describe("npo_return_hold", () => {
 
     expect(await npo_return_hold(npo_id)).toEqual({
       settlement_id: "sttl-repair",
+      status: "awaiting_repair",
+      amount: 100,
+      date: SENT,
       reason: "the default account predates the returned transfer",
     });
     expect(await resend_returned(npo_id)).toMatchObject({ status: "held" });

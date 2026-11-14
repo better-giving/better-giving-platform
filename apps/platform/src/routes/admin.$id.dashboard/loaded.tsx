@@ -39,6 +39,9 @@ export function Loaded({ classes = "", ...props }: Props) {
       {props.returned && (
         <ReturnedNotice returned={props.returned} classes="mb-4" />
       )}
+      {props.awaiting_repair && (
+        <AwaitingNotice {...props.awaiting_repair} classes="mb-4" />
+      )}
       <div className="grid gap-4 @lg:grid-cols-2">
         <Figure
           title="Savings"
@@ -215,6 +218,33 @@ function ReturnedNotice({ returned, classes = "" }: IReturnedNotice) {
       {returned.count === 1
         ? `${total} from ${format(returned.latest_date, "MMM d")} didn't reach your bank account, so it's back in your balance. Update your bank details, and it goes out again once the new ones are approved.`
         : `${returned.count} payouts (${total}) didn't reach your bank account, so they're back in your balance. Update your bank details, and they go out again once the new ones are approved.`}
+    </WarningCallout>
+  );
+}
+
+interface IAwaitingNotice {
+  amount: number;
+  date: string;
+  classes?: string;
+}
+
+/** a transfer came back and which donations it covered is still being checked */
+export function AwaitingNotice({
+  amount,
+  date,
+  classes = "",
+}: IAwaitingNotice) {
+  return (
+    <WarningCallout
+      title="Your bank sent a payout back"
+      classes={classes}
+      action={
+        <Link to="../banking" className="btn btn-primary btn-sm">
+          Update bank details
+        </Link>
+      }
+    >
+      {`${to_usd(amount, 2)} from ${format(date, "MMM d")} didn't reach your bank account. We're checking which donations it covered and will add them back to your balance. Payouts are paused until you update your bank details and the new ones are approved.`}
     </WarningCallout>
   );
 }

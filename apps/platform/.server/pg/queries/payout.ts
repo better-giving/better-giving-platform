@@ -344,9 +344,14 @@ export async function settlements_to_poll(
 export async function npo_last_return(
   npo_id: number,
   db_: DbOrTx = db
-): Promise<Pick<SettlementRow, "id" | "date"> | null> {
+): Promise<Pick<SettlementRow, "id" | "date" | "status" | "amount"> | null> {
   const [row] = await db_
-    .select({ id: settlements.id, date: settlements.date })
+    .select({
+      id: settlements.id,
+      date: settlements.date,
+      status: settlements.status,
+      amount: settlements.amount,
+    })
     .from(settlements)
     .where(
       and(

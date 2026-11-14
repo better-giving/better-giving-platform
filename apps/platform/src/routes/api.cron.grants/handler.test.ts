@@ -762,7 +762,15 @@ describe("grants cron execute", () => {
     const held = send_alert.mock.calls
       .map(([a]) => a)
       .filter((a) => a.title.startsWith("Grants held"));
-    expect(held).toHaveLength(1);
+    expect(held).toEqual([
+      expect.objectContaining({
+        body: expect.stringContaining("which payouts it covered is unclear"),
+        fields: expect.arrayContaining([
+          { name: "returned", value: "awaiting repair: nothing credited yet" },
+          { name: "pending", value: "200" },
+        ]),
+      }),
+    ]);
   });
 
   test("a new account made default releases the hold: the next run pays the returned payouts with the new ones", async () => {

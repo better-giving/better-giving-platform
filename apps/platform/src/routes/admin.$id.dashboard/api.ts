@@ -42,6 +42,9 @@ export interface DashboardData {
   returned: IReturnedPayouts | null;
   /** the latest returned transfer still holds this npo's payouts */
   return_hold: boolean;
+  /** the hold is a transfer that came back with its payouts' ownership
+   * unclear: nothing credited yet; null for any other hold or none */
+  awaiting_repair: { amount: number; date: string } | null;
 }
 
 export const endowUpdateAction = endowUpdate({ redirect: "." });
@@ -100,5 +103,9 @@ export const loader = async (x: Route.LoaderArgs) => {
     campaign_live: live,
     returned,
     return_hold: hold !== null,
+    awaiting_repair:
+      hold?.status === "awaiting_repair"
+        ? { amount: hold.amount, date: hold.date }
+        : null,
   } satisfies DashboardData;
 };

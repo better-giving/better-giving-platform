@@ -91,18 +91,23 @@ async function alert_held(el: Extract<GrantEligibility, { status: "held" }>) {
   const { npo, hold, total } = el;
   if (!(await hold_alert_claim(hold.settlement_id))) return;
   try {
-    const returned = await npo_returned_payouts(npo.id);
+    const repair = hold.status === "awaiting_repair";
+    const returned = repair ? null : await npo_returned_payouts(npo.id);
     await aws_monitor.send_alert({
       type: "ERROR",
       from: fn,
       title: `Grants held for npo:${npo.id}: ${npo.name}`,
-      body: "its last transfer came back, so nothing more is sent until a new bank account is approved and made its default; the returned payouts then go out with the next run",
+      body: repair
+        ? "its last transfer came back but which payouts it covered is unclear, so nothing more is sent until ops repairs the settlement and a new bank account is approved and made its default. if a new account lifts the hold first, the repair is still pending"
+        : "its last transfer came back, so nothing more is sent until a new bank account is approved and made its default; the returned payouts then go out with the next run",
       fields: [
         {
           name: "returned",
-          value: returned
-            ? `${returned.count} payout(s), ${returned.total}`
-            : "none left",
+          value: repair
+            ? "awaiting repair: nothing credited yet"
+            : returned
+              ? `${returned.count} payout(s), ${returned.total}`
+              : "none left",
         },
         { name: "pending", value: total.toString() },
         { name: "settlement", value: hold.settlement_id },

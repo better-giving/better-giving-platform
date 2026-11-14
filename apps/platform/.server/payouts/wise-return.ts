@@ -276,7 +276,7 @@ async function announce(
     if (!res.first) return;
     await alert({
       title: `Wise transfer returned, payouts' owner unclear: npo:${s.npo_id}`,
-      body: `settlement ${s.id}'s transfer came back, but loss-refunded payouts listed in its sources carry no settlement and another settlement lists them too, so which run owns them can't be told. nothing was credited; the settlement is marked ${AWAITING_REPAIR} and each poll tries again. if this is the transfer that paid them, stamp settled_id on those payouts by hand; a hand-sent copy of another run owns none, so leave it. either way the npo's grants are held until a newer account is its default, as after any returned transfer`,
+      body: `settlement ${s.id}'s transfer came back, but loss-refunded payouts listed in its sources carry no settlement and another settlement lists them too, so which run owns them can't be told. nothing was credited; the settlement is marked ${AWAITING_REPAIR} and each poll tries again. if this is the transfer that paid them, stamp settled_id on those payouts by hand; a hand-sent copy of another run owns none, so leave it. either way the npo's grants are held until a newer account is its default, as after any returned transfer. if a new account lifts the hold first, this repair is still pending`,
       fields: base,
     });
     return;

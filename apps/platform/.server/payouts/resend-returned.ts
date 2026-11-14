@@ -7,6 +7,12 @@ import { lock_run } from "./owed-run";
 export interface IReturnHold {
   /** the npo's latest returned or awaiting-repair settlement: the hold alert dedupes on it */
   settlement_id: string;
+  /** `awaiting_repair`: its transfer came back but which payouts it covered
+   * is unclear, so nothing is credited yet */
+  status: "returned" | "awaiting_repair";
+  /** what the settlement sent, in usd, and when */
+  amount: number;
+  date: string;
   reason: string;
 }
 
@@ -24,14 +30,20 @@ export async function npo_return_hold(
 ): Promise<IReturnHold | null> {
   const last = await npo_last_return(npo_id, db_);
   if (!last) return null;
+  const of = {
+    settlement_id: last.id,
+    status: last.status === "awaiting_repair" ? "awaiting_repair" : "returned",
+    amount: last.amount,
+    date: last.date,
+  } as const;
   const pays_to = await npo_default_bapp(npo_id, db_);
   if (!pays_to) {
-    return { settlement_id: last.id, reason: "no approved account" };
+    return { ...of, reason: "no approved account" };
   }
   const since = pays_to.updated_at ?? pays_to.date_created;
   if (Date.parse(since) <= Date.parse(last.date)) {
     return {
-      settlement_id: last.id,
+      ...of,
       reason: "the default account predates the returned transfer",
     };
   }
