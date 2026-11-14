@@ -157,6 +157,10 @@ async function take_back(
   tx: DbOrTx,
   s: SettlementRow
 ): Promise<{ res: ReturnResult; s: SettlementRow; npo_name?: string }> {
+  // `settled_id` names one settlement: a second one sharing these sources
+  // (a run sent again by hand) owns no payout, and taking any back would
+  // credit the npo twice. the settle stamps it on every payout of the run,
+  // those a refund took in flight included
   const owned = await run_payouts_locked(tx, s);
   // a run recorded before the settle stamped loss-refunded payouts in flight
   // has some with no owner. they are this run's when no other settlement lists
@@ -168,10 +172,6 @@ async function take_back(
     return { res: { status: "ownership_unclear", first }, s };
   }
   const run = [...owned, ...legacy.rows];
-  // `settled_id` names one settlement: a second one sharing these sources
-  // (a run sent again by hand) owns no payout, and taking any back would
-  // credit the npo twice. the settle stamps it on every payout of the run,
-  // those a refund took in flight included
   const npo_id = s.npo_id;
   if (npo_id === null || run.length === 0) {
     await settlement_status_set(tx, s.id, s.status, RETURNED);
