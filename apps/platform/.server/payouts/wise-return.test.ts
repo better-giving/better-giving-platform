@@ -462,6 +462,100 @@ describe("return_settlement", () => {
     expect(await npo_cash(npo.id)).toBe(400);
   });
 
+  describe("a run recorded before the settle stamped loss-refunded payouts", () => {
+    const unstamp = (id: string) =>
+      db().update(payouts).set({ settled_id: null }).where(eq(payouts.id, id));
+
+    test("a mixed run takes back its unowned loss payout as its own", async () => {
+      const npo = await seed_npo(500);
+      await seed_payout(npo.id, "p-1", 60);
+      const { don } = await seed_donation_payout(npo.id, "p-2", 40);
+      const transfer = await sent(npo, ["p-1", "p-2"], () => refund(don));
+      await unstamp("p-2");
+
+      const res = await return_settlement(transfer);
+
+      expect(res).toMatchObject({
+        status: "returned",
+        credited: 100,
+        returned: ["p-1"],
+        loss_reversed: ["p-2"],
+      });
+      expect(await payout_types()).toEqual({
+        "p-1": "returned",
+        "p-2": "refunded",
+      });
+      expect(await npo_cash(npo.id)).toBe(460);
+      const [owner] = await db()
+        .select({ s: payouts.settled_id })
+        .from(payouts)
+        .where(eq(payouts.id, "p-2"));
+      expect(owner?.s).toBe(transfer);
+    });
+
+    test("an all-refunded run is taken back, not marked returned empty", async () => {
+      const npo = await seed_npo(500);
+      const { don } = await seed_donation_payout(npo.id, "p-1", 100);
+      const transfer = await sent(npo, ["p-1"], () => refund(don));
+      await unstamp("p-1");
+
+      const res = await return_settlement(transfer);
+
+      expect(res).toMatchObject({ status: "returned", loss_reversed: ["p-1"] });
+      expect(await payout_types()).toEqual({ "p-1": "refunded" });
+      expect(await npo_cash(npo.id)).toBe(400);
+      expect(await status_of(transfer)).toBe("returned");
+    });
+
+    test("a copy listing the same sources makes it unclear: nothing credited, not final, told once", async () => {
+      const npo = await seed_npo(500);
+      const { don } = await seed_donation_payout(npo.id, "p-1", 100);
+      const run = await sent(npo, ["p-1"], () => refund(don));
+      await unstamp("p-1");
+      const [first] = await db().select().from(settlements);
+      await db()
+        .insert(settlements)
+        .values({ ...first!, id: "hand-sent-1", other_id: "hand-ref" });
+
+      expect(await return_settlement(run)).toEqual({
+        status: "ownership_unclear",
+        first: true,
+      });
+      expect(await return_settlement(run)).toEqual({
+        status: "ownership_unclear",
+        first: false,
+      });
+
+      expect(await payout_types()).toEqual({ "p-1": "refunded_loss" });
+      expect(await npo_cash(npo.id)).toBe(400);
+      expect(await status_of(run)).toBe("awaiting_repair");
+      expect(send_alert).toHaveBeenCalledOnce();
+    });
+
+    test("amounts that don't add up stamp nothing and credit nothing", async () => {
+      const npo = await seed_npo(500);
+      await seed_payout(npo.id, "p-1", 60);
+      const { don } = await seed_donation_payout(npo.id, "p-2", 40);
+      const transfer = await sent(npo, ["p-1", "p-2"], () => refund(don));
+      await unstamp("p-2");
+      await db()
+        .update(settlements)
+        .set({ amount: 90 })
+        .where(eq(settlements.id, transfer));
+
+      expect(await return_settlement(transfer)).toMatchObject({
+        status: "gross_mismatch",
+      });
+      expect(await npo_cash(npo.id)).toBe(400);
+      const [owner] = await db()
+        .select({ s: payouts.settled_id })
+        .from(payouts)
+        .where(eq(payouts.id, "p-2"));
+      expect(owner?.s).toBeNull();
+      expect(await status_of(transfer)).toBe("");
+    });
+  });
+
   test("a payout loss-refunded after it settled is refunded as if pending once the money is back", async () => {
     const npo = await seed_npo(500);
     await seed_payout(npo.id, "p-1", 60);

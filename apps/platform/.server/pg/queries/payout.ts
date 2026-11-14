@@ -392,6 +392,52 @@ export interface IRunPayout {
   settled_id: string | null;
 }
 
+export interface ILegacyLoss extends IRunPayout {
+  source_id: string;
+}
+
+/**
+ * payouts of the run behind `s` that a refund took in flight under the settle
+ * from before it stamped them: `refunded_loss`, no `settled_id`, listed in
+ * its `sources`. row-locked. `shared`: another settlement of the npo lists the
+ * same source too, so which run they belong to is not decidable here
+ */
+export async function legacy_losses_locked(
+  tx: DbOrTx,
+  s: Pick<SettlementRow, "id" | "npo_id" | "sources">
+): Promise<{ rows: ILegacyLoss[]; shared: boolean }> {
+  if (s.npo_id === null || !s.sources || s.sources.length === 0) {
+    return { rows: [], shared: false };
+  }
+  const rows = await tx
+    .select({
+      id: payouts.id,
+      amount: payouts.amount,
+      type: payouts.type,
+      settled_id: payouts.settled_id,
+      source_id: payouts.source_id,
+    })
+    .from(payouts)
+    .where(
+      and(
+        eq(payouts.npo_id, s.npo_id),
+        isNull(payouts.settled_id),
+        eq(payouts.type, "refunded_loss"),
+        inArray(payouts.source_id, s.sources)
+      )
+    )
+    .orderBy(asc(payouts.id))
+    .for("update");
+  if (rows.length === 0) return { rows, shared: false };
+  const others = await tx
+    .select({ id: settlements.id, sources: settlements.sources })
+    .from(settlements)
+    .where(and(eq(settlements.npo_id, s.npo_id), ne(settlements.id, s.id)));
+  const mine = new Set(rows.map((r) => r.source_id));
+  const shared = others.some((o) => (o.sources ?? []).some((x) => mine.has(x)));
+  return { rows, shared };
+}
+
 /**
  * every payout of the run behind `s`, row-locked in id order: those it owns
  * by `settled_id`, whatever they are now. one a refund took while the transfer

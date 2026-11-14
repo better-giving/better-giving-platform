@@ -49,7 +49,9 @@ import type { DbOrTx } from "../pg/queries/helpers";
 import { npo_balance_update, npo_get_locked } from "../pg/queries/npo";
 import { run_netted_usd, unrecover_owed } from "../pg/queries/owed";
 import {
+  legacy_losses_locked,
   payouts_move,
+  payouts_own_loss,
   run_payouts_locked,
   type SettlementRow,
   settlement_locked,
@@ -64,6 +66,9 @@ import { payout_cents, payout_total } from "./transfer";
 
 /** the state a settlement takes once its money is back in the npo's books */
 export const RETURNED = "returned";
+/** its transfer came back but which payouts are its own can't be decided: not
+ * final, so polling goes on, and nothing is credited until ops repairs it */
+export const AWAITING_REPAIR = "awaiting_repair";
 
 export type ReturnResult =
   | { status: "not_found" }
@@ -72,6 +77,10 @@ export type ReturnResult =
   /** marked returned with nothing credited: no payout of it was left to take back */
   | { status: "nothing_to_return" }
   | { status: "gross_mismatch"; recomputed: number; ledger: number }
+  /** loss-refunded payouts of the run carry no owner and another settlement
+   * lists them too: nothing written but the state; `first` is false on every
+   * poll after the one that told ops */
+  | { status: "ownership_unclear"; first: boolean }
   /** nothing written; reported and told to ops */
   | { status: "failed" }
   | {
@@ -146,7 +155,17 @@ async function take_back(
   tx: DbOrTx,
   s: SettlementRow
 ): Promise<{ res: ReturnResult; s: SettlementRow; npo_name?: string }> {
-  const run = await run_payouts_locked(tx, s);
+  const owned = await run_payouts_locked(tx, s);
+  // a run recorded before the settle stamped loss-refunded payouts in flight
+  // has some with no owner. they are this run's when no other settlement lists
+  // them, and not decidable when one does: never credit those
+  const legacy = await legacy_losses_locked(tx, s);
+  if (legacy.shared) {
+    const first = s.status !== AWAITING_REPAIR;
+    if (first) await settlement_status_set(tx, s.id, s.status, AWAITING_REPAIR);
+    return { res: { status: "ownership_unclear", first }, s };
+  }
+  const run = [...owned, ...legacy.rows];
   // `settled_id` names one settlement: a second one sharing these sources
   // (a run sent again by hand) owns no payout, and taking any back would
   // credit the npo twice. the settle stamps it on every payout of the run,
@@ -165,6 +184,12 @@ async function take_back(
     return { res: { status: "gross_mismatch", recomputed, ledger }, s };
   }
 
+  // reconciled: the unowned ones are this run's, once and for all
+  await payouts_own_loss(
+    tx,
+    legacy.rows.map((p) => p.id),
+    s.id
+  );
   const settled = run.filter((p) => p.type === "settled").map((p) => p.id);
   const returned = await payouts_move(tx, settled, "settled", {
     type: "returned",
@@ -242,6 +267,15 @@ async function announce(
         { name: "recomputed", value: res.recomputed.toString() },
         { name: "ledger", value: res.ledger.toString() },
       ],
+    });
+    return;
+  }
+  if (res.status === "ownership_unclear") {
+    if (!res.first) return;
+    await alert({
+      title: `Wise transfer returned, payouts' owner unclear: npo:${s.npo_id}`,
+      body: `settlement ${s.id}'s transfer came back, but loss-refunded payouts listed in its sources carry no settlement and another settlement lists them too, so which run owns them can't be told. nothing was credited; the settlement is marked ${AWAITING_REPAIR} and each poll tries again. stamp settled_id on the payouts that belong to it by hand`,
+      fields: base,
     });
     return;
   }
