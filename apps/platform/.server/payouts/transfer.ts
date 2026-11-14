@@ -10,6 +10,16 @@ export class NotFundedError extends Error {
   }
 }
 
+/** `wise_pay` refused to fund: the transfer would not pay the run's total, or
+ * would pay one of our own accounts. the cause of a `NotFundedError`; its
+ * message is what ops needs to act on */
+export class PayRefused extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PayRefused";
+  }
+}
+
 // fixed namespace for the uuid v5 below; changing it re-keys every ref
 const REF_NAMESPACE = Buffer.from("cb853edef275466b85c79409fa3f037a", "hex");
 

@@ -87,7 +87,7 @@ vi.mock("../pg/db", () => ({
 }));
 
 const { settle_npo_payouts } = await import("./settle");
-const { NotFundedError } = await import("./transfer");
+const { NotFundedError, PayRefused } = await import("./transfer");
 const { processing_payouts } = await import("../pg/queries/payout");
 const { dists_for_refund } = await import("../pg/queries/dist");
 const { process_refund } = await import("../refund/process");
@@ -101,6 +101,7 @@ const { owed_amounts, owed_entries, owed_notices } = await import(
 const { create_test_db } = await import("../pg/test-utils/pglite");
 const { owed_for_donation } = await import("../pg/queries/owed");
 const { npos } = await import("../pg/schema/npo");
+const { banking_apps } = await import("../pg/schema/banking");
 const { payouts, settlements } = await import("../pg/schema/payout");
 
 const db = () => test_db.current!.db;
@@ -130,6 +131,7 @@ beforeEach(async () => {
   await db().delete(dists);
   await db().delete(donations);
   await db().delete(settlements);
+  await db().delete(banking_apps);
   await db().delete(npos);
 });
 
@@ -368,6 +370,67 @@ describe("settle_npo_payouts", () => {
     expect(await npo_cash(npo.id)).toBe(500);
   });
 
+  test.each([false, true])(
+    "an npo held on a returned transfer is not claimed or paid, whatever eligibility read before (deductions on: %s)",
+    async (on) => {
+      deductions.on = on;
+      const npo = await seed_npo({ cash: 500, payout_minimum: 0 });
+      await seed_payout(npo.id, "p-1", 60);
+      // the return committed after the cron's eligibility read, before this claim
+      await db().insert(settlements).values({
+        id: "sttl-returned",
+        other_id: "ref-returned",
+        npo_id: npo.id,
+        date: "2026-10-01T00:00:00.000Z",
+        amount: 100,
+        status: "returned",
+      });
+      const pay = vi.fn<Pay>(async () => TRANSFER_ID);
+
+      const res = await settle_npo_payouts(npo, ["p-1"], {
+        ref_key: RECIPIENT,
+        pay,
+      });
+
+      expect(res).toMatchObject({ status: "held" });
+      expect(pay).not.toHaveBeenCalled();
+      expect(await payout_types()).toEqual({ "p-1": "pending" });
+      expect(await npo_cash(npo.id)).toBe(500);
+    }
+  );
+
+  test("a return and a newer default account after eligibility read the old one: the claim does not pay it", async () => {
+    const npo = await seed_npo({ cash: 500, payout_minimum: 0 });
+    await seed_payout(npo.id, "p-1", 60);
+    await db().insert(settlements).values({
+      id: "sttl-returned",
+      other_id: "ref-returned",
+      npo_id: npo.id,
+      date: "2026-10-01T00:00:00.000Z",
+      amount: 100,
+      status: "returned",
+    });
+    // bank B cleared the hold; the caller still holds bank A's id, "777"
+    await db().insert(banking_apps).values({
+      id: "888",
+      npo_id: npo.id,
+      status: "default",
+      date_created: "2026-10-15T00:00:00.000Z",
+      updated_at: "2026-10-15T00:00:00.000Z",
+    });
+    const pay = vi.fn<Pay>(async () => TRANSFER_ID);
+
+    const res = await settle_npo_payouts(npo, ["p-1"], {
+      ref_key: RECIPIENT,
+      pay,
+    });
+
+    expect(res).toEqual({ status: "recipient_changed", ref_key: RECIPIENT });
+    expect(pay).not.toHaveBeenCalled();
+    expect(await payout_types()).toEqual({ "p-1": "pending" });
+    expect(await npo_cash(npo.id)).toBe(500);
+  });
+
   test("claims and pays nothing when the pending total is under the npo's minimum", async () => {
     const npo = await seed_npo({ cash: 500, payout_minimum: 80 });
     await seed_payout(npo.id, "p-1", 30);
@@ -413,6 +476,55 @@ describe("settle_npo_payouts", () => {
       quote_failed,
       expect.objectContaining({ npo_id: npo.id, ref: pay.mock.calls[0]![0] })
     );
+  });
+
+  test("a payout refused before funding, as to our own account, settles nothing, goes back to pending and alerts ops", async () => {
+    const npo = await seed_npo({ cash: 500 });
+    await seed_payout(npo.id, "p-1", 72.82);
+    const refused = new PayRefused(
+      "recipient 881063184 is one of Better Giving's own Wise accounts"
+    );
+    const pay = vi.fn<Pay>(async () => {
+      throw new NotFundedError(refused);
+    });
+
+    const res = await settle_npo_payouts(npo, ["p-1"], {
+      ref_key: "881063184",
+      pay,
+    });
+
+    expect(res).toMatchObject({ status: "released" });
+    expect(await payout_types()).toEqual({ "p-1": "pending" });
+    expect(await db().select().from(settlements)).toEqual([]);
+    expect(await npo_cash(npo.id)).toBe(500);
+    expect(send_alert).toHaveBeenCalledOnce();
+    const [alert] = send_alert.mock.calls[0]!;
+    expect(alert.type).toBe("ERROR");
+    expect(alert.title).toBe(`payout refused for npo:${npo.id}`);
+    expect(alert.body).toContain("one of Better Giving's own Wise accounts");
+    expect(alert.fields).toEqual(
+      expect.arrayContaining([
+        { name: "npo", value: `${npo.id}: ${npo.name}` },
+        { name: "recipient", value: "881063184" },
+      ])
+    );
+  });
+
+  test("a refused payout whose alert fails to send is still released", async () => {
+    const npo = await seed_npo({ cash: 500 });
+    await seed_payout(npo.id, "p-1", 60);
+    send_alert.mockRejectedValue(new Error("slack down"));
+    const pay = vi.fn<Pay>(async () => {
+      throw new NotFundedError(new PayRefused("quote debits 97.07"));
+    });
+
+    const res = await settle_npo_payouts(npo, ["p-1"], {
+      ref_key: RECIPIENT,
+      pay,
+    });
+
+    expect(res).toMatchObject({ status: "released" });
+    expect(await payout_types()).toEqual({ "p-1": "pending" });
   });
 
   test("a claim stores its transfer ref on every claimed payout, where processing_payouts reads it", async () => {

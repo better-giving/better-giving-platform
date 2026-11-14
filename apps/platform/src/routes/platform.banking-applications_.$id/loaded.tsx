@@ -2,6 +2,7 @@ import { Actions, Badge, ExtLink } from "@better-giving/ui";
 import { SquareArrowOutUpRight } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { href, NavLink } from "react-router";
+import { WarningCallout } from "#/components/warning-callout";
 import type { LoaderData } from "#/pages/platform-admin/banking-applications/api";
 import { doc_href } from "@/docs";
 import { is_approvable } from "./approvable";
@@ -44,6 +45,14 @@ export function Loaded(props: LoaderData) {
           {new Date(props.ba.updated_at).toLocaleDateString()}
         </span>
       </div>
+
+      {props.own_account && (
+        <WarningCallout title="This is Better Giving's own bank account">
+          {prev_verdict
+            ? "Payouts to it never reach the nonprofit."
+            : "Payouts to it never reach the nonprofit, so it can't be approved."}
+        </WarningCallout>
+      )}
 
       <dl className="grid sm:grid-cols-[auto_auto_1fr] bg-card rounded-card border border-hairline">
         {/* the wise half of the record; the rows below it are our own and

@@ -36,8 +36,17 @@ export function to_payout(row: PayoutRow): IPayout {
       return { ...base, type: "cancelled" };
     case "processing":
       return { ...base, type: "processing", ref: row.message ?? "" };
-    default:
+    case "returned":
+      return { ...base, type: "returned" };
+    case "void":
+      return { ...base, type: "void" };
+    case "pending":
       return { ...base, type: "pending" };
+    default: {
+      // a type the union gains fails to compile here, not reads as pending
+      const unmapped: never = row.type;
+      throw new Error(`payout ${row.id} has unmapped type ${unmapped}`);
+    }
   }
 }
 

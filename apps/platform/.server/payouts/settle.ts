@@ -3,20 +3,25 @@ import type { Alert } from "@/slack";
 import { stage } from "../env";
 import { aws_monitor } from "../kit/slack";
 import { db } from "../pg/db";
+import { npo_default_bapp } from "../pg/queries/banking";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { npo_balance_update, npo_get_locked } from "../pg/queries/npo";
 import { outstanding_for_npo, unrecover_owed } from "../pg/queries/owed";
 import {
+  npo_last_return,
   payouts_in,
   payouts_move,
+  payouts_own_loss,
   pending_payouts_locked,
   settlement_put,
 } from "../pg/queries/payout";
 import { reverse_unfunded_payout_loss } from "../refund/unfunded";
 import { net_owed } from "./net-owed";
 import { deduct, lock_run, owed_netting_on, undo_deductions } from "./owed-run";
+import { type IReturnHold, npo_return_hold } from "./resend-returned";
 import {
   NotFundedError,
+  PayRefused,
   payout_total,
   recovered_run_ref,
   transfer_ref,
@@ -32,6 +37,13 @@ export type Pay = (ref: string, total: number) => Promise<number | string>;
 export type SettleResult =
   | { status: "none_pending" }
   | { status: "under_minimum"; total: number; minimum: number }
+  /** a returned transfer holds the npo's payouts: read under the run lock, so
+   * a return committing after the cron's eligibility read stops the claim */
+  | { status: "held"; hold: IReturnHold }
+  /** a return is on record and the account that cleared the hold is not the
+   * recipient the caller resolved earlier: nothing claimed, the next run pays
+   * the current one */
+  | { status: "recipient_changed"; ref_key: string }
   | { status: "released"; ref: string }
   | { status: "unreleased"; ref: string }
   | { status: "fund_unknown"; ref: string }
@@ -63,7 +75,20 @@ export async function settle_npo_payouts(
 ): Promise<SettleResult> {
   const nets = await owed_netting_on();
   const claim = await db.transaction(async (tx) => {
-    if (nets) await lock_npo_run(tx, npo.id);
+    // the lock `return_settlement` and `resend_returned` take: the hold read
+    // and the claim below happen with no return or re-send in between
+    await lock_npo_run(tx, npo.id);
+    const hold = await npo_return_hold(npo.id, tx);
+    if (hold) return { status: "held", hold } as const;
+    // eligibility resolved `to` before this lock: a return and a newer default
+    // account since then cleared the hold, but `to` is still the account that
+    // bounced
+    if (to !== null && (await npo_last_return(npo.id, tx))) {
+      const now = await npo_default_bapp(npo.id, tx);
+      if (now === undefined || String(now.id) !== to.ref_key) {
+        return { status: "recipient_changed", ref_key: to.ref_key } as const;
+      }
+    }
     const locked = await pending_payouts_locked(tx, payout_ids);
     if (locked.length === 0) return { status: "none_pending" } as const;
     // a refund locks payout, then npo, then owed row; the claim does too
@@ -96,21 +121,22 @@ export async function settle_npo_payouts(
       gross,
       total,
       ref,
-      pay: to.pay,
+      to,
     } as const;
   });
   if (claim.status !== "claimed") return claim;
-  const { payouts: claimed, ids, gross, total, ref, pay } = claim;
+  const { payouts: claimed, ids, gross, total, ref, to: recipient } = claim;
 
   const fields = [
     { name: "npo", value: `${npo.id}: ${npo.name}` },
+    { name: "recipient", value: recipient.ref_key },
     { name: "amount", value: total.toString() },
     { name: "payout_ids", value: ids.join(", ") },
   ];
 
   let transfer_id: string;
   try {
-    transfer_id = String(await pay(ref, total));
+    transfer_id = String(await recipient.pay(ref, total));
   } catch (err) {
     const ctx = { npo_id: npo.id, ref, payout_ids: ids };
     if (err instanceof NotFundedError) {
@@ -137,6 +163,13 @@ export async function settle_npo_payouts(
         ...ctx,
         ...(not_released.length > 0 && { not_released }),
       });
+      if (err.cause instanceof PayRefused) {
+        await alert({
+          title: `payout refused for npo:${npo.id}`,
+          body: `${err.cause.message}. no money moved; the payouts are back to pending. customerTransactionId ${ref}`,
+          fields,
+        });
+      }
       // ops undoes a refund from before the owed ledger another way
       for (const pre_ledger of [true, false]) {
         const payouts = kept.filter((k) => k.pre_ledger === pre_ledger);
@@ -194,6 +227,10 @@ export async function settle_npo_payouts(
       // a loss refund may take a payout in flight; the npo keeps that money
       const moved_on = ids.filter((id) => !settled.includes(id));
       const loss_refunded = await payouts_in(tx, moved_on, "refunded_loss");
+      // stamp these with the run too: a return finds its payouts by
+      // `settled_id`, and a copy of the run sharing its sources must never
+      // take them
+      await payouts_own_loss(tx, loss_refunded, transfer_id);
       return moved_on.filter((id) => !loss_refunded.includes(id));
     });
   } catch (err) {
@@ -206,7 +243,7 @@ export async function settle_npo_payouts(
     // the commit may have landed with its reply lost, so the alert says check first
     await alert({
       title: `funded, not recorded for npo:${npo.id}`,
-      body: `do not reset these payouts to pending or pay them again; Wise transfer ${transfer_id} (customerTransactionId ${ref}) was funded. if the payouts are still processing, record the settlement by hand: its settlement amount is the net, ${total}; debit the npo's cash by the gross, ${gross}`,
+      body: `do not reset these payouts to pending or pay them again; Wise transfer ${transfer_id} (customerTransactionId ${ref}) was funded. if the payouts are still processing, record the settlement by hand: its settlement amount is the net, ${total}; debit the npo's cash by the gross, ${gross}; also set settled_id to ${transfer_id} on any of these payouts a refund moved to refunded_loss while the transfer was in flight, or a return of the transfer will not find them`,
       fields: [...fields, { name: "gross", value: gross.toString() }],
     });
     return { status: "unrecorded", ref, transfer_id };

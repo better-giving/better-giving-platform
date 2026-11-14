@@ -31,6 +31,16 @@ export interface ICancelledStatus {
   type: "cancelled";
 }
 
+/** the bank sent the wise transfer back: the money is in the npo's balance, and goes out again once a newer approved account is the one the grants run pays (`npo_return_hold`) */
+export interface IReturnedStatus {
+  type: "returned";
+}
+
+/** voided by ops: not a grant, not counted */
+export interface IVoidStatus {
+  type: "void";
+}
+
 export type PayoutStatus =
   | IErrorStatus
   | ISettledStatus
@@ -38,7 +48,19 @@ export type PayoutStatus =
   | IProcessingStatus
   | IRefundedStatus
   | IRefundedLossStatus
-  | ICancelledStatus;
+  | ICancelledStatus
+  | IReturnedStatus
+  | IVoidStatus;
+
+/** the types whose money is in the npo's cash, not sent: a refund cancels the
+ * payout and takes its cash back */
+export const UNSENT_TYPES = [
+  "pending",
+  "returned",
+] as const satisfies readonly PayoutStatus["type"][];
+
+export const is_unsent = (type: string | null | undefined): boolean =>
+  UNSENT_TYPES.some((t) => t === type);
 
 /**
  * donation - a payout from a donation

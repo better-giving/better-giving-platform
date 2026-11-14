@@ -8,6 +8,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { page } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import type { IComposition } from "@/nav/interfaces";
 import { user } from "$/pg/schema/auth";
@@ -94,6 +95,7 @@ import {
   endowUpdateAction as dashboard_action,
   loader as dashboard_loader,
 } from "../api";
+import { AwaitingNotice } from "../loaded";
 import DashboardPage from "../route";
 
 // --- setup ---
@@ -833,5 +835,322 @@ describe("dashboard loader — where payouts go", () => {
 
     expect(data.payout_to).toEqual({ kind: "none" });
     expect(data.bank_pending).toBe(false);
+  });
+});
+
+describe("dashboard — returned payout notice", () => {
+  const seed_payout = (
+    npo_id: number,
+    id: string,
+    o: { type: "returned" | "settled"; amount: number; date: string }
+  ) =>
+    test_db.current!.db.insert(payouts).values({
+      id,
+      source_id: `don-${id}`,
+      npo_id,
+      source: "donation",
+      ...o,
+    });
+  const notice = (screen: Awaited<ReturnType<typeof render_dashboard>>) =>
+    screen.getByRole("region", { name: "Your bank sent a payout back" });
+
+  it("names the one returned payout's amount and date, and links to the bank details", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await seed_payout(npo.id, "p-ret", {
+      type: "returned",
+      amount: 250,
+      date: "2026-11-09T15:00:00.000Z",
+    });
+
+    const screen = await render_dashboard(npo.id);
+
+    await expect.element(notice(screen)).toBeVisible();
+    await expect
+      .element(
+        page
+          .elementLocator(notice(screen).element())
+          .getByText(
+            "$250.00 from Nov 9 didn't reach your bank account, so it's back in your balance. Update your bank details, and it goes out again once the new ones are approved.",
+            { exact: true }
+          )
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        screen.getByRole("link", { name: "Update bank details", exact: true })
+      )
+      .toHaveAttribute("href", `/admin/${npo.id}/banking`);
+    // the grant items card shows the same payout with its (!) explanation
+    await expect
+      .element(screen.getByText("Returned", { exact: true }))
+      .toBeVisible();
+    await screen.getByRole("button", { name: "What Returned means" }).click();
+    await expect
+      .element(
+        screen.getByRole("tooltip", { name: /Your bank sent this back/ })
+      )
+      .toBeVisible();
+  });
+
+  it("counts several returned payouts and sums them", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    for (const [id, amount, date] of [
+      ["p-1", 250, "2026-11-09T15:00:00.000Z"],
+      ["p-2", 400, "2026-11-04T15:00:00.000Z"],
+      ["p-3", 80, "2026-10-30T15:00:00.000Z"],
+    ] as const) {
+      await seed_payout(npo.id, id, { type: "returned", amount, date });
+    }
+
+    const screen = await render_dashboard(npo.id);
+
+    await expect
+      .element(
+        page
+          .elementLocator(notice(screen).element())
+          .getByText(
+            "3 payouts ($730.00) didn't reach your bank account, so they're back in your balance. Update your bank details, and they go out again once the new ones are approved.",
+            { exact: true }
+          )
+      )
+      .toBeVisible();
+  });
+
+  it("is absent when no payout was returned", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await seed_payout(npo.id, "p-ok", {
+      type: "settled",
+      amount: 250,
+      date: "2026-11-09T15:00:00.000Z",
+    });
+
+    const screen = await render_dashboard(npo.id);
+
+    await expect.element(screen.getByText("Savings")).toBeVisible();
+    expect(screen.getByText("Your bank sent a payout back").query()).toBeNull();
+  });
+});
+
+describe("dashboard — payout strip during a return hold", () => {
+  const RETURNED_AT = "2026-11-09T15:00:00.000Z";
+  const seed_returned = async (npo_id: number) => {
+    await test_db.current!.db.insert(settlements).values({
+      id: `set-${npo_id}`,
+      npo_id,
+      date: RETURNED_AT,
+      amount: 250,
+      status: "returned",
+    });
+    await test_db.current!.db.insert(payouts).values({
+      id: `p-${npo_id}`,
+      source_id: `don-${npo_id}`,
+      npo_id,
+      source: "donation",
+      type: "returned",
+      amount: 250,
+      date: RETURNED_AT,
+    });
+  };
+  // the default account predates the returned transfer, so payouts stay held
+  const file_old_bank = (npo_id: number) =>
+    test_db.current!.db.insert(banking_apps).values({
+      id: `bank-${npo_id}`,
+      npo_id,
+      status: "default",
+      bank_summary: "Chase ••1234",
+      date_created: "2026-11-01T15:00:00.000Z",
+      updated_at: "2026-11-01T15:00:00.000Z",
+    });
+  const hold_sentence = (
+    screen: Awaited<ReturnType<typeof render_dashboard>>
+  ) => screen.getByText(/Payouts are on hold until your/);
+
+  it("with a bank, shows the hold sentence and drops the Total / will-be-paid-out strip", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await seed_returned(npo.id);
+    await file_old_bank(npo.id);
+
+    const screen = await render_dashboard(npo.id);
+
+    await expect.element(hold_sentence(screen)).toBeVisible();
+    await expect
+      .element(screen.getByRole("link", { name: "new bank details" }))
+      .toHaveAttribute("href", `/admin/${npo.id}/banking`);
+    await expect
+      .element(
+        screen.getByText(
+          "are approved. Donations wait in your Better Giving balance. Nothing is lost."
+        )
+      )
+      .toBeVisible();
+    expect(screen.getByText("Total", { exact: true }).query()).toBeNull();
+    expect(screen.getByText(/will be paid out/).query()).toBeNull();
+  });
+
+  it("without a hold, the payout strip renders as before", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await file_old_bank(npo.id);
+    await test_db.current!.db.insert(payouts).values({
+      id: "p-ok",
+      source_id: "don-ok",
+      npo_id: npo.id,
+      source: "donation",
+      type: "settled",
+      amount: 250,
+      date: RETURNED_AT,
+    });
+
+    const screen = await render_dashboard(npo.id);
+
+    await expect
+      .element(screen.getByText("Total", { exact: true }))
+      .toBeVisible();
+    await expect.element(screen.getByText(/will be paid out/)).toBeVisible();
+    expect(hold_sentence(screen).query()).toBeNull();
+  });
+
+  it("held with no bank keeps the no-bank copy, not the hold sentence", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await seed_returned(npo.id);
+
+    const screen = await render_dashboard(npo.id);
+
+    await expect
+      .element(screen.getByText(/You have no way to get paid right now\./))
+      .toBeVisible();
+    expect(hold_sentence(screen).query()).toBeNull();
+  });
+});
+
+describe("dashboard — awaiting repair notice", () => {
+  const sent = "2026-11-12T15:00:00.000Z";
+  const load = (npo_id: number) =>
+    dashboard_loader({
+      context: { get: (k: unknown) => (k === admin_ctx ? npo_id : undefined) },
+    } as any);
+  const file_old_bank = (npo_id: number) =>
+    test_db.current!.db.insert(banking_apps).values({
+      id: `bank-${npo_id}`,
+      npo_id,
+      status: "default",
+      bank_summary: "Chase ••1234",
+      date_created: "2026-11-01T15:00:00.000Z",
+      updated_at: "2026-11-01T15:00:00.000Z",
+    });
+  const settle = (npo_id: number, status: string) =>
+    test_db.current!.db.insert(settlements).values({
+      id: `set-${npo_id}`,
+      npo_id,
+      date: sent,
+      amount: 1250,
+      status,
+    });
+
+  it("is set, with the amount and date, only for an awaiting_repair hold", async () => {
+    const npo = await seed_npo();
+    await file_old_bank(npo.id);
+    await settle(npo.id, "awaiting_repair");
+
+    const data = await load(npo.id);
+
+    expect(data.return_hold).toBe(true);
+    expect(data.awaiting_repair).toEqual({
+      amount: 1250,
+      date: expect.stringContaining("2026-11-12"),
+    });
+  });
+
+  it("is not set for a returned hold, nor for one whose returned payouts were refunded", async () => {
+    const npo = await seed_npo();
+    await file_old_bank(npo.id);
+    await settle(npo.id, "returned");
+
+    const data = await load(npo.id);
+
+    expect(data.return_hold).toBe(true);
+    expect(data.awaiting_repair).toBeNull();
+  });
+
+  it("is not set for a hold whose returned payouts were all refunded", async () => {
+    const npo = await seed_npo();
+    await file_old_bank(npo.id);
+    await settle(npo.id, "returned");
+    await test_db.current!.db.insert(payouts).values({
+      id: `p-${npo.id}`,
+      source_id: `don-${npo.id}`,
+      npo_id: npo.id,
+      source: "donation",
+      type: "refunded",
+      amount: 1250,
+      date: sent,
+      settled_id: `set-${npo.id}`,
+      settled_date: sent,
+    });
+
+    const data = await load(npo.id);
+
+    expect(data.return_hold).toBe(true);
+    expect(data.returned).toBeNull();
+    expect(data.awaiting_repair).toBeNull();
+  });
+
+  it("is not set once a newer default account lifts the hold", async () => {
+    const npo = await seed_npo();
+    await settle(npo.id, "awaiting_repair");
+    await test_db.current!.db.insert(banking_apps).values({
+      id: `bank-${npo.id}`,
+      npo_id: npo.id,
+      status: "default",
+      date_created: "2026-11-13T15:00:00.000Z",
+      updated_at: "2026-11-13T15:00:00.000Z",
+    });
+
+    const data = await load(npo.id);
+
+    expect(data.return_hold).toBe(false);
+    expect(data.awaiting_repair).toBeNull();
+  });
+
+  it("AwaitingNotice names the amount and date, says payouts are paused, and links to the bank details", async () => {
+    const Stub = createRoutesStub([
+      {
+        path: "/admin/:id",
+        Component: Outlet,
+        children: [
+          {
+            path: "dashboard",
+            Component: () => <AwaitingNotice amount={1250} date={sent} />,
+          },
+        ],
+      },
+    ]);
+    const screen = await render(
+      <Stub initialEntries={["/admin/7/dashboard"]} />
+    );
+
+    await expect
+      .element(
+        screen.getByRole("region", { name: "Your bank sent a payout back" })
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        screen.getByText(
+          "$1,250.00 from Nov 12 didn't reach your bank account. We're checking which donations it covered and will add them back to your balance. Payouts are paused until you update your bank details and the new ones are approved.",
+          { exact: true }
+        )
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        screen.getByRole("link", { name: "Update bank details", exact: true })
+      )
+      .toHaveAttribute("href", "/admin/7/banking");
   });
 });

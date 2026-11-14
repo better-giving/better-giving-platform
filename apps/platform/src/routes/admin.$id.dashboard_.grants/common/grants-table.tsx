@@ -1,5 +1,6 @@
 import { EmptyRow, LoadMoreRow } from "@better-giving/ui";
 import { format } from "date-fns";
+import { ReturnedGrant } from "#/components/returned-payout";
 import type { IPaginator } from "#/types/components";
 import { humanize } from "@/helpers/decimal";
 import type { IGrantRunDeductions } from "$/pg/queries/owed-history";
@@ -37,7 +38,11 @@ export function GrantsTable({
             items.map((payout, idx) => (
               <tr key={idx}>
                 <td>
-                  ${humanize(payout.amount)}{" "}
+                  {payout.status === "returned" ? (
+                    <ReturnedGrant amount={usd(payout.amount)} />
+                  ) : (
+                    `${usd(payout.amount)} `
+                  )}
                   {payout.run && payout.run.deductions.length > 0 && (
                     <ul className="text-sm text-gray-11">
                       <li>Gross {usd(payout.run.gross)}</li>

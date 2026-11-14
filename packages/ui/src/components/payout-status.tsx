@@ -1,7 +1,7 @@
 /** the payout status vocabulary, declared here rather than imported: a design
  * system owns no domain module. it mirrors `PayoutStatus["type"]` in the app's
- * `lib/payouts` — if the two ever diverge, the call site stops type-checking,
- * which is the point. */
+ * `lib/payouts`, and a type the app adds there that this union lacks stops the
+ * call site type-checking, which is the point. */
 export type PayoutStatusType =
   | "error"
   | "settled"
@@ -9,7 +9,9 @@ export type PayoutStatusType =
   | "processing"
   | "refunded"
   | "refunded_loss"
-  | "cancelled";
+  | "cancelled"
+  | "returned"
+  | "void";
 
 interface IConfig {
   text: string;
@@ -53,6 +55,19 @@ const configs: Record<PayoutStatusType, IConfig> = {
     text: "text-gray-11",
     dot: "bg-gray-11",
     label: "Cancelled",
+  },
+  // the bank sent it back and the money is in the balance again: owed, like
+  // pending, so the same warning step-12 ink
+  returned: {
+    text: "text-warning-subtle-fg",
+    dot: "bg-warning",
+    label: "Returned",
+  },
+  // never a payout: the hollow dot keeps it apart from cancelled's filled one
+  void: {
+    text: "text-gray-11",
+    dot: "ring-1 ring-inset ring-gray-11",
+    label: "Void",
   },
 };
 

@@ -8,12 +8,17 @@ import type { IPayout } from "@/payouts";
 import { payout_to, type TPayoutTo } from "@/payouts/payout-to";
 import type { IPageKeyed } from "@/types/api";
 import { stripe as stripe_env } from "$/env";
+import { npo_return_hold } from "$/payouts/resend-returned";
 import { npo_bapp_in_review, npo_default_bapp } from "$/pg/queries/banking";
 import { campaign_count, campaign_live_count } from "$/pg/queries/campaign";
 import { nav_ltd } from "$/pg/queries/nav";
 import { npo_get } from "$/pg/queries/npo";
-import type { SettlementRow } from "$/pg/queries/payout";
-import { npo_payouts, npo_settlements } from "$/pg/queries/payout";
+import type { IReturnedPayouts, SettlementRow } from "$/pg/queries/payout";
+import {
+  npo_payouts,
+  npo_returned_payouts,
+  npo_settlements,
+} from "$/pg/queries/payout";
 import type { Route } from "./+types/route";
 
 export interface DashboardData {
@@ -33,6 +38,13 @@ export interface DashboardData {
   total_inv_value: number;
   campaign_count: number;
   campaign_live: number;
+  /** payouts the bank sent back, waiting on new bank details; null when none */
+  returned: IReturnedPayouts | null;
+  /** the latest returned transfer still holds this npo's payouts */
+  return_hold: boolean;
+  /** the hold is a transfer that came back with its payouts' ownership
+   * unclear: nothing credited yet; null for any other hold or none */
+  awaiting_repair: { amount: number; date: string } | null;
 }
 
 export const endowUpdateAction = endowUpdate({ redirect: "." });
@@ -59,6 +71,8 @@ export const loader = async (x: Route.LoaderArgs) => {
     in_review,
     count,
     live,
+    returned,
+    hold,
   ] = await Promise.all([
     nav_ltd(),
     npo_get(id),
@@ -68,6 +82,8 @@ export const loader = async (x: Route.LoaderArgs) => {
     npo_bapp_in_review(id),
     campaign_count(id),
     campaign_live_count(id),
+    npo_returned_payouts(id),
+    npo_return_hold(id),
   ]);
 
   return {
@@ -85,5 +101,11 @@ export const loader = async (x: Route.LoaderArgs) => {
     total_inv_value: ltd.value,
     campaign_count: count,
     campaign_live: live,
+    returned,
+    return_hold: hold !== null,
+    awaiting_repair:
+      hold?.status === "awaiting_repair"
+        ? { amount: hold.amount, date: hold.date }
+        : null,
   } satisfies DashboardData;
 };

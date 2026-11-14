@@ -69,8 +69,8 @@ export async function npo_bapp_count(npo_id: number) {
  * the choice does not hang on the order postgres returns rows in. `id` breaks
  * a tie. `updated_at` is NOT NULL; the `date_created` fallback is belt and braces
  */
-export async function npo_default_bapp(npo_id: number) {
-  const rows = await db
+export async function npo_default_bapp(npo_id: number, db_: DbOrTx = db) {
+  const rows = await db_
     .select()
     .from(banking_apps)
     .where(
@@ -258,14 +258,19 @@ export async function bapp_set_default(
 }
 
 /**
- * approve `id`, as the npo's default when it has none. under the row lock
+ * approve `id`, as the npo's default when it has none, or when `as_default`
+ * says so, demoting the default it has. under the row lock
  * `bapp_set_default` takes, so of two approvals at once only the first sees
  * no default. only an `under-review` row moves: a verdict that committed after
- * the caller's read stands. returns the row's id and status as they were —
- * anything but `under-review` means nothing changed — undefined when `id` is
+ * the caller's read stands. returns the row's id and status as they were
+ * (anything but `under-review` means nothing changed), undefined when `id` is
  * not the npo's
  */
-export async function bapp_approve(id: string, npo_id: number) {
+export async function bapp_approve(
+  id: string,
+  npo_id: number,
+  opts: { as_default?: boolean } = {}
+) {
   return db.transaction(async (tx) => {
     const locked = await tx
       .select({ id: banking_apps.id, status: banking_apps.status })
@@ -278,14 +283,26 @@ export async function bapp_approve(id: string, npo_id: number) {
     const has_default = locked.some(
       (r) => r.id !== id && r.status === "default"
     );
+    const now = new Date().toISOString();
+    if (opts.as_default && has_default && prev.status === "under-review") {
+      await tx
+        .update(banking_apps)
+        .set({ status: "approved", updated_at: now })
+        .where(
+          and(
+            eq(banking_apps.npo_id, npo_id),
+            eq(banking_apps.status, "default")
+          )
+        );
+    }
     // the row lock above means `prev.status` is what this guard sees, so
     // `prev` reporting under-review is the update having landed
     await tx
       .update(banking_apps)
       .set({
-        status: has_default ? "approved" : "default",
+        status: has_default && !opts.as_default ? "approved" : "default",
         rejection_reason: "",
-        updated_at: new Date().toISOString(),
+        updated_at: now,
       })
       .where(
         and(eq(banking_apps.id, id), eq(banking_apps.status, "under-review"))

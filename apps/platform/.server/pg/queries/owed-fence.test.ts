@@ -10,9 +10,14 @@ const in_refund_core = (file: string) =>
   file.startsWith(`${platform}/.server/refund/`);
 const in_owed_admin = (file: string) =>
   file.startsWith(`${platform}/src/routes/platform.owed/`);
-const PAYOUT_RUNS = ["settle.ts", "settle-commissions.ts", "owed-run.ts"].map(
-  (f) => `${platform}/.server/payouts/${f}`
-);
+// wise-return.ts undoes a run whose transfer the bank sent back, as settle.ts
+// releases one that went unfunded
+const PAYOUT_RUNS = [
+  "settle.ts",
+  "settle-commissions.ts",
+  "owed-run.ts",
+  "wise-return.ts",
+].map((f) => `${platform}/.server/payouts/${f}`);
 const in_payout_run = (file: string) => PAYOUT_RUNS.includes(file);
 const OWNER: Record<string, (file: string) => boolean> = {
   record_owed: in_refund_core,

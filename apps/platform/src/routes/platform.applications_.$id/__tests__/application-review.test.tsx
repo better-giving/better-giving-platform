@@ -73,6 +73,8 @@ vi.mock("$/kit/wise", () => ({
         { key: "accountNumber", label: "Account", value: "***1234" },
       ],
     })),
+    // none of the balances we hold shares the account number above
+    account_details: vi.fn(async () => []),
   },
 }));
 
@@ -105,6 +107,7 @@ vi.mock("#/.server/toast", () => ({
 
 import type { LoaderFunction } from "react-router";
 import { get_session } from "#/.server/auth";
+import { ErrorModal } from "#/components/error";
 import { step_loader } from "#/pages/registration/data/step-loader";
 // registration page imports for cross-page verification
 import Dashboard from "#/routes/_app.register.$reg_id._steps.5/route";
@@ -403,6 +406,49 @@ describe("verdict dialog", () => {
 });
 
 describe("approval", () => {
+  // runs before anything else in this file reads our own accounts: a good read
+  // is held for an hour per module, so a later failure would never reach wise
+  it("shows the refusal in the dialog when our own accounts can't be checked", async () => {
+    await seed_user();
+    const id = await seed_reg(ALL_FIELDS);
+    vi.mocked(wise.account_details).mockRejectedValueOnce(
+      new Error("wise is down")
+    );
+    const Stub = createRoutesStub([
+      {
+        id: "routes/platform.applications_.$id",
+        path: "/platform/applications/:id",
+        Component: Page,
+        HydrateFallback: () => null,
+        loader: test_loader,
+        children: [
+          {
+            path: ":verdict",
+            Component: Prompt,
+            ErrorBoundary: ErrorModal,
+            action: action as any,
+          },
+        ],
+      },
+    ]);
+    const screen = await render(
+      <Stub initialEntries={[`/platform/applications/${id}/approved`]} />
+    );
+
+    (
+      screen.getByRole("button", { name: /submit/i }).element() as HTMLElement
+    ).click();
+
+    await expect
+      .element(screen.getByText(/couldn't check this bank account/i))
+      .toBeVisible();
+    expect(
+      screen.getByText("Unexpected Application Error!").query()
+    ).toBeNull();
+    // nothing was approved
+    expect((await reg_get(id))?.status).toBe("02");
+  });
+
   it("shows approved badge + success after admin approves", async () => {
     await seed_user();
     const id = await seed_reg(ALL_FIELDS);

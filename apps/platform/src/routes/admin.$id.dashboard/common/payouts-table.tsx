@@ -1,6 +1,11 @@
-import { EmptyRow, LoadMoreRow, PayoutStatus } from "@better-giving/ui";
+import { EmptyRow, LoadMoreRow } from "@better-giving/ui";
 import { format } from "date-fns";
 import { ArrowRightIcon } from "lucide-react";
+import {
+  amount_cls,
+  arrow_cls,
+  PayoutStatusCell,
+} from "#/components/returned-payout";
 import type { IPaginator } from "#/types/components";
 import { humanize } from "@/helpers/decimal";
 import type { IPayout } from "@/payouts";
@@ -34,23 +39,19 @@ export function PayoutsTable({
           {items.map((payout, idx) => (
             <tr key={idx}>
               <td className="w-8">
-                <ArrowRightIcon className="inline stroke-success icon-sm" />
+                <ArrowRightIcon
+                  className={`inline ${arrow_cls(payout)} icon-sm`}
+                />
               </td>
               <td>
-                <span
-                  className={
-                    payout.type === "refunded"
-                      ? "line-through text-destructive-subtle-fg"
-                      : ""
-                  }
-                >
+                <span className={amount_cls(payout)}>
                   ${humanize(payout.amount)}
                 </span>
               </td>
               <td>{desc(payout)}</td>
               <td>{format(payout.date, "PP")}</td>
               <td>
-                <PayoutStatus type={payout.type} />
+                <PayoutStatusCell payout={payout} />
               </td>
             </tr>
           ))}

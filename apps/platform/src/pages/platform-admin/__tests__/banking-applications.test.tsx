@@ -11,9 +11,11 @@ import {
 } from "vitest";
 import { cleanup, render } from "vitest-browser-react";
 import { doc_args } from "#/__tests__/fixtures/route-args";
+import { ErrorModal } from "#/components/error";
 import { get_qstash_events } from "#/setup-tests-browser";
 import { banking_apps } from "$/pg/schema/banking";
 import { npos } from "$/pg/schema/npo";
+import { payouts, settlements } from "$/pg/schema/payout";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
 // --- mocks (hoisted) ---
@@ -66,7 +68,7 @@ vi.mock("remix-client-cache", () => ({
 }));
 
 vi.mock("$/kit/wise", () => ({
-  wise: { v2_account: vi.fn() },
+  wise: { v2_account: vi.fn(), account_details: vi.fn() },
 }));
 
 vi.mock("#/.server/toast", async () => {
@@ -88,6 +90,7 @@ import DetailPage from "#/routes/platform.banking-applications_.$id/route";
 import ApprovePage from "#/routes/platform.banking-applications_.$id.approve/route";
 import RejectPage from "#/routes/platform.banking-applications_.$id.reject/route";
 import { wise } from "$/kit/wise";
+import { npo_return_hold, resend_returned } from "$/payouts/resend-returned";
 import { bapps_by_status } from "$/pg/queries/banking";
 import { create_test_db } from "$/pg/test-utils/pglite";
 
@@ -116,12 +119,16 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  await test_db.current!.db.delete(payouts);
+  await test_db.current!.db.delete(settlements);
   await test_db.current!.db.delete(banking_apps);
   await test_db.current!.db.delete(npos);
   counter = 0;
   // wise answers by default; the outage cases override it once. the approve
   // action re-checks the account before writing, so it needs one too.
   vi.mocked(wise.v2_account).mockResolvedValue(WISE_FIXTURE as never);
+  // none of the balances we hold shares the fixture's account number
+  vi.mocked(wise.account_details).mockResolvedValue([]);
 });
 
 // --- helpers ---
@@ -191,6 +198,7 @@ const WISE_FIXTURE = {
   currency: "USD",
   country: "US",
   name: { fullName: "Jane Doe" },
+  own_account: false,
   type: "checking",
   legalEntityType: "PERSON" as const,
   longAccountSummary: "USD account ending in 1234",
@@ -373,7 +381,12 @@ describe("approve flow", () => {
         loader: () => ({ ...WISE_FIXTURE, ba }),
         action,
         children: [
-          { path: "approve", Component: ApprovePage, action },
+          {
+            path: "approve",
+            Component: ApprovePage,
+            ErrorBoundary: ErrorModal,
+            action,
+          },
           {
             path: "success",
             Component: () => <div data-testid="success">OK</div>,
@@ -386,6 +399,35 @@ describe("approve flow", () => {
       <Stub initialEntries={[`/platform/banking-applications/${bapp_id}`]} />
     );
   }
+
+  // runs before anything else in this file reads our own accounts: a good read
+  // is held for an hour per module, so a later failure would never reach wise
+  it("shows the refusal in the dialog when our own accounts can't be checked", async () => {
+    const npo = await seed_npo();
+    const bapp_id = await seed_bapp(npo.id);
+    const row = await get_bapp(bapp_id);
+    vi.mocked(wise.account_details).mockRejectedValueOnce(
+      new Error("wise is down")
+    );
+
+    const screen = await render_with_approve(bapp_id, row);
+
+    await screen.getByRole("link", { name: /approve/i }).click();
+    await expect
+      .element(screen.getByText(/you are about to approve/i))
+      .toBeVisible();
+    (
+      screen.getByRole("button", { name: /submit/i }).element() as HTMLElement
+    ).click();
+
+    await expect
+      .element(screen.getByText(/couldn't check this bank account/i))
+      .toBeVisible();
+    expect(
+      screen.getByText("Unexpected Application Error!").query()
+    ).toBeNull();
+    expect((await get_bapp(bapp_id)).status).toBe("under-review");
+  });
 
   it("approves bapp — status becomes approved when npo already has a default", async () => {
     const npo = await seed_npo();
@@ -663,6 +705,67 @@ describe("action edge cases", () => {
 
     const statuses = [(await get_bapp(a)).status, (await get_bapp(b)).status];
     expect(statuses.sort()).toEqual(["approved", "default"]);
+  });
+
+  it("approving a held nonprofit's replacement makes it the default, lifts the hold and lets the returned payouts re-send", async () => {
+    const npo = await seed_npo();
+    // the account the transfer bounced from, older than the return
+    const old_id = await seed_bapp(npo.id, {
+      status: "default",
+      date_created: "2024-01-01T00:00:00.000Z",
+      updated_at: "2024-01-01T00:00:00.000Z",
+    });
+    const new_id = await seed_bapp(npo.id);
+    const sent = "2025-01-01T00:00:00.000Z";
+    const db = test_db.current!.db;
+    await db.insert(settlements).values({
+      id: "sttl-held",
+      other_id: "ref-held",
+      npo_id: npo.id,
+      date: sent,
+      amount: 100,
+      status: "returned",
+    });
+    await db.insert(payouts).values(
+      ["p-1", "p-2"].map((id) => ({
+        id,
+        source_id: `dist-${id}`,
+        npo_id: npo.id,
+        source: "donation" as const,
+        date: "2024-12-01T00:00:00.000Z",
+        amount: 100,
+        type: "returned" as const,
+        settled_id: "sttl-held",
+        settled_date: sent,
+      }))
+    );
+
+    const form = new FormData();
+    form.set("type", "approved");
+    await (action as (...a: any[]) => any)({
+      params: { id: new_id },
+      ...doc_args(
+        new Request(`http://test/platform/banking-applications/${new_id}`, {
+          method: "POST",
+          body: form,
+        })
+      ),
+      context: {},
+    });
+
+    // approved beside the old default it would be `approved` and still held
+    expect((await get_bapp(new_id)).status).toBe("default");
+    expect((await get_bapp(old_id)).status).toBe("approved");
+    expect(await npo_return_hold(npo.id)).toBeNull();
+    expect(await resend_returned(npo.id)).toEqual({
+      status: "resent",
+      ids: ["p-1", "p-2"],
+    });
+    const after = await db.select().from(payouts);
+    expect(after.map((p) => [p.id, p.type]).sort()).toEqual([
+      ["p-1", "pending"],
+      ["p-2", "pending"],
+    ]);
   });
 
   it("throws 409 and applies nothing when a rejection lands during the approve", async () => {

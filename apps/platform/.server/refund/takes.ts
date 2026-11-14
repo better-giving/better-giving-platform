@@ -20,7 +20,7 @@ import {
 } from "../pg/queries/take";
 import { dists } from "../pg/schema/dist";
 import type { OwedSource } from "./apply";
-import { dist_settled_usd, past_cut } from "./plan";
+import { dist_settled_usd, past_cut, scaled } from "./plan";
 import {
   type CreditPart,
   credit_parts,
@@ -28,6 +28,7 @@ import {
   grant_went_out,
   type LockedDist,
   type OwedShare,
+  owable_part,
   owed_shares,
   settled_dists_locked,
   split_cents,
@@ -71,7 +72,8 @@ const disputes_past_cut = (
  * owes the whole share of its commission paid or claimed for a transfer.
  * the npos in `legacy` hold a row recorded before routed dists stopped
  * owing a dispute's share (`legacy_row`): theirs are priced as before, as an
- * ungranted pooled dist is
+ * ungranted pooled dist is. a void payout's cash share owes nothing, its
+ * part of the fees included (`owable_part`)
  */
 export function owed_targets(
   ds: LockedDist[],
@@ -170,10 +172,10 @@ export async function legacy_routed_npos(
 
 /**
  * each npo's part of the gift's active dispute fees, split over its dists by
- * settled amount, recorded on its row once the gift is reversed: the
- * reversal records what the dists received and their card fees only, and a
- * dispute whose open never ran recorded no fee. a fee its open recorded
- * already changes nothing
+ * settled amount less a void payout's cash share (`owable_part`), recorded
+ * on its row once the gift is reversed: the reversal records what the dists
+ * received and their card fees only, and a dispute whose open never ran
+ * recorded no fee. a fee its open recorded already changes nothing
  */
 export async function record_dispute_fees(
   tx: DbOrTx,
@@ -188,8 +190,9 @@ export async function record_dispute_fees(
   const fees = new Map<number, number>();
   for (const t of takes) {
     for (const [i, c] of split_cents(t.fee_usd, weights).entries()) {
-      const npo_id = ds[i]!.to_id;
-      fees.set(npo_id, (fees.get(npo_id) ?? 0) + c);
+      const d = ds[i]!;
+      const fee = scaled(c, owable_part(d));
+      fees.set(d.to_id, (fees.get(d.to_id) ?? 0) + fee);
     }
   }
   for (const [npo_id, fee] of fees) {

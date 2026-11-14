@@ -374,6 +374,92 @@ describe("calc_refund_plan", () => {
     expect(po.kind === "payout_status" && po.status).toBe("refunded_loss");
   });
 
+  const loss_log_of = (plan: RefundPlan) =>
+    plan.effects.flatMap((e) => (e.kind === "loss_log" ? [e.loss] : []));
+
+  test("a void payout → a loss the platform takes: logged, nothing owed, payout left void", () => {
+    const plan = calc_refund_plan(
+      make_inputs({
+        payout: { id: "po-1", type: "void" },
+        rev_log_ids: ["rev-1"],
+      }),
+      make_ctx()
+    );
+    expect(plan.is_loss).toBe(true);
+    expect(plan.loss_reasons).toEqual(["payout po-1 is void"]);
+    expect(owed_of(plan)).toBeUndefined();
+    expect(plan.amount).toEqual([]);
+    expect(kinds(plan.effects)).toEqual([
+      "rev_log_status",
+      "donation_message_del",
+      "loss_log",
+    ]);
+    expect(plan.effects[0]).toMatchObject({ status: "refunded_loss" });
+    expect(loss_log_of(plan)).toEqual([
+      expect.objectContaining({
+        id: "void:dist-1",
+        dist_id: "dist-1",
+        npo_id: 1,
+        type: "payout",
+        amount: 110,
+        npo_amount: 100,
+        fees_bg: 8,
+        fees_processing: 2,
+      }),
+    ]);
+  });
+
+  test("a void payout with savings to take back → savings taken, the void cash share logged as the platform's", () => {
+    const plan = calc_refund_plan(
+      make_inputs({
+        dist: {
+          ...make_inputs().dist,
+          alloc: { liq: 50, lock: 0, cash: 50 },
+        },
+        payout: { id: "po-1", type: "void" },
+        bal: { liq: 50, lock_units: 0, cash: 0 },
+      }),
+      make_ctx()
+    );
+    expect(plan.is_loss).toBe(true);
+    expect(owed_of(plan)).toBeUndefined();
+    expect(plan.effects).toContainEqual({
+      kind: "balance_update",
+      npo_id: 1,
+      deltas: { liq: 50, lock: 0, lock_units: 0, cash: 0 },
+    });
+    expect(loss_log_of(plan)).toEqual([
+      expect.objectContaining({
+        npo_amount: 50,
+        fees_bg: 4,
+        fees_processing: 1,
+      }),
+    ]);
+  });
+
+  test("a void payout short on savings → the npo owes its savings share and that part of the card fee only", () => {
+    const plan = calc_refund_plan(
+      make_inputs({
+        dist: {
+          ...make_inputs().dist,
+          alloc: { liq: 50, lock: 0, cash: 50 },
+        },
+        payout: { id: "po-1", type: "void" },
+      }),
+      make_ctx()
+    );
+    expect(plan.is_loss).toBe(true);
+    expect(owed_of(plan)).toMatchObject({
+      received_usd: 50,
+      fee_processing_usd: 1,
+    });
+    expect(plan.amount).toEqual([{ party: { npo_id: 1 }, usd: 51 }]);
+    expect(plan.effects.some((e) => e.kind === "balance_update")).toBe(false);
+    expect(loss_log_of(plan)).toEqual([
+      expect.objectContaining({ npo_amount: 50, fees_processing: 1 }),
+    ]);
+  });
+
   test("mixed alloc: all sufficient → canonical effect order", () => {
     const plan = calc_refund_plan(
       make_inputs({
@@ -593,10 +679,8 @@ describe("calc_refund_plan", () => {
     expect(plan.preview.effects).toEqual([
       { label: "No balance changes", pass: true },
     ]);
-    expect(kinds(plan.effects)).toEqual([
-      "balance_update",
-      "donation_message_del",
-    ]);
+    // a zero balance update would set nothing, which drizzle refuses
+    expect(kinds(plan.effects)).toEqual(["donation_message_del"]);
   });
 
   test("dist alloc missing a share → that share is 0, deltas stay finite", () => {
@@ -640,13 +724,7 @@ describe("calc_refund_plan", () => {
       }),
       make_ctx()
     );
-    const bu = plan.effects.find((e) => e.kind === "balance_update");
-    expect(bu && bu.kind === "balance_update" && bu.deltas).toEqual({
-      liq: 0,
-      lock: 0,
-      lock_units: 0,
-      cash: 0,
-    });
+    expect(kinds(plan.effects)).not.toContain("balance_update");
   });
 
   test("the owed figure is recorded at ctx.now", () => {
@@ -769,12 +847,7 @@ describe("calc_refund_plan", () => {
       }),
       make_ctx()
     );
-    expect(plan.effects).toContainEqual(
-      expect.objectContaining({
-        kind: "balance_update",
-        deltas: { liq: 0, lock: 0, lock_units: 0, cash: 0 },
-      })
-    );
+    expect(kinds(plan.effects)).not.toContain("balance_update");
     expect(plan.is_loss).toBe(false);
   });
 

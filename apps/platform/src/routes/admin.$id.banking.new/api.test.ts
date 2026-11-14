@@ -8,8 +8,13 @@ const q = vi.hoisted(() => ({
   npo_bapp_count: vi.fn(),
   enqueue: vi.fn(),
 }));
+const wise = vi.hoisted(() => ({ v2_account: vi.fn() }));
+const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
 
 vi.mock("$/pg/db", () => ({ db: {} }));
+vi.mock("$/kit/wise", () => ({ wise }));
+vi.mock("$/payouts/own-accounts", () => own);
+vi.mock("#/errors/report", () => ({ report_degraded_null: () => null }));
 vi.mock("$/pg/queries/banking", () => ({
   bapp_get: q.bapp_get,
   bapp_put: q.bapp_put,
@@ -61,6 +66,8 @@ beforeEach(() => {
   for (const f of Object.values(q)) f.mockReset();
   q.npo_bapp_count.mockResolvedValue(0);
   q.bapp_put.mockResolvedValue(true);
+  wise.v2_account.mockReset().mockResolvedValue({ id: 40000001 });
+  own.is_own_recipient.mockReset().mockResolvedValue(false);
 });
 
 describe("new banking application", () => {
@@ -180,5 +187,26 @@ describe("new banking application", () => {
     expect(res.status).toBe(403);
     expect(q.bapp_put).not.toHaveBeenCalled();
     expect(q.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("refuses with 409 an account that is one of Better Giving's own, and files nothing", async () => {
+    own.is_own_recipient.mockResolvedValue(true);
+
+    const res: Response = await call(body(OWN_NPO));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      message: /belongs to Better Giving/i,
+    });
+    expect(q.bapp_put).not.toHaveBeenCalled();
+  });
+
+  it("still files when our own accounts can't be read: approval checks again", async () => {
+    own.is_own_recipient.mockRejectedValue(new Error("account-details 503"));
+
+    const res: Response = await call(body(OWN_NPO));
+
+    expect(res.status).toBe(302);
+    expect(q.bapp_put).toHaveBeenCalled();
   });
 });

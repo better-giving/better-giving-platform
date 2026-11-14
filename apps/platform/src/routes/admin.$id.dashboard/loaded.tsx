@@ -5,18 +5,21 @@ import {
   Content as HoverContent,
 } from "@better-giving/ui/hover-card";
 import { Arrow, Content } from "@better-giving/ui/tooltip";
+import { format } from "date-fns";
 import {
   ArrowDownToLineIcon,
   ArrowLeftRightIcon,
   ArrowUpFromLineIcon,
 } from "lucide-react";
-import { NavLink } from "react-router";
+import { Link, NavLink } from "react-router";
 import { Cell, Pie, PieChart } from "recharts";
+import { WarningCallout } from "#/components/warning-callout";
 import { category_colors } from "#/pages/admin/ticker-category-colors";
 import { use_admin_data } from "#/pages/admin/use-admin-data";
 import type { TickerCategory } from "@/nav/interfaces";
 import { group_by_category } from "@/nav/interfaces";
 import { min_payout_amount } from "@/npo/schema";
+import type { IReturnedPayouts } from "$/pg/queries/payout";
 import type { DashboardData } from "./api";
 import { GrantsTable } from "./common/grants-table";
 import { PayoutsTable } from "./common/payouts-table";
@@ -33,6 +36,12 @@ export function Loaded({ classes = "", ...props }: Props) {
 
   return (
     <div className={classes}>
+      {props.returned && (
+        <ReturnedNotice returned={props.returned} classes="mb-4" />
+      )}
+      {props.awaiting_repair && (
+        <AwaitingNotice {...props.awaiting_repair} classes="mb-4" />
+      )}
       <div className="grid gap-4 @lg:grid-cols-2">
         <Figure
           title="Savings"
@@ -153,16 +162,19 @@ export function Loaded({ classes = "", ...props }: Props) {
 
           {/* no bank: what is held is news before any payout exists */}
           {(props.recent_payouts.items.length > 0 ||
-            props.payout_to.kind !== "bank") && (
-            <Payout
-              next_payout={props.next_payout}
-              bal_cash={props.bal_cash}
-              threshold={payout_min}
-              to={props.payout_to}
-              bank_pending={props.bank_pending}
-              classes=""
-            />
-          )}
+            props.payout_to.kind !== "bank") &&
+            (props.return_hold && props.payout_to.kind === "bank" ? (
+              <ReturnHold />
+            ) : (
+              <Payout
+                next_payout={props.next_payout}
+                bal_cash={props.bal_cash}
+                threshold={payout_min}
+                to={props.payout_to}
+                bank_pending={props.bank_pending}
+                classes=""
+              />
+            ))}
         </section>
 
         <section className="card">
@@ -183,5 +195,69 @@ export function Loaded({ classes = "", ...props }: Props) {
         </section>
       </div>
     </div>
+  );
+}
+
+interface IReturnedNotice {
+  returned: IReturnedPayouts;
+  classes?: string;
+}
+
+function ReturnedNotice({ returned, classes = "" }: IReturnedNotice) {
+  const total = to_usd(returned.total, 2);
+  return (
+    <WarningCallout
+      title="Your bank sent a payout back"
+      classes={classes}
+      action={
+        <Link to="../banking" className="btn btn-primary btn-sm">
+          Update bank details
+        </Link>
+      }
+    >
+      {returned.count === 1
+        ? `${total} from ${format(returned.latest_date, "MMM d")} didn't reach your bank account, so it's back in your balance. Update your bank details, and it goes out again once the new ones are approved.`
+        : `${returned.count} payouts (${total}) didn't reach your bank account, so they're back in your balance. Update your bank details, and they go out again once the new ones are approved.`}
+    </WarningCallout>
+  );
+}
+
+interface IAwaitingNotice {
+  amount: number;
+  date: string;
+  classes?: string;
+}
+
+/** a transfer came back and which donations it covered is still being checked */
+export function AwaitingNotice({
+  amount,
+  date,
+  classes = "",
+}: IAwaitingNotice) {
+  return (
+    <WarningCallout
+      title="Your bank sent a payout back"
+      classes={classes}
+      action={
+        <Link to="../banking" className="btn btn-primary btn-sm">
+          Update bank details
+        </Link>
+      }
+    >
+      {`${to_usd(amount, 2)} from ${format(date, "MMM d")} didn't reach your bank account. We're checking which donations it covered and will add them back to your balance. Payouts are paused until you update your bank details and the new ones are approved.`}
+    </WarningCallout>
+  );
+}
+
+function ReturnHold() {
+  return (
+    <p className="text-sm">
+      Payouts are on hold until your{" "}
+      <Link to="../banking" className="link font-medium">
+        new bank details
+      </Link>{" "}
+      are approved. Donations wait in your Better Giving balance. Nothing is
+      lost.
+    </p>
   );
 }
