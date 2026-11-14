@@ -337,7 +337,10 @@ export async function settlements_to_poll(
     .orderBy(asc(settlements.date), asc(settlements.id));
 }
 
-/** the npo's latest settlement whose transfer came back; null when none did */
+/** the npo's latest settlement whose transfer came back, or came back and
+ * waits on ownership to be repaired (`AWAITING_REPAIR` in
+ * ../../payouts/wise-return): either way its bank account is the one that
+ * bounced. null when none did */
 export async function npo_last_return(
   npo_id: number,
   db_: DbOrTx = db
@@ -346,7 +349,10 @@ export async function npo_last_return(
     .select({ id: settlements.id, date: settlements.date })
     .from(settlements)
     .where(
-      and(eq(settlements.npo_id, npo_id), eq(settlements.status, "returned"))
+      and(
+        eq(settlements.npo_id, npo_id),
+        inArray(settlements.status, ["returned", "awaiting_repair"])
+      )
     )
     .orderBy(desc(settlements.date), desc(settlements.id))
     .limit(1);

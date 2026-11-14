@@ -288,6 +288,40 @@ describe("npo_return_hold", () => {
     });
   });
 
+  test("a transfer awaiting repair holds the npo like a returned one, and a new default lifts it with nothing to re-send", async () => {
+    await seed_bapp("old", "default");
+    await db().insert(settlements).values({
+      id: "sttl-repair",
+      other_id: "ref-repair",
+      npo_id,
+      date: SENT,
+      amount: 100,
+      status: "awaiting_repair",
+    });
+    await db().insert(payouts).values({
+      id: "p-loss",
+      source_id: "dist-p-loss",
+      npo_id,
+      source: "donation",
+      date: "2026-10-01T00:00:00.000Z",
+      amount: 100,
+      type: "refunded_loss",
+    });
+
+    expect(await npo_return_hold(npo_id)).toEqual({
+      settlement_id: "sttl-repair",
+      reason: "the default account predates the returned transfer",
+    });
+    expect(await resend_returned(npo_id)).toMatchObject({ status: "held" });
+
+    await seed_bapp("new", "under-review");
+    await bapp_approve("new", npo_id, { as_default: true });
+
+    expect(await npo_return_hold(npo_id)).toBeNull();
+    expect(await resend_returned(npo_id)).toEqual({ status: "none" });
+    expect((await rows())["p-loss"]).toEqual(["refunded_loss", null, null]);
+  });
+
   test("an account approved beside the old default leaves it held; made default, it lifts the hold and re-sends what is still returned", async () => {
     await seed_returned("p-1");
     await seed_returned("p-2");

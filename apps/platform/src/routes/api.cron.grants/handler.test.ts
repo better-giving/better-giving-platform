@@ -737,6 +737,34 @@ describe("grants cron execute", () => {
     ]);
   });
 
+  test("an npo whose returned transfer awaits repair is held like a returned one, and ops is told once", async () => {
+    const npo_id = await seed_npo({ cash: 300 });
+    await old_account();
+    await db()
+      .insert(settlements)
+      .values({
+        id: "sttl-repair",
+        other_id: "ref-repair",
+        npo_id,
+        date: "2026-09-02T00:00:00.000Z",
+        amount: 100,
+        sources: ["dist-p-loss"],
+        status: "awaiting_repair",
+      });
+    await seed_payout(npo_id, "p-new", 200);
+
+    await index();
+    await index();
+
+    expect(wise_pay_mock).not.toHaveBeenCalled();
+    expect(await payout_types()).toEqual({ "p-new": "pending" });
+    expect(await npo_cash(npo_id)).toBe(300);
+    const held = send_alert.mock.calls
+      .map(([a]) => a)
+      .filter((a) => a.title.startsWith("Grants held"));
+    expect(held).toHaveLength(1);
+  });
+
   test("a new account made default releases the hold: the next run pays the returned payouts with the new ones", async () => {
     const { bapp_set_default } = await import("$/pg/queries/banking");
     const { resend_returned } = await import("$/payouts/resend-returned");
