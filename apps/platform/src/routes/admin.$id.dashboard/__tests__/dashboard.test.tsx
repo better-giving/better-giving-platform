@@ -1077,6 +1077,29 @@ describe("dashboard — awaiting repair notice", () => {
     expect(data.awaiting_repair).toBeNull();
   });
 
+  it("is not set for a hold whose returned payouts were all refunded", async () => {
+    const npo = await seed_npo();
+    await file_old_bank(npo.id);
+    await settle(npo.id, "returned");
+    await test_db.current!.db.insert(payouts).values({
+      id: `p-${npo.id}`,
+      source_id: `don-${npo.id}`,
+      npo_id: npo.id,
+      source: "donation",
+      type: "refunded",
+      amount: 1250,
+      date: sent,
+      settled_id: `set-${npo.id}`,
+      settled_date: sent,
+    });
+
+    const data = await load(npo.id);
+
+    expect(data.return_hold).toBe(true);
+    expect(data.returned).toBeNull();
+    expect(data.awaiting_repair).toBeNull();
+  });
+
   it("is not set once a newer default account lifts the hold", async () => {
     const npo = await seed_npo();
     await settle(npo.id, "awaiting_repair");

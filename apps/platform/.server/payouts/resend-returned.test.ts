@@ -56,6 +56,7 @@ const { bapp_approve, bapp_set_default } = await import(
 );
 const { banking_apps } = await import("../pg/schema/banking");
 const { npos } = await import("../pg/schema/npo");
+const { npo_last_return } = await import("../pg/queries/payout");
 const { payouts, settlements } = await import("../pg/schema/payout");
 const { create_test_db } = await import("../pg/test-utils/pglite");
 
@@ -290,6 +291,33 @@ describe("npo_return_hold", () => {
       reason: "the default account predates the returned transfer",
     });
   });
+
+  test.each([
+    ["a newer awaiting_repair one", "returned", "awaiting_repair"],
+    ["a newer returned one", "awaiting_repair", "returned"],
+  ] as const)(
+    "npo_last_return picks the latest of two settlements in different states: %s",
+    async (_, older, newer) => {
+      const put = (id: string, status: string, date: string) =>
+        db()
+          .insert(settlements)
+          .values({
+            id,
+            other_id: `ref-${id}`,
+            npo_id,
+            date,
+            amount: 100,
+            status,
+          });
+      await put("sttl-old", older, "2026-10-01T00:00:00.000Z");
+      await put("sttl-new", newer, "2026-11-01T00:00:00.000Z");
+
+      expect(await npo_last_return(npo_id)).toMatchObject({
+        id: "sttl-new",
+        status: newer,
+      });
+    }
+  );
 
   test("a transfer awaiting repair holds the npo like a returned one, and a new default lifts it with nothing to re-send", async () => {
     await seed_bapp("old", "default");
