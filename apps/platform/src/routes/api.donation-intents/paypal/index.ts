@@ -28,8 +28,8 @@ export const paypal_intent: Provider = async ({
   }
   const charge = paypal_charge(intent.amount, scale);
 
-  // one paypal can't take as a subscription quantity is refused before a row
-  // or a paypal object exists
+  // a total paypal can't take as a subscription quantity is refused before a
+  // row or a paypal object exists
   if (
     intent.frequency !== "one-time" &&
     subscription_quantity(charge.total) === null

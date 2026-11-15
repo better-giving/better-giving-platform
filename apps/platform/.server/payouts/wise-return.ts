@@ -24,8 +24,9 @@
  * - a payout of the run `refunded_loss`, in flight or after it settled (an
  *   older run's, with no `settled_id`, counts when no other settlement lists
  *   it; else the return waits, see `ownership_unclear`): its refund found the
- *   grant gone and recorded the cash share as owed (dist `refund_status` 'loss', donation 'refunded_loss'). the
- *   cash is back, so with the credit above the npo holds it as if the payout
+ *   grant gone and recorded the cash share as owed (dist `refund_status`
+ *   'loss', donation 'refunded_loss'). the cash is back, so with the credit
+ *   above the npo holds it as if the payout
  *   were pending, and `reverse_unfunded_payout_loss` redoes the refund that
  *   way: payout 'refunded'; a dist that can reverse in full takes the cash
  *   share (and any savings share) from the npo's balances, credits the owed
