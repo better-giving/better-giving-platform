@@ -104,6 +104,11 @@ export const action: ActionFunction = async ({ request }) => {
     ...rest
   } = parsed.output;
 
+  // the chariot row is stored at upusd 1, which is only true of usd
+  if (via === "chariot" && rest.currency !== "USD") {
+    return refused(`chariot is usd-only, got ${rest.currency}`);
+  }
+
   const to = await to_fn(to_id, { open_at: new Date() });
   if (!to) {
     const recipient = typeof to_id === "number" ? "nonprofit" : "campaign";
