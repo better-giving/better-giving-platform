@@ -547,6 +547,13 @@
       "when": 1794740633206,
       "tag": "0077_settlements_recipient",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1794741414931,
+      "tag": "0078_referrer_payout_returns",
+      "breakpoints": true
     }
   ]
 }

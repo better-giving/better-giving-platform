@@ -269,6 +269,33 @@ describe("commissions cron", () => {
     });
   });
 
+  test("returned commissions wait while the referrer's payout account is the one that bounced, and go out in the same run once it is a different one", async () => {
+    await seed("d-1", 60);
+    await db()
+      .update(referrer_commissions)
+      .set({ status: "returned", ref: "r-0" });
+    await db().insert(referrer_payouts).values({
+      id: "r-0",
+      referrer_npo: REFERRER,
+      date: "2026-09-02T00:00:00.000Z",
+      amount: 60,
+      transfer_id: 1,
+      status: "returned",
+      recipient_id: "42",
+    });
+
+    await index();
+
+    expect(wise.transfer).not.toHaveBeenCalled();
+    expect(await statuses()).toEqual({ "d-1": "returned" });
+
+    referrer.pay_id = 43;
+    await index();
+
+    expect(quoted()).toEqual([60]);
+    expect(await statuses()).toEqual({ "d-1": "paid" });
+  });
+
   test("a payout wise prices off the total is refused before any transfer: back to pending, nothing paid, ops told", async () => {
     await seed("d-1", 60);
     wise.quote.mockImplementationOnce(async (_, q) => ({

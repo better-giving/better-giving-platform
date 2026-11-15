@@ -43,9 +43,6 @@
  * told both figures, again on each poll until it is reconciled.
  */
 import { report_error } from "#/errors/report";
-import type { Alert } from "@/slack";
-import { stage } from "../env";
-import { aws_monitor } from "../kit/slack";
 import { db } from "../pg/db";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { npo_balance_update, npo_get_locked } from "../pg/queries/npo";
@@ -68,12 +65,21 @@ import { reverse_unfunded_payout_loss } from "../refund/unfunded";
 import { lock_run } from "./owed-run";
 import { resend_returned } from "./resend-returned";
 import { payout_cents, payout_total } from "./transfer";
+import { poll_commission_returns } from "./wise-return-commission";
+import {
+  AWAITING_REPAIR,
+  alert,
+  FINAL,
+  MONEY_BACK,
+  ORDINARY,
+  RETURNED,
+  RETURNING,
+  read_transfer,
+  type TransferState,
+  WINDOW_DAYS,
+} from "./wise-states";
 
-/** the state a settlement takes once its money is back in the npo's books */
-export const RETURNED = "returned";
-/** its transfer came back but which payouts are its own can't be decided: not
- * final, so polling goes on, and nothing is credited until ops repairs it */
-export const AWAITING_REPAIR = "awaiting_repair";
+export { AWAITING_REPAIR, alert, RETURNED, type TransferState };
 
 export type ReturnResult =
   | { status: "not_found" }
@@ -332,41 +338,6 @@ async function announce(
   }
 }
 
-/** a transfer's wise state by its id, with the recipient it paid (wise's
- * `targetAccount`) when the caller has it */
-export type TransferState = (
-  transfer_id: number
-) => Promise<string | { status: string; recipient?: string }>;
-
-const read_transfer = async (state_of: TransferState, id: string) => {
-  const t = await state_of(Number(id));
-  return typeof t === "string" ? { status: t, recipient: undefined } : t;
-};
-
-/** stored states nothing polls again: ours once the money is back, and
- * `charged_back`. not `cancelled`: every polled transfer was funded, and a
- * funded one passes through `cancelled` on its way to `funds_refunded` */
-const FINAL = [RETURNED, "charged_back"] as const;
-const WINDOW_DAYS = 90;
-
-/**
- * wise's transfer states (https://docs.wise.com/guides/product/send-money/tracking-transfers).
- * `bounced_back` is not the money back: wise may still deliver it late or move
- * it on to `funds_refunded`, which alone is taken back
- */
-const ORDINARY: ReadonlySet<string> = new Set([
-  "incoming_payment_waiting",
-  "incoming_payment_initiated",
-  "processing",
-  "funds_converted",
-  "outgoing_payment_sent",
-]);
-const MONEY_BACK = "funds_refunded";
-/** off the ordinary path and possibly on to `MONEY_BACK`, where the poll takes
- * the run back by itself: settling the payouts by hand too would count the
- * money twice */
-const RETURNING: ReadonlySet<string> = new Set(["bounced_back", "cancelled"]);
-
 /**
  * asks wise the state of every grants-run transfer from the last 90 days not
  * yet final, and stores it on its settlement when it changed: the stored state
@@ -406,6 +377,7 @@ export async function poll_wise_returns(state_of: TransferState) {
     }
   }
   await fill_recipients(since, state_of);
+  await poll_commission_returns(state_of);
   // after the returns above, so a slow or large re-send backlog never delays finding them
   await retry_resends();
 }
@@ -439,19 +411,5 @@ async function retry_resends() {
     }
   } catch (err) {
     report_error(err);
-  }
-}
-
-/** an alert that fails to send is reported, never thrown past the money;
- * an `ERROR` unless `type` says otherwise */
-export async function alert(a: Omit<Alert, "from">) {
-  try {
-    await aws_monitor.send_alert({
-      type: "ERROR",
-      ...a,
-      from: `wise-returns:${stage}`,
-    });
-  } catch (err) {
-    report_error(err, { alert: a.title });
   }
 }

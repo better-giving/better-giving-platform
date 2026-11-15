@@ -46,12 +46,13 @@ export const v_donation_total_usd = pgView("v_donation_total_usd", {
 );
 
 // lifetime payouts per referrer. a row with `error` is a failed attempt kept
-// for the referrer's history — no money moved
+// for the referrer's history — no money moved. a returned transfer's money came
+// back, so it is not paid either
 export const v_referrer_payout_ltd = pgView("v_referrer_payout_ltd", {
   referrer: text("referrer"),
   total: numeric_as_number("total", { precision: 38, scale: 18 }),
 }).as(
-  sql`SELECT COALESCE(referrer_user, referrer_npo) as referrer, SUM(amount) as total FROM referrer_payouts WHERE error IS NULL GROUP BY COALESCE(referrer_user, referrer_npo)`
+  sql`SELECT COALESCE(referrer_user, referrer_npo) as referrer, SUM(amount) as total FROM referrer_payouts WHERE error IS NULL AND status <> 'returned' GROUP BY COALESCE(referrer_user, referrer_npo)`
 );
 
 // lifetime commissions per referrer and npo

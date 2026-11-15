@@ -217,6 +217,7 @@ export async function settle_referrer_commissions(
         amount: total,
         date: new Date().toISOString(),
         transfer_id: +transfer_id,
+        recipient_id: String(recipient.pay_id),
         ...party,
       };
       await referrer_payout_put(tx, payout);
