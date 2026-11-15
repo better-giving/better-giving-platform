@@ -109,6 +109,9 @@ test("a holder that releases after a throw lets the redelivery claim", async () 
 test("a holder that outlived its lease cannot release the claim taken since", async () => {
   const late = await claim_stamp();
   await expire_claim();
+  // stamps are millisecond-truncated `now()`: two claims inside one
+  // millisecond would share a stamp, and `late` would release `current`
+  await new Promise((r) => setTimeout(r, 2));
   const current = await claim_stamp();
   await release_dist_notice(DIST_ID, late);
   expect((await notice_of()).claimed).not.toBeNull();
