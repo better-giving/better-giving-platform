@@ -79,7 +79,7 @@ export default function Page({ loaderData: d, params }: Route.ComponentProps) {
       {d.wacc_unavailable && (
         <p className="text-sm text-gray-11 mt-2">
           Bank account details couldn't be loaded right now. This payout method
-          is unchanged — try again shortly.
+          is unchanged. Try again shortly.
         </p>
       )}
       <fetcher.Form method="POST" className="actions mt-4">
