@@ -189,6 +189,36 @@ describe("paypal_intent recurring", () => {
     expect(res).toMatchObject({ body: { tx_id: "I-SUB1", amount: "26.04" } });
   });
 
+  it("refuses a per-cycle total over paypal's quantity ceiling before any row or subscription exists", async () => {
+    const res = (await paypal_intent(
+      ctx({
+        frequency: "monthly",
+        amount: { base: 100000, tip: 0, fee_allowance: 0 },
+      })
+    )) as Response;
+
+    expect(res.status).toBe(400);
+    expect(res.headers.get("x-refusal")).toBe("1");
+    await expect(res.text()).resolves.toBe(
+      "We couldn't process this donation. Please refresh the page and try again."
+    );
+    expect(donation_put_mock).not.toHaveBeenCalled();
+    expect(create_subscription_mock).not.toHaveBeenCalled();
+  });
+
+  it("sends the largest total paypal takes as a plain decimal string", async () => {
+    await paypal_intent(
+      ctx({
+        frequency: "monthly",
+        amount: { base: 99999, tip: 0, fee_allowance: 0.99 },
+      })
+    );
+
+    expect(create_subscription_mock.mock.calls[0]![0].quantity).toBe(
+      "99999.99"
+    );
+  });
+
   it("fails only the frequency whose plan env is unset", async () => {
     await expect(paypal_intent(ctx({ frequency: "weekly" }))).rejects.toThrow(
       "weekly"

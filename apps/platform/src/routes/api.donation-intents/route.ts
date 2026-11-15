@@ -17,7 +17,7 @@ import { crypto_intent } from "./crypto";
 import { paypal_intent } from "./paypal";
 import { capture_order } from "./paypal/capture-order";
 import { stripe_intent } from "./stripe";
-import type { Ctx, Provider } from "./types";
+import { type Ctx, type Provider, REFUSED_COPY } from "./types";
 
 const providers = {
   card: stripe_intent,
@@ -63,9 +63,7 @@ const json_with_cookie_fn =
 // refusal header `resp.refuse` sets. the detail stays in the log
 const refused = (detail: string) => {
   console.info(`[resp] 400 - ${detail}`);
-  return resp.refuse(
-    "We couldn't process this donation. Please refresh the page and try again."
-  );
+  return resp.refuse(REFUSED_COPY);
 };
 
 const refused_issue = ([i]: [BaseIssue<unknown>, ...BaseIssue<unknown>[]]) =>
