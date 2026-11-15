@@ -21,7 +21,9 @@
  * both figures, again on each poll until it is reconciled.
  *
  * `resend_returned_commissions` puts them back to pending once the referrer's
- * payout account is a different wise recipient from the one that bounced.
+ * payout account is a different wise recipient from every one that bounced; the
+ * commissions run also pays nothing to such an account (`settle_referrer_commissions`
+ * returns `held`).
  */
 import { report_error } from "#/errors/report";
 import { db } from "../pg/db";
@@ -31,7 +33,7 @@ import {
   commissions_mark_returned,
   commissions_of_ref_locked,
   type ReferrerPayoutRow,
-  referrer_last_return,
+  referrer_bounced_recipients,
   referrer_payout_locked,
   referrer_payout_recipient_fill,
   referrer_payout_referrer,
@@ -255,9 +257,10 @@ export type CommissionResend =
 
 /**
  * a referrer's returned commissions go back to pending once the payout
- * account they have now is a different wise recipient from the one that
- * bounced (and one is on record); until then they stay `returned`. a repeat
- * moves nothing. under the referrer's run lock, which the return takes too
+ * account they have now is a different wise recipient from every one their
+ * returned transfers bounced from (each on record); until then they stay
+ * `returned`. a repeat moves nothing. under the referrer's run lock, which the
+ * return takes too
  */
 export async function resend_returned_commissions(
   referrer: string,
@@ -265,18 +268,18 @@ export async function resend_returned_commissions(
 ): Promise<CommissionResend> {
   return db.transaction(async (tx): Promise<CommissionResend> => {
     await lock_run(tx, `commission_run:${referrer}`);
-    const last = await referrer_last_return(referrer, tx);
-    if (!last) return { status: "none" };
+    const bounced = await referrer_bounced_recipients(referrer, tx);
+    if (!bounced.returned) return { status: "none" };
     if (pay_id === undefined) {
       return { status: "held", reason: "no payout account" };
     }
-    if (last.recipient_id === null) {
+    if (bounced.unrecorded) {
       return {
         status: "held",
-        reason: "the returned transfer's recipient is not on record",
+        reason: "a returned transfer's recipient is not on record",
       };
     }
-    if (String(pay_id) === last.recipient_id) {
+    if (bounced.recipients.has(String(pay_id))) {
       return {
         status: "held",
         reason: "the payout account is the one the transfer bounced from",

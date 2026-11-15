@@ -120,16 +120,23 @@ export async function commission_put(db: DbOrTx, data: ICommission) {
 }
 
 // refunded_loss stays: the unfunded-payout reversal returns an unclaimed one to refunded
-const REFUNDABLE: TStatus[] = ["pending", "processing", "refunded_loss"];
+const REFUNDABLE: TStatus[] = [
+  "pending",
+  "processing",
+  "returned",
+  "refunded_loss",
+];
 
 /**
  * reverses a refunded donation's commission, read under its row lock: one a
  * Wise transfer has claimed may already be paying out, so it becomes
  * `refunded_loss` whatever `status` asked, and one that is already
  * `refunded_loss` with a ref stays so — that transfer may have paid it. one
- * with no ref took its loss from the npo's side and follows `status`. a `paid`
- * one (or any status outside `REFUNDABLE`) is left as it is: the referrer has
- * the money. returns the row as it was.
+ * with no ref took its loss from the npo's side and follows `status`. a
+ * `returned` one was never paid (its transfer came back), so it follows
+ * `status` and drops its ref, which would read as a transfer that paid it. a
+ * `paid` one is left as it is: the referrer has the money. returns the row as
+ * it was.
  */
 export async function commission_refund(
   tx: DbOrTx,
@@ -147,7 +154,10 @@ export async function commission_refund(
     (cur.status === "refunded_loss" && cur.ref !== null);
   await tx
     .update(referrer_commissions)
-    .set({ status: claimed ? "refunded_loss" : status })
+    .set({
+      status: claimed ? "refunded_loss" : status,
+      ...(cur.status === "returned" && { ref: null }),
+    })
     .where(
       and(
         eq(referrer_commissions.donation_id, donation_id),
@@ -403,16 +413,22 @@ export async function referrers_with_returned(): Promise<string[]> {
   return rows.flatMap((r) => r.user ?? r.npo ?? []);
 }
 
-/** the referrer's latest returned payout: the account that bounced */
-export async function referrer_last_return(
+/**
+ * the wise recipients the referrer's returned payouts went to: the accounts
+ * that bounced. `unrecorded` is set when a returned payout has no recipient
+ * on record. the one notion the commissions run (skip a bounced account) and
+ * the re-send (refuse one) both read, so they cannot drift
+ */
+export async function referrer_bounced_recipients(
   referrer: string,
   db_: DbOrTx = db
-): Promise<Pick<ReferrerPayoutRow, "id" | "recipient_id"> | undefined> {
-  const [row] = await db_
-    .select({
-      id: referrer_payouts.id,
-      recipient_id: referrer_payouts.recipient_id,
-    })
+): Promise<{
+  returned: boolean;
+  recipients: Set<string>;
+  unrecorded: boolean;
+}> {
+  const rows = await db_
+    .select({ recipient_id: referrer_payouts.recipient_id })
     .from(referrer_payouts)
     .where(
       and(
@@ -422,10 +438,12 @@ export async function referrer_last_return(
         ),
         eq(referrer_payouts.status, "returned")
       )
-    )
-    .orderBy(desc(referrer_payouts.date), desc(referrer_payouts.id))
-    .limit(1);
-  return row;
+    );
+  return {
+    returned: rows.length > 0,
+    recipients: new Set(rows.flatMap((r) => r.recipient_id ?? [])),
+    unrecorded: rows.some((r) => r.recipient_id === null),
+  };
 }
 
 /** the referrer's returned commissions go back to pending, ref cleared, to be

@@ -13,12 +13,14 @@ import type { TestDb } from "../test-utils/pglite";
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
 
 const { create_test_db } = await import("../test-utils/pglite");
+const { campaigns } = await import("./campaign");
 const { dists } = await import("./dist");
 const { donations } = await import("./donation");
 const { funds } = await import("./fund");
 const { npos } = await import("./npo");
 const { user } = await import("./auth");
-const { v_contributions, v_donation_total_usd } = await import("./views");
+const { v_campaign_total_usd, v_contributions, v_donation_total_usd } =
+  await import("./views");
 
 const db = () => test_db.current!.db;
 
@@ -32,10 +34,15 @@ afterAll(async () => {
 
 let npo_id: number;
 const FUND = "fund-views";
+// one campaign per branch of `v_campaign_total_usd`: the donation names it, or
+// it was folded from the fund the dist carries
+const CAMPAIGN = "c-views";
+const LEGACY_CAMPAIGN = "c-views-legacy";
 
 beforeEach(async () => {
   await db().delete(dists);
   await db().delete(donations);
+  await db().delete(campaigns);
   await db().delete(funds);
   await db().delete(npos);
   await db().delete(user);
@@ -77,10 +84,29 @@ beforeEach(async () => {
       fund_donate_methods: ["stripe"],
       hide_bg_tip: true,
     });
+  await db()
+    .insert(campaigns)
+    .values([
+      {
+        id: CAMPAIGN,
+        owner_npo_id: npo_id,
+        creator_id: "u-views",
+        name: "Views campaign",
+        slug: "views-campaign",
+      },
+      {
+        id: LEGACY_CAMPAIGN,
+        owner_npo_id: npo_id,
+        creator_id: "u-views",
+        name: "Views legacy campaign",
+        slug: "views-legacy-campaign",
+        legacy_fund_id: FUND,
+      },
+    ]);
 });
 
-/** a gift of `usd` to the npo and the fund: the donation as `donation_status`
- * says, its dist as `dist_status` says */
+/** a gift of `usd` to the npo, the fund and the campaign: the donation as
+ * `donation_status` says, its dist as `dist_status` says */
 async function gift(
   id: string,
   usd: number,
@@ -98,6 +124,7 @@ async function gift(
     frequency: "one-time",
     source: "bg-marketplace",
     via: "stripe:card",
+    campaign_id: CAMPAIGN,
   });
   await db()
     .insert(dists)
@@ -128,23 +155,34 @@ const fund_total = async () =>
       .from(v_donation_total_usd)
       .where(eq(v_donation_total_usd.fund_id, FUND))
   )[0]?.total;
+const campaign_total = async (id: string) =>
+  (
+    await db()
+      .select()
+      .from(v_campaign_total_usd)
+      .where(eq(v_campaign_total_usd.campaign_id, id))
+  )[0]?.total;
 
 describe("lifetime totals count settled donations only", () => {
-  test("a refunded donation whose dist is still settled is in neither total", async () => {
+  test("a refunded donation whose dist is still settled is in no total", async () => {
     await gift("d-ok", 30, "settled");
     await gift("d-refunded", 70, "refunded");
     await gift("d-loss", 11, "refunded_loss");
 
     expect(await contributions()).toMatchObject({ total: 30, count: 1 });
     expect(await fund_total()).toBe(30);
+    expect(await campaign_total(CAMPAIGN)).toBe(30);
+    expect(await campaign_total(LEGACY_CAMPAIGN)).toBe(30);
   });
 
   test("a settled donation's settled dist still counts, and a refunded dist does not", async () => {
     await gift("d-ok", 30, "settled");
     await gift("d-ok-2", 5, "settled");
-    await gift("d-dist-refunded", 9, "refunded", "refunded");
+    await gift("d-dist-refunded", 9, "settled", "refunded");
 
     expect(await contributions()).toMatchObject({ total: 35, count: 2 });
     expect(await fund_total()).toBe(35);
+    expect(await campaign_total(CAMPAIGN)).toBe(35);
+    expect(await campaign_total(LEGACY_CAMPAIGN)).toBe(35);
   });
 });

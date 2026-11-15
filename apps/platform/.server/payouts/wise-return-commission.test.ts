@@ -64,6 +64,8 @@ const {
   return_commission_payout,
 } = await import("./wise-return-commission");
 const { poll_wise_returns } = await import("./wise-return");
+const { apply_refund_plan } = await import("../refund/apply");
+const { calc_refund_plan } = await import("../refund/plan");
 const { owed_for_donation } = await import("../pg/queries/owed");
 const { payout_ltd_get, pending_earnings } = await import(
   "../pg/queries/referrer"
@@ -491,6 +493,68 @@ describe("resend_returned_commissions", () => {
     });
   });
 
+  // the referrer never had the money, so the refund owes them nothing and the
+  // run that follows the new account must not pay it
+  test("a commission refunded while returned is not re-sent, paid, owed or counted", async () => {
+    await returned_run();
+    const plan = calc_refund_plan(
+      {
+        dist: {
+          id: "d-1",
+          donation_id: "don-1",
+          to_id: npo_id,
+          to_name: "Commission Return NPO",
+          alloc: { liq: 0, lock: 0, cash: 0 },
+          net: 0,
+          amount: 60,
+          amount_usd: 60,
+          fee_base: 0,
+          fee_fsa: 0,
+          fee_processing: 0,
+        },
+        payout: null,
+        commission: {
+          donation_id: "d-1",
+          amount: 60,
+          status: "returned",
+          referrer: { referrer_npo: REFERRER },
+        },
+        rev_log_ids: [],
+        bal: { liq: 0, lock_units: 0, cash: 0 },
+        nav: null,
+        sub_id: null,
+      },
+      {
+        now: "2026-09-20T00:00:00.000Z",
+        nav_date: "2026-09-20T00:00:00.001Z",
+        form_id: null,
+        program_id: null,
+      }
+    );
+    const refund = await db().transaction((tx) =>
+      apply_refund_plan(tx as any, plan, {
+        source: "refund",
+        source_ref: "re_d-1",
+      })
+    );
+    expect(refund.owed).toEqual([]);
+
+    expect(await resend_returned_commissions(REFERRER, 99)).toEqual({
+      status: "resent",
+      ids: ["d-2"],
+    });
+    expect(await statuses()).toEqual({ "d-1": "refunded", "d-2": "pending" });
+    expect(await pending_earnings(REFERRER)).toBe(40);
+    const run = await settle_referrer_commissions(
+      { id: REFERRER, pay_min: 0 },
+      { pay_id: 99, pay: async () => ++next_transfer }
+    );
+    if (run.status !== "paid") throw new Error(`run ${run.status}`);
+    expect((await payout(run.ref))?.amount).toBe(40);
+    expect(await statuses()).toEqual({ "d-1": "refunded", "d-2": "paid" });
+    expect(await owed_for_donation("don-1", db() as any)).toEqual([]);
+  });
+
   test("a referrer with nothing returned has nothing to re-send", async () => {
     await seed("d-1", 60);
 
@@ -508,5 +572,58 @@ describe("resend_returned_commissions", () => {
     const [alert] = send_alert.mock.calls[0]!;
     expect(alert.title).toBe(`Returned commissions re-sent for ${REFERRER}`);
     expect(alert.type).toBe("NOTICE");
+  });
+});
+
+describe("a referrer on a bounced account", () => {
+  const never_pays = vi.fn(async () => 1);
+
+  beforeEach(() => never_pays.mockClear());
+
+  test("commissions earned after a return are not paid to the bounced account, and are paid once it changes", async () => {
+    await seed("d-1", 60);
+    const { ref } = await sent(PAY_ID);
+    await return_commission_payout(ref);
+    await seed("d-2", 70);
+    send_alert.mockClear();
+
+    const held = await settle_referrer_commissions(
+      { id: REFERRER, pay_min: 0 },
+      { pay_id: PAY_ID, pay: never_pays }
+    );
+
+    expect(held).toEqual({ status: "held" });
+    expect(never_pays).not.toHaveBeenCalled();
+    expect(await statuses()).toEqual({ "d-1": "returned", "d-2": "pending" });
+    expect(send_alert).not.toHaveBeenCalled();
+    expect(report_error).not.toHaveBeenCalled();
+
+    const paid = await settle_referrer_commissions(
+      { id: REFERRER, pay_min: 0 },
+      { pay_id: 99, pay: async () => ++next_transfer }
+    );
+    expect(paid.status).toBe("paid");
+    expect(await statuses()).toEqual({ "d-1": "returned", "d-2": "paid" });
+  });
+
+  test("two bounced runs from accounts A and B: on B both stay returned, on C both are re-sent", async () => {
+    await seed("d-1", 60);
+    await return_commission_payout((await sent(PAY_ID)).ref);
+    await seed("d-2", 40);
+    await return_commission_payout((await sent(77)).ref);
+    expect(await statuses()).toEqual({ "d-1": "returned", "d-2": "returned" });
+
+    expect(await resend_returned_commissions(REFERRER, PAY_ID)).toMatchObject({
+      status: "held",
+    });
+    expect(await resend_returned_commissions(REFERRER, 77)).toMatchObject({
+      status: "held",
+    });
+    expect(await statuses()).toEqual({ "d-1": "returned", "d-2": "returned" });
+
+    expect(await resend_returned_commissions(REFERRER, 99)).toEqual({
+      status: "resent",
+      ids: ["d-1", "d-2"],
+    });
   });
 });

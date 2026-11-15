@@ -561,6 +561,13 @@
       "when": 1794741761877,
       "tag": "0079_lifetime_totals_settled_donations",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1794743586482,
+      "tag": "0080_campaign_total_settled_donations",
+      "breakpoints": true
     }
   ]
 }

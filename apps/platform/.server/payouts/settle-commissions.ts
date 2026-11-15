@@ -11,6 +11,7 @@ import {
   commissions_claim,
   commissions_mark_paid,
   commissions_release,
+  referrer_bounced_recipients,
   referrer_payout_put,
 } from "../pg/queries/referrer";
 import {
@@ -53,14 +54,16 @@ export type CommissionSettleResult =
   | { status: "paid"; ref: string; total: number; transfer_id: string }
   /** every commission went to what the referrer owes: paid with no transfer */
   | { status: "recovered"; ref: string; total: number }
-  | { status: "no_recipient"; total: number };
+  | { status: "no_recipient"; total: number }
+  /** the payout account is one a returned transfer bounced from: nothing is claimed */
+  | { status: "held" };
 
 /** thrown from inside the claim, so its tx rolls back and nothing is claimed */
 class NotClaimed extends Error {
   constructor(
     readonly result: Extract<
       CommissionSettleResult,
-      { status: "under_minimum" | "no_recipient" }
+      { status: "under_minimum" | "no_recipient" | "held" }
     >
   ) {
     super(result.status);
@@ -264,6 +267,14 @@ async function claim(
 ) {
   return db.transaction(async (tx) => {
     if (nets) await lock_referrer_run(tx, referrer.id);
+    // a bounced account is not paid again: what is pending waits, as a held
+    // npo's grants do, until the referrer names a different one
+    if (to) {
+      const bounced = await referrer_bounced_recipients(referrer.id, tx);
+      if (bounced.recipients.has(String(to.pay_id))) {
+        throw new NotClaimed({ status: "held" });
+      }
+    }
     let gross = 0;
     /** set when the claim sends a transfer: the net and who it goes to */
     let send: { total: number; to: IReferrerRecipient } | undefined;
