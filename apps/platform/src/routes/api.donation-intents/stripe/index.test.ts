@@ -15,10 +15,17 @@ vi.mock("$/kit/stripe", () => ({
 }));
 const rates = vi.hoisted(
   () =>
-    ({ NZD: 1.78, EUR: 0.92, PHP: 58.5, CAD: 1.37 }) as Record<string, number>
+    ({ USD: 1, NZD: 1.78, EUR: 0.92, PHP: 58.5, CAD: 1.37 }) as Record<
+      string,
+      number
+    >
 );
 vi.mock("#/.server/unit-per-usd", () => ({
-  unit_per_usd: async (c: string) => rates[c.toUpperCase()] ?? 1,
+  unit_per_usd: async (c: string) => {
+    const r = rates[c.toUpperCase()];
+    if (r === undefined) throw new Error(`no mocked rate for ${c}`);
+    return r;
+  },
 }));
 vi.mock("./customer-with-currency", () => ({
   customer_with_currency: async () => "cus_1",

@@ -262,6 +262,10 @@ describe("crypto_intent", () => {
     const [row] = await rows();
     expect(row.id).toBe(invoice.order_id);
     expect(row.via_extra).toBe("5745459419");
+    // ETH stays ETH at its quoted rate, never usdc at 1
+    expect(row.currency).toBe("ETH");
+    expect(row.upusd).not.toBe(1);
+    expect(row.upusd).toBeCloseTo(0.17061637 / 3999.5, 12);
     expect(res).toMatchObject({
       don_id: invoice.order_id,
       body: {

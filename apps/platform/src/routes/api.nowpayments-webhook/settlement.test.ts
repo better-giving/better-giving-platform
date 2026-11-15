@@ -634,7 +634,8 @@ describe("nowpayments ipn settlement", () => {
     });
 
   it("a settled coin donation and its repeated deposit stay in the coin, at its rate, never usdc at 1", async () => {
-    await seed_donation();
+    // intent quoted at a stale rate, so only the live rate can satisfy the assert
+    await seed_donation({ upusd: 1 / 1800 });
     await deliver(payment());
     await deliver(child());
 
@@ -645,7 +646,7 @@ describe("nowpayments ipn settlement", () => {
     ))!;
     for (const don of [parent, clone]) {
       expect(don.currency).toBe("ETH");
-      expect(don.upusd).toBeCloseTo(1 / usd_rates.eth);
+      expect(don.upusd).toBe(1 / usd_rates.eth);
       expect(don.upusd).not.toBe(1);
     }
     expect(clone.amount.base).toBeCloseTo(0.2);
