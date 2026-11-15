@@ -125,6 +125,8 @@ namespace Res {
      * @link https://docs.wise.com/api-docs/api-reference/transfer#object
      */
     status?: string;
+    /** the recipient account the transfer pays (the id `v2_account` takes) */
+    targetAccount?: number | string;
     /** the amount sent: the quote's source amount less its fee */
     sourceValue?: number;
     sourceCurrency?: string;

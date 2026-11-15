@@ -54,6 +54,10 @@ export const settlements = pgTable(
     status: text("status").notNull(),
     /** when ops was told this npo's payouts are held after a return: once */
     hold_alerted_at: timestamptz("hold_alerted_at"),
+    /** the wise recipient the transfer paid (the banking app id; wise's
+     * `targetAccount`): what a return hold compares the npo's current account
+     * with. null on a run from before it was stored, until a poll reads it */
+    recipient_id: text("recipient_id"),
   },
   (t) => [index("settlements_npo_id_date_idx").on(t.npo_id, t.date)]
 );

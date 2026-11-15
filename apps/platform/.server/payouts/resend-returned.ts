@@ -18,11 +18,14 @@ export interface IReturnHold {
 
 /**
  * whether the npo's grants are held: its latest transfer came back (returned,
- * or awaiting repair because which payouts are its own is unclear), and the
- * account the grants run pays (`npo_default_bapp`) was not approved or made
- * default since that transfer was sent, so a run would pay the account that
- * bounced. keyed on the settlement, not the payouts: refunding or cancelling
- * the returned payouts leaves it held. null when not held
+ * or awaiting repair because which payouts are its own is unclear), unless
+ * the account the grants run pays (`npo_default_bapp`) is a different wise
+ * recipient from the one that transfer paid and was approved or made default
+ * since it was sent. an edit to the account that bounced changes neither, so
+ * a run would pay it again. a transfer whose recipient is not on record
+ * holds too: the poll stores it from wise. keyed on the settlement, not the
+ * payouts: refunding or cancelling the returned payouts leaves it held. null
+ * when not held
  */
 export async function npo_return_hold(
   npo_id: number,
@@ -45,6 +48,18 @@ export async function npo_return_hold(
     return {
       ...of,
       reason: "the default account predates the returned transfer",
+    };
+  }
+  if (last.recipient_id === null) {
+    return {
+      ...of,
+      reason: "the returned transfer's recipient is not on record",
+    };
+  }
+  if (String(pays_to.id) === last.recipient_id) {
+    return {
+      ...of,
+      reason: "the default account is the one the transfer bounced from",
     };
   }
   return null;

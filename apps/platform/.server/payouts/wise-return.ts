@@ -55,10 +55,12 @@ import {
   npos_with_returned_payouts,
   payouts_move,
   payouts_own_loss,
+  returned_missing_recipient,
   run_payouts_locked,
   type SettlementRow,
   settlement_locked,
   settlement_npo_id,
+  settlement_recipient_fill,
   settlement_status_set,
   settlements_to_poll,
 } from "../pg/queries/payout";
@@ -107,7 +109,10 @@ interface IKept {
  * settlement added (only this locks it): the npo's run lock, the settlement,
  * the payouts, the npo, the owed rows
  */
-export async function return_settlement(id: string): Promise<ReturnResult> {
+export async function return_settlement(
+  id: string,
+  recipient?: string
+): Promise<ReturnResult> {
   let out: { res: ReturnResult; s?: SettlementRow; npo_name?: string };
   try {
     out = await db.transaction(async (tx) => {
@@ -116,6 +121,7 @@ export async function return_settlement(id: string): Promise<ReturnResult> {
       if (npo_id !== null) await lock_run(tx, `grant_run:npo:${npo_id}`);
       const s = await settlement_locked(tx, id);
       if (!s) return { res: { status: "not_found" } };
+      if (recipient) await settlement_recipient_fill(tx, id, recipient);
       if (s.status === RETURNED) return { res: { status: "already_returned" } };
       return take_back(tx, s);
     });
@@ -326,8 +332,16 @@ async function announce(
   }
 }
 
-/** a transfer's wise state by its id */
-export type TransferState = (transfer_id: number) => Promise<string>;
+/** a transfer's wise state by its id, with the recipient it paid (wise's
+ * `targetAccount`) when the caller has it */
+export type TransferState = (
+  transfer_id: number
+) => Promise<string | { status: string; recipient?: string }>;
+
+const read_transfer = async (state_of: TransferState, id: string) => {
+  const t = await state_of(Number(id));
+  return typeof t === "string" ? { status: t, recipient: undefined } : t;
+};
 
 /** stored states nothing polls again: ours once the money is back, and
  * `charged_back`. not `cancelled`: every polled transfer was funded, and a
@@ -365,10 +379,11 @@ export async function poll_wise_returns(state_of: TransferState) {
   ).toISOString();
   for (const s of await settlements_to_poll(since, FINAL)) {
     try {
-      const state = await state_of(Number(s.id));
+      const { status: state, recipient } = await read_transfer(state_of, s.id);
+      if (recipient) await settlement_recipient_fill(db, s.id, recipient);
       if (state === s.status) continue;
       if (state === MONEY_BACK) {
-        await return_settlement(s.id);
+        await return_settlement(s.id, recipient);
         continue;
       }
       const changed = await settlement_status_set(db, s.id, s.status, state);
@@ -390,8 +405,26 @@ export async function poll_wise_returns(state_of: TransferState) {
       report_error(err, { settlement_id: s.id });
     }
   }
+  await fill_recipients(since, state_of);
   // after the returns above, so a slow or large re-send backlog never delays finding them
   await retry_resends();
+}
+
+/** a returned run recorded before its recipient was stored: the transfer
+ * still names it, and the npo's hold can't lift without it */
+async function fill_recipients(since: string, state_of: TransferState) {
+  try {
+    for (const s of await returned_missing_recipient(since)) {
+      try {
+        const { recipient } = await read_transfer(state_of, s.id);
+        if (recipient) await settlement_recipient_fill(db, s.id, recipient);
+      } catch (err) {
+        report_error(err, { settlement_id: s.id });
+      }
+    }
+  } catch (err) {
+    report_error(err);
+  }
 }
 
 /** every npo still holding `returned` payouts is asked to re-send them again:

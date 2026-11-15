@@ -10,7 +10,10 @@ export const action: ActionFunction = async ({ request }) => {
   await poll_wise_returns(async (id) => {
     const t = await wise.transfer_get(id);
     if (!t.status) throw new Error(`wise transfer ${id} has no status`);
-    return t.status;
+    return {
+      status: t.status,
+      recipient: t.targetAccount == null ? undefined : String(t.targetAccount),
+    };
   });
   return new Response("ok", { status: 200 });
 };
