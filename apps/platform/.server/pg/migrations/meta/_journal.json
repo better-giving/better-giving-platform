@@ -554,6 +554,13 @@
       "when": 1794741414931,
       "tag": "0078_referrer_payout_returns",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1794741761877,
+      "tag": "0079_lifetime_totals_settled_donations",
+      "breakpoints": true
     }
   ]
 }

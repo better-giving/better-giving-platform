@@ -17,13 +17,14 @@ export const v_loss_ltd = pgView("v_loss_ltd", {
   total: numeric_as_number("total", { precision: 38, scale: 18 }),
 }).as(sql`SELECT npo_id, SUM(amount) as total FROM loss_logs GROUP BY npo_id`);
 
-// per-npo settled contribution total and count
+// per-npo settled contribution total and count. a dist counts only while its
+// donation is settled: a refund can leave the dist settled
 export const v_contributions = pgView("v_contributions", {
   npo_id: integer("npo_id"),
   total: numeric_as_number("total", { precision: 38, scale: 18 }),
   count: bigint("count", { mode: "number" }),
 }).as(
-  sql`SELECT to_id as npo_id, COALESCE(SUM(amount_usd), 0) as total, COUNT(*) as count FROM dists WHERE status = 'settled' GROUP BY to_id`
+  sql`SELECT dists.to_id as npo_id, COALESCE(SUM(dists.amount_usd), 0) as total, COUNT(*) as count FROM dists INNER JOIN donations ON donations.id = dists.donation_id WHERE dists.status = 'settled' AND donations.status = 'settled' GROUP BY dists.to_id`
 );
 
 // per-campaign settled donation total, net (after fees). the gift stays an
@@ -37,12 +38,13 @@ export const v_campaign_total_usd = pgView("v_campaign_total_usd", {
   sql`SELECT campaign_id, COALESCE(SUM(net), 0) as total FROM (SELECT d.campaign_id as campaign_id, dists.net as net FROM donations d INNER JOIN dists ON dists.donation_id = d.id WHERE d.campaign_id IS NOT NULL AND dists.status = 'settled' UNION ALL SELECT c.id as campaign_id, dists.net as net FROM campaigns c INNER JOIN dists ON dists.fund_id = c.legacy_fund_id WHERE c.legacy_fund_id IS NOT NULL AND dists.status = 'settled') s GROUP BY campaign_id`
 );
 
-// per-fund settled donation total, net (after fees)
+// per-fund settled donation total, net (after fees); settled donations only,
+// as `v_contributions`
 export const v_donation_total_usd = pgView("v_donation_total_usd", {
   fund_id: text("fund_id"),
   total: numeric_as_number("total", { precision: 38, scale: 18 }),
 }).as(
-  sql`SELECT fund_id, COALESCE(SUM(net), 0) as total FROM dists WHERE fund_id IS NOT NULL AND status = 'settled' GROUP BY fund_id`
+  sql`SELECT dists.fund_id, COALESCE(SUM(dists.net), 0) as total FROM dists INNER JOIN donations ON donations.id = dists.donation_id WHERE dists.fund_id IS NOT NULL AND dists.status = 'settled' AND donations.status = 'settled' GROUP BY dists.fund_id`
 );
 
 // lifetime payouts per referrer. a row with `error` is a failed attempt kept
