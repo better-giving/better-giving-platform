@@ -639,6 +639,8 @@ describe("grants cron execute", () => {
         amount,
         sources: [`dist-${id}`],
         status: "returned",
+        // the account that bounced: the hold lifts only for a different one
+        recipient_id: String(WISE_RECIPIENT),
       });
     await seed_payout(npo_id, id, amount);
     await db()
@@ -750,6 +752,7 @@ describe("grants cron execute", () => {
         amount: 100,
         sources: ["dist-p-loss"],
         status: "awaiting_repair",
+        recipient_id: String(WISE_RECIPIENT),
       });
     await seed_payout(npo_id, "p-new", 200);
 

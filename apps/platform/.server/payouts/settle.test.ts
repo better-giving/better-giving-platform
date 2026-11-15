@@ -409,6 +409,7 @@ describe("settle_npo_payouts", () => {
       date: "2026-10-01T00:00:00.000Z",
       amount: 100,
       status: "returned",
+      recipient_id: RECIPIENT,
     });
     // bank B cleared the hold; the caller still holds bank A's id, "777"
     await db().insert(banking_apps).values({
@@ -429,6 +430,50 @@ describe("settle_npo_payouts", () => {
     expect(pay).not.toHaveBeenCalled();
     expect(await payout_types()).toEqual({ "p-1": "pending" });
     expect(await npo_cash(npo.id)).toBe(500);
+  });
+
+  test("an edit to the account that bounced does not lift the hold at the claim", async () => {
+    const npo = await seed_npo({ cash: 500, payout_minimum: 0 });
+    await seed_payout(npo.id, "p-1", 60);
+    await db().insert(settlements).values({
+      id: "sttl-returned",
+      other_id: "ref-returned",
+      npo_id: npo.id,
+      date: "2026-10-01T00:00:00.000Z",
+      amount: 100,
+      status: "returned",
+      recipient_id: RECIPIENT,
+    });
+    await db().insert(banking_apps).values({
+      id: RECIPIENT,
+      npo_id: npo.id,
+      status: "default",
+      date_created: "2026-09-01T00:00:00.000Z",
+      updated_at: "2026-10-15T00:00:00.000Z",
+    });
+    const pay = vi.fn<Pay>(async () => TRANSFER_ID);
+
+    const res = await settle_npo_payouts(npo, ["p-1"], {
+      ref_key: RECIPIENT,
+      pay,
+    });
+
+    expect(res).toMatchObject({ status: "held" });
+    expect(pay).not.toHaveBeenCalled();
+    expect(await payout_types()).toEqual({ "p-1": "pending" });
+  });
+
+  test("a claim that pays records the recipient on its settlement", async () => {
+    const npo = await seed_npo({ cash: 500, payout_minimum: 0 });
+    await seed_payout(npo.id, "p-1", 60);
+
+    await settle_npo_payouts(npo, ["p-1"], {
+      ref_key: RECIPIENT,
+      pay: async () => TRANSFER_ID,
+    });
+
+    const [row] = await db().select().from(settlements);
+    expect(row?.recipient_id).toBe(RECIPIENT);
   });
 
   test("claims and pays nothing when the pending total is under the npo's minimum", async () => {

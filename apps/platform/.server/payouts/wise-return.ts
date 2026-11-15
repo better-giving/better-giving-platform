@@ -24,8 +24,9 @@
  * - a payout of the run `refunded_loss`, in flight or after it settled (an
  *   older run's, with no `settled_id`, counts when no other settlement lists
  *   it; else the return waits, see `ownership_unclear`): its refund found the
- *   grant gone and recorded the cash share as owed (dist `refund_status` 'loss', donation 'refunded_loss'). the
- *   cash is back, so with the credit above the npo holds it as if the payout
+ *   grant gone and recorded the cash share as owed (dist `refund_status`
+ *   'loss', donation 'refunded_loss'). the cash is back, so with the credit
+ *   above the npo holds it as if the payout
  *   were pending, and `reverse_unfunded_payout_loss` redoes the refund that
  *   way: payout 'refunded'; a dist that can reverse in full takes the cash
  *   share (and any savings share) from the npo's balances, credits the owed
@@ -43,9 +44,6 @@
  * told both figures, again on each poll until it is reconciled.
  */
 import { report_error } from "#/errors/report";
-import type { Alert } from "@/slack";
-import { stage } from "../env";
-import { aws_monitor } from "../kit/slack";
 import { db } from "../pg/db";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { npo_balance_update, npo_get_locked } from "../pg/queries/npo";
@@ -55,10 +53,12 @@ import {
   npos_with_returned_payouts,
   payouts_move,
   payouts_own_loss,
+  returned_missing_recipient,
   run_payouts_locked,
   type SettlementRow,
   settlement_locked,
   settlement_npo_id,
+  settlement_recipient_fill,
   settlement_status_set,
   settlements_to_poll,
 } from "../pg/queries/payout";
@@ -66,12 +66,21 @@ import { reverse_unfunded_payout_loss } from "../refund/unfunded";
 import { lock_run } from "./owed-run";
 import { resend_returned } from "./resend-returned";
 import { payout_cents, payout_total } from "./transfer";
+import { poll_commission_returns } from "./wise-return-commission";
+import {
+  AWAITING_REPAIR,
+  alert,
+  FINAL,
+  MONEY_BACK,
+  ORDINARY,
+  RETURNED,
+  RETURNING,
+  read_transfer,
+  type TransferState,
+  WINDOW_DAYS,
+} from "./wise-states";
 
-/** the state a settlement takes once its money is back in the npo's books */
-export const RETURNED = "returned";
-/** its transfer came back but which payouts are its own can't be decided: not
- * final, so polling goes on, and nothing is credited until ops repairs it */
-export const AWAITING_REPAIR = "awaiting_repair";
+export { AWAITING_REPAIR, alert, RETURNED, type TransferState };
 
 export type ReturnResult =
   | { status: "not_found" }
@@ -107,7 +116,10 @@ interface IKept {
  * settlement added (only this locks it): the npo's run lock, the settlement,
  * the payouts, the npo, the owed rows
  */
-export async function return_settlement(id: string): Promise<ReturnResult> {
+export async function return_settlement(
+  id: string,
+  recipient?: string
+): Promise<ReturnResult> {
   let out: { res: ReturnResult; s?: SettlementRow; npo_name?: string };
   try {
     out = await db.transaction(async (tx) => {
@@ -116,6 +128,7 @@ export async function return_settlement(id: string): Promise<ReturnResult> {
       if (npo_id !== null) await lock_run(tx, `grant_run:npo:${npo_id}`);
       const s = await settlement_locked(tx, id);
       if (!s) return { res: { status: "not_found" } };
+      if (recipient) await settlement_recipient_fill(tx, id, recipient);
       if (s.status === RETURNED) return { res: { status: "already_returned" } };
       return take_back(tx, s);
     });
@@ -326,33 +339,6 @@ async function announce(
   }
 }
 
-/** a transfer's wise state by its id */
-export type TransferState = (transfer_id: number) => Promise<string>;
-
-/** stored states nothing polls again: ours once the money is back, and
- * `charged_back`. not `cancelled`: every polled transfer was funded, and a
- * funded one passes through `cancelled` on its way to `funds_refunded` */
-const FINAL = [RETURNED, "charged_back"] as const;
-const WINDOW_DAYS = 90;
-
-/**
- * wise's transfer states (https://docs.wise.com/guides/product/send-money/tracking-transfers).
- * `bounced_back` is not the money back: wise may still deliver it late or move
- * it on to `funds_refunded`, which alone is taken back
- */
-const ORDINARY: ReadonlySet<string> = new Set([
-  "incoming_payment_waiting",
-  "incoming_payment_initiated",
-  "processing",
-  "funds_converted",
-  "outgoing_payment_sent",
-]);
-const MONEY_BACK = "funds_refunded";
-/** off the ordinary path and possibly on to `MONEY_BACK`, where the poll takes
- * the run back by itself: settling the payouts by hand too would count the
- * money twice */
-const RETURNING: ReadonlySet<string> = new Set(["bounced_back", "cancelled"]);
-
 /**
  * asks wise the state of every grants-run transfer from the last 90 days not
  * yet final, and stores it on its settlement when it changed: the stored state
@@ -365,10 +351,11 @@ export async function poll_wise_returns(state_of: TransferState) {
   ).toISOString();
   for (const s of await settlements_to_poll(since, FINAL)) {
     try {
-      const state = await state_of(Number(s.id));
+      const { status: state, recipient } = await read_transfer(state_of, s.id);
+      if (recipient) await settlement_recipient_fill(db, s.id, recipient);
       if (state === s.status) continue;
       if (state === MONEY_BACK) {
-        await return_settlement(s.id);
+        await return_settlement(s.id, recipient);
         continue;
       }
       const changed = await settlement_status_set(db, s.id, s.status, state);
@@ -390,8 +377,27 @@ export async function poll_wise_returns(state_of: TransferState) {
       report_error(err, { settlement_id: s.id });
     }
   }
+  await fill_recipients(state_of);
+  await poll_commission_returns(state_of);
   // after the returns above, so a slow or large re-send backlog never delays finding them
   await retry_resends();
+}
+
+/** a returned run recorded before its recipient was stored: the transfer
+ * still names it, and the npo's hold can't lift without it */
+async function fill_recipients(state_of: TransferState) {
+  try {
+    for (const s of await returned_missing_recipient()) {
+      try {
+        const { recipient } = await read_transfer(state_of, s.id);
+        if (recipient) await settlement_recipient_fill(db, s.id, recipient);
+      } catch (err) {
+        report_error(err, { settlement_id: s.id });
+      }
+    }
+  } catch (err) {
+    report_error(err);
+  }
 }
 
 /** every npo still holding `returned` payouts is asked to re-send them again:
@@ -406,19 +412,5 @@ async function retry_resends() {
     }
   } catch (err) {
     report_error(err);
-  }
-}
-
-/** an alert that fails to send is reported, never thrown past the money;
- * an `ERROR` unless `type` says otherwise */
-export async function alert(a: Omit<Alert, "from">) {
-  try {
-    await aws_monitor.send_alert({
-      type: "ERROR",
-      ...a,
-      from: `wise-returns:${stage}`,
-    });
-  } catch (err) {
-    report_error(err, { alert: a.title });
   }
 }

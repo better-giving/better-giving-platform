@@ -812,7 +812,10 @@ describe("poll_wise_returns", () => {
 
   describe("a re-send that did not land after a return", () => {
     const stuck = async (npo_id: number, bank_updated: string) => {
-      await seed_settlement(npo_id, "2001", { status: "returned" });
+      await seed_settlement(npo_id, "2001", {
+        status: "returned",
+        recipient_id: "old-bank",
+      });
       await seed_payout(npo_id, "p-back", 100);
       await db()
         .update(payouts)
@@ -850,7 +853,10 @@ describe("poll_wise_returns", () => {
     const npo = await seed_npo(0);
     await seed_settlement(npo.id, "1001");
     await seed_settlement(npo.id, "1002", { status: "outgoing_payment_sent" });
-    await seed_settlement(npo.id, "1003", { status: "returned" });
+    await seed_settlement(npo.id, "1003", {
+      status: "returned",
+      recipient_id: "555",
+    });
     await seed_settlement(npo.id, "1004", { status: "charged_back" });
     // funded, so on wise's way to `funds_refunded`
     await seed_settlement(npo.id, "1005", { status: "cancelled" });
@@ -867,6 +873,60 @@ describe("poll_wise_returns", () => {
       1001, 1002, 1005, 1007,
     ]);
   });
+
+  test("stores the recipient wise names on a transfer, and reads it for a returned run recorded without one", async () => {
+    const npo = await seed_npo(0);
+    await seed_settlement(npo.id, "3001");
+    await seed_settlement(npo.id, "3002", { status: "returned" });
+    const recipients = async () =>
+      Object.fromEntries(
+        (await db().select().from(settlements)).map((s) => [
+          s.id,
+          s.recipient_id,
+        ])
+      );
+
+    await poll_wise_returns(async (id) => ({
+      status: id === 3001 ? "processing" : "funds_refunded",
+      recipient: `bank-${id}`,
+    }));
+
+    expect(await recipients()).toEqual({
+      "3001": "bank-3001",
+      "3002": "bank-3002",
+    });
+  });
+
+  test.each([["returned"], ["awaiting_repair"]])(
+    "a %s run older than the poll window still has its recipient read off the transfer, so its npo's hold can lift",
+    async (status) => {
+      const npo = await seed_npo(0);
+      await seed_settlement(npo.id, "3101", {
+        status,
+        date: "2025-01-01T00:00:00.000Z",
+      });
+      await seed_settlement(npo.id, "3102", {
+        status: "returned",
+        recipient_id: "kept",
+        date: "2025-01-02T00:00:00.000Z",
+      });
+      const lookup = vi.fn(async (id: number) => ({
+        status: "funds_refunded",
+        recipient: `bank-${id}`,
+      }));
+
+      await poll_wise_returns(lookup);
+
+      const rows = Object.fromEntries(
+        (await db().select().from(settlements)).map((s) => [
+          s.id,
+          s.recipient_id,
+        ])
+      );
+      expect(rows).toEqual({ "3101": "bank-3101", "3102": "kept" });
+      expect(lookup.mock.calls.map(([id]) => id)).toEqual([3101]);
+    }
+  );
 
   test("a transfer seen cancelled is polled on, and its money coming back takes the run back", async () => {
     const npo = await seed_npo(500);

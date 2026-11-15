@@ -93,4 +93,31 @@ describe("banking application review — Better Giving's own account", () => {
       .toBeVisible();
     expect(screen.getByText("Recipient name").query()).toBeNull();
   });
+
+  test("an application with no statement on file shows no statement row or link", async () => {
+    const d = data({});
+    const screen = await render_page({
+      ...d,
+      ba: { ...d.ba, bank_statement_url: "" },
+    });
+    await expect
+      .element(screen.getByText("Currency", { exact: true }))
+      .toBeVisible();
+    expect(
+      screen.getByText("Bank statement", { exact: true }).query()
+    ).toBeNull();
+    expect(
+      screen.getByRole("link", { name: /s\.pdf|statement/i }).query()
+    ).toBeNull();
+  });
+
+  test("a statement on file shows its link", async () => {
+    const screen = await render_page(data({}));
+    await expect
+      .element(screen.getByText("Bank statement", { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByRole("link", { name: /s\.pdf/ }))
+      .toBeVisible();
+  });
 });

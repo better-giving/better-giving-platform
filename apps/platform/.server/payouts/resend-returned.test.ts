@@ -100,7 +100,11 @@ beforeEach(async () => {
 });
 
 /** a payout of a run whose transfer came back, for `npo` */
-async function seed_returned(id: string, npo = npo_id) {
+async function seed_returned(
+  id: string,
+  npo = npo_id,
+  recipient_id: string | null = "old"
+) {
   const sttl = `sttl-${npo}`;
   await db()
     .insert(settlements)
@@ -111,6 +115,7 @@ async function seed_returned(id: string, npo = npo_id) {
       date: SENT,
       amount: 100,
       status: "returned",
+      recipient_id,
     })
     .onConflictDoNothing();
   await db()
@@ -271,6 +276,79 @@ describe("resend_returned", () => {
   });
 });
 
+describe("npo_return_hold: which account lifts it", () => {
+  test("an edit to the account that bounced keeps the npo held and its payouts returned", async () => {
+    await seed_returned("p-1");
+    await seed_bapp("old", "default", "2026-11-10T00:00:00.000Z");
+
+    expect(await npo_return_hold(npo_id)).toMatchObject({
+      reason: "the default account is the one the transfer bounced from",
+    });
+    expect(await resend_returned(npo_id)).toMatchObject({ status: "held" });
+    expect((await rows())["p-1"]?.[0]).toBe("returned");
+  });
+
+  test("a different account approved after the return lifts it", async () => {
+    await seed_returned("p-1");
+    await seed_bapp("old", "approved", "2026-11-10T00:00:00.000Z");
+    await seed_bapp("new", "default", "2026-11-11T00:00:00.000Z");
+
+    expect(await npo_return_hold(npo_id)).toBeNull();
+  });
+
+  test("a different account older than the return does not lift it", async () => {
+    await seed_returned("p-1");
+    await seed_bapp("other", "default", "2026-10-01T00:00:00.000Z");
+
+    expect(await npo_return_hold(npo_id)).toMatchObject({
+      reason: "the default account predates the returned transfer",
+    });
+  });
+
+  test("a returned transfer whose recipient is not on record holds", async () => {
+    await seed_returned("p-1", npo_id, null);
+    await seed_bapp("new", "default", "2026-11-11T00:00:00.000Z");
+
+    expect(await npo_return_hold(npo_id)).toMatchObject({
+      reason: "the returned transfer's recipient is not on record",
+    });
+  });
+
+  test.each([
+    ["earlier first", ["a", "b"]],
+    ["later first", ["b", "a"]],
+  ] as const)(
+    "two returns to different accounts hold the same whichever is recorded first: %s",
+    async (_, order) => {
+      const put = (r: "a" | "b") =>
+        db()
+          .insert(settlements)
+          .values({
+            id: `sttl-${r}`,
+            other_id: `ref-${r}`,
+            npo_id,
+            date: r === "a" ? "2026-10-01T00:00:00.000Z" : SENT,
+            amount: 100,
+            status: "returned",
+            recipient_id: r,
+          });
+      for (const r of order) await put(r);
+      // `a` came back first, `b` (the later run) last, so `b` is what bounced
+      await seed_bapp("b", "default", "2026-11-10T00:00:00.000Z");
+      expect(await npo_return_hold(npo_id)).toMatchObject({
+        settlement_id: "sttl-b",
+        reason: "the default account is the one the transfer bounced from",
+      });
+      await db()
+        .update(banking_apps)
+        .set({ status: "approved" })
+        .where(eq(banking_apps.id, "b"));
+      await seed_bapp("a", "default", "2026-11-12T00:00:00.000Z");
+      expect(await npo_return_hold(npo_id)).toBeNull();
+    }
+  );
+});
+
 describe("npo_return_hold", () => {
   test("an npo whose transfers never came back is not held", async () => {
     await seed_bapp("old", "default");
@@ -328,6 +406,7 @@ describe("npo_return_hold", () => {
       date: SENT,
       amount: 100,
       status: "awaiting_repair",
+      recipient_id: "old",
     });
     await db().insert(payouts).values({
       id: "p-loss",

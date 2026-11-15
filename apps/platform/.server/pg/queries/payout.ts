@@ -323,6 +323,37 @@ export async function settlement_status_set(
   return rows.length > 0;
 }
 
+/** stores the wise recipient a transfer paid, where none is stored yet */
+export async function settlement_recipient_fill(
+  db_: DbOrTx,
+  id: string,
+  recipient_id: string
+) {
+  await db_
+    .update(settlements)
+    .set({ recipient_id })
+    .where(and(eq(settlements.id, id), isNull(settlements.recipient_id)));
+}
+
+/** returned or awaiting-repair settlements of a real wise transfer whose
+ * recipient was never stored (a run from before it was), of any age: the hold
+ * refuses every account until it is known, so the poll window does not bound
+ * them. the poll reads it off the transfer */
+export async function returned_missing_recipient(): Promise<SettlementRow[]> {
+  return db
+    .select()
+    .from(settlements)
+    .where(
+      and(
+        isNotNull(settlements.other_id),
+        gt(settlements.amount, 0),
+        inArray(settlements.status, ["returned", "awaiting_repair"]),
+        isNull(settlements.recipient_id)
+      )
+    )
+    .orderBy(asc(settlements.date), asc(settlements.id));
+}
+
 /**
  * the settlements of a real wise transfer (a grants run's: `other_id` is its
  * ref, the amount what it sent) dated since `since`, whose stored state is
@@ -353,13 +384,17 @@ export async function settlements_to_poll(
 export async function npo_last_return(
   npo_id: number,
   db_: DbOrTx = db
-): Promise<Pick<SettlementRow, "id" | "date" | "status" | "amount"> | null> {
+): Promise<Pick<
+  SettlementRow,
+  "id" | "date" | "status" | "amount" | "recipient_id"
+> | null> {
   const [row] = await db_
     .select({
       id: settlements.id,
       date: settlements.date,
       status: settlements.status,
       amount: settlements.amount,
+      recipient_id: settlements.recipient_id,
     })
     .from(settlements)
     .where(

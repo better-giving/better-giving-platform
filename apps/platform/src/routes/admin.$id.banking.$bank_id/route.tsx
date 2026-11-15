@@ -67,17 +67,19 @@ export default function Page({ loaderData: d, params }: Route.ComponentProps) {
             ))}
           </>
         )}
-        <Row label="Bank statement">
-          <ExtLink href={doc_href(d.ba.bank_statement_url)} className="link">
-            <span className="break-all">{d.ba.bank_statement_url}</span>
-            <SquareArrowOutUpRight className="inline relative bottom-px ml-2 icon-md" />
-          </ExtLink>
-        </Row>
+        {d.ba.bank_statement_url && (
+          <Row label="Bank statement">
+            <ExtLink href={doc_href(d.ba.bank_statement_url)} className="link">
+              <span className="break-all">{d.ba.bank_statement_url}</span>
+              <SquareArrowOutUpRight className="inline relative bottom-px ml-2 icon-md" />
+            </ExtLink>
+          </Row>
+        )}
       </dl>
       {d.wacc_unavailable && (
         <p className="text-sm text-gray-11 mt-2">
           Bank account details couldn't be loaded right now. This payout method
-          is unchanged — try again shortly.
+          is unchanged. Try again shortly.
         </p>
       )}
       <fetcher.Form method="POST" className="actions mt-4">

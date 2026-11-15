@@ -71,3 +71,17 @@ test("a referrer whose only attempt failed has paid out nothing", async () => {
   });
   expect(await payout_ltd_get(REF)).toBe(0);
 });
+
+test("a returned transfer's money came back, so lifetime payouts leave it out", async () => {
+  await test_db.current!.db.insert(referrer_payouts).values([
+    { id: "p-1", referrer_npo: REF, amount: 40, date: "2026-09-01T00:00:00Z" },
+    {
+      id: "p-back",
+      referrer_npo: REF,
+      amount: 25,
+      date: "2026-09-08T00:00:00Z",
+      status: "returned",
+    },
+  ]);
+  expect(await payout_ltd_get(REF)).toBe(40);
+});

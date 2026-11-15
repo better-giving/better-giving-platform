@@ -71,15 +71,17 @@ export function Loaded(props: LoaderData) {
             ))}
           </>
         )}
-        <Row label="Bank statement">
-          <ExtLink
-            href={doc_href(props.ba.bank_statement_url)}
-            className="link"
-          >
-            <span className="break-all">{props.ba.bank_statement_url}</span>
-            <SquareArrowOutUpRight className="inline relative bottom-px ml-2 icon-md" />
-          </ExtLink>
-        </Row>
+        {props.ba.bank_statement_url && (
+          <Row label="Bank statement">
+            <ExtLink
+              href={doc_href(props.ba.bank_statement_url)}
+              className="link"
+            >
+              <span className="break-all">{props.ba.bank_statement_url}</span>
+              <SquareArrowOutUpRight className="inline relative bottom-px ml-2 icon-md" />
+            </ExtLink>
+          </Row>
+        )}
       </dl>
       {props.wacc_unavailable && (
         <p className="text-sm text-gray-11 -mt-2">

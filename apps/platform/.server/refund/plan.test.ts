@@ -621,6 +621,27 @@ describe("calc_refund_plan", () => {
     });
   });
 
+  test("a commission whose transfer came back is reversed and nobody owes it", () => {
+    const plan = calc_refund_plan(
+      make_inputs({
+        payout: { id: "po-1", type: "pending" },
+        commission: {
+          donation_id: "dist-1",
+          amount: 5,
+          status: "returned",
+          referrer: REFERRER,
+        },
+      }),
+      make_ctx()
+    );
+    expect(plan.amount).toEqual([]);
+    expect(plan.preview.effects).toContainEqual({
+      label: "Commission",
+      pass: true,
+      reason: "$5.00 will be reversed",
+    });
+  });
+
   test("a paid commission previews as recovered from the referrer's next commission", () => {
     const plan = calc_refund_plan(
       make_inputs({

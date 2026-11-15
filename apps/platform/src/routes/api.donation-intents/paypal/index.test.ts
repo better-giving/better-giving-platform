@@ -58,6 +58,33 @@ beforeEach(() => {
   create_order_mock.mockResolvedValue({ id: "ORDER-1" });
 });
 
+describe("paypal_intent stored currency and rate", () => {
+  it.each([
+    ["GBP", 0.79],
+    ["PLN", 4.05],
+    ["EUR", 0.92],
+  ])(
+    "a one-time %s gift is stored as %s at %s per usd, not usd at 1",
+    async (currency, rate) => {
+      upusd.v = rate;
+
+      await paypal_intent(
+        ctx({
+          currency,
+          amount: { base: 25, tip: 0, fee_allowance: 0 },
+          source: "bg-widget",
+        })
+      );
+
+      expect(donation_put_mock.mock.calls[0]![1]).toMatchObject({
+        currency,
+        upusd: rate,
+        source: "bg-widget",
+      });
+    }
+  );
+});
+
 describe("paypal_intent currency", () => {
   it("answers a currency paypal can't take with a 400, writing nothing", async () => {
     const res = (await paypal_intent(ctx({ currency: "NGN" }))) as Response;
@@ -187,6 +214,36 @@ describe("paypal_intent recurring", () => {
     expect(req).toMatchObject({ plan_id: "P-MONTHLY-USD", quantity: "26.04" });
     expect(request_id).toBe(`subs-${donation_put_mock.mock.calls[0]![1].id}`);
     expect(res).toMatchObject({ body: { tx_id: "I-SUB1", amount: "26.04" } });
+  });
+
+  it("refuses a per-cycle total over paypal's quantity ceiling before any row or subscription exists", async () => {
+    const res = (await paypal_intent(
+      ctx({
+        frequency: "monthly",
+        amount: { base: 100000, tip: 0, fee_allowance: 0 },
+      })
+    )) as Response;
+
+    expect(res.status).toBe(400);
+    expect(res.headers.get("x-refusal")).toBe("1");
+    await expect(res.text()).resolves.toBe(
+      "We couldn't process this donation. Please refresh the page and try again."
+    );
+    expect(donation_put_mock).not.toHaveBeenCalled();
+    expect(create_subscription_mock).not.toHaveBeenCalled();
+  });
+
+  it("sends the largest total paypal takes as a plain decimal string", async () => {
+    await paypal_intent(
+      ctx({
+        frequency: "monthly",
+        amount: { base: 99999, tip: 0, fee_allowance: 0.99 },
+      })
+    );
+
+    expect(create_subscription_mock.mock.calls[0]![0].quantity).toBe(
+      "99999.99"
+    );
   });
 
   it("fails only the frequency whose plan env is unset", async () => {

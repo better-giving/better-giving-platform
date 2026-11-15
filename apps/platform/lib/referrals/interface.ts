@@ -2,6 +2,7 @@ export type TStatus =
   | "pending"
   | "processing"
   | "paid"
+  | "returned"
   | "refunded"
   | "refunded_loss";
 
@@ -37,6 +38,8 @@ export interface IPayout {
   // error or transfer_id; neither on a $0 row recovered as owed
   error?: string;
   transfer_id?: number;
+  /** the wise recipient the transfer paid */
+  recipient_id?: string;
 }
 
 export interface IPayoutLtd {

@@ -212,6 +212,7 @@ export async function settle_npo_payouts(
         amount: total,
         sources: claimed.map((p) => p.source_id),
         status: "",
+        recipient_id: recipient.ref_key,
       });
       const settled = await payouts_move(tx, ids, "processing", {
         type: "settled",

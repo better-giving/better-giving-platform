@@ -3,6 +3,7 @@ import { npo_default_bapp } from "../pg/queries/banking";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { npo_last_return, returned_payouts_resend } from "../pg/queries/payout";
 import { lock_run } from "./owed-run";
+import { type HoldCause, return_hold_cause } from "./return-hold";
 
 export interface IReturnHold {
   /** the npo's latest returned or awaiting-repair settlement: the hold alert dedupes on it */
@@ -16,13 +17,23 @@ export interface IReturnHold {
   reason: string;
 }
 
+const REASONS: Record<HoldCause, string> = {
+  no_account: "no approved account",
+  predates: "the default account predates the returned transfer",
+  unrecorded: "the returned transfer's recipient is not on record",
+  same: "the default account is the one the transfer bounced from",
+};
+
 /**
  * whether the npo's grants are held: its latest transfer came back (returned,
- * or awaiting repair because which payouts are its own is unclear), and the
- * account the grants run pays (`npo_default_bapp`) was not approved or made
- * default since that transfer was sent, so a run would pay the account that
- * bounced. keyed on the settlement, not the payouts: refunding or cancelling
- * the returned payouts leaves it held. null when not held
+ * or awaiting repair because which payouts are its own is unclear), unless
+ * the account the grants run pays (`npo_default_bapp`) is a different wise
+ * recipient from the one that transfer paid and was approved or made default
+ * since it was sent. an edit to the account that bounced changes neither, so
+ * a run would pay it again. a transfer whose recipient is not on record
+ * holds too: the poll stores it from wise. keyed on the settlement, not the
+ * payouts: refunding or cancelling the returned payouts leaves it held. null
+ * when not held
  */
 export async function npo_return_hold(
   npo_id: number,
@@ -37,16 +48,14 @@ export async function npo_return_hold(
     date: last.date,
   } as const;
   const pays_to = await npo_default_bapp(npo_id, db_);
-  if (!pays_to) {
-    return { ...of, reason: "no approved account" };
-  }
-  const since = pays_to.updated_at ?? pays_to.date_created;
-  if (Date.parse(since) <= Date.parse(last.date)) {
-    return {
-      ...of,
-      reason: "the default account predates the returned transfer",
-    };
-  }
+  const cause = return_hold_cause(
+    last,
+    pays_to && {
+      id: String(pays_to.id),
+      since: pays_to.updated_at ?? pays_to.date_created,
+    }
+  );
+  if (cause) return { ...of, reason: REASONS[cause] };
   return null;
 }
 
