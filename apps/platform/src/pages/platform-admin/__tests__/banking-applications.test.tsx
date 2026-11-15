@@ -725,6 +725,7 @@ describe("action edge cases", () => {
       date: sent,
       amount: 100,
       status: "returned",
+      recipient_id: old_id,
     });
     await db.insert(payouts).values(
       ["p-1", "p-2"].map((id) => ({
