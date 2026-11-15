@@ -269,7 +269,10 @@ async function claim(
   nets: boolean
 ) {
   return db.transaction(async (tx) => {
-    if (nets) await lock_referrer_run(tx, referrer.id);
+    // the lock `return_commission_payout` and the re-send take, held before the
+    // hold is read, deductions or not: a return committing between that read and
+    // the claim would otherwise have its account paid
+    await lock_referrer_run(tx, referrer.id);
     // a bounced account is not paid again: what is pending waits, as a held
     // npo's grants do, until the referrer names a different one
     if (to) {

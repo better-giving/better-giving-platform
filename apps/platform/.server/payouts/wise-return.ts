@@ -377,7 +377,7 @@ export async function poll_wise_returns(state_of: TransferState) {
       report_error(err, { settlement_id: s.id });
     }
   }
-  await fill_recipients(since, state_of);
+  await fill_recipients(state_of);
   await poll_commission_returns(state_of);
   // after the returns above, so a slow or large re-send backlog never delays finding them
   await retry_resends();
@@ -385,9 +385,9 @@ export async function poll_wise_returns(state_of: TransferState) {
 
 /** a returned run recorded before its recipient was stored: the transfer
  * still names it, and the npo's hold can't lift without it */
-async function fill_recipients(since: string, state_of: TransferState) {
+async function fill_recipients(state_of: TransferState) {
   try {
-    for (const s of await returned_missing_recipient(since)) {
+    for (const s of await returned_missing_recipient()) {
       try {
         const { recipient } = await read_transfer(state_of, s.id);
         if (recipient) await settlement_recipient_fill(db, s.id, recipient);

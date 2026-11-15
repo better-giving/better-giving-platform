@@ -897,6 +897,37 @@ describe("poll_wise_returns", () => {
     });
   });
 
+  test.each([["returned"], ["awaiting_repair"]])(
+    "a %s run older than the poll window still has its recipient read off the transfer, so its npo's hold can lift",
+    async (status) => {
+      const npo = await seed_npo(0);
+      await seed_settlement(npo.id, "3101", {
+        status,
+        date: "2025-01-01T00:00:00.000Z",
+      });
+      await seed_settlement(npo.id, "3102", {
+        status: "returned",
+        recipient_id: "kept",
+        date: "2025-01-02T00:00:00.000Z",
+      });
+      const lookup = vi.fn(async (id: number) => ({
+        status: "funds_refunded",
+        recipient: `bank-${id}`,
+      }));
+
+      await poll_wise_returns(lookup);
+
+      const rows = Object.fromEntries(
+        (await db().select().from(settlements)).map((s) => [
+          s.id,
+          s.recipient_id,
+        ])
+      );
+      expect(rows).toEqual({ "3101": "bank-3101", "3102": "kept" });
+      expect(lookup.mock.calls.map(([id]) => id)).toEqual([3101]);
+    }
+  );
+
   test("a transfer seen cancelled is polled on, and its money coming back takes the run back", async () => {
     const npo = await seed_npo(500);
     await seed_payout(npo.id, "p-1", 100);

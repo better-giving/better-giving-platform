@@ -335,12 +335,11 @@ export async function settlement_recipient_fill(
     .where(and(eq(settlements.id, id), isNull(settlements.recipient_id)));
 }
 
-/** returned settlements of a real wise transfer dated since `since` whose
- * recipient was never stored (a run from before it was): the poll reads it
- * off the transfer so the npo's return hold can compare accounts */
-export async function returned_missing_recipient(
-  since: string
-): Promise<SettlementRow[]> {
+/** returned or awaiting-repair settlements of a real wise transfer whose
+ * recipient was never stored (a run from before it was), of any age: the hold
+ * refuses every account until it is known, so the poll window does not bound
+ * them. the poll reads it off the transfer */
+export async function returned_missing_recipient(): Promise<SettlementRow[]> {
   return db
     .select()
     .from(settlements)
@@ -348,8 +347,7 @@ export async function returned_missing_recipient(
       and(
         isNotNull(settlements.other_id),
         gt(settlements.amount, 0),
-        gte(settlements.date, since),
-        eq(settlements.status, "returned"),
+        inArray(settlements.status, ["returned", "awaiting_repair"]),
         isNull(settlements.recipient_id)
       )
     )

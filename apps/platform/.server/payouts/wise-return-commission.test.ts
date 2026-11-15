@@ -232,6 +232,83 @@ describe("return_commission_payout", () => {
     expect(locks).toContain(`commission_run:${REFERRER}`);
   });
 
+  test("a commission whose gift was refunded after it was paid is not payable again: it is cancelled and what the referrer owes for it is credited back", async () => {
+    await seed("d-1", 60);
+    await seed("d-2", 40);
+    const { ref } = await sent();
+    // the donor's refund came after the pay-out: the commission stays paid and
+    // the referrer owes it
+    await db().insert(donations).values({
+      id: "don-1",
+      created_at: "2026-08-01T00:00:00.000Z",
+      upusd: 1,
+      status: "refunded",
+      amount_base: 60,
+      amount_tip: 0,
+      amount_fee_allowance: 0,
+      currency: "USD",
+      frequency: "one-time",
+      source: "bg-marketplace",
+      via: "stripe:card",
+    });
+    await db().insert(dists).values({
+      id: "d-1",
+      donation_id: "don-1",
+      status: "refunded",
+      refund_status: "completed",
+      date_created: "2026-08-01T00:00:00.000Z",
+      to_id: npo_id,
+      amount_denom: "USD",
+      net: 60,
+    });
+    const [owed] = await db()
+      .insert(owed_amounts)
+      .values({
+        donation_id: "don-1",
+        referrer_npo: REFERRER,
+        source: "refund",
+        source_ref: "re_don-1",
+        recorded_at: "2026-09-15T00:00:00.000Z",
+        received_usd: 60,
+      })
+      .returning({ id: owed_amounts.id });
+    await db().insert(owed_notices).values({
+      owed_id: owed!.id,
+      kind: "recorded",
+      created_at: "2026-09-15T00:00:00.000Z",
+      sent_at: "2026-09-15T00:00:00.000Z",
+    });
+    const [before] = await owed_for_donation("don-1", db() as never);
+    expect(before?.outstanding_usd).toBe(60);
+
+    const res = await return_commission_payout(ref);
+
+    expect(res).toMatchObject({
+      status: "returned",
+      returned: ["d-2"],
+      loss_credited: ["d-1"],
+    });
+    // d-2 is owed to the referrer again; d-1 can never be paid again
+    expect(await statuses()).toEqual({
+      "d-1": "refunded_loss",
+      "d-2": "returned",
+    });
+    const [after] = await owed_for_donation("don-1", db() as never);
+    expect(after?.outstanding_usd).toBe(0);
+    expect(await pending_earnings(REFERRER)).toBe(40);
+    // a new account re-sends only what is still owed
+    expect(await resend_returned_commissions(REFERRER, { pay_id: 99 })).toEqual(
+      {
+        status: "resent",
+        ids: ["d-2"],
+      }
+    );
+    expect(await statuses()).toEqual({
+      "d-1": "refunded_loss",
+      "d-2": "pending",
+    });
+  });
+
   test("a second detection of the same return changes nothing and tells no one", async () => {
     await seed("d-1", 60);
     const { ref } = await sent();
@@ -398,6 +475,23 @@ describe("poll_commission_returns", () => {
     await db()
       .update(referrer_payouts)
       .set({ recipient_id: null })
+      .where(eq(referrer_payouts.id, ref));
+
+    await poll_commission_returns(async () => ({
+      status: "funds_refunded",
+      recipient: "31",
+    }));
+
+    expect((await payout(ref))?.recipient_id).toBe("31");
+  });
+
+  test("a returned run older than the poll window still has its recipient read off the transfer", async () => {
+    await seed("d-1", 60);
+    const { ref } = await sent();
+    await return_commission_payout(ref);
+    await db()
+      .update(referrer_payouts)
+      .set({ recipient_id: null, date: "2025-01-01T00:00:00.000Z" })
       .where(eq(referrer_payouts.id, ref));
 
     await poll_commission_returns(async () => ({
@@ -643,6 +737,22 @@ describe("resend_returned_commissions", () => {
 
 describe("a referrer on a bounced account", () => {
   const never_pays = vi.fn(async () => 1);
+
+  test.each([[false], [true]])(
+    "the claim reads the hold under the referrer's run lock, the one a return takes (deductions on: %s)",
+    async (on) => {
+      deductions.on = on;
+      await seed("d-1", 60);
+      locks.length = 0;
+
+      await settle_referrer_commissions(
+        { id: REFERRER, pay_min: 0 },
+        { pay_id: PAY_ID, pay: async () => ++next_transfer }
+      );
+
+      expect(locks[0]).toBe(`commission_run:${REFERRER}`);
+    }
+  );
 
   beforeEach(() => never_pays.mockClear());
 

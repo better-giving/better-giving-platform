@@ -10,11 +10,14 @@
  *   detection change nothing. amount, date and transfer_id stay, so the
  *   referrer's history still lists it; `v_referrer_payout_ltd` stops counting it.
  * - commissions the run paid and still `paid`: 'returned', ref kept. they count
- *   in `pending_earnings` again. one refunded another way stays as it is.
+ *   in `pending_earnings` again. one whose gift was refunded after it was paid
+ *   (its dist reversed) stays `paid` through the refund while the referrer owes
+ *   it, so it goes `refunded_loss` instead, never payable again, and is credited
+ *   as below.
  * - owed rows: `unrecover_owed` under the run's ref, as the grants return does.
- * - a commission `refunded_loss` while the transfer was in flight: its referrer
- *   was never paid it, so `credit_unfunded_commissions` credits what the gift's
- *   row counts for it back.
+ * - a commission `refunded_loss`, in flight or as above: its referrer was never
+ *   paid it, so `credit_unfunded_commissions` credits what the gift's row counts
+ *   for it back.
  *
  * fail closed: when G recomputed from the run's commissions disagrees with what
  * the ledger says the run sent (N + R - Q), nothing is written and ops is told
@@ -30,8 +33,10 @@ import { db } from "../pg/db";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { run_netted_usd, unrecover_owed } from "../pg/queries/owed";
 import {
+  commissions_mark_refunded_loss,
   commissions_mark_returned,
   commissions_of_ref_locked,
+  commissions_reversed,
   type ReferrerPayoutRow,
   referrer_last_return,
   referrer_payout_locked,
@@ -115,12 +120,28 @@ async function take_back(
   if (payout_cents([recomputed]) !== payout_cents([ledger])) {
     return { res: { status: "gross_mismatch", recomputed, ledger }, p };
   }
-  const returned = (await commissions_mark_returned(tx, p.id)).map(
-    (c) => c.donation_id
+  // a paid commission whose gift was refunded since is cancelled, not owed to
+  // the referrer again: it stays `paid` after a refund while the referrer owes
+  // it, and the money coming back means nothing was paid to owe it from
+  const reversed = await commissions_reversed(
+    tx,
+    run.filter((c) => c.status === "paid").map((c) => c.donation_id)
   );
-  const losses = run
-    .filter((c) => c.status === "refunded_loss")
-    .map((c) => c.donation_id);
+  const returned = (
+    await commissions_mark_returned(
+      tx,
+      p.id,
+      run
+        .filter((c) => c.status === "paid" && !reversed.has(c.donation_id))
+        .map((c) => c.donation_id)
+    )
+  ).map((c) => c.donation_id);
+  const losses = [
+    ...run
+      .filter((c) => c.status === "refunded_loss")
+      .map((c) => c.donation_id),
+    ...(await commissions_mark_refunded_loss(tx, p.id, [...reversed])),
+  ].sort();
   await referrer_payout_status_set(tx, p.id, p.status, RETURNED);
   if (returned.length === 0 && losses.length === 0) {
     return { res: { status: "nothing_to_return" }, p };
@@ -234,7 +255,7 @@ export async function poll_commission_returns(state_of: TransferState) {
     }
   }
   try {
-    for (const p of await referrer_returned_missing_recipient(since)) {
+    for (const p of await referrer_returned_missing_recipient()) {
       try {
         const { recipient } = await read_transfer(
           state_of,

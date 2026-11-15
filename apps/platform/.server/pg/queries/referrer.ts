@@ -8,6 +8,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  ne,
   notInArray,
   or,
   sql,
@@ -15,6 +16,7 @@ import {
 } from "drizzle-orm";
 import type { ICommission, IPayout, TStatus } from "@/referrals";
 import { db } from "../db";
+import { dists } from "../schema/dist";
 import { referrer_commissions, referrer_payouts } from "../schema/referrer";
 import {
   v_referrer_commissions_ltd,
@@ -348,18 +350,18 @@ export async function referrer_payouts_to_poll(
     .orderBy(asc(referrer_payouts.date), asc(referrer_payouts.id));
 }
 
-/** returned payouts of a real transfer dated since `since` with no recipient
- * stored: the poll reads it off the transfer */
-export async function referrer_returned_missing_recipient(
-  since: string
-): Promise<ReferrerPayoutRow[]> {
+/** returned payouts of a real transfer with no recipient stored, of any age:
+ * the hold refuses every account until it is known, so the poll window does
+ * not bound them. the poll reads it off the transfer */
+export async function referrer_returned_missing_recipient(): Promise<
+  ReferrerPayoutRow[]
+> {
   return db
     .select()
     .from(referrer_payouts)
     .where(
       and(
         isNotNull(referrer_payouts.transfer_id),
-        gte(referrer_payouts.date, since),
         eq(referrer_payouts.status, "returned"),
         isNull(referrer_payouts.recipient_id)
       )
@@ -381,10 +383,26 @@ export async function commissions_of_ref_locked(
   return rows.map(to_commission);
 }
 
-/** the ref's commissions that are paid go `returned`, ref kept; returns those moved */
+/** the donation ids among `ids` whose dist was reversed (refunded or lost):
+ * a commission's `donation_id` is its dist's id */
+export async function commissions_reversed(
+  tx: DbOrTx,
+  ids: string[]
+): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await tx
+    .select({ id: dists.id })
+    .from(dists)
+    .where(and(inArray(dists.id, ids), ne(dists.status, "settled")));
+  return new Set(rows.map((r) => r.id));
+}
+
+/** the ref's commissions that are paid go `returned`, ref kept, those in
+ * `only` when it is given; returns those moved */
 export async function commissions_mark_returned(
   tx: DbOrTx,
-  ref: string
+  ref: string,
+  only?: string[]
 ): Promise<ICommission[]> {
   const rows = await tx
     .update(referrer_commissions)
@@ -392,13 +410,37 @@ export async function commissions_mark_returned(
     .where(
       and(
         eq(referrer_commissions.ref, ref),
-        eq(referrer_commissions.status, "paid")
+        eq(referrer_commissions.status, "paid"),
+        only ? inArray(referrer_commissions.donation_id, only) : undefined
       )
     )
     .returning();
   return rows
     .map(to_commission)
     .sort((a, b) => a.donation_id.localeCompare(b.donation_id));
+}
+
+/** paid commissions `ids` of the ref, whose gift was refunded after they were
+ * paid, go `refunded_loss`, ref kept: never payable again, as one refunded
+ * while its transfer was in flight; returns those moved */
+export async function commissions_mark_refunded_loss(
+  tx: DbOrTx,
+  ref: string,
+  ids: string[]
+): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const rows = await tx
+    .update(referrer_commissions)
+    .set({ status: "refunded_loss" })
+    .where(
+      and(
+        eq(referrer_commissions.ref, ref),
+        eq(referrer_commissions.status, "paid"),
+        inArray(referrer_commissions.donation_id, ids)
+      )
+    )
+    .returning({ id: referrer_commissions.donation_id });
+  return rows.map((r) => r.id).sort();
 }
 
 /** referrers holding returned commissions */
