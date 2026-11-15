@@ -943,6 +943,8 @@ describe("dashboard — payout strip during a return hold", () => {
       date: RETURNED_AT,
       amount: 250,
       status: "returned",
+      // the account that bounced; the old bank filed below is the same one
+      recipient_id: `bank-${npo_id}`,
     });
     await test_db.current!.db.insert(payouts).values({
       id: `p-${npo_id}`,
@@ -1043,13 +1045,19 @@ describe("dashboard — awaiting repair notice", () => {
       date_created: "2026-11-01T15:00:00.000Z",
       updated_at: "2026-11-01T15:00:00.000Z",
     });
-  const settle = (npo_id: number, status: string) =>
+  // `recipient`: the account the transfer bounced from, the old bank by default
+  const settle = (
+    npo_id: number,
+    status: string,
+    recipient = `bank-${npo_id}`
+  ) =>
     test_db.current!.db.insert(settlements).values({
       id: `set-${npo_id}`,
       npo_id,
       date: sent,
       amount: 1250,
       status,
+      recipient_id: recipient,
     });
 
   it("is set, with the amount and date, only for an awaiting_repair hold", async () => {
@@ -1102,7 +1110,7 @@ describe("dashboard — awaiting repair notice", () => {
 
   it("is not set once a newer default account lifts the hold", async () => {
     const npo = await seed_npo();
-    await settle(npo.id, "awaiting_repair");
+    await settle(npo.id, "awaiting_repair", "bank-old");
     await test_db.current!.db.insert(banking_apps).values({
       id: `bank-${npo.id}`,
       npo_id: npo.id,
