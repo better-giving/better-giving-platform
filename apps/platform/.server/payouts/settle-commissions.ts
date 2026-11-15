@@ -11,7 +11,7 @@ import {
   commissions_claim,
   commissions_mark_paid,
   commissions_release,
-  referrer_bounced_recipients,
+  referrer_last_return,
   referrer_payout_put,
 } from "../pg/queries/referrer";
 import {
@@ -23,6 +23,7 @@ import {
 import { owe_takes_of_dists } from "../refund/takes";
 import { net_owed } from "./net-owed";
 import { deduct, lock_run, owed_netting_on, undo_deductions } from "./owed-run";
+import { return_hold_cause } from "./return-hold";
 import type { Pay } from "./settle";
 import {
   NotFundedError,
@@ -41,6 +42,8 @@ export interface ISettleReferrer {
 export interface IReferrerRecipient {
   /** wise recipient account id */
   pay_id: number;
+  /** when that account was approved or made default, for a nonprofit referrer */
+  since?: string;
   pay: Pay;
 }
 
@@ -270,10 +273,11 @@ async function claim(
     // a bounced account is not paid again: what is pending waits, as a held
     // npo's grants do, until the referrer names a different one
     if (to) {
-      const bounced = await referrer_bounced_recipients(referrer.id, tx);
-      if (bounced.recipients.has(String(to.pay_id))) {
-        throw new NotClaimed({ status: "held" });
-      }
+      const last = await referrer_last_return(referrer.id, tx);
+      const cause =
+        last &&
+        return_hold_cause(last, { id: String(to.pay_id), since: to.since });
+      if (cause) throw new NotClaimed({ status: "held" });
     }
     let gross = 0;
     /** set when the claim sends a transfer: the net and who it goes to */

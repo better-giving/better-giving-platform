@@ -414,21 +414,22 @@ export async function referrers_with_returned(): Promise<string[]> {
 }
 
 /**
- * the wise recipients the referrer's returned payouts went to: the accounts
- * that bounced. `unrecorded` is set when a returned payout has no recipient
- * on record. the one notion the commissions run (skip a bounced account) and
- * the re-send (refuse one) both read, so they cannot drift
+ * the referrer's latest returned payout, the transfer whose account bounced:
+ * what `return_hold_cause` compares the account paid now with. the one read
+ * the commissions run (skip a held account) and the re-send both use
  */
-export async function referrer_bounced_recipients(
+export async function referrer_last_return(
   referrer: string,
   db_: DbOrTx = db
-): Promise<{
-  returned: boolean;
-  recipients: Set<string>;
-  unrecorded: boolean;
-}> {
-  const rows = await db_
-    .select({ recipient_id: referrer_payouts.recipient_id })
+): Promise<
+  Pick<ReferrerPayoutRow, "id" | "date" | "recipient_id"> | undefined
+> {
+  const [row] = await db_
+    .select({
+      id: referrer_payouts.id,
+      date: referrer_payouts.date,
+      recipient_id: referrer_payouts.recipient_id,
+    })
     .from(referrer_payouts)
     .where(
       and(
@@ -438,12 +439,10 @@ export async function referrer_bounced_recipients(
         ),
         eq(referrer_payouts.status, "returned")
       )
-    );
-  return {
-    returned: rows.length > 0,
-    recipients: new Set(rows.flatMap((r) => r.recipient_id ?? [])),
-    unrecorded: rows.some((r) => r.recipient_id === null),
-  };
+    )
+    .orderBy(desc(referrer_payouts.date), desc(referrer_payouts.id))
+    .limit(1);
+  return row;
 }
 
 /** the referrer's returned commissions go back to pending, ref cleared, to be

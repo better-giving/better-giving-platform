@@ -448,7 +448,9 @@ describe("resend_returned_commissions", () => {
   test("the same payout account keeps them returned", async () => {
     await returned_run();
 
-    expect(await resend_returned_commissions(REFERRER, PAY_ID)).toEqual({
+    expect(
+      await resend_returned_commissions(REFERRER, { pay_id: PAY_ID })
+    ).toEqual({
       status: "held",
       reason: "the payout account is the one the transfer bounced from",
     });
@@ -471,7 +473,9 @@ describe("resend_returned_commissions", () => {
       .set({ recipient_id: null })
       .where(eq(referrer_payouts.id, ref));
 
-    expect(await resend_returned_commissions(REFERRER, 99)).toMatchObject({
+    expect(
+      await resend_returned_commissions(REFERRER, { pay_id: 99 })
+    ).toMatchObject({
       status: "held",
     });
   });
@@ -479,18 +483,22 @@ describe("resend_returned_commissions", () => {
   test("a different payout account puts them back to pending, once, under the run lock", async () => {
     await returned_run();
 
-    expect(await resend_returned_commissions(REFERRER, 99)).toEqual({
-      status: "resent",
-      ids: ["d-1", "d-2"],
-    });
+    expect(await resend_returned_commissions(REFERRER, { pay_id: 99 })).toEqual(
+      {
+        status: "resent",
+        ids: ["d-1", "d-2"],
+      }
+    );
     expect(await statuses()).toEqual({ "d-1": "pending", "d-2": "pending" });
     expect(
       (await db().select().from(referrer_commissions)).map((c) => c.ref)
     ).toEqual([null, null]);
     expect(locks).toEqual([`commission_run:${REFERRER}`]);
-    expect(await resend_returned_commissions(REFERRER, 99)).toEqual({
-      status: "none",
-    });
+    expect(await resend_returned_commissions(REFERRER, { pay_id: 99 })).toEqual(
+      {
+        status: "none",
+      }
+    );
   });
 
   // the referrer never had the money, so the refund owes them nothing and the
@@ -539,10 +547,12 @@ describe("resend_returned_commissions", () => {
     );
     expect(refund.owed).toEqual([]);
 
-    expect(await resend_returned_commissions(REFERRER, 99)).toEqual({
-      status: "resent",
-      ids: ["d-2"],
-    });
+    expect(await resend_returned_commissions(REFERRER, { pay_id: 99 })).toEqual(
+      {
+        status: "resent",
+        ids: ["d-2"],
+      }
+    );
     expect(await statuses()).toEqual({ "d-1": "refunded", "d-2": "pending" });
     expect(await pending_earnings(REFERRER)).toBe(40);
     const run = await settle_referrer_commissions(
@@ -555,18 +565,74 @@ describe("resend_returned_commissions", () => {
     expect(await owed_for_donation("don-1", db() as any)).toEqual([]);
   });
 
+  test("a nonprofit referrer's account approved before the bounce stays held, one approved after it is re-sent", async () => {
+    const ref = await returned_run();
+    const [row] = await db()
+      .select()
+      .from(referrer_payouts)
+      .where(eq(referrer_payouts.id, ref));
+    const bounced_at = row!.date;
+    const before = new Date(Date.parse(bounced_at) - 1000).toISOString();
+    const after = new Date(Date.parse(bounced_at) + 1000).toISOString();
+
+    expect(
+      await resend_returned_commissions(REFERRER, { pay_id: 99, since: before })
+    ).toEqual({
+      status: "held",
+      reason: "the payout account predates the returned transfer",
+    });
+    expect(await statuses()).toEqual({ "d-1": "returned", "d-2": "returned" });
+
+    // the account that bounced, approved again after it: still the same recipient
+    expect(
+      await resend_returned_commissions(REFERRER, {
+        pay_id: PAY_ID,
+        since: after,
+      })
+    ).toMatchObject({ status: "held" });
+
+    expect(
+      await resend_returned_commissions(REFERRER, { pay_id: 99, since: after })
+    ).toEqual({ status: "resent", ids: ["d-1", "d-2"] });
+  });
+
+  test("the commissions run holds a nonprofit referrer's account approved before the bounce", async () => {
+    await seed("d-1", 60);
+    const first = await sent(PAY_ID);
+    await return_commission_payout(first.ref);
+    const [row] = await db()
+      .select()
+      .from(referrer_payouts)
+      .where(eq(referrer_payouts.id, first.ref));
+    await seed("d-2", 70);
+
+    const held = await settle_referrer_commissions(
+      { id: REFERRER, pay_min: 0 },
+      {
+        pay_id: 99,
+        since: new Date(Date.parse(row!.date) - 1000).toISOString(),
+        pay: async () => ++next_transfer,
+      }
+    );
+
+    expect(held).toEqual({ status: "held" });
+    expect(await statuses()).toEqual({ "d-1": "returned", "d-2": "pending" });
+  });
+
   test("a referrer with nothing returned has nothing to re-send", async () => {
     await seed("d-1", 60);
 
-    expect(await resend_returned_commissions(REFERRER, 99)).toEqual({
-      status: "none",
-    });
+    expect(await resend_returned_commissions(REFERRER, { pay_id: 99 })).toEqual(
+      {
+        status: "none",
+      }
+    );
   });
 
   test("the sweep re-sends for each referrer on a new account, and tells ops", async () => {
     await returned_run();
 
-    await resend_all_returned_commissions(async () => 99);
+    await resend_all_returned_commissions(async () => ({ pay_id: 99 }));
 
     expect(await statuses()).toEqual({ "d-1": "pending", "d-2": "pending" });
     const [alert] = send_alert.mock.calls[0]!;
@@ -606,24 +672,52 @@ describe("a referrer on a bounced account", () => {
     expect(await statuses()).toEqual({ "d-1": "returned", "d-2": "paid" });
   });
 
-  test("two bounced runs from accounts A and B: on B both stay returned, on C both are re-sent", async () => {
+  test("bounced on A, then on B: B stays held, and switching back to A is a different account than the latest bounce, so it is re-sent", async () => {
     await seed("d-1", 60);
-    await return_commission_payout((await sent(PAY_ID)).ref);
+    const first = await sent(PAY_ID);
+    await return_commission_payout(first.ref);
     await seed("d-2", 40);
-    await return_commission_payout((await sent(77)).ref);
+    const second = await sent(77);
+    await return_commission_payout(second.ref);
+    await db()
+      .update(referrer_payouts)
+      .set({ date: "2026-10-01T00:00:00.000Z" })
+      .where(eq(referrer_payouts.id, first.ref));
+    await db()
+      .update(referrer_payouts)
+      .set({ date: "2026-10-10T00:00:00.000Z" })
+      .where(eq(referrer_payouts.id, second.ref));
     expect(await statuses()).toEqual({ "d-1": "returned", "d-2": "returned" });
 
-    expect(await resend_returned_commissions(REFERRER, PAY_ID)).toMatchObject({
-      status: "held",
-    });
-    expect(await resend_returned_commissions(REFERRER, 77)).toMatchObject({
+    expect(
+      await resend_returned_commissions(REFERRER, { pay_id: 77 })
+    ).toMatchObject({
       status: "held",
     });
     expect(await statuses()).toEqual({ "d-1": "returned", "d-2": "returned" });
 
-    expect(await resend_returned_commissions(REFERRER, 99)).toEqual({
+    expect(
+      await resend_returned_commissions(REFERRER, { pay_id: PAY_ID })
+    ).toEqual({
       status: "resent",
       ids: ["d-1", "d-2"],
     });
+  });
+
+  test("bounced on A, then a different account B is the one paid: not held, and what bounced on A is paid to B", async () => {
+    await seed("d-1", 60);
+    await return_commission_payout((await sent(PAY_ID)).ref);
+
+    expect(await resend_returned_commissions(REFERRER, { pay_id: 99 })).toEqual(
+      {
+        status: "resent",
+        ids: ["d-1"],
+      }
+    );
+    const paid = await settle_referrer_commissions(
+      { id: REFERRER, pay_min: 0 },
+      { pay_id: 99, pay: async () => ++next_transfer }
+    );
+    expect(paid.status).toBe("paid");
   });
 });

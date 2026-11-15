@@ -33,7 +33,7 @@ import {
   commissions_mark_returned,
   commissions_of_ref_locked,
   type ReferrerPayoutRow,
-  referrer_bounced_recipients,
+  referrer_last_return,
   referrer_payout_locked,
   referrer_payout_recipient_fill,
   referrer_payout_referrer,
@@ -45,6 +45,7 @@ import {
 } from "../pg/queries/referrer";
 import { credit_unfunded_commissions, referrer_of } from "../refund/commission";
 import { lock_run } from "./owed-run";
+import { type HoldCause, return_hold_cause } from "./return-hold";
 import { payout_cents, payout_total } from "./transfer";
 import {
   alert,
@@ -255,53 +256,57 @@ export type CommissionResend =
   | { status: "resent"; ids: string[] }
   | { status: "held"; reason: string };
 
+/** the payout account a referrer has now: its wise recipient id, and for a
+ * nonprofit referrer when that account was approved or made default */
+export interface IPayAccount {
+  pay_id: number;
+  since?: string;
+}
+
+const REASONS: Record<HoldCause, string> = {
+  no_account: "no payout account",
+  predates: "the payout account predates the returned transfer",
+  unrecorded: "the returned transfer's recipient is not on record",
+  same: "the payout account is the one the transfer bounced from",
+};
+
 /**
- * a referrer's returned commissions go back to pending once the payout
- * account they have now is a different wise recipient from every one their
- * returned transfers bounced from (each on record); until then they stay
- * `returned`. a repeat moves nothing. under the referrer's run lock, which the
- * return takes too
+ * a referrer's returned commissions go back to pending on the nonprofit hold's
+ * rule (`return_hold_cause`): the payout account now is a different wise
+ * recipient from the latest returned transfer's, approved or made default
+ * after it; until then they stay `returned`. a repeat moves nothing. under the
+ * referrer's run lock, which the return takes too
  */
 export async function resend_returned_commissions(
   referrer: string,
-  pay_id: number | undefined
+  pays_to: IPayAccount | undefined
 ): Promise<CommissionResend> {
   return db.transaction(async (tx): Promise<CommissionResend> => {
     await lock_run(tx, `commission_run:${referrer}`);
-    const bounced = await referrer_bounced_recipients(referrer, tx);
-    if (!bounced.returned) return { status: "none" };
-    if (pay_id === undefined) {
-      return { status: "held", reason: "no payout account" };
-    }
-    if (bounced.unrecorded) {
-      return {
-        status: "held",
-        reason: "a returned transfer's recipient is not on record",
-      };
-    }
-    if (bounced.recipients.has(String(pay_id))) {
-      return {
-        status: "held",
-        reason: "the payout account is the one the transfer bounced from",
-      };
-    }
+    const last = await referrer_last_return(referrer, tx);
+    if (!last) return { status: "none" };
+    const cause = return_hold_cause(
+      last,
+      pays_to && { id: String(pays_to.pay_id), since: pays_to.since }
+    );
+    if (cause) return { status: "held", reason: REASONS[cause] };
     const ids = await returned_commissions_resend(tx, referrer);
     return ids.length > 0 ? { status: "resent", ids } : { status: "none" };
   });
 }
 
 /** every referrer holding returned commissions is asked to re-send them, with
- * the payout account `pay_id_of` finds for them now; a failure is reported and
+ * the payout account `pay_of` finds for them now; a failure is reported and
  * the commissions stay `returned` for the next run */
 export async function resend_all_returned_commissions(
-  pay_id_of: (referrer: string) => Promise<number | undefined>
+  pay_of: (referrer: string) => Promise<IPayAccount | undefined>
 ) {
   try {
     for (const referrer of await referrers_with_returned()) {
       try {
         const res = await resend_returned_commissions(
           referrer,
-          await pay_id_of(referrer)
+          await pay_of(referrer)
         );
         if (res.status !== "resent") continue;
         await alert({

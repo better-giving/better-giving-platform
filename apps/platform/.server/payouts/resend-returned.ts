@@ -3,6 +3,7 @@ import { npo_default_bapp } from "../pg/queries/banking";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { npo_last_return, returned_payouts_resend } from "../pg/queries/payout";
 import { lock_run } from "./owed-run";
+import { type HoldCause, return_hold_cause } from "./return-hold";
 
 export interface IReturnHold {
   /** the npo's latest returned or awaiting-repair settlement: the hold alert dedupes on it */
@@ -15,6 +16,13 @@ export interface IReturnHold {
   date: string;
   reason: string;
 }
+
+const REASONS: Record<HoldCause, string> = {
+  no_account: "no approved account",
+  predates: "the default account predates the returned transfer",
+  unrecorded: "the returned transfer's recipient is not on record",
+  same: "the default account is the one the transfer bounced from",
+};
 
 /**
  * whether the npo's grants are held: its latest transfer came back (returned,
@@ -40,28 +48,14 @@ export async function npo_return_hold(
     date: last.date,
   } as const;
   const pays_to = await npo_default_bapp(npo_id, db_);
-  if (!pays_to) {
-    return { ...of, reason: "no approved account" };
-  }
-  const since = pays_to.updated_at ?? pays_to.date_created;
-  if (Date.parse(since) <= Date.parse(last.date)) {
-    return {
-      ...of,
-      reason: "the default account predates the returned transfer",
-    };
-  }
-  if (last.recipient_id === null) {
-    return {
-      ...of,
-      reason: "the returned transfer's recipient is not on record",
-    };
-  }
-  if (String(pays_to.id) === last.recipient_id) {
-    return {
-      ...of,
-      reason: "the default account is the one the transfer bounced from",
-    };
-  }
+  const cause = return_hold_cause(
+    last,
+    pays_to && {
+      id: String(pays_to.id),
+      since: pays_to.updated_at ?? pays_to.date_created,
+    }
+  );
+  if (cause) return { ...of, reason: REASONS[cause] };
   return null;
 }
 
