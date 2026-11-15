@@ -49,7 +49,7 @@ export const v_donation_total_usd = pgView("v_donation_total_usd", {
 );
 
 // lifetime payouts per referrer. a row with `error` is a failed attempt kept
-// for the referrer's history — no money moved. a returned transfer's money came
+// for the referrer's history, no money moved. a returned transfer's money came
 // back, so it is not paid either
 export const v_referrer_payout_ltd = pgView("v_referrer_payout_ltd", {
   referrer: text("referrer"),
