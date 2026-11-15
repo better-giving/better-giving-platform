@@ -13,7 +13,13 @@ vi.mock("$/kit/stripe", () => ({
     setupIntents: { create: si_create_mock },
   },
 }));
-vi.mock("#/.server/unit-per-usd", () => ({ unit_per_usd: async () => 1 }));
+const rates = vi.hoisted(
+  () =>
+    ({ NZD: 1.78, EUR: 0.92, PHP: 58.5, CAD: 1.37 }) as Record<string, number>
+);
+vi.mock("#/.server/unit-per-usd", () => ({
+  unit_per_usd: async (c: string) => rates[c.toUpperCase()] ?? 1,
+}));
 vi.mock("./customer-with-currency", () => ({
   customer_with_currency: async () => "cus_1",
 }));
@@ -32,8 +38,9 @@ vi.mock("$/env", async (importOriginal) => {
   };
 });
 const donation_update_mock = vi.hoisted(() => vi.fn());
+const donation_put_mock = vi.hoisted(() => vi.fn());
 vi.mock("$/pg/queries/donation", () => ({
-  donation_put: async (_db: unknown, r: unknown) => r,
+  donation_put: donation_put_mock,
   donation_update: donation_update_mock,
 }));
 
@@ -66,7 +73,44 @@ const stripe_refusal = (code: string, message: string) =>
 beforeEach(() => {
   vi.clearAllMocks();
   donation_update_mock.mockResolvedValue({});
+  donation_put_mock.mockImplementation(async (_db: unknown, r: unknown) => r);
   routing.on = false;
+});
+
+// the row is what every later renewal clones, so it carries the charged
+// currency and that currency's units per usd, never usd at 1
+describe("stripe_intent stored currency and rate", () => {
+  beforeEach(() => {
+    pi_create_mock.mockResolvedValue({ client_secret: "pi_secret" });
+    si_create_mock.mockResolvedValue({ client_secret: "seti_secret" });
+  });
+
+  it.each([
+    ["NZD", "card", "one-time", 1.78],
+    ["NZD", "card", "monthly", 1.78],
+    ["EUR", "bank", "one-time", 0.92],
+    ["PHP", "card", "one-time", 58.5],
+    ["CAD", "bank", "one-time", 1.37],
+  ] as const)(
+    "%s over %s, %s: stored as that currency at %s per usd",
+    async (currency, via, frequency, rate) => {
+      await stripe_intent(
+        ctx(
+          {
+            currency,
+            frequency,
+            amount: { base: 10_000, tip: 0, fee_allowance: 0 },
+          },
+          via
+        )
+      );
+
+      expect(donation_put_mock.mock.calls[0]![1]).toMatchObject({
+        currency,
+        upusd: rate,
+      });
+    }
+  );
 });
 
 describe("stripe_intent refusals", () => {

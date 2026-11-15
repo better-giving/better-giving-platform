@@ -633,6 +633,24 @@ describe("nowpayments ipn settlement", () => {
       ...o,
     });
 
+  it("a settled coin donation and its repeated deposit stay in the coin, at its rate, never usdc at 1", async () => {
+    await seed_donation();
+    await deliver(payment());
+    await deliver(child());
+
+    const rows = await settlements();
+    const parent = (await donation_get(ORDER_ID))!;
+    const clone = (await donation_get(
+      rows.find((r) => r.sttl_id === "5002")!.donation_id
+    ))!;
+    for (const don of [parent, clone]) {
+      expect(don.currency).toBe("ETH");
+      expect(don.upusd).toBeCloseTo(1 / usd_rates.eth);
+      expect(don.upusd).not.toBe(1);
+    }
+    expect(clone.amount.base).toBeCloseTo(0.2);
+  });
+
   it("settles a repeated deposit as its own donation, leaving the parent intact", async () => {
     await seed_donation();
     await deliver(payment());

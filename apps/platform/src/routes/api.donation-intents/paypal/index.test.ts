@@ -58,6 +58,33 @@ beforeEach(() => {
   create_order_mock.mockResolvedValue({ id: "ORDER-1" });
 });
 
+describe("paypal_intent stored currency and rate", () => {
+  it.each([
+    ["GBP", 0.79],
+    ["PLN", 4.05],
+    ["EUR", 0.92],
+  ])(
+    "a one-time %s gift is stored as %s at %s per usd, not usd at 1",
+    async (currency, rate) => {
+      upusd.v = rate;
+
+      await paypal_intent(
+        ctx({
+          currency,
+          amount: { base: 25, tip: 0, fee_allowance: 0 },
+          source: "bg-widget",
+        })
+      );
+
+      expect(donation_put_mock.mock.calls[0]![1]).toMatchObject({
+        currency,
+        upusd: rate,
+        source: "bg-widget",
+      });
+    }
+  );
+});
+
 describe("paypal_intent currency", () => {
   it("answers a currency paypal can't take with a 400, writing nothing", async () => {
     const res = (await paypal_intent(ctx({ currency: "NGN" }))) as Response;
