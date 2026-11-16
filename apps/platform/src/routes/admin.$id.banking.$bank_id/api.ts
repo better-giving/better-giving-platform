@@ -7,6 +7,7 @@ import { msg } from "@/queue";
 import { $int_gte1 } from "@/schemas";
 import { enqueue } from "$/kit/queue";
 import { wise } from "$/kit/wise";
+import { is_own_recipient } from "$/payouts/own-accounts";
 import { bapp_get, bapp_set_default } from "$/pg/queries/banking";
 import type { Route } from "./+types/route";
 
@@ -23,7 +24,18 @@ export const loader = async (args: Route.LoaderArgs) => {
   // uploaded bank statement, Delete and Set Default are all ours. neither action
   // reads the account, so both stay live — the page just can't show the numbers.
   const y = await wise.v2_account(bank_id).catch(report_degraded_null);
-  return { ...(y ?? {}), id: bank_id, ba: x, wacc_unavailable: !y };
+  // true only on a confirmed match: a failed check shows the member nothing,
+  // since there is nothing for them to act on
+  const own_account = y
+    ? (await is_own_recipient(y).catch(report_degraded_null)) === true
+    : false;
+  return {
+    ...(y ?? {}),
+    id: bank_id,
+    ba: x,
+    wacc_unavailable: !y,
+    own_account,
+  };
 };
 
 export const default_action = async (args: Route.ActionArgs) => {

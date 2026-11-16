@@ -2,6 +2,7 @@ import { Badge, Breadcrumb, ExtLink } from "@better-giving/ui";
 import { CircleAlert, SquareArrowOutUpRight } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { href, NavLink, Outlet, useFetcher } from "react-router";
+import { WarningCallout } from "#/components/warning-callout";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
 import { doc_href } from "@/docs";
 import type { Route } from "./+types/route";
@@ -44,10 +45,24 @@ export default function Page({ loaderData: d, params }: Route.ComponentProps) {
       </div>
 
       {is_rejected && (
-        <p className="text-sm text-destructive-subtle-fg my-2">
-          <CircleAlert className="relative inline bottom-px mr-1" />
+        <p className="flex items-start gap-1.5 text-sm text-destructive-subtle-fg my-2">
+          {/* a one-line box, so the icon sits on the reason's first line */}
+          <span className="inline-flex items-center h-[1lh] shrink-0">
+            <CircleAlert className="icon-sm" aria-hidden />
+          </span>
           <span>{d.ba.rejection_reason}</span>
         </p>
+      )}
+
+      {d.own_account && (
+        <WarningCallout
+          title="This matches a Better Giving bank account"
+          classes="mb-2"
+        >
+          Payouts sent here may not reach your nonprofit. If you entered it by
+          mistake, add your own bank account instead. Otherwise no action is
+          needed.
+        </WarningCallout>
       )}
 
       <dl className="grid sm:grid-cols-[auto_auto_1fr] bg-card rounded-card border border-hairline mt-2">

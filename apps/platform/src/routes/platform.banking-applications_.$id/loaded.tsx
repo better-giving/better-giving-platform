@@ -47,10 +47,16 @@ export function Loaded(props: LoaderData) {
       </div>
 
       {props.own_account && (
-        <WarningCallout title="This is Better Giving's own bank account">
+        <WarningCallout title="This matches one of Better Giving's own bank accounts">
           {prev_verdict
-            ? "Payouts to it never reach the nonprofit."
-            : "Payouts to it never reach the nonprofit, so it can't be approved."}
+            ? "Payouts to it may not reach the nonprofit."
+            : "Payouts to it may not reach the nonprofit. You can still approve it."}
+        </WarningCallout>
+      )}
+      {props.own_account_unknown && !prev_verdict && (
+        <WarningCallout title="We couldn't check this account against Better Giving's own accounts">
+          It may be one of ours. Reload to try again, or approve it if you've
+          confirmed it's the nonprofit's own account.
         </WarningCallout>
       )}
 

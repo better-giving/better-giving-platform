@@ -45,13 +45,34 @@ describe("banking application detail loader", () => {
   it("flags an account that is one of Better Giving's own", async () => {
     own.is_own_recipient.mockResolvedValue(true);
 
-    expect((await call()).own_account).toBe(true);
+    const d = await call();
+    expect(d.own_account).toBe(true);
+    expect(d.own_account_unknown).toBe(false);
   });
 
-  it("reads an account it can't check against ours as not flagged", async () => {
+  it("reads an account it can't check against ours as unknown, not as a match", async () => {
     own.is_own_recipient.mockRejectedValue(new Error("account-details 503"));
 
-    expect((await call()).own_account).toBe(false);
+    const d = await call();
+    expect(d.own_account).toBe(false);
+    expect(d.own_account_unknown).toBe(true);
+  });
+
+  it("flags an account that isn't one of ours as false", async () => {
+    own.is_own_recipient.mockResolvedValue(false);
+
+    const d = await call();
+    expect(d.own_account).toBe(false);
+    expect(d.own_account_unknown).toBe(false);
+  });
+
+  it("an account wise could not return is neither a match nor unknown", async () => {
+    wise.v2_account.mockRejectedValue(new Error("wise down"));
+
+    const d = await call();
+    expect(d.wacc_unavailable).toBe(true);
+    expect(d.own_account).toBe(false);
+    expect(d.own_account_unknown).toBe(false);
   });
 
   it("names the application's nonprofit, and leaves the name out when its row is gone", async () => {

@@ -36,13 +36,6 @@ export function is_own_account(
   return recipient_ids(r).some((id) => ours.has(id));
 }
 
-/** approving a nonprofit's bank account that is one of ours */
-export const OWN_ACCOUNT_REFUSAL =
-  "This bank account belongs to Better Giving, so it can't receive the nonprofit's payouts.";
-/** approving one whose check failed: approval fails closed */
-export const OWN_LOOKUP_REFUSAL =
-  "We couldn't check this bank account against Better Giving's own accounts. Try again in a few minutes.";
-
 // our account details change when ops opens a balance, not per payout
 const TTL_MS = 60 * 60 * 1000;
 
@@ -64,7 +57,8 @@ function own_account_details(): Promise<AccountDetails[]> {
 }
 
 /** whether paying `r` pays one of our own wise balances. rejects when our
- * details can't be read: callers refuse rather than guess */
+ * details can't be read. callers only warn on it, never refuse: a match or a
+ * failed check is shown to staff or sent to ops, and the money goes ahead */
 export async function is_own_recipient(r: V2RecipientAccount) {
   return is_own_account(r, await own_account_details());
 }

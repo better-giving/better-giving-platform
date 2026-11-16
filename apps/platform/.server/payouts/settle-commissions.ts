@@ -23,11 +23,11 @@ import {
 import { owe_takes_of_dists } from "../refund/takes";
 import { net_owed } from "./net-owed";
 import { deduct, lock_run, owed_netting_on, undo_deductions } from "./owed-run";
+import { type IPayWarning, send_pay_warning, warning_of } from "./pay-warning";
 import { return_hold_cause } from "./return-hold";
 import type { Pay } from "./settle";
 import {
   NotFundedError,
-  PayRefused,
   payout_total,
   recovered_run_ref,
   transfer_ref,
@@ -113,8 +113,11 @@ export async function settle_referrer_commissions(
   const ctx = { referrer: referrer.id, ref, donation_ids: ids };
 
   let transfer_id: string;
+  let warning: IPayWarning | undefined;
   try {
-    transfer_id = String(await recipient.pay(ref, total));
+    const result = await recipient.pay(ref, total);
+    transfer_id = String(typeof result === "object" ? result.id : result);
+    warning = typeof result === "object" ? result.warning : undefined;
   } catch (err) {
     await error_row(referrer.id, total);
     if (err instanceof NotFundedError) {
@@ -168,13 +171,6 @@ export async function settle_referrer_commissions(
         });
         return { status: "unreleased", ref };
       }
-      if (err.cause instanceof PayRefused) {
-        await alert({
-          title: `commission payout refused for ${referrer.id}`,
-          body: `${err.cause.message}. no money moved; the commissions are back to pending. customerTransactionId ${ref}`,
-          fields,
-        });
-      }
       if (not_released.length > 0) {
         await alert({
           title: `commission refunded in flight, not funded, ${referrer.id}`,
@@ -210,6 +206,8 @@ export async function settle_referrer_commissions(
       ].join("\n"),
       fields,
     });
+    // after our own alert: a warning that rode on the throw (an own-account warning)
+    await send_pay_warning(warning_of(err));
     return { status: "fund_unknown", ref };
   }
 
@@ -240,6 +238,7 @@ export async function settle_referrer_commissions(
           ? fields
           : [...fields, { name: "gross", value: gross.toString() }],
     });
+    await send_pay_warning(warning);
     return { status: "unrecorded", ref, transfer_id };
   }
   // a refund or dispute recorded while a commission was pending owed nothing for it
@@ -252,6 +251,8 @@ export async function settle_referrer_commissions(
       fields: [...fields, { name: "refunded", value: unpaid.join(", ") }],
     });
   }
+  // last, and unable to throw: the payout is already recorded
+  await send_pay_warning(warning);
   return { status: "paid", ref, total, transfer_id };
 }
 

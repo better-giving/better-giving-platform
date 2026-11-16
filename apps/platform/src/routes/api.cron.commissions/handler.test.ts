@@ -37,21 +37,11 @@ const wise = vi.hoisted(() => {
     by_ref,
     by_id,
     v2_account: vi.fn(async () => ({ currency: "USD" })),
-    // fee-free balance option: the transfer sends the whole quoted amount
     quote: vi.fn(async (_: string, q: { sourceAmount: number }) => ({
       id: `q-${q.sourceAmount}`,
       sourceAmount: q.sourceAmount,
       sourceCurrency: "USD",
       payOut: "BANK_TRANSFER",
-      paymentOptions: [
-        {
-          disabled: false,
-          payIn: "BALANCE",
-          payOut: "BANK_TRANSFER",
-          sourceAmount: q.sourceAmount,
-          fee: { total: 0 },
-        },
-      ],
     })),
     // none of ours: no recipient here is one of our own balances
     account_details: vi.fn(async () => []),
@@ -66,7 +56,6 @@ const wise = vi.hoisted(() => {
         const created = {
           id: 9000 + by_ref.size,
           status: "incoming_payment_waiting",
-          sourceValue: Number(t.quoteUuid.slice(2)),
         };
         by_ref.set(t.customerTransactionId, created);
         by_id.set(created.id, created);
@@ -296,28 +285,34 @@ describe("commissions cron", () => {
     expect(await statuses()).toEqual({ "d-1": "paid" });
   });
 
-  test("a payout wise prices off the total is refused before any transfer: back to pending, nothing paid, ops told", async () => {
+  test("a payout to one of our own wise accounts is paid as normal, and ops is warned", async () => {
     await seed("d-1", 60);
-    wise.quote.mockImplementationOnce(async (_, q) => ({
-      id: "q-off",
-      sourceAmount: q.sourceAmount + 1,
-      sourceCurrency: "USD",
-      payOut: "BANK_TRANSFER",
-      paymentOptions: [],
-    }));
+    wise.v2_account.mockResolvedValueOnce({
+      currency: "USD",
+      ownedByCustomer: true,
+      name: { fullName: "Better Giving Inc" },
+    } as never);
+    const at_warning: Record<string, string>[] = [];
+    send_alert.mockImplementation(async (a: { title: string }) => {
+      if (a.title.startsWith("payout to one of"))
+        at_warning.push(await statuses());
+    });
 
     await index();
 
-    expect(wise.transfer).not.toHaveBeenCalled();
-    expect(await statuses()).toEqual({ "d-1": "pending" });
-    // only the failure row: nothing recorded as paid
-    expect(
-      (await db().select().from(referrer_payouts)).map((p) => p.error)
-    ).toEqual(["Failed to process commission"]);
-    const refused = send_alert.mock.calls
+    // recorded first: the commission is already paid when the alert goes out
+    expect(at_warning).toEqual([{ "d-1": "paid" }]);
+
+    expect(wise.transfer).toHaveBeenCalledOnce();
+    expect(wise.fund_transfer).toHaveBeenCalledOnce();
+    expect(await statuses()).toEqual({ "d-1": "paid" });
+    const warned = send_alert.mock.calls
       .map(([a]) => a)
-      .find((a) => a.title === `commission payout refused for ${REFERRER}`);
-    expect(refused?.fields).toEqual(
+      .filter(
+        (a) => a.title === "payout to one of Better Giving's own Wise accounts"
+      );
+    expect(warned).toHaveLength(1);
+    expect(warned[0]!.fields).toEqual(
       expect.arrayContaining([{ name: "recipient", value: "42" }])
     );
   });

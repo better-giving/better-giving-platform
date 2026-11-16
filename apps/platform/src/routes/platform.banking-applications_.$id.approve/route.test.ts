@@ -143,25 +143,39 @@ describe("the approve submit, posted around the page", () => {
     expect(q.bapp_update_status).toHaveBeenCalled();
   });
 
-  it("refuses with 409 and writes nothing when the account is one of Better Giving's own", async () => {
+  it.each([
+    [
+      "is one of Better Giving's own",
+      () => own.is_own_recipient.mockResolvedValue(true),
+    ],
+    [
+      "can't be checked against ours",
+      () =>
+        own.is_own_recipient.mockRejectedValue(
+          new Error("account-details 503")
+        ),
+    ],
+  ])(
+    "approves an account that %s: it is warned about, never refused",
+    async (_name, arrange) => {
+      q.bapp_get.mockResolvedValue(bapp("under-review"));
+      q.bapp_approve.mockResolvedValue({ status: "under-review" });
+      arrange();
+
+      await submit("approved");
+
+      expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7, {
+        as_default: false,
+      });
+      expect(queue.enqueue).toHaveBeenCalled();
+    }
+  );
+
+  it("opens the approve prompt for an account that is one of our own", async () => {
     q.bapp_get.mockResolvedValue(bapp("under-review"));
     own.is_own_recipient.mockResolvedValue(true);
 
-    const r: unknown = await submit("approved").catch((e: unknown) => e);
-
-    expect((r as Response).status).toBe(409);
-    expect(await (r as Response).text()).toMatch(/belongs to Better Giving/);
-    expect(q.bapp_approve).not.toHaveBeenCalled();
-  });
-
-  it("refuses with 409 and writes nothing when our own accounts can't be read", async () => {
-    q.bapp_get.mockResolvedValue(bapp("under-review"));
-    own.is_own_recipient.mockRejectedValue(new Error("account-details 503"));
-
-    const r: unknown = await submit("approved").catch((e: unknown) => e);
-
-    expect((r as Response).status).toBe(409);
-    expect(q.bapp_approve).not.toHaveBeenCalled();
+    expect(await redirected_to()).toBeNull();
   });
 });
 

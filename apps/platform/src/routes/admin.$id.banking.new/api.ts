@@ -36,13 +36,12 @@ export const action: ActionFunction = async (args) => {
   const wacc = await wise
     .v2_account(+x.wiseRecipientID)
     .catch(report_degraded_null);
-  // a failed lookup files it anyway: approval and every payout check again
-  if (wacc && (await is_own_recipient(wacc).catch(report_degraded_null))) {
-    return resp.fail(
-      409,
-      "This bank account belongs to Better Giving and can't receive your payouts. Add your nonprofit's own bank account."
-    );
-  }
+  // an account that matches one of ours is filed all the same: the page the
+  // member lands on says so, and nothing is rejected over it. a check that
+  // could not run says nothing to the member; staff see it at approval
+  const own = wacc
+    ? await is_own_recipient(wacc).catch(report_degraded_null)
+    : null;
 
   const count = await npo_bapp_count(npo_id);
   const filed =
@@ -80,7 +79,9 @@ export const action: ActionFunction = async (args) => {
   await enqueue(msg("banking-new", { npo_id }));
 
   return redirectWithSuccess(
-    `../${routes.banking}`,
+    own === true
+      ? `../${routes.banking}/${x.wiseRecipientID}`
+      : `../${routes.banking}`,
     "Banking application submitted"
   );
 };

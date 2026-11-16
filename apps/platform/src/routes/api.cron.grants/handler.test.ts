@@ -44,29 +44,18 @@ vi.mock("$/kit/slack", () => ({ aws_monitor: { send_alert } }));
 // replaces `wise_pay_mock`'s implementation
 const wise = vi.hoisted(() => ({
   v2_account: vi.fn(async () => ({ currency: "USD" })),
-  // fee-free balance option: the transfer sends the whole quoted amount
   quote: vi.fn(async (_: string, q: { sourceAmount: number }) => ({
     id: `q-${q.sourceAmount}`,
     sourceAmount: q.sourceAmount,
     sourceCurrency: "USD",
     payOut: "BANK_TRANSFER",
-    paymentOptions: [
-      {
-        disabled: false,
-        payIn: "BALANCE",
-        payOut: "BANK_TRANSFER",
-        sourceAmount: q.sourceAmount,
-        fee: { total: 0 },
-      },
-    ],
   })),
   // none of ours: no recipient here is one of our own balances
   account_details: vi.fn(async () => []),
   transfer: vi.fn(
-    async (t: { customerTransactionId: string; quoteUuid: string }) => ({
+    async (_: { customerTransactionId: string; quoteUuid: string }) => ({
       id: 9001,
       status: "incoming_payment_waiting",
-      sourceValue: Number(t.quoteUuid.slice(2)),
     })
   ),
   fund_transfer: vi.fn(async () => ({ status: "COMPLETED" })),
@@ -263,6 +252,45 @@ const npo_cash = async (id: number) =>
     ?.cash;
 
 describe("grants cron execute", () => {
+  test("a recipient that is one of our own wise accounts is paid as normal, and ops is warned", async () => {
+    const npo_id = await seed_npo({ cash: 500 });
+    await seed_payout(npo_id, "p-1", 60);
+    wise.v2_account.mockResolvedValueOnce({
+      currency: "USD",
+      ownedByCustomer: true,
+      name: { fullName: "Better Giving Inc" },
+    } as never);
+    // what the books say at the moment the warning goes out
+    const at_warning: { cash: number | undefined; settlements: number }[] = [];
+    send_alert.mockImplementation(async (a: { title: string }) => {
+      if (a.title.startsWith("payout to one of"))
+        at_warning.push({
+          cash: await npo_cash(npo_id),
+          settlements: (await db().select().from(settlements)).length,
+        });
+    });
+
+    await index();
+
+    // recorded first: the cash is taken and the settlement exists before the alert
+    expect(at_warning).toEqual([{ cash: 440, settlements: 1 }]);
+
+    expect(wise.transfer).toHaveBeenCalledOnce();
+    expect(wise.fund_transfer).toHaveBeenCalledOnce();
+    // funded and recorded as any run: payouts on their way, cash taken
+    expect(await payout_types()).toEqual({ "p-1": "processing" });
+    expect(await npo_cash(npo_id)).toBe(440);
+    const warned = send_alert.mock.calls
+      .map(([a]) => a)
+      .filter(
+        (a) => a.title === "payout to one of Better Giving's own Wise accounts"
+      );
+    expect(warned).toHaveLength(1);
+    expect(warned[0]!.fields).toEqual(
+      expect.arrayContaining([{ name: "holder", value: "Better Giving Inc" }])
+    );
+  });
+
   test("pays the npo its full pending total and settles every payout", async () => {
     const npo_id = await seed_npo({ cash: 500 });
     await seed_payout(npo_id, "p-1", 60);

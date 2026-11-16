@@ -93,11 +93,6 @@ const report_error = vi.hoisted(() => vi.fn());
 vi.mock("#/errors/report", () => ({ report_error }));
 const accounts = vi.hoisted(() => ({ retrieve: vi.fn() }));
 vi.mock("$/kit/stripe", () => ({ stripe: { accounts } }));
-const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
-vi.mock("$/payouts/own-accounts", async (io) => ({
-  ...(await io<typeof import("$/payouts/own-accounts")>()),
-  ...own,
-}));
 
 import type { ReactNode } from "react";
 import { render } from "react-email";
@@ -161,7 +156,6 @@ beforeEach(async () => {
   report_error.mockClear();
   vi.mocked(wise.v2_account).mockClear();
   accounts.retrieve.mockReset().mockResolvedValue(NOT_READY);
-  own.is_own_recipient.mockReset().mockResolvedValue(false);
 
   await db.insert(user).values({
     id: "u-1",
@@ -214,32 +208,16 @@ const dedupe_keys = (kind: string) =>
   new Set(enqueued.filter((m) => m.id === kind).map((m) => m.dedupe));
 
 describe("approve", () => {
-  describe("a bank that may be Better Giving's own", () => {
-    /** refused whole: no npo, no bank, the registration still in review */
-    const refused = async (res: Response, why: RegExp) => {
-      expect(res.status).toBe(409);
-      expect(await res.text()).toMatch(why);
-      const db = test_db.current!.db;
-      expect(await db.select().from(npos)).toEqual([]);
-      expect(await db.select().from(banking_apps)).toEqual([]);
-      expect((await reg_get(RID))?.status).toBe("02");
-      expect(enqueued).toEqual([]);
-    };
+  test("approval files the registration's bank as the default, and refuses nothing over whose account it is", async () => {
+    const res = await verdict("approved");
 
-    test("one of our own accounts refuses the approval with 409", async () => {
-      own.is_own_recipient.mockResolvedValueOnce(true);
-
-      await refused(await verdict("approved"), /belongs to Better Giving/);
-      expect(own.is_own_recipient).toHaveBeenCalledWith(
-        expect.objectContaining({ name: { fullName: "Test Bank" } })
-      );
-    });
-
-    test("a check that fails refuses the approval with 409", async () => {
-      own.is_own_recipient.mockRejectedValueOnce(new Error("wise 503"));
-
-      await refused(await verdict("approved"), /couldn't check this bank/);
-    });
+    expect(res.status).toBe(302);
+    const db = test_db.current!.db;
+    expect(await db.select().from(npos)).toHaveLength(1);
+    const banks = await db.select().from(banking_apps);
+    expect(banks).toHaveLength(1);
+    expect(banks[0]?.status).toBe("default");
+    expect((await reg_get(RID))?.status).toBe("03");
   });
 
   test("enqueues the approved row, which mails the approval", async () => {

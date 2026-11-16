@@ -1,7 +1,13 @@
 import { wise as wise_env } from "../env";
 import { wise } from "../kit/wise";
 import { is_own_recipient } from "./own-accounts";
-import { NotFundedError, PayRefused, payout_cents } from "./transfer";
+import {
+  attach_warning,
+  type IPaid,
+  type IPayWarning,
+  within,
+} from "./pay-warning";
+import { NotFundedError } from "./transfer";
 
 /** awaiting our funding: the one status in which funding is ours to ask for */
 const UNFUNDED = "incoming_payment_waiting";
@@ -16,17 +22,21 @@ const FUNDED = new Set([
 /**
  * pays `amount` USD to wise recipient `to` under `ref`, wise's idempotency key:
  * quote → transfer → fund. resolves with the transfer id once funding was
- * accepted. throws `NotFundedError` only when no money moved; any other throw
- * means it may have. funds only a transfer that debits exactly `amount` and
- * pays a recipient that is not one of our own accounts; otherwise the
- * `NotFundedError`'s cause is a `PayRefused`.
+ * accepted, and any warning for the caller to send after it has recorded the
+ * payout: nothing here waits between accepted funding and that write. throws
+ * `NotFundedError` only when no money moved; any other throw means it may
+ * have. a recipient that is one of our own accounts, or whose
+ * check could not run, is paid all the same: Better Giving does not pry into
+ * where a nonprofit sends its funds, so ops is warned, never blocked. a throw
+ * from the funding call is rethrown as it is, carrying the warning
+ * (`warning_of`) as "funding status unknown".
  */
 export async function wise_pay(
   to: number,
   amount: number,
   ref: string
-): Promise<number> {
-  const { transfer, fee } = await create_transfer(to, amount, ref).catch(
+): Promise<IPaid> {
+  const { transfer, warning } = await create_transfer(to, amount, ref).catch(
     (err) => {
       throw new NotFundedError(err);
     }
@@ -36,7 +46,7 @@ export async function wise_pay(
   // its original transfer, funded or cancelled. the crons never reach these on
   // their own: each claim draws a fresh ref, and a claim left processing is
   // not retried, so only a caller re-sending a claim's stored ref meets them.
-  if (FUNDED.has(transfer.status ?? "")) return transfer.id;
+  if (FUNDED.has(transfer.status ?? "")) return { id: transfer.id };
   if (transfer.status === "cancelled") {
     // cancelled before it was funded: no money moved
     throw new NotFundedError(
@@ -51,38 +61,68 @@ export async function wise_pay(
       `transfer ${transfer.id} (customerTransactionId ${ref}) is ${transfer.status}`
     );
   }
-  const refused = await cancel_unless_debit_is(amount, transfer, fee, ref);
-  if (refused) throw new NotFundedError(refused);
-
-  const funding = await wise.fund_transfer(transfer.id, +wise_env.profile_id, {
-    type: "BALANCE",
-  });
+  const funding = await wise
+    .fund_transfer(transfer.id, +wise_env.profile_id, { type: "BALANCE" })
+    .catch((err: unknown) => {
+      // the transfer exists and funding may have landed: the own-account
+      // warning rides on the error, saying the outcome is unknown
+      if (warning) {
+        attach_warning(err, {
+          ...warning,
+          body: warning.body.replace(
+            "the payout went ahead",
+            "the payout may have gone ahead: funding status unknown"
+          ),
+        });
+      }
+      throw err;
+    });
 
   if (funding.status === "REJECTED") {
     throw new NotFundedError(new Error(`funding failed ${funding.errorCode}`));
   }
-  return transfer.id;
+  return { id: transfer.id, warning };
 }
 
 type Transfer = Awaited<ReturnType<typeof wise.transfer>>;
 
-/** the transfer, and the fee its quote prices for funding it from the balance */
+/** the own-account lookup is given this long: a stalled one must not hold a
+ * batch of payouts, and counts as a check that could not run */
+const CHECK_MS = 5_000;
+/** the transfer, and the warning to send ops once it is funded */
 async function create_transfer(
   to: number,
   amount: number,
   ref: string
-): Promise<{ transfer: Transfer; fee: number }> {
+): Promise<{ transfer: Transfer; warning?: IPayWarning }> {
   const recipient = await wise.v2_account(to);
-  const own = await is_own_recipient(recipient).catch((err) => {
-    throw new PayRefused(
-      `could not read Better Giving's own Wise account details to check recipient ${to} against (${String(err)})`
-    );
-  });
-  if (own) {
-    throw new PayRefused(
-      `recipient ${to} (${recipient.name?.fullName ?? "no name"}) is one of Better Giving's own Wise accounts, not the payee's`
-    );
-  }
+  const checked = await within(
+    CHECK_MS,
+    is_own_recipient(recipient).then(
+      (own) => ({ own, err: null as unknown }),
+      (err: unknown) => ({ own: false, err })
+    ),
+    () => ({ own: false, err: "timed out" as unknown })
+  );
+  const fields = [
+    { name: "recipient", value: to.toString() },
+    { name: "holder", value: recipient.name?.fullName ?? "no name" },
+    { name: "customerTransactionId", value: ref },
+  ];
+  const warning: IPayWarning | undefined =
+    checked.err !== null
+      ? {
+          title: "own-account check could not run before a payout",
+          body: `could not read Better Giving's own Wise account details to check recipient ${to}: ${String(checked.err)}. the payout went ahead`,
+          fields,
+        }
+      : checked.own
+        ? {
+            title: "payout to one of Better Giving's own Wise accounts",
+            body: `recipient ${to} matches one of Better Giving's own Wise accounts. the payout went ahead: check it is what the nonprofit asked for`,
+            fields,
+          }
+        : undefined;
 
   const quote = await wise.quote(wise_env.profile_id, {
     sourceCurrency: "USD",
@@ -90,23 +130,11 @@ async function create_transfer(
     sourceAmount: amount,
     targetAmount: null,
     payOut: null,
+    // priced for the balance we fund it from: without it wise quotes a
+    // bank-transfer pay-in fee, and the balance then debits another total
     preferredPayIn: "BALANCE",
     targetAccount: to.toString(),
   });
-  if (payout_cents([quote.sourceAmount]) !== payout_cents([amount])) {
-    throw new PayRefused(
-      `quote ${quote.id} debits ${quote.sourceAmount} ${quote.sourceCurrency}, not the run's ${amount} USD`
-    );
-  }
-  const option = quote.paymentOptions?.find(
-    (o) => o.payIn === "BALANCE" && o.payOut === quote.payOut && !o.disabled
-  );
-  if (!option) {
-    throw new PayRefused(
-      `quote ${quote.id} has no balance payment option for payout ${quote.payOut}`
-    );
-  }
-
   const transfer = await wise.transfer({
     targetAccount: to.toString(),
     quoteUuid: quote.id,
@@ -118,33 +146,5 @@ async function create_transfer(
   });
 
   if (transfer.errors) throw transfer.errors;
-  return { transfer, fee: option.fee.total };
-}
-
-/**
- * wise sends `sourceValue` and takes the balance option's fee on top: the two
- * are what the balance is debited, and they must be the run's total to the
- * cent. a transfer that isn't is cancelled, and its refusal returned
- */
-async function cancel_unless_debit_is(
-  amount: number,
-  transfer: Transfer,
-  fee: number,
-  ref: string
-): Promise<PayRefused | null> {
-  const sent = transfer.sourceValue;
-  const debit_cents =
-    sent === undefined ? null : payout_cents([sent]) + payout_cents([fee]);
-  if (debit_cents === payout_cents([amount])) return null;
-  const debit =
-    debit_cents === null
-      ? "an amount wise did not return"
-      : `${debit_cents / 100} USD (${sent} sent + ${fee} fee)`;
-  const why = `transfer ${transfer.id} (customerTransactionId ${ref}) would debit ${debit}, not the run's ${amount} USD`;
-  const cancelled = await wise.cancel_transfer(transfer.id).then(
-    () => "it was cancelled",
-    (err) =>
-      `its cancel failed (${String(err)}): cancel transfer ${transfer.id} by hand in Wise before it is funded`
-  );
-  return new PayRefused(`${why}; ${cancelled}`);
+  return { transfer, warning };
 }
