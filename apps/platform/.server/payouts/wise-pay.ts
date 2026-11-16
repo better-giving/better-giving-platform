@@ -17,9 +17,8 @@ const FUNDED = new Set([
  * pays `amount` USD to wise recipient `to` under `ref`, wise's idempotency key:
  * quote → transfer → fund. resolves with the transfer id once funding was
  * accepted. throws `NotFundedError` only when no money moved; any other throw
- * means it may have. funds only a transfer that pays a recipient that is not
- * one of our own accounts; otherwise the `NotFundedError`'s cause is a
- * `PayRefused`.
+ * means it may have. a recipient that is one of our own accounts, or whose
+ * check failed, is refused: the `NotFundedError`'s cause is a `PayRefused`.
  */
 export async function wise_pay(
   to: number,
