@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   afterAll,
   afterEach,
@@ -250,6 +250,21 @@ async function sent(
   });
   const res = await settle_npo_payouts(npo, ids, { ref_key: RECIPIENT, pay });
   expect(res.status).toBe("settled");
+  // wise delivering it: the poll's job (`wise-delivery.test.ts`), done here so
+  // a return meets the payouts as a delivered run leaves them
+  await db()
+    .update(payouts)
+    .set({
+      type: "settled",
+      settled_date: new Date().toISOString(),
+      message: null,
+    })
+    .where(
+      and(
+        eq(payouts.settled_id, String(transfer_id)),
+        eq(payouts.type, "processing")
+      )
+    );
   return String(transfer_id);
 }
 
@@ -869,8 +884,9 @@ describe("poll_wise_returns", () => {
 
     await poll_wise_returns(lookup);
 
+    // 1004 is final, but its npo is held on it, so its recipient is read once
     expect(lookup.mock.calls.map(([id]) => id).sort()).toEqual([
-      1001, 1002, 1005, 1007,
+      1001, 1002, 1004, 1005, 1007,
     ]);
   });
 
@@ -1007,7 +1023,7 @@ describe("poll_wise_returns", () => {
     "bounced_back",
     "some_new_state",
   ])(
-    "a transfer now %s is stored and alerted once, and changes nothing else",
+    "a transfer now %s is stored and alerted once, bounces its payouts and holds the npo",
     async (state) => {
       const npo = await seed_npo(0);
       await seed_payout(npo.id, "p-1", 100);
@@ -1023,15 +1039,15 @@ describe("poll_wise_returns", () => {
       await poll_wise_returns(async () => state);
 
       expect(await status_of("1001")).toBe(state);
-      expect(await payout_types()).toEqual({ "p-1": "settled" });
+      expect(await payout_types()).toEqual({ "p-1": "bounced" });
       expect(await npo_cash(npo.id)).toBe(0);
       expect(send_alert).toHaveBeenCalledOnce();
       const [alert] = send_alert.mock.calls[0]!;
       expect(alert.title).toBe(`Wise transfer ${state}: npo:${npo.id}`);
       expect(alert.body).toMatch(
         state === "cancelled" || state === "bounced_back"
-          ? /the next poll takes the run back by itself\. Change nothing by hand/
-          : /settle its payouts by hand if its money moved/
+          ? /the next poll takes the run back by itself; if wise delivers it late.*Change nothing by hand/
+          : /show as Bounced.*settle the payouts by hand/
       );
       expect(alert.fields).toEqual(
         expect.arrayContaining([

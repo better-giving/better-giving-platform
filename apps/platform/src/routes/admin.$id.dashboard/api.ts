@@ -15,6 +15,7 @@ import { nav_ltd } from "$/pg/queries/nav";
 import { npo_get } from "$/pg/queries/npo";
 import type { IReturnedPayouts, SettlementRow } from "$/pg/queries/payout";
 import {
+  npo_bounced_payouts,
   npo_payouts,
   npo_returned_payouts,
   npo_settlements,
@@ -40,6 +41,8 @@ export interface DashboardData {
   campaign_live: number;
   /** payouts the bank sent back, waiting on new bank details; null when none */
   returned: IReturnedPayouts | null;
+  /** payouts wise reports bounced and has not delivered or refunded; null when none */
+  bounced: IReturnedPayouts | null;
   /** the latest returned transfer still holds this npo's payouts */
   return_hold: boolean;
   /** the hold is a transfer that came back with its payouts' ownership
@@ -72,6 +75,7 @@ export const loader = async (x: Route.LoaderArgs) => {
     count,
     live,
     returned,
+    bounced,
     hold,
   ] = await Promise.all([
     nav_ltd(),
@@ -83,6 +87,7 @@ export const loader = async (x: Route.LoaderArgs) => {
     campaign_count(id),
     campaign_live_count(id),
     npo_returned_payouts(id),
+    npo_bounced_payouts(id),
     npo_return_hold(id),
   ]);
 
@@ -102,6 +107,7 @@ export const loader = async (x: Route.LoaderArgs) => {
     campaign_count: count,
     campaign_live: live,
     returned,
+    bounced,
     return_hold: hold !== null,
     awaiting_repair:
       hold?.status === "awaiting_repair"

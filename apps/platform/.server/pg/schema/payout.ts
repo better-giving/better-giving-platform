@@ -34,7 +34,7 @@ export const payouts = pgTable(
     check("amount_check", sql`${t.amount} > 0`),
     check(
       "type_check",
-      sql`${t.type} IN ('pending','processing','settled','error','refunded','refunded_loss','cancelled','returned','void')`
+      sql`${t.type} IN ('pending','processing','settled','error','refunded','refunded_loss','cancelled','returned','bounced','void')`
     ),
     index("payouts_npo_id_date_idx").on(t.npo_id, t.date),
     index("payouts_type_date_idx").on(t.type, t.date),

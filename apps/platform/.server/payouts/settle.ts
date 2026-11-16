@@ -9,6 +9,7 @@ import { npo_balance_update, npo_get_locked } from "../pg/queries/npo";
 import { outstanding_for_npo, unrecover_owed } from "../pg/queries/owed";
 import {
   npo_last_return,
+  payouts_funded,
   payouts_in,
   payouts_move,
   payouts_own_loss,
@@ -48,6 +49,7 @@ export type SettleResult =
   | { status: "unreleased"; ref: string }
   | { status: "fund_unknown"; ref: string }
   | { status: "unrecorded"; ref: string; transfer_id: string }
+  /** funded and recorded: the payouts are `processing` until wise reports the transfer sent */
   | { status: "settled"; ref: string; total: number; transfer_id: string }
   /** every payout went to what the npo owes: settled with no transfer */
   | { status: "recovered"; ref: string; total: number }
@@ -214,11 +216,9 @@ export async function settle_npo_payouts(
         status: "",
         recipient_id: recipient.ref_key,
       });
-      const settled = await payouts_move(tx, ids, "processing", {
-        type: "settled",
-        settled_date: date,
-        settled_id: transfer_id,
-      });
+      // not settled yet: they stay `processing` until wise reports the
+      // transfer sent (`poll_wise_returns`), owned by it from here
+      const settled = await payouts_funded(tx, ids, transfer_id);
       await npo_balance_update(
         tx,
         npo.id,
@@ -244,7 +244,7 @@ export async function settle_npo_payouts(
     // the commit may have landed with its reply lost, so the alert says check first
     await alert({
       title: `funded, not recorded for npo:${npo.id}`,
-      body: `do not reset these payouts to pending or pay them again; Wise transfer ${transfer_id} (customerTransactionId ${ref}) was funded. if the payouts are still processing, record the settlement by hand: its settlement amount is the net, ${total}; debit the npo's cash by the gross, ${gross}; also set settled_id to ${transfer_id} on any of these payouts a refund moved to refunded_loss while the transfer was in flight, or a return of the transfer will not find them`,
+      body: `do not reset these payouts to pending or pay them again; Wise transfer ${transfer_id} (customerTransactionId ${ref}) was funded. if the payouts are still processing and name no settled_id, record the settlement by hand: its settlement amount is the net, ${total}; debit the npo's cash by the gross, ${gross}; also set settled_id to ${transfer_id} on any of these payouts a refund moved to refunded_loss while the transfer was in flight, or a return of the transfer will not find them`,
       fields: [...fields, { name: "gross", value: gross.toString() }],
     });
     return { status: "unrecorded", ref, transfer_id };
@@ -252,7 +252,7 @@ export async function settle_npo_payouts(
   if (unsettled.length > 0) {
     await alert({
       title: `paid but not marked settled, npo:${npo.id}`,
-      body: `Wise transfer ${transfer_id} (customerTransactionId ${ref}) paid these payouts and is recorded, but they had already moved out of processing by a path other than a loss refund, so they were not marked settled. check each before the next run: one back in pending is paid again`,
+      body: `Wise transfer ${transfer_id} (customerTransactionId ${ref}) paid these payouts and is recorded, but they had already moved out of processing by a path other than a loss refund, so they were not stamped with the transfer. check each before the next run: one back in pending is paid again`,
       fields: [...fields, { name: "unsettled", value: unsettled.join(", ") }],
     });
   }

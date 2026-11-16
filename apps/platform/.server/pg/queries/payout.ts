@@ -21,6 +21,7 @@ import {
   type PayoutStatus,
   UNSENT_TYPES,
 } from "@/payouts";
+import { ON_PATH } from "@/payouts/wise-path";
 import { db } from "../db";
 import { payouts, settlements } from "../schema/payout";
 import type { DbOrTx, IPage } from "./helpers";
@@ -95,14 +96,15 @@ export async function pending_payouts(): Promise<IPayout[]> {
   return rows.map(to_payout);
 }
 
-/** claimed by a grants run that has not settled or released them yet */
+/** claimed by a grants run that has not funded or released them yet: a funded
+ * one is on its way and names its transfer in `settled_id` */
 export async function processing_payouts(): Promise<
   IPayout<IProcessingStatus>[]
 > {
   const rows = await db
     .select()
     .from(payouts)
-    .where(eq(payouts.type, "processing"))
+    .where(and(eq(payouts.type, "processing"), isNull(payouts.settled_id)))
     .orderBy(asc(payouts.npo_id), asc(payouts.id));
   return rows.map(to_payout) as IPayout<IProcessingStatus>[];
 }
@@ -189,6 +191,42 @@ export async function payouts_move(
   return rows.map((r) => r.id);
 }
 
+/**
+ * the funding of a claim was accepted: its still-processing payouts name the
+ * transfer (`settled_id`), so a return or the delivery poll finds them, and
+ * stay `processing` until wise reports it sent. returns the ids it stamped
+ */
+export async function payouts_funded(
+  db: DbOrTx,
+  ids: string[],
+  transfer_id: string
+): Promise<string[]> {
+  const rows = await db
+    .update(payouts)
+    .set({ settled_id: transfer_id })
+    .where(and(inArray(payouts.id, ids), eq(payouts.type, "processing")))
+    .returning({ id: payouts.id });
+  return rows.map((r) => r.id);
+}
+
+/** compare-and-set of the payouts a transfer owns (`settled_id`) that are in
+ * one of `from`; returns the ids moved */
+export async function settlement_payouts_move(
+  db: DbOrTx,
+  settlement_id: string,
+  from: PayoutStatus["type"][],
+  upd: PayoutStatus
+): Promise<string[]> {
+  const rows = await db
+    .update(payouts)
+    .set(from_payout_update(upd))
+    .where(
+      and(eq(payouts.settled_id, settlement_id), inArray(payouts.type, from))
+    )
+    .returning({ id: payouts.id });
+  return rows.map((r) => r.id);
+}
+
 /** the ids among `ids` whose payout is currently `type` */
 export async function payouts_in(
   db: DbOrTx,
@@ -206,7 +244,7 @@ export async function payouts_in(
 export interface IReturnedPayouts {
   count: number;
   total: number;
-  /** the latest returned payout's own `date`, iso */
+  /** the latest returned payout's own `date` (a bounced one's transfer date), iso */
   latest_date: string;
 }
 
@@ -224,6 +262,25 @@ export async function npo_returned_payouts(
     })
     .from(payouts)
     .where(and(eq(payouts.npo_id, npo_id), eq(payouts.type, "returned")));
+  return row && row.count > 0 ? row : null;
+}
+
+/** the npo's payouts wise reports bounced, still undelivered and not refunded,
+ * and when the latest of their transfers was sent; null when none */
+export async function npo_bounced_payouts(
+  npo_id: number
+): Promise<IReturnedPayouts | null> {
+  const [row] = await db
+    .select({
+      count: sql<number>`count(*)::int`,
+      total: sql<number>`sum(${payouts.amount})`.mapWith(payouts.amount),
+      latest_date: sql<string>`max(${settlements.date})`.mapWith(
+        settlements.date
+      ),
+    })
+    .from(payouts)
+    .innerJoin(settlements, eq(settlements.id, payouts.settled_id))
+    .where(and(eq(payouts.npo_id, npo_id), eq(payouts.type, "bounced")));
   return row && row.count > 0 ? row : null;
 }
 
@@ -335,7 +392,7 @@ export async function settlement_recipient_fill(
     .where(and(eq(settlements.id, id), isNull(settlements.recipient_id)));
 }
 
-/** returned or awaiting-repair settlements of a real wise transfer whose
+/** returned, awaiting-repair or bounced settlements of a real wise transfer whose
  * recipient was never stored (a run from before it was), of any age: the hold
  * refuses every account until it is known, so the poll window does not bound
  * them. the poll reads it off the transfer */
@@ -347,7 +404,7 @@ export async function returned_missing_recipient(): Promise<SettlementRow[]> {
       and(
         isNotNull(settlements.other_id),
         gt(settlements.amount, 0),
-        inArray(settlements.status, ["returned", "awaiting_repair"]),
+        notInArray(settlements.status, [...ON_PATH]),
         isNull(settlements.recipient_id)
       )
     )
@@ -377,10 +434,11 @@ export async function settlements_to_poll(
     .orderBy(asc(settlements.date), asc(settlements.id));
 }
 
-/** the npo's latest settlement whose transfer came back, or came back and
- * waits on ownership to be repaired (`AWAITING_REPAIR` in
- * ../../payouts/wise-return): either way its bank account is the one that
- * bounced. null when none did */
+/** the npo's latest settlement whose transfer came back, came back and waits
+ * on ownership to be repaired (`AWAITING_REPAIR` in ../../payouts/wise-return),
+ * or is bounced (any wise state off the ordinary path that is not the money
+ * back, until wise delivers it late): in each its bank account is the one
+ * that bounced. null when none did */
 export async function npo_last_return(
   npo_id: number,
   db_: DbOrTx = db
@@ -400,7 +458,7 @@ export async function npo_last_return(
     .where(
       and(
         eq(settlements.npo_id, npo_id),
-        inArray(settlements.status, ["returned", "awaiting_repair"])
+        notInArray(settlements.status, [...ON_PATH])
       )
     )
     .orderBy(desc(settlements.date), desc(settlements.id))

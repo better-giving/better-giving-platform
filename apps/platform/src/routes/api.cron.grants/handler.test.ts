@@ -293,8 +293,8 @@ describe("grants cron execute", () => {
       })
     );
     expect(await payout_types()).toEqual({
-      "p-1": "settled",
-      "p-2": "settled",
+      "p-1": "processing",
+      "p-2": "processing",
     });
     const [stlmt] = await db().select().from(settlements);
     expect(stlmt).toMatchObject({ id: String(TRANSFER_ID), amount: 100 });
@@ -320,7 +320,7 @@ describe("grants cron execute", () => {
       expect.any(String)
     );
     expect(await payout_types()).toEqual({
-      "p-1": "settled",
+      "p-1": "processing",
       "p-2": "refunded",
     });
     const [stlmt] = await db().select().from(settlements);
@@ -382,7 +382,7 @@ describe("grants cron execute", () => {
       "stuck-1": "processing",
       "stuck-2": "processing",
       "stuck-3": "processing",
-      "p-1": "settled",
+      "p-1": "processing",
     });
   });
 
@@ -399,7 +399,7 @@ describe("grants cron execute", () => {
 
     expect(res.statusCode).toBe(200);
     expect(report_error_mock).toHaveBeenCalledWith(slack_down);
-    expect(await payout_types()).toMatchObject({ "p-1": "settled" });
+    expect(await payout_types()).toMatchObject({ "p-1": "processing" });
   });
 
   test("a snapshot under the npo's minimum claims nothing", async () => {
@@ -431,8 +431,8 @@ describe("grants cron execute", () => {
       expect.any(String)
     );
     expect(await payout_types()).toEqual({
-      "p-1": "settled",
-      "p-2": "settled",
+      "p-1": "processing",
+      "p-2": "processing",
     });
   });
 
@@ -584,8 +584,8 @@ describe("grants cron execute", () => {
         expect.any(String)
       );
       expect(await payout_types()).toEqual({
-        "p-1": "settled",
-        "p-2": "settled",
+        "p-1": "processing",
+        "p-2": "processing",
       });
       expect(await npo_cash(npo_id)).toBe(0);
     }
@@ -604,7 +604,7 @@ describe("grants cron execute", () => {
       100,
       expect.any(String)
     );
-    expect(await payout_types()).toEqual({ "p-1": "settled" });
+    expect(await payout_types()).toEqual({ "p-1": "processing" });
   });
 
   test("two approved banks and no default: no bank is guessed, the payout stays pending", async () => {
@@ -798,8 +798,8 @@ describe("grants cron execute", () => {
     expect(wise_pay_mock).toHaveBeenCalledOnce();
     expect(wise_pay_mock).toHaveBeenCalledWith(778, 300, expect.any(String));
     expect(await payout_types()).toEqual({
-      "p-back": "settled",
-      "p-new": "settled",
+      "p-back": "processing",
+      "p-new": "processing",
     });
     expect(await npo_cash(npo_id)).toBe(0);
   });

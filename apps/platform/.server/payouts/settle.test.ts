@@ -297,8 +297,8 @@ describe("settle_npo_payouts", () => {
     expect(pay).toHaveBeenCalledWith(expect.any(String), 100);
     expect(seen_at_pay).toEqual([{ "p-1": "processing", "p-2": "processing" }]);
     expect(await payout_types()).toEqual({
-      "p-1": "settled",
-      "p-2": "settled",
+      "p-1": "processing",
+      "p-2": "processing",
     });
     const [stlmt] = await db().select().from(settlements);
     expect(stlmt).toMatchObject({
@@ -613,7 +613,7 @@ describe("settle_npo_payouts", () => {
       .orderBy(payouts.id);
     expect(rows).toEqual([
       { id: "p-1", type: "pending", message: null },
-      { id: "p-2", type: "settled", message: null },
+      { id: "p-2", type: "processing", message: expect.any(String) },
     ]);
   });
 
@@ -712,8 +712,8 @@ describe("settle_npo_payouts", () => {
     expect(again).not.toBe(first);
     expect(res).toMatchObject({ status: "settled", ref: again });
     expect(await payout_types()).toEqual({
-      "p-1": "settled",
-      "p-2": "settled",
+      "p-1": "processing",
+      "p-2": "processing",
     });
   });
 
@@ -733,7 +733,7 @@ describe("settle_npo_payouts", () => {
 
     expect(res).toMatchObject({ status: "settled", total: 100 });
     expect(await payout_types()).toEqual({
-      "p-1": "settled",
+      "p-1": "processing",
       "p-2": "refunded_loss",
     });
     const [stlmt] = await db().select().from(settlements);
@@ -751,7 +751,7 @@ describe("settle_npo_payouts", () => {
       .where(eq(donations.id, don));
     expect(dn?.status).toBe("refunded_loss");
     const refs = await db().select({ message: payouts.message }).from(payouts);
-    expect(refs).toEqual([{ message: null }, { message: null }]);
+    expect(refs).toEqual(expect.arrayContaining([{ message: null }]));
     expect(send_alert).not.toHaveBeenCalled();
   });
 
@@ -985,7 +985,7 @@ describe("settle_npo_payouts", () => {
 
     expect(res).toMatchObject({ status: "settled", total: 100 });
     expect(await payout_types()).toEqual({
-      "p-1": "settled",
+      "p-1": "processing",
       "p-2": "cancelled",
     });
     expect(await npo_cash(npo.id)).toBe(400);
@@ -1135,7 +1135,7 @@ describe("settle_npo_payouts: owed deductions", () => {
     const [ref] = pay.mock.calls[0]!;
     expect(pay).toHaveBeenCalledWith(ref, 406.8);
     expect(res).toMatchObject({ status: "settled", total: 406.8 });
-    expect(await payout_types()).toEqual({ "p-1": "settled" });
+    expect(await payout_types()).toEqual({ "p-1": "processing" });
     const [stlmt] = await db().select().from(settlements);
     expect(stlmt).toMatchObject({ other_id: ref, amount: 406.8 });
     // the payouts leave the npo's cash whole: part paid, part recovered

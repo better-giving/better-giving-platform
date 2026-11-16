@@ -11,7 +11,11 @@ export interface ISettledStatus {
 export interface IPendingStatus {
   type: "pending";
 }
-/** claimed by the grants cron: its wise transfer is in flight or unreconciled */
+/**
+ * claimed by the grants cron and not yet delivered: its wise transfer is
+ * unfunded or unreconciled (no `settled_id`), or funded and on its way
+ * (`settled_id` names the transfer) until wise reports it sent
+ */
 export interface IProcessingStatus {
   type: "processing";
   /** the claim's wise `customerTransactionId`; `""` on a claim made before it was stored */
@@ -36,6 +40,11 @@ export interface IReturnedStatus {
   type: "returned";
 }
 
+/** wise reports its transfer off the ordinary path (`bounced_back` and the like): not delivered, so not settled. the money may still be delivered late (back to `settled`) or refunded (`returned`) */
+export interface IBouncedStatus {
+  type: "bounced";
+}
+
 /** voided by ops: not a grant, not counted */
 export interface IVoidStatus {
   type: "void";
@@ -50,6 +59,7 @@ export type PayoutStatus =
   | IRefundedLossStatus
   | ICancelledStatus
   | IReturnedStatus
+  | IBouncedStatus
   | IVoidStatus;
 
 /** the types whose money is in the npo's cash, not sent: a refund cancels the

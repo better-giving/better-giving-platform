@@ -81,3 +81,81 @@ describe("grants table — a returned grant", () => {
     ).toBeTruthy();
   });
 });
+
+describe("grants table — sending and bounced grants", () => {
+  const sent = (id: string, amount: number, status: string) =>
+    grant(id, amount, { other_id: `ref-${id}`, status });
+  const struck = (screen: Awaited<ReturnType<typeof render>>, text: string) =>
+    getComputedStyle(screen.getByText(text, { exact: true }).element())
+      .textDecorationLine;
+
+  test("a grant funded but not yet reported sent shows Sending, an unstruck gray amount and Not counted yet", async () => {
+    const screen = await render(
+      <GrantsTable items={[sent("g1", 1120, "funds_converted")]} />
+    );
+    await expect
+      .element(screen.getByText("Sending", { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText("Not counted yet", { exact: true }))
+      .toBeVisible();
+    expect(struck(screen, "$1,120.00")).toBe("none");
+    expect(
+      screen.getByText("$1,120.00", { exact: true }).element().className
+    ).toContain("text-gray-11");
+    await screen
+      .getByRole("button", { name: "What this sending grant means" })
+      .click();
+    await expect
+      .element(
+        screen.getByRole("tooltip", {
+          name: "Not counted in your grant totals yet. It counts once your bank confirms it received this grant.",
+        })
+      )
+      .toBeVisible();
+  });
+
+  test("a grant whose transfer was never read shows Sending too", async () => {
+    const screen = await render(<GrantsTable items={[sent("g1", 50, "")]} />);
+    await expect
+      .element(screen.getByText("Sending", { exact: true }))
+      .toBeVisible();
+  });
+
+  test.each(["bounced_back", "cancelled"])(
+    "a grant whose transfer is %s shows a struck amount, Bounced and Not counted",
+    async (status) => {
+      const screen = await render(
+        <GrantsTable items={[sent("g1", 481.5, status)]} />
+      );
+      await expect
+        .element(screen.getByText("Bounced", { exact: true }))
+        .toBeVisible();
+      await expect
+        .element(screen.getByText("Not counted", { exact: true }))
+        .toBeVisible();
+      expect(struck(screen, "$481.50")).toBe("line-through");
+      await screen
+        .getByRole("button", { name: "What this bounced grant means" })
+        .click();
+      await expect
+        .element(
+          screen.getByRole("tooltip", {
+            name: "Your bank didn't accept this grant, so it isn't counted in your grant totals. The money is on its way back to your balance. Check your bank details.",
+          })
+        )
+        .toBeVisible();
+    }
+  );
+
+  test("a late-delivered grant is a plain Settled-looking amount with nothing extra", async () => {
+    const screen = await render(
+      <GrantsTable items={[sent("g1", 481.5, "outgoing_payment_sent")]} />
+    );
+    await expect.element(screen.getByText("$481.50")).toBeVisible();
+    expect(screen.getByText("Bounced").query()).toBeNull();
+    expect(screen.getByText("Sending").query()).toBeNull();
+    expect(screen.getByRole("button").query()).toBeNull();
+    expect(struck(screen, "$481.50")).toBe("none");
+  });
+});

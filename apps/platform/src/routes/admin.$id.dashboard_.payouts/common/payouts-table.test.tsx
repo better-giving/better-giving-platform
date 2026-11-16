@@ -49,7 +49,11 @@ describe("payouts table — returned and void", () => {
     await expect
       .element(screen.getByRole("button", { name: "What Void means" }))
       .toBeVisible();
-    expect(screen.getByRole("button").elements()).toHaveLength(2);
+    // the processing one is Sending, which explains itself too
+    await expect
+      .element(screen.getByRole("button", { name: "What Sending means" }))
+      .toBeVisible();
+    expect(screen.getByRole("button").elements()).toHaveLength(3);
   });
 
   test("opening the returned button shows what it means", async () => {
@@ -84,10 +88,72 @@ describe("payouts table — returned and void", () => {
     expect(struck("$320.00")).toBe("line-through");
   });
 
-  test("a table with no returned or void payout has no (!) button", async () => {
-    const screen = await render_table([ITEMS[2]!, ITEMS[3]!]);
-    await expect.element(screen.getByText("Processing")).toBeVisible();
+  test("a table with only settled and refunded payouts has no (!) button", async () => {
+    const screen = await render_table([
+      payout("s", { type: "settled", settled_date: "", settled_id: "t" }, 75),
+      ITEMS[3]!,
+    ]);
+    await expect.element(screen.getByText("Settled")).toBeVisible();
     expect(screen.container.querySelectorAll("tbody tr")).toHaveLength(2);
     expect(screen.getByRole("button").query()).toBeNull();
+  });
+});
+
+describe("payouts table — sending and bounced", () => {
+  afterEach(async () => {
+    await userEvent.keyboard("{Escape}");
+  });
+
+  const rows = [
+    payout("s", { type: "processing", ref: "r" }, 1120),
+    payout("b", { type: "bounced" }, 481.5),
+    payout("d", { type: "settled", settled_date: "", settled_id: "t" }, 960.4),
+  ];
+  const arrow_of = (
+    screen: Awaited<ReturnType<typeof render_table>>,
+    i: number
+  ) => screen.container.querySelectorAll("tbody tr")[i]!.querySelector("svg")!;
+
+  test("a processing payout reads Sending, and its (!) says the bank hasn't confirmed", async () => {
+    const screen = await render_table(rows);
+    await expect
+      .element(screen.getByText("Sending", { exact: true }))
+      .toBeVisible();
+    expect(screen.getByText("Processing").query()).toBeNull();
+    await screen.getByRole("button", { name: "What Sending means" }).click();
+    await expect
+      .element(
+        screen.getByRole("tooltip", {
+          name: "Your bank hasn't confirmed it received this payout yet. Nothing is needed from you. It shows as Settled once the bank confirms.",
+        })
+      )
+      .toBeVisible();
+  });
+
+  test("a bounced payout reads Bounced with its (!), a muted arrow and an unstruck amount", async () => {
+    const screen = await render_table(rows);
+    await expect
+      .element(screen.getByText("Bounced", { exact: true }))
+      .toBeVisible();
+    await screen.getByRole("button", { name: "What Bounced means" }).click();
+    await expect
+      .element(
+        screen.getByRole("tooltip", {
+          name: "Your bank didn't accept this payout, and the money is on its way back to your balance. Check that your bank details are right and update them if not. It goes out again once the new ones are approved.",
+        })
+      )
+      .toBeVisible();
+    expect(
+      getComputedStyle(screen.getByText("$481.50", { exact: true }).element())
+        .textDecorationLine
+    ).toBe("none");
+    expect(arrow_of(screen, 1).classList.contains("stroke-gray-11")).toBe(true);
+    expect(arrow_of(screen, 0).classList.contains("stroke-gray-11")).toBe(true);
+  });
+
+  test("a settled payout, late-delivered or not, has the green arrow and no (!)", async () => {
+    const screen = await render_table(rows);
+    expect(arrow_of(screen, 2).classList.contains("stroke-success")).toBe(true);
+    expect(screen.getByRole("button").elements()).toHaveLength(2);
   });
 });

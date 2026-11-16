@@ -38,6 +38,8 @@ export function to_payout(row: PayoutRow): IPayout {
       return { ...base, type: "processing", ref: row.message ?? "" };
     case "returned":
       return { ...base, type: "returned" };
+    case "bounced":
+      return { ...base, type: "bounced" };
     case "void":
       return { ...base, type: "void" };
     case "pending":

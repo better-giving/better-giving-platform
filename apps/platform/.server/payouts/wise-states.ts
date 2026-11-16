@@ -30,18 +30,12 @@ export const FINAL = [RETURNED, "charged_back"] as const;
 export const WINDOW_DAYS = 90;
 
 /**
- * wise's transfer states (https://docs.wise.com/guides/product/send-money/tracking-transfers).
- * `bounced_back` is not the money back: wise may still deliver it late or move
- * it on to `funds_refunded`, which alone is taken back
+ * wise's transfer states (`@/payouts/wise-path`). `bounced_back` is not the
+ * money back: wise may still deliver it late or move it on to
+ * `funds_refunded`, which alone is taken back. a payout is settled only from
+ * `DELIVERED`, and bounced from any state off the ordinary path
  */
-export const ORDINARY: ReadonlySet<string> = new Set([
-  "incoming_payment_waiting",
-  "incoming_payment_initiated",
-  "processing",
-  "funds_converted",
-  "outgoing_payment_sent",
-]);
-export const MONEY_BACK = "funds_refunded";
+export { DELIVERED, MONEY_BACK, ORDINARY } from "@/payouts/wise-path";
 /** off the ordinary path and possibly on to `MONEY_BACK`, where the poll takes
  * the run back by itself: settling the payouts by hand too would count the
  * money twice */

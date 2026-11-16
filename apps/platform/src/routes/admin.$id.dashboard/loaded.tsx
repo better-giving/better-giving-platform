@@ -36,6 +36,9 @@ export function Loaded({ classes = "", ...props }: Props) {
 
   return (
     <div className={classes}>
+      {props.bounced && (
+        <BouncedNotice bounced={props.bounced} classes="mb-4" />
+      )}
       {props.returned && (
         <ReturnedNotice returned={props.returned} classes="mb-4" />
       )}
@@ -218,6 +221,31 @@ function ReturnedNotice({ returned, classes = "" }: IReturnedNotice) {
       {returned.count === 1
         ? `${total} from ${format(returned.latest_date, "MMM d")} didn't reach your bank account, so it's back in your balance. Update your bank details, and it goes out again once the new ones are approved.`
         : `${returned.count} payouts (${total}) didn't reach your bank account, so they're back in your balance. Update your bank details, and they go out again once the new ones are approved.`}
+    </WarningCallout>
+  );
+}
+
+interface IBouncedNotice {
+  bounced: IReturnedPayouts;
+  classes?: string;
+}
+
+/** wise reports a transfer bounced: the npo is held, and the bank may still be fixed */
+function BouncedNotice({ bounced, classes = "" }: IBouncedNotice) {
+  const total = to_usd(bounced.total, 2);
+  return (
+    <WarningCallout
+      title="Your bank didn't accept a payout"
+      classes={classes}
+      action={
+        <Link to="../banking" className="btn btn-primary btn-sm">
+          Check bank details
+        </Link>
+      }
+    >
+      {bounced.count === 1
+        ? `${total} from ${format(bounced.latest_date, "MMM d")} couldn't be delivered to your bank account and is on its way back to your balance. Check your bank details and update them if they're wrong. Payouts are paused until new ones are approved.`
+        : `${bounced.count} payouts (${total}) couldn't be delivered to your bank account and are on their way back to your balance. Check your bank details and update them if they're wrong. Payouts are paused until new ones are approved.`}
     </WarningCallout>
   );
 }

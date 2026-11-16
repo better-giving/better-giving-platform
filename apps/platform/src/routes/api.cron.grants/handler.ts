@@ -55,7 +55,8 @@ export async function index(event?: IInput) {
 /**
  * a processing row was claimed and never settled or released: a killed run, a
  * failed release, a transfer whose funding or record is unknown, or a
- * concurrent run still in flight. `pending_payouts` never returns these rows,
+ * concurrent run still in flight. a funded one is no longer this: it waits on
+ * wise's delivery under its transfer. `pending_payouts` never returns these rows,
  * so without this they sit unpaid and unannounced
  */
 async function alert_unsettled_claims() {
@@ -92,22 +93,28 @@ async function alert_held(el: Extract<GrantEligibility, { status: "held" }>) {
   if (!(await hold_alert_claim(hold.settlement_id))) return;
   try {
     const repair = hold.status === "awaiting_repair";
-    const returned = repair ? null : await npo_returned_payouts(npo.id);
+    const bounced = hold.status === "bounced";
+    const returned =
+      repair || bounced ? null : await npo_returned_payouts(npo.id);
     await aws_monitor.send_alert({
       type: "ERROR",
       from: fn,
       title: `Grants held for npo:${npo.id}: ${npo.name}`,
       body: repair
         ? "its last transfer came back but which payouts it covered is unclear, so nothing more is sent until ops repairs the settlement and a new bank account is approved and made its default. if a new account lifts the hold first, the repair is still pending"
-        : "its last transfer came back, so nothing more is sent until a new bank account is approved and made its default; the returned payouts then go out with the next run",
+        : bounced
+          ? "its last transfer bounced (Wise may still deliver it late or refund it), so nothing more is sent until a new bank account is approved and made its default, or Wise delivers it. if Wise refunds it, the returned payouts then go out with the next run"
+          : "its last transfer came back, so nothing more is sent until a new bank account is approved and made its default; the returned payouts then go out with the next run",
       fields: [
         {
           name: "returned",
           value: repair
             ? "awaiting repair: nothing credited yet"
-            : returned
-              ? `${returned.count} payout(s), ${returned.total}`
-              : "none left",
+            : bounced
+              ? "bounced: not credited unless Wise refunds it"
+              : returned
+                ? `${returned.count} payout(s), ${returned.total}`
+                : "none left",
         },
         { name: "pending", value: total.toString() },
         { name: "settlement", value: hold.settlement_id },

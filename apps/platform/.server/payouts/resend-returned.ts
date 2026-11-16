@@ -9,8 +9,9 @@ export interface IReturnHold {
   /** the npo's latest returned or awaiting-repair settlement: the hold alert dedupes on it */
   settlement_id: string;
   /** `awaiting_repair`: its transfer came back but which payouts it covered
-   * is unclear, so nothing is credited yet */
-  status: "returned" | "awaiting_repair";
+   * is unclear, so nothing is credited yet; `bounced`: wise reports it off
+   * the ordinary path and may still deliver it late or refund it */
+  status: "returned" | "awaiting_repair" | "bounced";
   /** what the settlement sent, in usd, and when */
   amount: number;
   date: string;
@@ -26,7 +27,9 @@ const REASONS: Record<HoldCause, string> = {
 
 /**
  * whether the npo's grants are held: its latest transfer came back (returned,
- * or awaiting repair because which payouts are its own is unclear), unless
+ * or awaiting repair because which payouts are its own is unclear) or bounced
+ * and wise has not delivered it (so the next run would pay the same failing
+ * account), unless
  * the account the grants run pays (`npo_default_bapp`) is a different wise
  * recipient from the one that transfer paid and was approved or made default
  * since it was sent. an edit to the account that bounced changes neither, so
@@ -43,7 +46,10 @@ export async function npo_return_hold(
   if (!last) return null;
   const of = {
     settlement_id: last.id,
-    status: last.status === "awaiting_repair" ? "awaiting_repair" : "returned",
+    status:
+      last.status === "awaiting_repair" || last.status === "returned"
+        ? last.status
+        : "bounced",
     amount: last.amount,
     date: last.date,
   } as const;
