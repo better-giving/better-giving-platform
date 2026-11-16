@@ -64,7 +64,7 @@ function own_account_details(): Promise<AccountDetails[]> {
 }
 
 /** whether paying `r` pays one of our own wise balances. rejects when our
- * details can't be read: callers refuse rather than guess */
+ * details can't be read: approval refuses rather than guess, and `wise_pay` warns ops and pays */
 export async function is_own_recipient(r: V2RecipientAccount) {
   return is_own_account(r, await own_account_details());
 }

@@ -29,9 +29,11 @@ export async function wise_pay(
   amount: number,
   ref: string
 ): Promise<number> {
-  const transfer = await create_transfer(to, amount, ref).catch((err) => {
-    throw new NotFundedError(err);
-  });
+  const { transfer, warning } = await create_transfer(to, amount, ref).catch(
+    (err) => {
+      throw new NotFundedError(err);
+    }
+  );
 
   // guards for a ref reused within one claim: wise answers a reused ref with
   // its original transfer, funded or cancelled. the crons never reach these on
@@ -59,39 +61,62 @@ export async function wise_pay(
   if (funding.status === "REJECTED") {
     throw new NotFundedError(new Error(`funding failed ${funding.errorCode}`));
   }
+  // only now is it true that the payout went ahead
+  if (warning) await warn_ops(warning);
   return transfer.id;
 }
 
 type Transfer = Awaited<ReturnType<typeof wise.transfer>>;
+type Warning = Parameters<typeof warn_ops>[0];
 
+/** the own-account lookup is given this long: a stalled one must not hold a
+ * batch of payouts, and counts as a check that could not run */
+const CHECK_MS = 5_000;
+/** an ops alert is given this long, so a stalled Slack cannot stall a payout */
+const ALERT_MS = 3_000;
+
+/** `p`'s answer, or `on_timeout` once `ms` pass */
+const within = <T>(ms: number, p: Promise<T>, on_timeout: () => T) =>
+  new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => resolve(on_timeout()), ms);
+    p.then(resolve, reject).finally(() => clearTimeout(t));
+  });
+
+/** the transfer, and the warning to send ops once it is funded */
 async function create_transfer(
   to: number,
   amount: number,
   ref: string
-): Promise<Transfer> {
+): Promise<{ transfer: Transfer; warning?: Warning }> {
   const recipient = await wise.v2_account(to);
-  const checked = await is_own_recipient(recipient).then(
-    (own) => ({ own, err: null }),
-    (err: unknown) => ({ own: false, err })
+  const checked = await within(
+    CHECK_MS,
+    is_own_recipient(recipient).then(
+      (own) => ({ own, err: null as unknown }),
+      (err: unknown) => ({ own: false, err })
+    ),
+    () => ({ own: false, err: "timed out" as unknown })
   );
   const fields = [
     { name: "recipient", value: to.toString() },
     { name: "holder", value: recipient.name?.fullName ?? "no name" },
     { name: "customerTransactionId", value: ref },
   ];
-  if (checked.err !== null) {
-    await warn_ops({
-      title: "own-account check could not run before a payout",
-      body: `could not read Better Giving's own Wise account details to check recipient ${to} against (${String(checked.err)}). the payout went ahead`,
-      fields,
-    });
-  } else if (checked.own) {
-    await warn_ops({
-      title: "payout to one of Better Giving's own Wise accounts",
-      body: `recipient ${to} matches one of Better Giving's own Wise accounts. the payout went ahead: check it is what the nonprofit asked for`,
-      fields,
-    });
-  }
+  // a warning, never a refusal: sent once the payout is funded
+  const warning: Warning | undefined =
+    checked.err !== null
+      ? {
+          title: "own-account check could not run before a payout",
+          body: `could not read Better Giving's own Wise account details to check recipient ${to} against (${String(checked.err)}). the payout went ahead`,
+          fields,
+        }
+      : checked.own
+        ? {
+            title: "payout to one of Better Giving's own Wise accounts",
+            body: `recipient ${to} matches one of Better Giving's own Wise accounts. the payout went ahead: check it is what the nonprofit asked for`,
+            fields,
+          }
+        : undefined;
 
   const quote = await wise.quote(wise_env.profile_id, {
     sourceCurrency: "USD",
@@ -115,21 +140,25 @@ async function create_transfer(
   });
 
   if (transfer.errors) throw transfer.errors;
-  return transfer;
+  return { transfer, warning };
 }
 
-/** an alert that fails to send is reported, never thrown past the money */
+/** an alert that fails or stalls is reported, never thrown past the money */
 async function warn_ops(a: {
   title: string;
   body: string;
   fields: NonNullable<Alert["fields"]>;
 }) {
   try {
-    await aws_monitor.send_alert({
-      ...a,
-      type: "ERROR",
-      from: `wise-pay:${stage}`,
-    });
+    await within(
+      ALERT_MS,
+      aws_monitor.send_alert({
+        ...a,
+        type: "ERROR",
+        from: `wise-pay:${stage}`,
+      }),
+      () => undefined
+    );
   } catch (err) {
     report_error(err, { alert: a.title });
   }

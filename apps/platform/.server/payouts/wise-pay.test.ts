@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const wise = vi.hoisted(() => ({
   v2_account: vi.fn(),
@@ -9,9 +9,10 @@ const wise = vi.hoisted(() => ({
 }));
 const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
 const slack = vi.hoisted(() => ({ send_alert: vi.fn() }));
+const report_error = vi.hoisted(() => vi.fn());
 
 vi.mock("../env", () => ({ stage: "test", wise: { profile_id: "42" } }));
-vi.mock("#/errors/report", () => ({ report_error: vi.fn() }));
+vi.mock("#/errors/report", () => ({ report_error }));
 vi.mock("../kit/wise", () => ({ wise }));
 vi.mock("../kit/slack", () => ({ aws_monitor: slack }));
 vi.mock("./own-accounts", () => own);
@@ -39,6 +40,7 @@ beforeEach(() => {
     .mockResolvedValue({ id: TRANSFER_ID, status: "cancelled" });
   own.is_own_recipient.mockReset().mockResolvedValue(false);
   slack.send_alert.mockReset().mockResolvedValue(undefined);
+  report_error.mockReset();
 });
 
 describe("wise_pay", () => {
@@ -209,11 +211,89 @@ describe("wise_pay", () => {
     expect(slack.send_alert).not.toHaveBeenCalled();
   });
 
-  test("a warning that fails to send never blocks the payout", async () => {
+  test("a warning that fails to send never blocks the payout, and is reported", async () => {
     own.is_own_recipient.mockResolvedValue(true);
     slack.send_alert.mockRejectedValue(new Error("slack down"));
 
     await expect(wise_pay(881063184, 72.82, REF)).resolves.toBe(TRANSFER_ID);
+
     expect(wise.fund_transfer).toHaveBeenCalledOnce();
+    expect(slack.send_alert).toHaveBeenCalledOnce();
+    expect(report_error).toHaveBeenCalledWith(expect.any(Error), {
+      alert: "payout to one of Better Giving's own Wise accounts",
+    });
+  });
+
+  test("the warning goes out after funding was accepted, not before the money moves", async () => {
+    own.is_own_recipient.mockResolvedValue(true);
+
+    await wise_pay(881063184, 72.82, REF);
+
+    expect(wise.fund_transfer.mock.invocationCallOrder[0]!).toBeLessThan(
+      slack.send_alert.mock.invocationCallOrder[0]!
+    );
+  });
+
+  test.each([
+    [
+      "the transfer is answered with errors",
+      () =>
+        wise.transfer.mockResolvedValue({
+          id: TRANSFER_ID,
+          errors: [{ code: "x" }],
+        }),
+    ],
+    [
+      "funding is rejected",
+      () =>
+        wise.fund_transfer.mockResolvedValue({
+          status: "REJECTED",
+          errorCode: "balance",
+        }),
+    ],
+  ])(
+    "no warning goes out when %s: nothing was paid",
+    async (_name, arrange) => {
+      own.is_own_recipient.mockResolvedValue(true);
+      arrange();
+
+      await expect(wise_pay(881063184, 72.82, REF)).rejects.toBeInstanceOf(
+        NotFundedError
+      );
+
+      expect(slack.send_alert).not.toHaveBeenCalled();
+    }
+  );
+
+  describe("a hung dependency never strands a payout", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    test("a Slack call that never answers is given up on after a few seconds", async () => {
+      own.is_own_recipient.mockResolvedValue(true);
+      slack.send_alert.mockReturnValue(new Promise(() => {}));
+
+      const paid = wise_pay(881063184, 72.82, REF);
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      await expect(paid).resolves.toBe(TRANSFER_ID);
+    });
+
+    test("an own-account lookup that never answers is treated as a check that could not run, and the payout goes ahead", async () => {
+      own.is_own_recipient.mockReturnValue(new Promise(() => {}));
+
+      const paid = wise_pay(777, 100, REF);
+      await vi.advanceTimersByTimeAsync(20_000);
+
+      await expect(paid).resolves.toBe(TRANSFER_ID);
+      expect(slack.send_alert).toHaveBeenCalledOnce();
+      expect(slack.send_alert.mock.calls[0]![0].title).toBe(
+        "own-account check could not run before a payout"
+      );
+    });
   });
 });
