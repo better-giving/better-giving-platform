@@ -209,6 +209,7 @@ export async function reg_stripe_deauthorize(
 }
 
 const PAGE = 15;
+const STATUSES: TStatus[] = ["01", "02", "03", "04"];
 /** what the database writes for a timestamptz: a cursor for another sort is not one */
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 /** a string postgres accepts as a parameter, which a NUL is not */
@@ -224,13 +225,27 @@ function encode_regs_cursor(
   sort_key: string,
   sort_dir: string,
   value: string | null,
-  id: string
+  id: string,
+  /** the status inferred from a legacy cursor, carried to the pages after it */
+  inferred_status?: TStatus
 ) {
-  return encode_cursor({ k: sort_key, d: sort_dir, v: value, i: id });
+  return encode_cursor({
+    k: sort_key,
+    d: sort_dir,
+    v: value,
+    i: id,
+    ...(inferred_status && { s: inferred_status }),
+  });
 }
 
 type RegsCursor =
-  | { kind: "keyset"; value: string | null; id: string }
+  | {
+      kind: "keyset";
+      value: string | null;
+      id: string;
+      /** a status a legacy cursor implied, for a request that names none */
+      status?: TStatus;
+    }
   /** a bare date from before keyset paging */
   | { kind: "date"; date: string };
 
@@ -254,7 +269,13 @@ function decode_regs_cursor(
           x.v === null ||
           is_timestamp(x.v as string))
       ) {
-        return { kind: "keyset", value: x.v as string | null, id: x.i };
+        return {
+          kind: "keyset",
+          value: x.v as string | null,
+          id: x.i,
+          ...(typeof x.s === "string" &&
+            STATUSES.includes(x.s as TStatus) && { status: x.s as TStatus }),
+        };
       }
       return undefined;
     }
@@ -298,9 +319,17 @@ export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
     ? decode_regs_cursor(next, sort_key, desc_ ? "desc" : "asc")
     : undefined;
   // a tab from before this default changed pages with a bare date and no
-  // status, which then meant under review
-  const status =
-    cursor?.kind === "date" && asked_status === undefined ? "02" : asked_status;
+  // status, which then meant under review. that status rides in the cursors
+  // after it, and a status the request names always wins
+  const inferred =
+    asked_status !== undefined
+      ? undefined
+      : cursor?.kind === "date"
+        ? "02"
+        : cursor?.kind === "keyset"
+          ? cursor.status
+          : undefined;
+  const status = asked_status ?? inferred;
   let after: SQL | undefined;
   if (cursor?.kind === "keyset") {
     const { value, id } = cursor;
@@ -357,7 +386,8 @@ export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
             sort_key,
             desc_ ? "desc" : "asc",
             (last[sort_key] as string | null | undefined) ?? null,
-            last.id
+            last.id,
+            inferred
           )
         : undefined,
   };

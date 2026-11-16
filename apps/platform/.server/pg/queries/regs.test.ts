@@ -279,6 +279,78 @@ describe("regs: cursor edge cases", () => {
     expect(page.items.map((r) => r.id)).toEqual(first.items.map((r) => r.id));
   });
 
+  describe("a legacy cursor's inferred status carries to later pages", () => {
+    const legacy_cursor = (at: string) =>
+      btoa(at).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const seed_mixed = async () => {
+      await test_db.current!.db.insert(registrations).values(
+        Array.from({ length: 60 }, (_, i) => ({
+          id: `reg-${String(i).padStart(2, "0")}`,
+          r_id: `user-${i}`,
+          // two in three are under review, the rest every other status
+          status: (i % 3 === 0
+            ? (["01", "03", "04"] as const)[(i / 3) % 3]
+            : "02") as "01" | "02" | "03" | "04",
+          o_name: `Org ${i}`,
+          updated_at: iso(i),
+        }))
+      );
+    };
+
+    test("a bare date with no status, then two more pages, stays under review on every page", async () => {
+      await seed_mixed();
+      const pages: Awaited<ReturnType<typeof regs>>["items"][] = [];
+      let next: string | undefined = legacy_cursor(iso(-1));
+      while (next && pages.length < 6) {
+        const page = await regs({ next });
+        pages.push(page.items);
+        next = page.next;
+      }
+
+      expect(pages.length).toBeGreaterThanOrEqual(3);
+      for (const items of pages) {
+        for (const r of items) expect(r.status).toBe("02");
+      }
+      const ids = pages.flat().map((r) => r.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids).toHaveLength(40);
+    });
+
+    test("an explicit status with such a cursor uses the explicit one, on every page", async () => {
+      await seed_mixed();
+      const pages: string[][] = [];
+      let next: string | undefined = legacy_cursor(iso(-1));
+      while (next && pages.length < 6) {
+        const page = await regs({ next, status: "" });
+        pages.push(page.items.map((r) => r.status as string));
+        next = page.next;
+      }
+
+      // every status, not just under review
+      expect(new Set(pages.flat()).size).toBeGreaterThan(1);
+      expect(pages.flat()).toHaveLength(60);
+    });
+
+    test("a normal cursor carries no inferred status and the list stays unfiltered", async () => {
+      await seed_mixed();
+      const first = await regs();
+      expect(
+        JSON.parse(atob(first.next!.replace(/-/g, "+").replace(/_/g, "/")))
+      ).not.toHaveProperty("s");
+
+      const statuses = new Set<string>();
+      let next: string | undefined = first.next;
+      for (const r of first.items) statuses.add(r.status as string);
+      while (next) {
+        const page = await regs({ next });
+        for (const r of page.items) statuses.add(r.status as string);
+        next = page.next;
+      }
+
+      expect([...statuses].sort()).toEqual(["01", "02", "03", "04"]);
+    });
+  });
+
   test("a keyset cursor is followed under a filter that matches more than a page", async () => {
     await test_db.current!.db.insert(registrations).values(
       Array.from({ length: 20 }, (_, i) => ({
