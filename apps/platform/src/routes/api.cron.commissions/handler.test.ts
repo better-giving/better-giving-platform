@@ -285,24 +285,31 @@ describe("commissions cron", () => {
     expect(await statuses()).toEqual({ "d-1": "paid" });
   });
 
-  test("a payout to one of our own wise accounts is refused before any quote: back to pending, nothing paid, ops told", async () => {
+  test("a payout to one of our own wise accounts is paid as normal, and ops is warned", async () => {
     await seed("d-1", 60);
     wise.v2_account.mockResolvedValueOnce({
       currency: "USD",
       ownedByCustomer: true,
+      name: { fullName: "Better Giving Inc" },
     } as never);
 
     await index();
 
-    expect(wise.quote).not.toHaveBeenCalled();
-    expect(wise.transfer).not.toHaveBeenCalled();
-    expect(await statuses()).toEqual({ "d-1": "pending" });
-    const refused = send_alert.mock.calls
+    expect(wise.transfer).toHaveBeenCalledOnce();
+    expect(wise.fund_transfer).toHaveBeenCalledOnce();
+    expect(await statuses()).toEqual({ "d-1": "paid" });
+    const warned = send_alert.mock.calls
       .map(([a]) => a)
-      .find((a) => a.title === `commission payout refused for ${REFERRER}`);
-    expect(refused?.fields).toEqual(
+      .filter(
+        (a) => a.title === "payout to one of Better Giving's own Wise accounts"
+      );
+    expect(warned).toHaveLength(1);
+    expect(warned[0]!.fields).toEqual(
       expect.arrayContaining([{ name: "recipient", value: "42" }])
     );
+    expect(
+      send_alert.mock.calls.filter(([a]) => /refused/.test(a.title))
+    ).toEqual([]);
   });
 
   test("a retry over a grown set after an unknown funding outcome pays only the new commission", async () => {

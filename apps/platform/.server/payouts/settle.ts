@@ -22,7 +22,6 @@ import { deduct, lock_run, owed_netting_on, undo_deductions } from "./owed-run";
 import { type IReturnHold, npo_return_hold } from "./resend-returned";
 import {
   NotFundedError,
-  PayRefused,
   payout_total,
   recovered_run_ref,
   transfer_ref,
@@ -165,13 +164,6 @@ export async function settle_npo_payouts(
         ...ctx,
         ...(not_released.length > 0 && { not_released }),
       });
-      if (err.cause instanceof PayRefused) {
-        await alert({
-          title: `payout refused for npo:${npo.id}`,
-          body: `${err.cause.message}. no money moved; the payouts are back to pending. customerTransactionId ${ref}`,
-          fields,
-        });
-      }
       // ops undoes a refund from before the owed ledger another way
       for (const pre_ledger of [true, false]) {
         const payouts = kept.filter((k) => k.pre_ledger === pre_ledger);

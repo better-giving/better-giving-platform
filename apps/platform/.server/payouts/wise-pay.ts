@@ -1,7 +1,10 @@
-import { wise as wise_env } from "../env";
+import { report_error } from "#/errors/report";
+import type { Alert } from "@/slack";
+import { stage, wise as wise_env } from "../env";
+import { aws_monitor } from "../kit/slack";
 import { wise } from "../kit/wise";
 import { is_own_recipient } from "./own-accounts";
-import { NotFundedError, PayRefused } from "./transfer";
+import { NotFundedError } from "./transfer";
 
 /** awaiting our funding: the one status in which funding is ours to ask for */
 const UNFUNDED = "incoming_payment_waiting";
@@ -18,7 +21,8 @@ const FUNDED = new Set([
  * quote → transfer → fund. resolves with the transfer id once funding was
  * accepted. throws `NotFundedError` only when no money moved; any other throw
  * means it may have. a recipient that is one of our own accounts, or whose
- * check failed, is refused: the `NotFundedError`'s cause is a `PayRefused`.
+ * check could not run, is paid all the same: Better Giving does not pry into
+ * where a nonprofit sends its funds, so ops is warned, never blocked.
  */
 export async function wise_pay(
   to: number,
@@ -66,15 +70,27 @@ async function create_transfer(
   ref: string
 ): Promise<Transfer> {
   const recipient = await wise.v2_account(to);
-  const own = await is_own_recipient(recipient).catch((err) => {
-    throw new PayRefused(
-      `could not read Better Giving's own Wise account details to check recipient ${to} against (${String(err)})`
-    );
-  });
-  if (own) {
-    throw new PayRefused(
-      `recipient ${to} (${recipient.name?.fullName ?? "no name"}) is one of Better Giving's own Wise accounts, not the payee's`
-    );
+  const checked = await is_own_recipient(recipient).then(
+    (own) => ({ own, err: null }),
+    (err: unknown) => ({ own: false, err })
+  );
+  const fields = [
+    { name: "recipient", value: to.toString() },
+    { name: "holder", value: recipient.name?.fullName ?? "no name" },
+    { name: "customerTransactionId", value: ref },
+  ];
+  if (checked.err !== null) {
+    await warn_ops({
+      title: "own-account check could not run before a payout",
+      body: `could not read Better Giving's own Wise account details to check recipient ${to} against (${String(checked.err)}). the payout went ahead`,
+      fields,
+    });
+  } else if (checked.own) {
+    await warn_ops({
+      title: "payout to one of Better Giving's own Wise accounts",
+      body: `recipient ${to} matches one of Better Giving's own Wise accounts. the payout went ahead: check it is what the nonprofit asked for`,
+      fields,
+    });
   }
 
   const quote = await wise.quote(wise_env.profile_id, {
@@ -100,4 +116,21 @@ async function create_transfer(
 
   if (transfer.errors) throw transfer.errors;
   return transfer;
+}
+
+/** an alert that fails to send is reported, never thrown past the money */
+async function warn_ops(a: {
+  title: string;
+  body: string;
+  fields: NonNullable<Alert["fields"]>;
+}) {
+  try {
+    await aws_monitor.send_alert({
+      ...a,
+      type: "ERROR",
+      from: `wise-pay:${stage}`,
+    });
+  } catch (err) {
+    report_error(err, { alert: a.title });
+  }
 }

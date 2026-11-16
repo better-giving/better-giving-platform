@@ -27,7 +27,6 @@ import { return_hold_cause } from "./return-hold";
 import type { Pay } from "./settle";
 import {
   NotFundedError,
-  PayRefused,
   payout_total,
   recovered_run_ref,
   transfer_ref,
@@ -167,13 +166,6 @@ export async function settle_referrer_commissions(
           fields,
         });
         return { status: "unreleased", ref };
-      }
-      if (err.cause instanceof PayRefused) {
-        await alert({
-          title: `commission payout refused for ${referrer.id}`,
-          body: `${err.cause.message}. no money moved; the commissions are back to pending. customerTransactionId ${ref}`,
-          fields,
-        });
       }
       if (not_released.length > 0) {
         await alert({

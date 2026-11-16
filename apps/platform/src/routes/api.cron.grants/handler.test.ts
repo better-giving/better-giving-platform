@@ -252,24 +252,34 @@ const npo_cash = async (id: number) =>
     ?.cash;
 
 describe("grants cron execute", () => {
-  test("a recipient that is one of our own wise accounts is refused before any quote: payouts back to pending, nothing paid, ops told", async () => {
+  test("a recipient that is one of our own wise accounts is paid as normal, and ops is warned", async () => {
     const npo_id = await seed_npo({ cash: 500 });
     await seed_payout(npo_id, "p-1", 60);
     wise.v2_account.mockResolvedValueOnce({
       currency: "USD",
       ownedByCustomer: true,
+      name: { fullName: "Better Giving Inc" },
     } as never);
 
     await index();
 
-    expect(wise.quote).not.toHaveBeenCalled();
-    expect(wise.transfer).not.toHaveBeenCalled();
-    expect(await payout_types()).toEqual({ "p-1": "pending" });
-    expect(await npo_cash(npo_id)).toBe(500);
-    const refused = send_alert.mock.calls
+    expect(wise.transfer).toHaveBeenCalledOnce();
+    expect(wise.fund_transfer).toHaveBeenCalledOnce();
+    // funded and recorded as any run: payouts on their way, cash taken
+    expect(await payout_types()).toEqual({ "p-1": "processing" });
+    expect(await npo_cash(npo_id)).toBe(440);
+    const warned = send_alert.mock.calls
       .map(([a]) => a)
-      .find((a) => a.title === `payout refused for npo:${npo_id}`);
-    expect(refused?.body).toContain("one of Better Giving's own Wise accounts");
+      .filter(
+        (a) => a.title === "payout to one of Better Giving's own Wise accounts"
+      );
+    expect(warned).toHaveLength(1);
+    expect(warned[0]!.fields).toEqual(
+      expect.arrayContaining([{ name: "holder", value: "Better Giving Inc" }])
+    );
+    expect(
+      send_alert.mock.calls.filter(([a]) => /refused/.test(a.title))
+    ).toEqual([]);
   });
 
   test("pays the npo its full pending total and settles every payout", async () => {

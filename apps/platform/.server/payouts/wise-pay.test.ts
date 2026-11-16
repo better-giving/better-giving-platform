@@ -8,13 +8,16 @@ const wise = vi.hoisted(() => ({
   cancel_transfer: vi.fn(),
 }));
 const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
+const slack = vi.hoisted(() => ({ send_alert: vi.fn() }));
 
-vi.mock("../env", () => ({ wise: { profile_id: "42" } }));
+vi.mock("../env", () => ({ stage: "test", wise: { profile_id: "42" } }));
+vi.mock("#/errors/report", () => ({ report_error: vi.fn() }));
 vi.mock("../kit/wise", () => ({ wise }));
+vi.mock("../kit/slack", () => ({ aws_monitor: slack }));
 vi.mock("./own-accounts", () => own);
 
 const { wise_pay } = await import("./wise-pay");
-const { NotFundedError, PayRefused } = await import("./transfer");
+const { NotFundedError } = await import("./transfer");
 
 const TRANSFER_ID = 9001;
 const REF = "0d3c1b52-7a4e-5c1f-9a2b-3c4d5e6f7a8b";
@@ -35,6 +38,7 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ id: TRANSFER_ID, status: "cancelled" });
   own.is_own_recipient.mockReset().mockResolvedValue(false);
+  slack.send_alert.mockReset().mockResolvedValue(undefined);
 });
 
 describe("wise_pay", () => {
@@ -156,26 +160,60 @@ describe("wise_pay", () => {
     expect(wise.fund_transfer).toHaveBeenCalledOnce();
   });
 
-  test("a recipient that is one of our own wise accounts is refused before any quote", async () => {
+  test("a recipient that is one of our own wise accounts is paid as normal, and ops is warned once", async () => {
     own.is_own_recipient.mockResolvedValue(true);
+    wise.v2_account.mockResolvedValue({
+      currency: "EUR",
+      name: { fullName: "Better Giving Inc" },
+    });
 
-    const err = await wise_pay(881063184, 72.82, REF).catch((e) => e);
+    await expect(wise_pay(881063184, 72.82, REF)).resolves.toBe(TRANSFER_ID);
 
-    expect(err).toBeInstanceOf(NotFundedError);
-    expect(err.cause).toBeInstanceOf(PayRefused);
-    expect(String(err.cause)).toContain("881063184");
-    expect(wise.quote).not.toHaveBeenCalled();
-    expect(wise.fund_transfer).not.toHaveBeenCalled();
+    expect(wise.quote).toHaveBeenCalledOnce();
+    expect(wise.transfer).toHaveBeenCalledOnce();
+    expect(wise.fund_transfer).toHaveBeenCalledOnce();
+    expect(slack.send_alert).toHaveBeenCalledOnce();
+    const [alert] = slack.send_alert.mock.calls[0]!;
+    expect(alert.title).toBe(
+      "payout to one of Better Giving's own Wise accounts"
+    );
+    expect(alert.fields).toEqual(
+      expect.arrayContaining([
+        { name: "recipient", value: "881063184" },
+        { name: "holder", value: "Better Giving Inc" },
+        { name: "customerTransactionId", value: REF },
+      ])
+    );
   });
 
-  test("a failed lookup of our own accounts refuses the payout", async () => {
+  test("a failed lookup of our own accounts pays as normal and tells ops the check could not run", async () => {
     own.is_own_recipient.mockRejectedValue("account-details 503");
 
-    const err = await wise_pay(777, 100, REF).catch((e) => e);
+    await expect(wise_pay(777, 100, REF)).resolves.toBe(TRANSFER_ID);
 
-    expect(err).toBeInstanceOf(NotFundedError);
-    expect(err.cause).toBeInstanceOf(PayRefused);
-    expect(String(err.cause)).toContain("account-details 503");
-    expect(wise.quote).not.toHaveBeenCalled();
+    expect(wise.fund_transfer).toHaveBeenCalledOnce();
+    expect(slack.send_alert).toHaveBeenCalledOnce();
+    const [alert] = slack.send_alert.mock.calls[0]!;
+    expect(alert.title).toBe("own-account check could not run before a payout");
+    expect(alert.body).toContain("account-details 503");
+    expect(alert.fields).toEqual(
+      expect.arrayContaining([
+        { name: "recipient", value: "777" },
+        { name: "customerTransactionId", value: REF },
+      ])
+    );
+  });
+
+  test("an ordinary recipient raises no alert", async () => {
+    await wise_pay(777, 100, REF);
+    expect(slack.send_alert).not.toHaveBeenCalled();
+  });
+
+  test("a warning that fails to send never blocks the payout", async () => {
+    own.is_own_recipient.mockResolvedValue(true);
+    slack.send_alert.mockRejectedValue(new Error("slack down"));
+
+    await expect(wise_pay(881063184, 72.82, REF)).resolves.toBe(TRANSFER_ID);
+    expect(wise.fund_transfer).toHaveBeenCalledOnce();
   });
 });
