@@ -30,7 +30,9 @@ function Applications({ loaderData: page1 }: Route.ComponentProps) {
   const { node, loading } = use_table<IReg>({
     // a filter or sort change drops every loaded page: rows of the old view
     // must never stay beside the new one
-    filter_key: params.toString(),
+    // the params plus what page 1 is: a cached page 1 swapped for a fresh one
+    // under the same URL must drop the pages loaded beside the stale one
+    filter_key: `${params.toString()}|${page1.next ?? ""}|${page1.items[0]?.id ?? ""}`,
     table: ({ items, ...props }) => (
       <Table
         items={items}
@@ -68,6 +70,8 @@ function Applications({ loaderData: page1 }: Route.ComponentProps) {
         >
           <Search className="absolute top-1/2 -translate-y-1/2 left-3 icon-xl" />
           <input
+            // uncontrolled, so a query cleared elsewhere (Reset filters) remounts it
+            key={params.get("query") ?? ""}
             disabled={loading}
             name="query"
             defaultValue={params.get("query") ?? ""}

@@ -180,6 +180,89 @@ describe("regs: every sort pages without repeating or skipping a row", () => {
   });
 });
 
+describe("regs: cursor edge cases", () => {
+  test("names with characters beyond Latin-1 page across the boundary under a name sort", async () => {
+    const names = [
+      "Children’s Fund",
+      "Łódź Aid",
+      "Café – Kenya",
+      "日本 Relief",
+      "Zeta",
+    ];
+    await test_db.current!.db.insert(registrations).values(
+      Array.from({ length: 20 }, (_, i) => ({
+        id: `reg-${String(i).padStart(2, "0")}`,
+        r_id: `user-${i}`,
+        status: "03" as const,
+        // the 15th row of the page is always a wide-character name
+        o_name: i < 14 ? `Alpha ${String(i).padStart(2, "0")}` : names[i - 14],
+        updated_at: iso(i),
+      }))
+    );
+
+    const pages = await all_pages({ sort_key: "o_name", sort_dir: "asc" });
+    const ids = pages.flat();
+
+    expect(new Set(ids).size).toBe(20);
+    expect(pages).toHaveLength(2);
+  });
+
+  test("a malformed next is ignored, not an error", async () => {
+    await seed_many(5);
+
+    const page = await regs({ next: "%%%not-a-cursor" });
+
+    expect(page.items).toHaveLength(5);
+  });
+
+  test("a cursor for another sort is ignored, not an error", async () => {
+    await seed_many(30);
+    const by_name = await regs({ sort_key: "o_name", sort_dir: "asc" });
+
+    const page = await regs({ sort_key: "updated_at", next: by_name.next });
+
+    expect(page.items.length).toBeGreaterThan(0);
+  });
+
+  test("a keyset cursor is followed under a filter that matches more than a page", async () => {
+    await test_db.current!.db.insert(registrations).values(
+      Array.from({ length: 20 }, (_, i) => ({
+        id: `reg-k-${String(i).padStart(2, "0")}`,
+        r_id: `user-k-${i}`,
+        status: "03" as const,
+        o_name: `Kenya Org ${i}`,
+        o_hq_country: "Kenya",
+        updated_at: iso(i),
+      }))
+    );
+
+    const pages = await all_pages({
+      status: "03",
+      country: "Kenya",
+      sort_key: "o_name",
+    });
+
+    expect(pages.map((p) => p.length)).toEqual([15, 5]);
+    expect(new Set(pages.flat()).size).toBe(20);
+  });
+
+  test("a bare date cursor from an old tab keeps the old default: under review", async () => {
+    await test_db.current!.db.insert(registrations).values([
+      { id: "a", r_id: "u1", status: "02", updated_at: iso(3) },
+      { id: "b", r_id: "u2", status: "03", updated_at: iso(4) },
+      { id: "c", r_id: "u3", status: "02", updated_at: iso(5) },
+    ]);
+    const old_cursor = btoa(iso(2))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    const page = await regs({ next: old_cursor });
+
+    expect(page.items.map((r) => r.id)).toEqual(["a", "c"]);
+  });
+});
+
 describe("regs: filters", () => {
   test("a query that matches nothing returns an empty page", async () => {
     await seed_many(5);

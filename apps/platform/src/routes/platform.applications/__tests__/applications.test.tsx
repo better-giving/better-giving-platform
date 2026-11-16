@@ -193,6 +193,22 @@ describe("applications — reset", () => {
   });
 });
 
+describe("applications — reset clears the search", () => {
+  it("Reset filters empties the search box too", async () => {
+    const screen = await render_applications("?query=Pending");
+    const search_input = screen.getByPlaceholder(/search applications/i);
+    await expect.element(search_input).toHaveValue("Pending");
+
+    await screen.getByRole("button", { name: /^filter$/i }).click();
+    await screen.getByRole("button", { name: /reset filters/i }).click();
+
+    await expect
+      .element(screen.getByPlaceholder(/search applications/i))
+      .toHaveValue("");
+    await expect.element(screen.getByText("Approved Org")).toBeInTheDocument();
+  });
+});
+
 describe("applications — empty states", () => {
   it("says No applications yet when nothing is filtered and the list is empty", async () => {
     await test_db.current!.db.delete(registrations);

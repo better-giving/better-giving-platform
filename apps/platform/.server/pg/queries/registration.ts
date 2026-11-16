@@ -24,7 +24,7 @@ import {
 import { db } from "../db";
 import { registrations } from "../schema/registration";
 import type { DbOrTx, IPage } from "./helpers";
-import { decode_date_cursor } from "./helpers";
+import { decode_cursor, decode_date_cursor, encode_cursor } from "./helpers";
 
 export async function reg_get(id: string): Promise<IReg | undefined> {
   const [row] = await db
@@ -209,28 +209,46 @@ export async function reg_stripe_deauthorize(
 }
 
 const PAGE = 15;
+/** what the database writes for a timestamptz: a cursor for another sort is not one */
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 
-/** a keyset cursor: the last row's sort value and id, base64url of a json pair */
-function encode_regs_cursor(value: string | null, id: string): string {
-  return btoa(JSON.stringify([value, id]))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+/** a keyset cursor: the last row's sort value and id, utf-8 safe */
+function encode_regs_cursor(value: string | null, id: string) {
+  return encode_cursor({ v: value, i: id });
 }
 
-/** a cursor's pair, or undefined for anything else (a bare date from before
- * keyset paging included, which the caller reads as `updated_at <`) */
-function decode_regs_cursor(c: string): [string | null, string] | undefined {
+type RegsCursor =
+  | { kind: "keyset"; value: string | null; id: string }
+  /** a bare date from before keyset paging */
+  | { kind: "date"; date: string };
+
+/** what `next` holds, or undefined for anything unreadable: a stale or edited
+ * cursor starts the list over rather than failing it */
+function decode_regs_cursor(
+  next: string,
+  sort_key: string
+): RegsCursor | undefined {
   try {
-    const x = JSON.parse(decode_date_cursor(c) ?? "");
+    const x = decode_cursor(next);
     if (
-      Array.isArray(x) &&
-      x.length === 2 &&
-      (x[0] === null || typeof x[0] === "string") &&
-      typeof x[1] === "string"
+      x &&
+      typeof x.i === "string" &&
+      (x.v === null || typeof x.v === "string")
     ) {
-      return [x[0], x[1]];
+      // a timestamp must read as one, or the comparison would fail in postgres
+      if (
+        sort_key === "updated_at" &&
+        x.v !== null &&
+        !ISO_TIMESTAMP.test(x.v)
+      ) {
+        return undefined;
+      }
+      return { kind: "keyset", value: x.v, id: x.i };
     }
+  } catch {}
+  try {
+    const date = decode_date_cursor(next);
+    if (date && !Number.isNaN(Date.parse(date))) return { kind: "date", date };
   } catch {}
   return undefined;
 }
@@ -243,7 +261,7 @@ function decode_regs_cursor(c: string): [string | null, string] | undefined {
  */
 export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
   const {
-    status,
+    status: asked_status,
     start_date,
     end_date,
     country,
@@ -263,10 +281,14 @@ export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
   const desc_ = sort_dir !== "asc";
   const dir = desc_ ? desc : asc;
 
-  const parsed = next ? decode_regs_cursor(next) : undefined;
+  const cursor = next ? decode_regs_cursor(next, sort_key) : undefined;
+  // a tab from before this default changed pages with a bare date and no
+  // status, which then meant under review
+  const status =
+    cursor?.kind === "date" && asked_status === undefined ? "02" : asked_status;
   let after: SQL | undefined;
-  if (parsed) {
-    const [value, id] = parsed;
+  if (cursor?.kind === "keyset") {
+    const { value, id } = cursor;
     // a timestamp column compares as one, whatever the cursor's text
     const v =
       sort_key === "updated_at" ? sql`${value}::timestamptz` : sql`${value}`;
@@ -276,9 +298,8 @@ export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
         ? // nulls sort last: only nulls with a later id remain
           sql`(${col} is null and ${registrations.id} ${past} ${id})`
         : sql`(${col} ${past} ${v} or (${col} = ${v} and ${registrations.id} ${past} ${id}) or ${col} is null)`;
-  } else if (next) {
-    // a bare date cursor from before keyset paging: the newest-first view
-    after = sql`${registrations.updated_at} < ${decode_date_cursor(next)}`;
+  } else if (cursor?.kind === "date") {
+    after = sql`${registrations.updated_at} < ${cursor.date}`;
   }
 
   const rows = await db
