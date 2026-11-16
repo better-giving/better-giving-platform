@@ -3,6 +3,7 @@ import {
   asc,
   desc,
   eq,
+  getTableColumns,
   gt,
   gte,
   inArray,
@@ -320,15 +321,22 @@ export async function npos_with_returned_payouts(): Promise<number[]> {
 export type SettlementRow = typeof settlements.$inferSelect;
 type SettlementInsert = typeof settlements.$inferInsert;
 
+/** a grant as the npo's pages list it: `bounced` is set when wise bounced a
+ * payout of it, which tells a transfer wise cancelled from one ops cancelled */
+export type GrantRow = SettlementRow & { bounced: boolean };
+
 export async function npo_settlements(
   npo_id: number,
   opts: INpoSettlementsOptions
-): Promise<IPage<SettlementRow>> {
+): Promise<IPage<GrantRow>> {
   const { limit = 10, next } = opts;
   const cursor = decode_date_cursor(next);
 
   const rows = await db
-    .select()
+    .select({
+      ...getTableColumns(settlements),
+      bounced: sql<boolean>`${bounced_payouts()}`,
+    })
     .from(settlements)
     .where(
       and(

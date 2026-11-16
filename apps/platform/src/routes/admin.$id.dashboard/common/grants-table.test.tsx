@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { render } from "vitest-browser-react";
-import type { SettlementRow } from "$/pg/queries/payout";
+import type { GrantRow } from "$/pg/queries/payout";
 import { GrantsTable } from "./grants-table";
 
-const grant = (id: string, status: string): SettlementRow =>
+const grant = (id: string, status: string, bounced = false): GrantRow =>
   ({
     id,
     other_id: `ref-${id}`,
@@ -14,7 +14,8 @@ const grant = (id: string, status: string): SettlementRow =>
     status,
     hold_alerted_at: null,
     recipient_id: null,
-  }) as SettlementRow;
+    bounced,
+  }) as GrantRow;
 
 describe("dashboard payout history — grant rows", () => {
   test("a bounced grant is struck, Bounced and Not counted", async () => {
@@ -30,6 +31,17 @@ describe("dashboard payout history — grant rows", () => {
     expect(
       getComputedStyle(screen.getByText("$481.50").element()).textDecorationLine
     ).toBe("line-through");
+  });
+
+  test("a cancelled grant is Bounced only when wise bounced a payout of it", async () => {
+    const screen = await render(
+      <GrantsTable
+        items={[grant("g1", "cancelled", true), grant("g2", "cancelled")]}
+      />
+    );
+    expect(
+      screen.getByText("Bounced", { exact: true }).elements()
+    ).toHaveLength(1);
   });
 
   test("a sending grant says Not counted yet, and a delivered one has nothing extra", async () => {

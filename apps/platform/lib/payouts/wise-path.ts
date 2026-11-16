@@ -49,6 +49,8 @@ export type GrantState = "sending" | "settled" | "bounced" | "returned";
 export function grant_state(s: {
   status: string;
   other_id: string | null;
+  /** wise bounced a payout of it: what makes `cancelled` a bounce, not ops' own cancel */
+  bounced?: boolean;
 }): GrantState | "repair" {
   if (s.status === "returned") return "returned";
   if (s.status === "awaiting_repair") return "repair";
@@ -58,5 +60,7 @@ export function grant_state(s: {
   // the money is back in the balance, the return not yet recorded
   if (s.status === MONEY_BACK) return "returned";
   if (ON_PATH.includes(s.status)) return "sending";
+  // a transfer ops cancelled by hand is history, not a bounce
+  if (s.status === CANCELLED && !s.bounced) return "settled";
   return "bounced";
 }

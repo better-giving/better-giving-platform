@@ -54,7 +54,9 @@ vi.mock("../pg/db", () => ({
 const { poll_wise_returns } = await import("./wise-return");
 const { settle_npo_payouts } = await import("./settle");
 const { npo_return_hold } = await import("./resend-returned");
-const { processing_payouts } = await import("../pg/queries/payout");
+const { npo_settlements, processing_payouts } = await import(
+  "../pg/queries/payout"
+);
 const { dists } = await import("../pg/schema/dist");
 const { bal_txs } = await import("../pg/schema/bal-tx");
 const { donations } = await import("../pg/schema/donation");
@@ -351,6 +353,32 @@ describe("history stored before delivery was tracked holds no one", () => {
       expect(await npo_return_hold(npo.id)).toBeNull();
     }
   );
+});
+
+describe("the grants list tells wise's bounce from ops' own cancel", () => {
+  test("a settlement is flagged bounced only while one of its payouts is", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    const transfer = await funded(npo, ["p-1"]);
+    await db()
+      .insert(settlements)
+      .values({
+        id: "9002",
+        other_id: "ref-9002",
+        npo_id: npo.id,
+        date: days_ago(200),
+        amount: 50,
+        status: "cancelled",
+      });
+    await poll_wise_returns(state("cancelled"));
+
+    const { items } = await npo_settlements(npo.id, {});
+
+    expect(Object.fromEntries(items.map((i) => [i.id, i.bounced]))).toEqual({
+      [transfer]: true,
+      "9002": false,
+    });
+  });
 });
 
 describe("a transfer refunded while its payouts are still Sending", () => {

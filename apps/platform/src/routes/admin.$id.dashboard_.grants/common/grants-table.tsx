@@ -4,9 +4,9 @@ import { GrantAmount } from "#/components/returned-payout";
 import type { IPaginator } from "#/types/components";
 import { humanize } from "@/helpers/decimal";
 import type { IGrantRunDeductions } from "$/pg/queries/owed-history";
-import type { SettlementRow } from "$/pg/queries/payout";
+import type { GrantRow } from "$/pg/queries/payout";
 
-export interface IGrantLine extends SettlementRow {
+export interface IGrantLine extends GrantRow {
   /** set when the grant recovered anything owed */
   run?: IGrantRunDeductions;
 }

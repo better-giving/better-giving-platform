@@ -13,7 +13,7 @@ import { npo_bapp_in_review, npo_default_bapp } from "$/pg/queries/banking";
 import { campaign_count, campaign_live_count } from "$/pg/queries/campaign";
 import { nav_ltd } from "$/pg/queries/nav";
 import { npo_get } from "$/pg/queries/npo";
-import type { IReturnedPayouts, SettlementRow } from "$/pg/queries/payout";
+import type { GrantRow, IReturnedPayouts } from "$/pg/queries/payout";
 import {
   npo_bounced_payouts,
   npo_payouts,
@@ -29,7 +29,7 @@ export interface DashboardData {
   bal_cash: number;
   /** compute in server save client bundle */
   recent_payouts: IPageKeyed<IPayout>;
-  recent_settlements: IPageKeyed<SettlementRow>;
+  recent_settlements: IPageKeyed<GrantRow>;
   next_payout: string;
   pm?: IBapp;
   payout_to: TPayoutTo;
@@ -45,7 +45,6 @@ export interface DashboardData {
   bounced: IReturnedPayouts | null;
   /** the hold is a bounced transfer (not a returned one) */
   bounce_hold: boolean;
-  /** the latest returned transfer still holds this npo's payouts */
   /** a returned (or awaiting-repair) transfer holds this npo's payouts */
   return_hold: boolean;
   /** the hold is a transfer that came back with its payouts' ownership
