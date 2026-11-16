@@ -1016,8 +1016,9 @@ describe("dashboard — bounced payout notice", () => {
 
     const screen = await render_dashboard(npo.id);
 
+    // once in each of the payout and grant history tables
     await expect
-      .element(screen.getByText("Sending", { exact: true }))
+      .element(screen.getByText("Sending", { exact: true }).first())
       .toBeVisible();
     expect(
       screen.getByText("Your bank didn't accept a payout").query()
