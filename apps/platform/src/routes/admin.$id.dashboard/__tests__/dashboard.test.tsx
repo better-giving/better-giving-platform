@@ -1081,9 +1081,10 @@ describe("dashboard — bounced payout notice", () => {
 
     const screen = await render_dashboard(npo.id);
 
-    expect(screen.container.querySelectorAll('[role="region"]')).toHaveLength(
-      1
-    );
+    // exactly one notice: the returned and awaiting notices share a title
+    expect(
+      screen.getByText("Your bank sent a payout back").elements()
+    ).toHaveLength(1);
     await expect
       .element(
         page
@@ -1123,9 +1124,10 @@ describe("dashboard — bounced payout notice", () => {
 
     const screen = await render_dashboard(npo.id);
 
-    expect(screen.container.querySelectorAll('[role="region"]')).toHaveLength(
-      1
-    );
+    // exactly one notice: the returned and awaiting notices share a title
+    expect(
+      screen.getByText("Your bank sent a payout back").elements()
+    ).toHaveLength(1);
     await expect
       .element(notice(screen, "Your bank sent a payout back"))
       .toBeVisible();
@@ -1145,9 +1147,7 @@ describe("dashboard — bounced payout notice", () => {
     await expect
       .element(screen.getByText("Sending", { exact: true }).first())
       .toBeVisible();
-    expect(screen.container.querySelectorAll('[role="region"]')).toHaveLength(
-      0
-    );
+    expect(screen.getByRole("region").elements()).toHaveLength(0);
     expect(bounce_hold(screen).query()).toBeNull();
     expect(return_hold(screen).query()).toBeNull();
     await expect.element(screen.getByText(/will be paid out/)).toBeVisible();
