@@ -54,9 +54,12 @@ vi.mock("../pg/db", () => ({
 const { poll_wise_returns } = await import("./wise-return");
 const { settle_npo_payouts } = await import("./settle");
 const { npo_return_hold, resend_returned } = await import("./resend-returned");
-const { npo_payouts, npo_settlements, processing_payouts } = await import(
-  "../pg/queries/payout"
-);
+const {
+  npo_bounced_payouts,
+  npo_payouts,
+  npo_settlements,
+  processing_payouts,
+} = await import("../pg/queries/payout");
 const { dists } = await import("../pg/schema/dist");
 const { bal_txs } = await import("../pg/schema/bal-tx");
 const { donations } = await import("../pg/schema/donation");
@@ -451,46 +454,107 @@ describe("the pause survives a donor refund", () => {
       settlement_id: "9005",
       status: "returned",
     });
-    // a manual cancel with refunded payouts, newer than the returned run, is history, not a hold
-    await db()
-      .insert(settlements)
-      .values({
-        id: "9006",
-        other_id: "ref-9006",
-        npo_id: npo.id,
-        date: days_ago(2),
-        amount: 50,
-        status: "cancelled",
-      });
-    await seed_payout(npo.id, "p-c", 50);
-    await db()
-      .update(payouts)
-      .set({ type: "refunded_loss", settled_id: "9006" })
-      .where(eq(payouts.id, "p-c"));
-    expect(await npo_return_hold(npo.id)).toMatchObject({
-      settlement_id: "9005",
-    });
   });
 
-  test("a manual cancel's refunded payouts hold no one", async () => {
+  test.each(["cancelled", "some_new_state"])(
+    "a %s run whose only bounced payout is refunded keeps the npo held, and nothing is re-sent",
+    async (wise_state) => {
+      const npo = await seed_npo(500);
+      await seed_payout(npo.id, "p-1", 100);
+      const transfer = await funded(npo, ["p-1"]);
+      await poll_wise_returns(state(wise_state));
+      expect(await types()).toEqual({ "p-1": "bounced" });
+
+      await db()
+        .update(payouts)
+        .set({ type: "refunded_loss" })
+        .where(eq(payouts.id, "p-1"));
+
+      expect(await npo_return_hold(npo.id)).toMatchObject({
+        settlement_id: transfer,
+        status: "bounced",
+        wise_state,
+      });
+      expect(await resend_returned(npo.id)).toMatchObject({ status: "held" });
+      expect(await types()).toEqual({ "p-1": "refunded_loss" });
+    }
+  );
+
+  test("an awaiting-repair run with a refunded payout holds exactly as before", async () => {
     const npo = await seed_npo(0);
-    await seed_payout(npo.id, "p-old", 100);
+    await seed_payout(npo.id, "p-a", 100);
     await db()
       .insert(settlements)
       .values({
-        id: "9004",
-        other_id: "ref-9004",
+        id: "9007",
+        other_id: "ref-9007",
         npo_id: npo.id,
         date: days_ago(5),
         amount: 100,
-        status: "cancelled",
+        status: "awaiting_repair",
+        recipient_id: "bank-x",
       });
     await db()
       .update(payouts)
-      .set({ type: "refunded_loss", settled_id: "9004" })
-      .where(eq(payouts.id, "p-old"));
+      .set({ type: "refunded_loss", settled_id: "9007" })
+      .where(eq(payouts.id, "p-a"));
+
+    expect(await npo_return_hold(npo.id)).toMatchObject({
+      settlement_id: "9007",
+      status: "awaiting_repair",
+    });
+  });
+
+  test("a delivered or legacy-settled run's refunded payouts hold no one", async () => {
+    const npo = await seed_npo(0);
+    let n = 0;
+    for (const status of [
+      "outgoing_payment_sent",
+      "settled",
+      "processing",
+      "",
+    ]) {
+      const id = `p-d${n}`;
+      await seed_payout(npo.id, id, 10);
+      await db()
+        .insert(settlements)
+        .values({
+          id: `920${n}`,
+          other_id: `ref-920${n}`,
+          npo_id: npo.id,
+          date: days_ago(5),
+          amount: 10,
+          status,
+        });
+      await db()
+        .update(payouts)
+        .set({ type: "refunded_loss", settled_id: `920${n}` })
+        .where(eq(payouts.id, id));
+      n++;
+    }
 
     expect(await npo_return_hold(npo.id)).toBeNull();
+  });
+
+  test("a cancelled run at day 120 with a refunded payout is still polled, and its refund is read", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    const transfer = await funded(npo, ["p-1"]);
+    await poll_wise_returns(state("cancelled"));
+    await db()
+      .update(payouts)
+      .set({ type: "refunded_loss" })
+      .where(eq(payouts.id, "p-1"));
+    await db()
+      .update(settlements)
+      .set({ date: days_ago(120) })
+      .where(eq(settlements.id, transfer));
+    const lookup = vi.fn(state("cancelled"));
+
+    await poll_wise_returns(lookup);
+
+    expect(lookup).toHaveBeenCalledOnce();
+    expect(await npo_return_hold(npo.id)).not.toBeNull();
   });
 });
 
@@ -519,6 +583,35 @@ describe("the payouts list carries the charged-back flag", () => {
     expect(by_id["p-c"]).toMatchObject({ type: "bounced", charged_back: true });
     expect(by_id["p-b"]).toMatchObject({ type: "bounced" });
     expect(by_id["p-b"]).not.toHaveProperty("charged_back");
+  });
+});
+
+describe("what the notices count as coming back", () => {
+  test("a charged-back run's payouts are left out of the bounced count and total", async () => {
+    const npo = await seed_npo(1000);
+    await seed_payout(npo.id, "p-c", 481.5);
+    await seed_payout(npo.id, "p-b", 100);
+    const charged = await funded(npo, ["p-c"]);
+    await funded(npo, ["p-b"]);
+    await poll_wise_returns(state("bounced_back"));
+    await db()
+      .update(settlements)
+      .set({ status: "charged_back" })
+      .where(eq(settlements.id, charged));
+
+    expect(await npo_bounced_payouts(npo.id)).toMatchObject({
+      count: 1,
+      total: 100,
+    });
+  });
+
+  test("with only charged-back payouts there is nothing coming back", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-c", 100);
+    await funded(npo, ["p-c"]);
+    await poll_wise_returns(state("charged_back"));
+
+    expect(await npo_bounced_payouts(npo.id)).toBeNull();
   });
 });
 

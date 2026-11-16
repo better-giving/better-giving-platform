@@ -1282,6 +1282,41 @@ describe("dashboard — bounced payout notice", () => {
       await expect.element(charged_hold(screen)).toBeVisible();
     });
 
+    it("an older charged-back payout is not counted in a newer return's notice", async () => {
+      const npo = await seed_npo();
+      await seed_nav_log({ price: 1, units: 0, value: 0 });
+      await file_bank(npo.id);
+      // reversed a while ago, then a return became the latest hold
+      await seed_bounced(npo.id, "p-old", 481.5, "bounced", "charged_back");
+      await test_db
+        .current!.db.update(settlements)
+        .set({ date: new Date(Date.now() - 20 * 86_400_000).toISOString() });
+      await test_db.current!.db.insert(settlements).values({
+        id: "set-ret",
+        other_id: "ref-ret",
+        npo_id: npo.id,
+        date: new Date().toISOString(),
+        amount: 250,
+        status: "returned",
+        recipient_id: "bank-old",
+      });
+      await seed_returned_payout(npo.id, "p-ret", 250);
+
+      const screen = await render_dashboard(npo.id);
+
+      await expect
+        .element(
+          page
+            .elementLocator(
+              notice(screen, "Your bank sent a payout back").element()
+            )
+            .getByText(/^\$250\.00 from .* didn't reach your bank account/)
+        )
+        .toBeVisible();
+      expect(screen.getByText(/\$731\.50/).query()).toBeNull();
+      expect(charged_notice(screen).query()).toBeNull();
+    });
+
     it("awaiting repair still wins", async () => {
       const npo = await seed_npo();
       await seed_nav_log({ price: 1, units: 0, value: 0 });

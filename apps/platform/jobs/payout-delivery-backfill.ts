@@ -1,5 +1,8 @@
 import { and, asc, eq, inArray, isNotNull, notInArray, sql } from "drizzle-orm";
-import { db } from "../.server/pg/db";
+import { neonConfig, Pool } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import ws from "ws";
+import type { Db } from "../.server/pg/db";
 import { payouts, settlements } from "../.server/pg/schema/payout";
 import { CANCELLED, DELIVERED_STATES, ON_PATH } from "../lib/payouts/wise-path";
 
@@ -41,8 +44,10 @@ import { CANCELLED, DELIVERED_STATES, ON_PATH } from "../lib/payouts/wise-path";
  *
  * ## Running
  *
- * env (a `--env-file` or the shell): `DATABASE_URL`, the database to read and
- * write. check it is the one you mean before passing `--commit`.
+ * env (a `--env-file` or the shell): `DATABASE_URL` only, the database to read
+ * and write. the job opens its own connection and loads none of the app's env
+ * (no `BASE_URL`, `APP_*` or payment-provider values). check it is the one you
+ * mean before passing `--commit`.
  *
  * 1. dry run, the default: `bun --env-file=<env> jobs/payout-delivery-backfill.ts`.
  *    writes nothing. prints one json line per payout it would change
@@ -97,11 +102,13 @@ export interface ISummary {
 }
 
 export interface IDeps {
+  /** the connection to read and write: the job builds its own, so it loads no app env */
+  db: Db;
   log: (line: string) => void;
 }
 
 /** whether migration 0081 is applied: the payouts type check admits `bounced` */
-export async function bounced_admitted(): Promise<boolean> {
+export async function bounced_admitted(db: Db): Promise<boolean> {
   const res = await db.execute(
     sql`select pg_get_constraintdef(oid) as def from pg_constraint where conname = 'type_check' and conrelid = 'payouts'::regclass`
   );
@@ -110,7 +117,8 @@ export async function bounced_admitted(): Promise<boolean> {
 }
 
 export async function run(opts: IOpts, deps: IDeps): Promise<ISummary> {
-  const admitted = await bounced_admitted();
+  const { db } = deps;
+  const admitted = await bounced_admitted(db);
   deps.log(
     admitted
       ? "payouts type_check admits 'bounced' (migration 0081 is applied)"
@@ -222,6 +230,12 @@ if (import.meta.main) {
     ? new URL(process.env.DATABASE_URL!).host
     : "unparsed DATABASE_URL";
   console.info(`${commit ? "COMMIT" : "dry run"} against ${host}`);
-  await run({ commit }, { log: (l) => console.info(l) });
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL is not set");
+  neonConfig.webSocketConstructor = ws;
+  // the job reads and writes only the payout tables, so it needs none of the
+  // app's schema or env; `Db` is the app's type, which the job's queries fit
+  const db = drizzle(new Pool({ connectionString: url })) as unknown as Db;
+  await run({ commit }, { db, log: (l) => console.info(l) });
   process.exit(0);
 }

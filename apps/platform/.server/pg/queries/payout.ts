@@ -24,7 +24,6 @@ import {
   UNSENT_TYPES,
 } from "@/payouts";
 import {
-  BOUNCED_BACK,
   CANCELLED,
   CHARGED_BACK,
   DELIVERED_STATES,
@@ -278,7 +277,8 @@ export async function npo_returned_payouts(
 }
 
 /** the npo's payouts wise reports bounced, still undelivered and not refunded,
- * and when the latest of their transfers was sent; null when none */
+ * and when the latest of their transfers was sent; null when none. a charged-back
+ * run's payouts are left out: that money was reversed, not coming back */
 export async function npo_bounced_payouts(
   npo_id: number
 ): Promise<IReturnedPayouts | null> {
@@ -292,7 +292,13 @@ export async function npo_bounced_payouts(
     })
     .from(payouts)
     .innerJoin(settlements, eq(settlements.id, payouts.settled_id))
-    .where(and(eq(payouts.npo_id, npo_id), eq(payouts.type, "bounced")));
+    .where(
+      and(
+        eq(payouts.npo_id, npo_id),
+        eq(payouts.type, "bounced"),
+        ne(settlements.status, CHARGED_BACK)
+      )
+    );
   return row && row.count > 0 ? row : null;
 }
 
@@ -441,12 +447,16 @@ const bounced_payouts = () =>
 /**
  * what keeps a state off the ordinary path a hold: a payout wise bounced, or
  * one a donor refund then moved to `refunded_loss` while the transfer is still
- * bounced or charged back (the next run would pay the same account). any other
- * run's refunded payouts hold no one: a transfer ops cancelled by hand is
- * history, and a returned or awaiting-repair run holds by its own rule
+ * off the ordinary path (`bounced_back`, `charged_back`, `cancelled`, any state
+ * wise adds): the next run would pay the same account. our own resolved states
+ * are not counted: a returned or awaiting-repair run holds by its own rule,
+ * and the delivered, legacy-settled and ordinary states are no bounce at all
  */
 const holding_payouts = () =>
-  sql`exists (select 1 from ${payouts} where ${payouts.settled_id} = ${settlements.id} and (${payouts.type} = 'bounced' or (${payouts.type} = 'refunded_loss' and ${settlements.status} in (${BOUNCED_BACK}, ${CHARGED_BACK}))))`;
+  sql`exists (select 1 from ${payouts} where ${payouts.settled_id} = ${settlements.id} and (${payouts.type} = 'bounced' or (${payouts.type} = 'refunded_loss' and ${settlements.status} not in (${sql.join(
+    [...ON_PATH, "returned", "awaiting_repair"].map((x) => sql`${x}`),
+    sql`, `
+  )}))))`;
 
 /** one of the settlement's payouts is waiting on wise: sent and not settled,
  * or bounced. a run stored before this was tracked has neither, so it is
@@ -482,11 +492,11 @@ export async function settlements_to_poll(
             gte(settlements.date, since)
           ),
           // cancelled: a refund may still follow, so it is read for the window,
-          // or while a payout of it is open; an old one with settled payouts
-          // is history (ops' own cancel)
+          // or while it holds (a payout of it bounced or refunded after a
+          // bounce); an old one with settled payouts is history (ops' own cancel)
           and(
             eq(settlements.status, CANCELLED),
-            or(open_payouts(), gte(settlements.date, since))
+            or(holding_payouts(), open_payouts(), gte(settlements.date, since))
           )
         )
       )

@@ -1,21 +1,10 @@
 import { sql } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
-const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
-
-vi.mock("$/pg/db", () => ({
-  db: new Proxy(
-    {},
-    {
-      get(_, prop) {
-        const real = test_db.current?.db;
-        if (!real) throw new Error("test_db not initialized");
-        return (real as any)[prop];
-      },
-    }
-  ),
-}));
+// the job opens its own connection and loads no app env, so the test hands it
+// a pglite database and mocks nothing
+const test_db = { current: null as TestDb | null };
 
 const { bounced_admitted, run, target_for } = await import(
   "./payout-delivery-backfill"
@@ -128,10 +117,10 @@ describe("the deploy-order guard", () => {
   };
 
   it("sees whether the payouts type check admits bounced", async () => {
-    expect(await bounced_admitted()).toBe(true);
+    expect(await bounced_admitted(db() as never)).toBe(true);
     await without_bounced();
     try {
-      expect(await bounced_admitted()).toBe(false);
+      expect(await bounced_admitted(db() as never)).toBe(false);
     } finally {
       await with_bounced();
     }
@@ -141,12 +130,12 @@ describe("the deploy-order guard", () => {
     await seed("t-flight", "funds_converted");
     await without_bounced();
     try {
-      await expect(run({ commit: true }, { log: () => {} })).rejects.toThrow(
+      await expect(run({ commit: true }, { db: db() as never, log: () => {} })).rejects.toThrow(
         /0081/
       );
       expect(await types()).toEqual({ "p-t-flight": "settled" });
       const lines: string[] = [];
-      await run({ commit: false }, { log: (l) => lines.push(l) });
+      await run({ commit: false }, { db: db() as never, log: (l) => lines.push(l) });
       expect(lines[0]).toMatch(/does not admit 'bounced'.*0081/);
     } finally {
       await with_bounced();
@@ -155,7 +144,7 @@ describe("the deploy-order guard", () => {
 
   it("says at the top of its output that the check admits bounced", async () => {
     const lines: string[] = [];
-    await run({ commit: false }, { log: (l) => lines.push(l) });
+    await run({ commit: false }, { db: db() as never, log: (l) => lines.push(l) });
     expect(lines[0]).toMatch(/admits 'bounced'/);
   });
 });
@@ -180,7 +169,7 @@ describe("run", () => {
     await seed_all();
     const lines: string[] = [];
 
-    const sum = await run({ commit: false }, { log: (l) => lines.push(l) });
+    const sum = await run({ commit: false }, { db: db() as never, log: (l) => lines.push(l) });
 
     expect(await types()).toEqual({
       "p-t-sent": "settled",
@@ -245,7 +234,7 @@ describe("run", () => {
   it("a commit keeps delivered history settled, moves in-flight and bounced runs, and a rerun changes nothing", async () => {
     await seed_all();
 
-    const first = await run({ commit: true }, { log: () => {} });
+    const first = await run({ commit: true }, { db: db() as never, log: () => {} });
     expect(first).toMatchObject({ to_change: 4, changed: 4 });
     const rows = Object.fromEntries(
       (await db().select().from(payouts)).map((p) => [p.id, p])
@@ -272,7 +261,7 @@ describe("run", () => {
       "p-t-cancel": "settled",
     });
 
-    const second = await run({ commit: true }, { log: () => {} });
+    const second = await run({ commit: true }, { db: db() as never, log: () => {} });
     expect(second).toMatchObject({ to_change: 0, changed: 0 });
   });
 });
