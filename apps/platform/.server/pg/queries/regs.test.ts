@@ -135,7 +135,7 @@ describe("regs: every sort pages without repeating or skipping a row", () => {
       next: first.next,
     });
     const names: (string | null)[] = [...first.items, ...second.items].map(
-      (r) => r.o_name
+      (r) => r.o_name ?? null
     );
 
     const present = names.filter((n) => n !== null);
