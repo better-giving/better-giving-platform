@@ -750,10 +750,16 @@ describe("settle_npo_payouts", () => {
       .from(donations)
       .where(eq(donations.id, don));
     expect(dn?.status).toBe("refunded_loss");
-    const refs = await db().select({ message: payouts.message }).from(payouts);
+    const refs = Object.fromEntries(
+      (
+        await db()
+          .select({ id: payouts.id, message: payouts.message })
+          .from(payouts)
+      ).map((r) => [r.id, r.message])
+    );
     // the funded payout keeps its claim ref until delivery; the loss-refunded one has none
-    expect(refs.filter((r) => r.message === null)).toHaveLength(1);
-    expect(refs.filter((r) => typeof r.message === "string")).toHaveLength(1);
+    expect(refs["p-1"]).toEqual(expect.any(String));
+    expect(refs["p-2"]).toBeNull();
     expect(send_alert).not.toHaveBeenCalled();
   });
 

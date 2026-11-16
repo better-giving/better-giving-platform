@@ -393,10 +393,14 @@ export async function settlement_recipient_fill(
     .where(and(eq(settlements.id, id), isNull(settlements.recipient_id)));
 }
 
-/** returned or awaiting-repair settlements of a real wise transfer whose
- * recipient was never stored (a run from before it was), of any age: the hold
- * refuses every account until it is known, so the poll window does not bound
- * them. the poll reads it off the transfer */
+/** the oldest send date the poll still reads */
+const window_start = () =>
+  new Date(Date.now() - WINDOW_DAYS * 86_400_000).toISOString();
+
+/** returned or awaiting-repair settlements of a real wise transfer, of any age,
+ * and bounced ones still inside the poll window, whose recipient was never
+ * stored (a run from before it was): the hold refuses every account until it
+ * is known. the poll reads it off the transfer */
 export async function returned_missing_recipient(): Promise<SettlementRow[]> {
   return db
     .select()
@@ -405,7 +409,13 @@ export async function returned_missing_recipient(): Promise<SettlementRow[]> {
       and(
         isNotNull(settlements.other_id),
         gt(settlements.amount, 0),
-        inArray(settlements.status, ["returned", "awaiting_repair"]),
+        or(
+          inArray(settlements.status, ["returned", "awaiting_repair"]),
+          and(
+            notInArray(settlements.status, [...ON_PATH]),
+            gte(settlements.date, window_start())
+          )
+        ),
         isNull(settlements.recipient_id)
       )
     )
@@ -466,10 +476,7 @@ export async function npo_last_return(
           and(
             isNotNull(settlements.other_id),
             notInArray(settlements.status, [...ON_PATH]),
-            gte(
-              settlements.date,
-              new Date(Date.now() - WINDOW_DAYS * 86_400_000).toISOString()
-            )
+            gte(settlements.date, window_start())
           )
         )
       )

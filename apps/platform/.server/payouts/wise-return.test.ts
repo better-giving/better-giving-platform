@@ -884,8 +884,10 @@ describe("poll_wise_returns", () => {
 
     await poll_wise_returns(lookup);
 
+    // 1004 is final, but a bounce inside the window holds its npo, so its
+    // recipient is read once
     expect(lookup.mock.calls.map(([id]) => id).sort()).toEqual([
-      1001, 1002, 1005, 1007,
+      1001, 1002, 1004, 1005, 1007,
     ]);
   });
 
@@ -1046,7 +1048,7 @@ describe("poll_wise_returns", () => {
       expect(alert.body).toMatch(
         state === "cancelled" || state === "bounced_back"
           ? /the next poll takes the run back by itself; if wise delivers it late.*Change nothing by hand/
-          : /show as Bounced.*settle the payouts by hand/
+          : /show as Bounced.*hold lifts when Wise delivers it or refunds it/
       );
       expect(alert.fields).toEqual(
         expect.arrayContaining([

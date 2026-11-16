@@ -36,7 +36,7 @@ export function Loaded({ classes = "", ...props }: Props) {
 
   return (
     <div className={classes}>
-      {props.bounced && props.return_hold && (
+      {props.bounced && props.bounce_hold && (
         <BouncedNotice bounced={props.bounced} classes="mb-4" />
       )}
       {props.returned && (

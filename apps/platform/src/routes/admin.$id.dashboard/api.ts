@@ -43,6 +43,8 @@ export interface DashboardData {
   returned: IReturnedPayouts | null;
   /** payouts wise reports bounced and has not delivered or refunded; null when none */
   bounced: IReturnedPayouts | null;
+  /** the hold is a bounced transfer (not a returned one) */
+  bounce_hold: boolean;
   /** the latest returned transfer still holds this npo's payouts */
   return_hold: boolean;
   /** the hold is a transfer that came back with its payouts' ownership
@@ -109,6 +111,7 @@ export const loader = async (x: Route.LoaderArgs) => {
     returned,
     bounced,
     return_hold: hold !== null,
+    bounce_hold: hold?.status === "bounced",
     awaiting_repair:
       hold?.status === "awaiting_repair"
         ? { amount: hold.amount, date: hold.date }

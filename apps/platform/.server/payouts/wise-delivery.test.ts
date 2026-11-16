@@ -228,7 +228,7 @@ describe("a funded grants run is Sending until wise reports it sent", () => {
     }
   );
 
-  test("outgoing_payment_sent settles them with the date wise said so, once", async () => {
+  test("outgoing_payment_sent settles them, dated when the poll saw it, once", async () => {
     const npo = await seed_npo(500);
     await seed_payout(npo.id, "p-1", 100);
     const transfer = await funded(npo, ["p-1"]);

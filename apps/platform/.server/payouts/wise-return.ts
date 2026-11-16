@@ -371,7 +371,7 @@ export async function poll_wise_returns(state_of: TransferState) {
           title: `Wise transfer ${state}: npo:${s.npo_id}`,
           body: RETURNING.has(state)
             ? `Wise is returning this transfer, or may still deliver it: its payouts show as Bounced and the npo's grants are held. if it reaches ${MONEY_BACK}, the next poll takes the run back by itself; if wise delivers it late, they are Settled again and the hold lifts. Change nothing by hand`
-            : `its payouts show as Bounced and the npo's grants are held: check the transfer in Wise. if its money moved, settle the payouts by hand`,
+            : `its payouts show as Bounced and the npo's grants are held: check the transfer in Wise. the hold lifts when Wise delivers it or refunds it, or when a different bank account is approved`,
           fields: [
             { name: "settlement", value: s.id },
             { name: "state", value: state },

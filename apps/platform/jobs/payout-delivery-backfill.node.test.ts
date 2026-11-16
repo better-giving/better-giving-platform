@@ -177,6 +177,19 @@ describe("run", () => {
 
     const first = await run({ commit: true, now: NOW }, { log: () => {} });
     expect(first).toMatchObject({ to_change: 2, changed: 2 });
+    const rows = Object.fromEntries(
+      (await db().select().from(payouts)).map((p) => [p.id, p])
+    );
+    // processing keeps the run's ref and has no settled date; bounced has no ref
+    expect(rows["p-t-flight"]).toMatchObject({
+      message: "ref-t-flight",
+      settled_date: null,
+      settled_id: "t-flight",
+    });
+    expect(rows["p-t-bounce"]).toMatchObject({
+      message: null,
+      settled_id: "t-bounce",
+    });
     expect(await types()).toEqual({
       "p-t-sent": "settled",
       "p-t-flight": "processing",
