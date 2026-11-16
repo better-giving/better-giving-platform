@@ -131,7 +131,9 @@ describe("grants table — sending and bounced grants", () => {
     "a grant whose transfer is %s shows a struck amount, Bounced and Not counted",
     async (status) => {
       const screen = await render(
-        <GrantsTable items={[sent("g1", 481.5, status)]} />
+        <GrantsTable
+          items={[{ ...sent("g1", 481.5, status), bounced: true }]}
+        />
       );
       await expect
         .element(screen.getByText("Bounced", { exact: true }))
