@@ -695,6 +695,47 @@ describe("grants cron execute", () => {
     }
   );
 
+  test("an npo whose transfer is bounced is sent nothing, and ops is told it bounced", async () => {
+    const npo_id = await seed_npo({ cash: 300 });
+    await old_account();
+    await seed_returned(npo_id, "p-back", 100);
+    await db()
+      .update(settlements)
+      .set({ status: "bounced_back", date: new Date().toISOString() });
+    await db()
+      .update(payouts)
+      .set({ type: "bounced", settled_date: null })
+      .where(eq(payouts.id, "p-back"));
+    await seed_payout(npo_id, "p-new", 200);
+    // the account that bounced was approved before the transfer went out
+    await db()
+      .update(banking_apps)
+      .set({ updated_at: "2026-06-01T00:00:00.000Z" })
+      .where(eq(banking_apps.id, String(WISE_RECIPIENT)));
+
+    await index();
+
+    expect(wise_pay_mock).not.toHaveBeenCalled();
+    expect(await payout_types()).toEqual({
+      "p-back": "bounced",
+      "p-new": "pending",
+    });
+    const held = send_alert.mock.calls
+      .map(([a]) => a)
+      .filter((a) => a.title.startsWith("Grants held"));
+    expect(held).toEqual([
+      expect.objectContaining({
+        body: expect.stringContaining("bounced"),
+        fields: expect.arrayContaining([
+          {
+            name: "returned",
+            value: "bounced: not credited unless Wise refunds it",
+          },
+        ]),
+      }),
+    ]);
+  });
+
   test("a hold alert that fails to send is tried again on the next run", async () => {
     const npo_id = await seed_npo({ cash: 300 });
     await old_account();

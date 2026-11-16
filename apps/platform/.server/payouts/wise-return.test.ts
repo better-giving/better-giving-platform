@@ -884,9 +884,8 @@ describe("poll_wise_returns", () => {
 
     await poll_wise_returns(lookup);
 
-    // 1004 is final, but its npo is held on it, so its recipient is read once
     expect(lookup.mock.calls.map(([id]) => id).sort()).toEqual([
-      1001, 1002, 1004, 1005, 1007,
+      1001, 1002, 1005, 1007,
     ]);
   });
 

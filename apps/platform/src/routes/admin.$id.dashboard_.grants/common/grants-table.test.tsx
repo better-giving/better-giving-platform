@@ -83,8 +83,13 @@ describe("grants table — a returned grant", () => {
 });
 
 describe("grants table — sending and bounced grants", () => {
-  const sent = (id: string, amount: number, status: string) =>
-    grant(id, amount, { other_id: `ref-${id}`, status });
+  // inside the poll window: older, a stored state is history and reads settled
+  const sent = (id: string, amount: number, status: string, days_ago = 3) =>
+    grant(id, amount, {
+      other_id: `ref-${id}`,
+      status,
+      date: new Date(Date.now() - days_ago * 86_400_000).toISOString(),
+    });
   const struck = (screen: Awaited<ReturnType<typeof render>>, text: string) =>
     getComputedStyle(screen.getByText(text, { exact: true }).element())
       .textDecorationLine;
@@ -147,6 +152,25 @@ describe("grants table — sending and bounced grants", () => {
         .toBeVisible();
     }
   );
+
+  test("a grant past the poll window with a state never settled reads as plain history", async () => {
+    const screen = await render(
+      <GrantsTable items={[sent("g1", 75, "funds_converted", 120)]} />
+    );
+    await expect.element(screen.getByText("$75.00")).toBeVisible();
+    expect(screen.getByText("Sending").query()).toBeNull();
+    expect(screen.getByRole("button").query()).toBeNull();
+  });
+
+  test("a grant whose money is refunded reads Returned, not Sending", async () => {
+    const screen = await render(
+      <GrantsTable items={[sent("g1", 75, "funds_refunded")]} />
+    );
+    await expect
+      .element(screen.getByText("Returned", { exact: true }))
+      .toBeVisible();
+    expect(screen.getByText("Sending").query()).toBeNull();
+  });
 
   test("a late-delivered grant is a plain Settled-looking amount with nothing extra", async () => {
     const screen = await render(

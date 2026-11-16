@@ -1,3 +1,4 @@
+import { format } from "date-fns";
 import { createRoutesStub, Outlet } from "react-router";
 import {
   afterAll,
@@ -935,7 +936,9 @@ describe("dashboard — returned payout notice", () => {
 });
 
 describe("dashboard — bounced payout notice", () => {
-  const SENT_AT = "2026-11-11T15:00:00.000Z";
+  // inside the poll window, which a bounce must be to hold the npo
+  const SENT_AT = new Date(Date.now() - 5 * 86_400_000).toISOString();
+  const SENT_ON = format(SENT_AT, "MMM d");
   const seed_bounced = async (
     npo_id: number,
     id: string,
@@ -977,7 +980,7 @@ describe("dashboard — bounced payout notice", () => {
         page
           .elementLocator(notice(screen).element())
           .getByText(
-            "$481.50 from Nov 11 couldn't be delivered to your bank account and is on its way back to your balance. Check your bank details and update them if they're wrong. Payouts are paused until new ones are approved.",
+            `$481.50 from ${SENT_ON} couldn't be delivered to your bank account and is on its way back to your balance. Check your bank details and update them if they're wrong. Payouts are paused until new ones are approved.`,
             { exact: true }
           )
       )
@@ -1025,6 +1028,31 @@ describe("dashboard — bounced payout notice", () => {
     ).toBeNull();
     expect(
       screen.getByText(/Payouts are on hold until your/).query()
+    ).toBeNull();
+  });
+
+  it("is absent once a different bank is approved after the bounce, which lifts the hold", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await seed_bounced(npo.id, "p-n", 481.5);
+    await test_db
+      .current!.db.update(settlements)
+      .set({ recipient_id: "bank-old" });
+    const now = new Date().toISOString();
+    await test_db.current!.db.insert(banking_apps).values({
+      id: "bank-new",
+      npo_id: npo.id,
+      status: "default",
+      bank_summary: "Chase ••9999",
+      date_created: now,
+      updated_at: now,
+    });
+
+    const screen = await render_dashboard(npo.id);
+
+    await expect.element(screen.getByText("Savings")).toBeVisible();
+    expect(
+      screen.getByText("Your bank didn't accept a payout").query()
     ).toBeNull();
   });
 

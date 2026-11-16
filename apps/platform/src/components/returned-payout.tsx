@@ -125,7 +125,7 @@ export function BouncedGrant({ amount }: IUncountedGrant) {
 
 interface IGrantAmount {
   /** the grant's transfer: its stored wise state decides what it counts as */
-  grant: { status: string; other_id: string | null };
+  grant: { status: string; other_id: string | null; date: string };
   amount: string;
 }
 

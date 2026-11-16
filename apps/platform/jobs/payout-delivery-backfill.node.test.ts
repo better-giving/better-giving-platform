@@ -100,9 +100,15 @@ describe("target_for", () => {
     expect(target_for(state, "2026-11-11T00:00:00.000Z", NOW)).toBe(to);
   });
 
-  it("a never-read run is processing inside the poll window and unread outside it", () => {
+  it("a run is processing or bounced inside the poll window and stale outside it, whatever its state", () => {
     expect(target_for("", "2026-11-11T00:00:00.000Z", NOW)).toBe("processing");
-    expect(target_for("", "2026-01-01T00:00:00.000Z", NOW)).toBe("unread");
+    for (const state of ["", "processing", "bounced_back"]) {
+      expect(target_for(state, "2026-01-01T00:00:00.000Z", NOW)).toBe("stale");
+    }
+    // delivered history stays settled however old
+    expect(
+      target_for("outgoing_payment_sent", "2026-01-01T00:00:00.000Z", NOW)
+    ).toBeNull();
   });
 });
 
@@ -114,6 +120,9 @@ describe("run", () => {
     await seed("t-returned", "returned", { payout_type: "returned" });
     await seed("t-recovered", "", { other_id: null });
     await seed("t-old", "", { date: "2026-01-01T00:00:00.000Z" });
+    await seed("t-old-bounce", "bounced_back", {
+      date: "2026-01-01T00:00:00.000Z",
+    });
   };
 
   it("a dry run lists what it would change and writes nothing", async () => {
@@ -129,11 +138,12 @@ describe("run", () => {
       "p-t-returned": "returned",
       "p-t-recovered": "settled",
       "p-t-old": "settled",
+      "p-t-old-bounce": "settled",
     });
     expect(sum).toMatchObject({
       to_change: 2,
       changed: 0,
-      unread: 1,
+      stale: 2,
       bounced_npos: [npo_id],
     });
     const changes = lines
@@ -174,6 +184,7 @@ describe("run", () => {
       "p-t-returned": "returned",
       "p-t-recovered": "settled",
       "p-t-old": "settled",
+      "p-t-old-bounce": "settled",
     });
 
     const second = await run({ commit: true, now: NOW }, { log: () => {} });

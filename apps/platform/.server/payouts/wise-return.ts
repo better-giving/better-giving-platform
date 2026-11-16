@@ -395,7 +395,8 @@ export async function poll_wise_returns(state_of: TransferState) {
  * with it, in one transaction so the stored state never says what the payouts
  * don't: `outgoing_payment_sent` settles those still `processing`, or
  * `bounced` and delivered late; a state off the ordinary path bounces those
- * `processing` or `settled`. false when another writer stored it first
+ * `processing` or `settled`; back on the path short of delivery, a `bounced`
+ * one is `processing` again. false when another writer stored it first
  */
 async function record_state(s: SettlementRow, state: string) {
   return db.transaction(async (tx) => {
@@ -408,7 +409,13 @@ async function record_state(s: SettlementRow, state: string) {
         settled_date: new Date().toISOString(),
         settled_id: s.id,
       });
-    } else if (!ORDINARY.has(state)) {
+    } else if (ORDINARY.has(state)) {
+      // wise has it moving again: a bounce that is no longer one
+      await settlement_payouts_move(tx, s.id, ["bounced"], {
+        type: "processing",
+        ref: s.other_id ?? "",
+      });
+    } else {
       await settlement_payouts_move(tx, s.id, ["processing", "settled"], {
         type: "bounced",
       });

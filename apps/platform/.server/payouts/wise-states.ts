@@ -27,15 +27,18 @@ export const read_transfer = async (state_of: TransferState, id: string) => {
  * `charged_back`. not `cancelled`: every polled transfer was funded, and a
  * funded one passes through `cancelled` on its way to `funds_refunded` */
 export const FINAL = [RETURNED, "charged_back"] as const;
-export const WINDOW_DAYS = 90;
-
 /**
  * wise's transfer states (`@/payouts/wise-path`). `bounced_back` is not the
  * money back: wise may still deliver it late or move it on to
  * `funds_refunded`, which alone is taken back. a payout is settled only from
  * `DELIVERED`, and bounced from any state off the ordinary path
  */
-export { DELIVERED, MONEY_BACK, ORDINARY } from "@/payouts/wise-path";
+export {
+  DELIVERED,
+  MONEY_BACK,
+  ORDINARY,
+  WINDOW_DAYS,
+} from "@/payouts/wise-path";
 /** off the ordinary path and possibly on to `MONEY_BACK`, where the poll takes
  * the run back by itself: settling the payouts by hand too would count the
  * money twice */

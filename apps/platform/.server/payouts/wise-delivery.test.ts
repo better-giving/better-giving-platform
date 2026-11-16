@@ -245,7 +245,64 @@ describe("a funded grants run is Sending until wise reports it sent", () => {
   });
 });
 
+describe("a run is scoped by its own transfer", () => {
+  test("delivering one run leaves another run's payouts processing", async () => {
+    const npo = await seed_npo(1000);
+    await seed_payout(npo.id, "p-1", 100);
+    await seed_payout(npo.id, "p-2", 100);
+    const first = await funded(npo, ["p-1"]);
+    await funded(npo, ["p-2"]);
+
+    await poll_wise_returns(async (id) =>
+      String(id) === first ? "outgoing_payment_sent" : "processing"
+    );
+
+    expect(await types()).toEqual({ "p-1": "settled", "p-2": "processing" });
+  });
+});
+
+describe("a transfer refunded while its payouts are still Sending", () => {
+  test("takes them back as returned and credits the cash", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    const transfer = await funded(npo, ["p-1"]);
+    expect(await npo_cash(npo.id)).toBe(400);
+
+    await poll_wise_returns(state("funds_refunded"));
+
+    expect(await types()).toEqual({ "p-1": "returned" });
+    expect(await status_of(transfer)).toMatchObject({ status: "returned" });
+    expect(await npo_cash(npo.id)).toBe(500);
+  });
+});
+
 describe("a bounced transfer is Bounced and holds the npo", () => {
+  test("a bounce wise moves back onto the ordinary path is Sending again, and the hold lifts", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    await funded(npo, ["p-1"]);
+    await poll_wise_returns(state("bounced_back"));
+    expect(await npo_return_hold(npo.id)).not.toBeNull();
+
+    await poll_wise_returns(state("processing"));
+
+    expect(await types()).toEqual({ "p-1": "processing" });
+    expect(await npo_return_hold(npo.id)).toBeNull();
+  });
+
+  test("a bounce older than the poll window no longer holds the npo", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    const transfer = await funded(npo, ["p-1"]);
+    await poll_wise_returns(state("bounced_back"));
+    await db()
+      .update(settlements)
+      .set({ date: "2026-06-01T00:00:00.000Z" })
+      .where(eq(settlements.id, transfer));
+
+    expect(await npo_return_hold(npo.id)).toBeNull();
+  });
+
   test.each([
     ["processing", "bounced_back"],
     ["settled", "bounced_back"],

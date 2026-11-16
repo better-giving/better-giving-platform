@@ -10,6 +10,7 @@ import {
   isNull,
   ne,
   notInArray,
+  or,
   sql,
 } from "drizzle-orm";
 import {
@@ -21,7 +22,7 @@ import {
   type PayoutStatus,
   UNSENT_TYPES,
 } from "@/payouts";
-import { ON_PATH } from "@/payouts/wise-path";
+import { ON_PATH, WINDOW_DAYS } from "@/payouts/wise-path";
 import { db } from "../db";
 import { payouts, settlements } from "../schema/payout";
 import type { DbOrTx, IPage } from "./helpers";
@@ -392,7 +393,7 @@ export async function settlement_recipient_fill(
     .where(and(eq(settlements.id, id), isNull(settlements.recipient_id)));
 }
 
-/** returned, awaiting-repair or bounced settlements of a real wise transfer whose
+/** returned or awaiting-repair settlements of a real wise transfer whose
  * recipient was never stored (a run from before it was), of any age: the hold
  * refuses every account until it is known, so the poll window does not bound
  * them. the poll reads it off the transfer */
@@ -404,7 +405,7 @@ export async function returned_missing_recipient(): Promise<SettlementRow[]> {
       and(
         isNotNull(settlements.other_id),
         gt(settlements.amount, 0),
-        notInArray(settlements.status, [...ON_PATH]),
+        inArray(settlements.status, ["returned", "awaiting_repair"]),
         isNull(settlements.recipient_id)
       )
     )
@@ -436,8 +437,8 @@ export async function settlements_to_poll(
 
 /** the npo's latest settlement whose transfer came back, came back and waits
  * on ownership to be repaired (`AWAITING_REPAIR` in ../../payouts/wise-return),
- * or is bounced (any wise state off the ordinary path that is not the money
- * back, until wise delivers it late): in each its bank account is the one
+ * or is bounced within the poll window (any wise state off the ordinary path
+ * that is not the money back, until wise delivers it late): in each its bank account is the one
  * that bounced. null when none did */
 export async function npo_last_return(
   npo_id: number,
@@ -458,7 +459,19 @@ export async function npo_last_return(
     .where(
       and(
         eq(settlements.npo_id, npo_id),
-        notInArray(settlements.status, [...ON_PATH])
+        or(
+          inArray(settlements.status, ["returned", "awaiting_repair"]),
+          // a bounce is news only while the poll still reads the transfer
+          // and could see it delivered; older, it is history
+          and(
+            isNotNull(settlements.other_id),
+            notInArray(settlements.status, [...ON_PATH]),
+            gte(
+              settlements.date,
+              new Date(Date.now() - WINDOW_DAYS * 86_400_000).toISOString()
+            )
+          )
+        )
       )
     )
     .orderBy(desc(settlements.date), desc(settlements.id))
