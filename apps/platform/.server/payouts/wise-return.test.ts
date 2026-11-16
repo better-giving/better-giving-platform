@@ -1070,7 +1070,7 @@ describe("poll_wise_returns", () => {
       expect(alert.title).toBe(`Wise transfer ${state}: npo:${npo.id}`);
       expect(alert.body).toMatch(
         state === "cancelled" || state === "bounced_back"
-          ? /the next poll takes the run back by itself; if wise delivers it late.*Change nothing by hand/
+          ? /the next poll takes the run back by itself; if Wise delivers it late.*Change nothing by hand/
           : state === "charged_back"
             ? /was charged back: nothing was credited or re-sent.*resolve it by hand/
             : /show as Bounced.*hold lifts when Wise delivers it or refunds it/
