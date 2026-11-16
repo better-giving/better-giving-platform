@@ -331,6 +331,39 @@ describe("regs: cursor edge cases", () => {
       expect(pages.flat()).toHaveLength(60);
     });
 
+    test("an explicit status wins over a legacy cursor, and a stale or unknown carried status never overrides it", async () => {
+      await seed_mixed();
+
+      const explicit = await regs({
+        next: legacy_cursor(iso(-1)),
+        status: "03",
+      });
+      expect(explicit.items.length).toBeGreaterThan(0);
+      expect(explicit.items.every((r) => r.status === "03")).toBe(true);
+
+      // a keyset cursor claiming under review, read for a request that asks for approved
+      const carried = encode_cursor({
+        k: "updated_at",
+        d: "desc",
+        v: iso(-1),
+        i: "zzz",
+        s: "02",
+      });
+      const asked = await regs({ next: carried, status: "03" });
+      expect(asked.items.every((r) => r.status === "03")).toBe(true);
+
+      // an unknown carried status is ignored: the list is unfiltered
+      const unknown = encode_cursor({
+        k: "updated_at",
+        d: "desc",
+        v: iso(-1),
+        i: "zzz",
+        s: "99",
+      });
+      const all = await regs({ next: unknown });
+      expect(new Set(all.items.map((r) => r.status)).size).toBeGreaterThan(1);
+    });
+
     test("a normal cursor carries no inferred status and the list stays unfiltered", async () => {
       await seed_mixed();
       const first = await regs();

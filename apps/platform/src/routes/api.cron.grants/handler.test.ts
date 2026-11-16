@@ -252,6 +252,26 @@ const npo_cash = async (id: number) =>
     ?.cash;
 
 describe("grants cron execute", () => {
+  test("a recipient that is one of our own wise accounts is refused before any quote: payouts back to pending, nothing paid, ops told", async () => {
+    const npo_id = await seed_npo({ cash: 500 });
+    await seed_payout(npo_id, "p-1", 60);
+    wise.v2_account.mockResolvedValueOnce({
+      currency: "USD",
+      ownedByCustomer: true,
+    } as never);
+
+    await index();
+
+    expect(wise.quote).not.toHaveBeenCalled();
+    expect(wise.transfer).not.toHaveBeenCalled();
+    expect(await payout_types()).toEqual({ "p-1": "pending" });
+    expect(await npo_cash(npo_id)).toBe(500);
+    const refused = send_alert.mock.calls
+      .map(([a]) => a)
+      .find((a) => a.title === `payout refused for npo:${npo_id}`);
+    expect(refused?.body).toContain("one of Better Giving's own Wise accounts");
+  });
+
   test("pays the npo its full pending total and settles every payout", async () => {
     const npo_id = await seed_npo({ cash: 500 });
     await seed_payout(npo_id, "p-1", 60);
