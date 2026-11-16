@@ -6,7 +6,7 @@ import { lock_run } from "./owed-run";
 import { type HoldCause, return_hold_cause } from "./return-hold";
 
 export interface IReturnHold {
-  /** the npo's latest returned or awaiting-repair settlement: the hold alert dedupes on it */
+  /** the npo's latest returned, awaiting-repair or bounced settlement: the hold alert dedupes on it */
   settlement_id: string;
   /** `awaiting_repair`: its transfer came back but which payouts it covered
    * is unclear, so nothing is credited yet; `bounced`: wise reports it off
@@ -29,10 +29,9 @@ const REASONS: Record<HoldCause, string> = {
  * whether the npo's grants are held: its latest transfer came back (returned,
  * or awaiting repair because which payouts are its own is unclear) or bounced
  * and wise has not delivered it (so the next run would pay the same failing
- * account), unless
- * the account the grants run pays (`npo_default_bapp`) is a different wise
- * recipient from the one that transfer paid and was approved or made default
- * since it was sent. an edit to the account that bounced changes neither, so
+ * account), unless the account the grants run pays (`npo_default_bapp`) is a
+ * different wise recipient from the one that transfer paid and was approved or
+ * made default since it was sent. an edit to the account that bounced changes neither, so
  * a run would pay it again. a transfer whose recipient is not on record
  * holds too: the poll stores it from wise. keyed on the settlement, not the
  * payouts: refunding or cancelling the returned payouts leaves it held. null
