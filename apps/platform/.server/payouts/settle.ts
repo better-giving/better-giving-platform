@@ -202,7 +202,7 @@ export async function settle_npo_payouts(
       body: `do not reset these payouts to pending or pay them again; reconcile in Wise by customerTransactionId ${ref}`,
       fields,
     });
-    // after our own alert: a warning that rode on the throw (an own-account match)
+    // after our own alert: a warning that rode on the throw (an own-account warning)
     await send_pay_warning(warning_of(err));
     return { status: "fund_unknown", ref };
   }

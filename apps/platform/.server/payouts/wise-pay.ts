@@ -23,8 +23,9 @@ const FUNDED = new Set([
  * pays `amount` USD to wise recipient `to` under `ref`, wise's idempotency key:
  * quote → transfer → fund. resolves with the transfer id once funding was
  * accepted, and any warning for the caller to send after it has recorded the
- * payout: nothing here waits between accepted funding and that write. throws `NotFundedError` only when no money moved; any other throw
- * means it may have. a recipient that is one of our own accounts, or whose
+ * payout: nothing here waits between accepted funding and that write. throws
+ * `NotFundedError` only when no money moved; any other throw means it may
+ * have. a recipient that is one of our own accounts, or whose
  * check could not run, is paid all the same: Better Giving does not pry into
  * where a nonprofit sends its funds, so ops is warned, never blocked. a throw
  * from the funding call is rethrown as it is, carrying the warning

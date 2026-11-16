@@ -206,7 +206,7 @@ export async function settle_referrer_commissions(
       ].join("\n"),
       fields,
     });
-    // after our own alert: a warning that rode on the throw (an own-account match)
+    // after our own alert: a warning that rode on the throw (an own-account warning)
     await send_pay_warning(warning_of(err));
     return { status: "fund_unknown", ref };
   }
