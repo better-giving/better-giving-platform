@@ -451,7 +451,7 @@ describe("the pause survives a donor refund", () => {
       settlement_id: "9005",
       status: "returned",
     });
-    // an older awaiting-repair-free history: a manual cancel beside it is not the hold
+    // a manual cancel with refunded payouts, newer than the returned run, is history, not a hold
     await db()
       .insert(settlements)
       .values({

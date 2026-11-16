@@ -30,9 +30,8 @@ import { CANCELLED, DELIVERED_STATES, ON_PATH } from "../lib/payouts/wise-path";
  *
  * ## Order
  *
- * 1. deploy the PR that adds the `bounced` payout type (#293): its migration
- *    0081 is what lets the table hold `bounced`, and its code is what polls
- *    the transfers and reads the new types.
+ * 1. deploy the release that carries migration 0081, which lets the table hold
+ *    `bounced`, and the code that polls the transfers and reads the new types.
  * 2. check the first poll's results (the wise-returns cron's alerts and the
  *    npos it held).
  * 3. dry-run this job, read the list, then commit it.
