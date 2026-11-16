@@ -18,7 +18,7 @@ export const DELIVERED = "outgoing_payment_sent";
  * before May 2026): delivered, exactly as `DELIVERED` */
 export const LEGACY_SETTLED = "settled";
 /** a manual cancel stored by ops, or wise's `cancelled` on the way to a refund:
- * open only while one of its payouts is, see `settlements_to_poll` */
+ * read for the window, or while a payout of it is open, see `settlements_to_poll` */
 export const CANCELLED = "cancelled";
 export const MONEY_BACK = "funds_refunded";
 /** stored states that mean the bank has the money */

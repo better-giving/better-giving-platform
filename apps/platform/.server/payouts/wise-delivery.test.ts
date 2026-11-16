@@ -421,6 +421,8 @@ describe("a charged-back transfer", () => {
     expect(alert.body).toMatch(/nothing was credited or re-sent/);
     expect(alert.body).toMatch(/resolve it by hand/);
     expect(alert.body).not.toMatch(/hold lifts when Wise delivers/);
+    expect(alert.body).toMatch(/do not move the payouts to returned/);
+    expect(alert.body).not.toMatch(/go out again/);
   });
 });
 

@@ -374,7 +374,7 @@ export async function poll_wise_returns(state_of: TransferState) {
           title: `Wise transfer ${state}: npo:${s.npo_id}`,
           body:
             state === CHARGED_BACK
-              ? `this transfer was charged back: nothing was credited or re-sent, and it is not polled again. its payouts stay Bounced and the npo's grants stay held until a different bank account is approved. resolve it by hand: if the money did not reach the npo, credit its cash by the payouts' total and move them to returned (they go out again once a new account is approved); if it did, settle them`
+              ? `this transfer was charged back: nothing was credited or re-sent, and it is not polled again. its payouts stay Bounced and the npo's grants stay held until a different bank account is approved. resolve it by hand, and do not move the payouts to returned: that lifts the hold and re-sends them to the account that was charged back. if the money did not reach the npo, credit its cash by the payouts' total and cancel the payouts; if it did, settle them`
               : RETURNING.has(state)
                 ? `Wise is returning this transfer, or may still deliver it: its payouts show as Bounced and the npo's grants are held. if it reaches ${MONEY_BACK}, the next poll takes the run back by itself; if wise delivers it late, they are Settled again and the hold lifts. Change nothing by hand`
                 : `its payouts show as Bounced and the npo's grants are held: check the transfer in Wise. the hold lifts when Wise delivers it or refunds it, or when a different bank account is approved`,

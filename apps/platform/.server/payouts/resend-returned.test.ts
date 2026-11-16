@@ -363,6 +363,7 @@ describe("npo_return_hold", () => {
 
     expect(await npo_return_hold(npo_id)).toEqual({
       settlement_id: `sttl-${npo_id}`,
+      wise_state: "returned",
       status: "returned",
       amount: 100,
       date: SENT,
@@ -420,6 +421,7 @@ describe("npo_return_hold", () => {
 
     expect(await npo_return_hold(npo_id)).toEqual({
       settlement_id: "sttl-repair",
+      wise_state: "awaiting_repair",
       status: "awaiting_repair",
       amount: 100,
       date: SENT,

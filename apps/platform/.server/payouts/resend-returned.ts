@@ -12,6 +12,8 @@ export interface IReturnHold {
    * is unclear, so nothing is credited yet; `bounced`: wise reports it off
    * the ordinary path and may still deliver it late or refund it */
   status: "returned" | "awaiting_repair" | "bounced";
+  /** the settlement's stored wise state: `charged_back` is final, any other bounce may still be delivered or refunded */
+  wise_state: string;
   /** what the settlement sent, in usd, and when */
   amount: number;
   date: string;
@@ -45,6 +47,7 @@ export async function npo_return_hold(
   if (!last) return null;
   const of = {
     settlement_id: last.id,
+    wise_state: last.status,
     status:
       last.status === "awaiting_repair" || last.status === "returned"
         ? last.status

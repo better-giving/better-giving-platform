@@ -173,7 +173,7 @@ export function Loaded({ classes = "", ...props }: Props) {
           {(props.recent_payouts.items.length > 0 ||
             props.payout_to.kind !== "bank") &&
             (props.payout_to.kind === "bank" &&
-            (props.return_hold ||
+            ((props.return_hold && !props.bounce_hold) ||
               props.awaiting_repair ||
               (props.bounce_hold && props.returned)) ? (
               <ReturnHold />
