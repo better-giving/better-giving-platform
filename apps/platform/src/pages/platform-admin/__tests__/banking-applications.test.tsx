@@ -424,7 +424,8 @@ describe("approve flow", () => {
     expect(
       screen.getByText("Unexpected Application Error!").query()
     ).toBeNull();
-    expect((await get_bapp(bapp_id)).status).toBe("approved");
+    // approved, and made the default as the npo's first
+    expect((await get_bapp(bapp_id)).status).toBe("default");
   });
 
   it("approves bapp — status becomes approved when npo already has a default", async () => {
