@@ -251,7 +251,7 @@ export async function settle_npo_payouts(
   }
   if (unsettled.length > 0) {
     await alert({
-      title: `paid but not marked settled, npo:${npo.id}`,
+      title: `paid but not stamped with its transfer, npo:${npo.id}`,
       body: `Wise transfer ${transfer_id} (customerTransactionId ${ref}) paid these payouts and is recorded, but they had already moved out of processing by a path other than a loss refund, so they were not stamped with the transfer. check each before the next run: one back in pending is paid again`,
       fields: [...fields, { name: "unsettled", value: unsettled.join(", ") }],
     });

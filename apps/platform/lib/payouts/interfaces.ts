@@ -40,7 +40,11 @@ export interface IReturnedStatus {
   type: "returned";
 }
 
-/** wise reports its transfer off the ordinary path (`bounced_back` and the like): not delivered, so not settled. the money may still be delivered late (back to `settled`) or refunded (`returned`) */
+/**
+ * wise reports its transfer off the ordinary path (`bounced_back` and the
+ * like): not delivered, so not settled. the money may still be delivered late
+ * (back to `settled`) or refunded (`returned`)
+ */
 export interface IBouncedStatus {
   type: "bounced";
 }

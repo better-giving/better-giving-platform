@@ -33,7 +33,7 @@ import { DELIVERED, in_window, ON_PATH } from "../lib/payouts/wise-path";
  * ## Running
  *
  * env (a `--env-file` or the shell): `DATABASE_URL`, the database to read and
- * write. Check it is the one you mean before passing `--commit`.
+ * write. check it is the one you mean before passing `--commit`.
  *
  * 1. dry run, the default: `bun --env-file=<env> jobs/payout-delivery-backfill.ts`.
  *    writes nothing. prints one json line per payout it would change

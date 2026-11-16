@@ -11,8 +11,8 @@
  * - settlement: `status` 'returned', which ends polling and makes a second
  *   detection change nothing. amount, date and sources stay, so the grants page
  *   still lists it.
- * - payouts of the run still `processing`, `settled` or `bounced`: 'returned'. `settled_id` and
- *   `settled_date` stay, naming the run that returned them. one moved on any
+ * - payouts of the run still `processing`, `settled` or `bounced`: 'returned'.
+ *   `settled_id` and `settled_date` stay, naming the run that returned them. one moved on any
  *   other way (reset by hand, voided) is left as it is and named to ops.
  * - npo cash: credited payout_total of the payouts this transaction takes back:
  *   the ones it moves to 'returned' and the run's loss-refunded ones, which

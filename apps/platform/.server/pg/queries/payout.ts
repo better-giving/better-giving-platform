@@ -245,7 +245,8 @@ export async function payouts_in(
 export interface IReturnedPayouts {
   count: number;
   total: number;
-  /** the latest returned payout's own `date` (a bounced one's transfer date), iso */
+  /** the latest returned payout's own `date` (a bounced one's transfer date),
+   * iso */
   latest_date: string;
 }
 
@@ -448,8 +449,8 @@ export async function settlements_to_poll(
 /** the npo's latest settlement whose transfer came back, came back and waits
  * on ownership to be repaired (`AWAITING_REPAIR` in ../../payouts/wise-return),
  * or is bounced within the poll window (any wise state off the ordinary path
- * that is not the money back, until wise delivers it late): in each its bank account is the one
- * that bounced. null when none did */
+ * that is not the money back, until wise delivers it late): in each its bank
+ * account is the one that bounced. null when none did */
 export async function npo_last_return(
   npo_id: number,
   db_: DbOrTx = db
