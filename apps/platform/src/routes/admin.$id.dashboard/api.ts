@@ -46,6 +46,7 @@ export interface DashboardData {
   /** the hold is a bounced transfer (not a returned one) */
   bounce_hold: boolean;
   /** the latest returned transfer still holds this npo's payouts */
+  /** a returned (or awaiting-repair) transfer holds this npo's payouts */
   return_hold: boolean;
   /** the hold is a transfer that came back with its payouts' ownership
    * unclear: nothing credited yet; null for any other hold or none */
@@ -110,7 +111,9 @@ export const loader = async (x: Route.LoaderArgs) => {
     campaign_live: live,
     returned,
     bounced,
-    return_hold: hold !== null,
+    // a bounce hold is its own: it lifts when the bounce resolves, and its
+    // line says so
+    return_hold: hold !== null && hold.status !== "bounced",
     bounce_hold: hold?.status === "bounced",
     awaiting_repair:
       hold?.status === "awaiting_repair"

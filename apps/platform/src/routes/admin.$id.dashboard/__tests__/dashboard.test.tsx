@@ -936,7 +936,6 @@ describe("dashboard — returned payout notice", () => {
 });
 
 describe("dashboard — bounced payout notice", () => {
-  // inside the poll window, which a bounce must be to hold the npo
   const SENT_AT = new Date(Date.now() - 5 * 86_400_000).toISOString();
   const SENT_ON = format(SENT_AT, "MMM d");
   const seed_bounced = async (
@@ -952,6 +951,7 @@ describe("dashboard — bounced payout notice", () => {
       date: SENT_AT,
       amount,
       status: type === "bounced" ? "bounced_back" : "processing",
+      recipient_id: "bank-old",
     });
     await test_db.current!.db.insert(payouts).values({
       id,
@@ -964,32 +964,68 @@ describe("dashboard — bounced payout notice", () => {
       settled_id: `set-${id}`,
     });
   };
-  const notice = (screen: Awaited<ReturnType<typeof render_dashboard>>) =>
-    screen.getByRole("region", { name: "Your bank didn't accept a payout" });
+  // the default bank the transfer bounced from, approved before it was sent
+  const file_bank = (npo_id: number, at = "2026-06-01T00:00:00.000Z") =>
+    test_db.current!.db.insert(banking_apps).values({
+      id: `bank-${at}`,
+      npo_id,
+      status: "default",
+      bank_summary: "Chase ••1234",
+      date_created: at,
+      updated_at: at,
+    });
+  const seed_returned_payout = (npo_id: number, id: string, amount: number) =>
+    test_db.current!.db.insert(payouts).values({
+      id,
+      source_id: `don-${id}`,
+      npo_id,
+      source: "donation",
+      type: "returned",
+      amount,
+      date: "2026-11-09T15:00:00.000Z",
+    });
+  type Screen = Awaited<ReturnType<typeof render_dashboard>>;
+  const notice = (screen: Screen, name: string) =>
+    screen.getByRole("region", { name });
+  const bounce_notice = (screen: Screen) =>
+    notice(screen, "Your bank didn't accept a payout");
+  const bounce_hold = (screen: Screen) =>
+    screen.getByText(/Payouts are paused while this payout comes back/);
+  const return_hold = (screen: Screen) =>
+    screen.getByText(/Payouts are on hold until your/);
 
-  it("names the bounced payout's amount and transfer date, and links to check the bank details", async () => {
+  it("bounced only: the bounce notice names the amount and date, drops the pause sentence, and BounceHold replaces the payout strip", async () => {
     const npo = await seed_npo();
     await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await file_bank(npo.id);
     await seed_bounced(npo.id, "p-b", 481.5);
 
     const screen = await render_dashboard(npo.id);
 
-    await expect.element(notice(screen)).toBeVisible();
+    await expect.element(bounce_notice(screen)).toBeVisible();
     await expect
       .element(
         page
-          .elementLocator(notice(screen).element())
+          .elementLocator(bounce_notice(screen).element())
           .getByText(
-            `$481.50 from ${SENT_ON} couldn't be delivered to your bank account and is on its way back to your balance. Check your bank details and update them if they're wrong. Payouts are paused until new ones are approved.`,
+            `$481.50 from ${SENT_ON} couldn't be delivered to your bank account and is on its way back to your balance. Check your bank details and update them if they're wrong.`,
             { exact: true }
           )
       )
       .toBeVisible();
+    expect(screen.getByText(/paused until/).query()).toBeNull();
     await expect
       .element(
         screen.getByRole("link", { name: "Check bank details", exact: true })
       )
       .toHaveAttribute("href", `/admin/${npo.id}/banking`);
+    await expect
+      .element(bounce_hold(screen))
+      .toHaveTextContent(
+        "Payouts are paused while this payout comes back to your balance. Donations wait in your Better Giving balance. Nothing is lost."
+      );
+    expect(return_hold(screen).query()).toBeNull();
+    expect(screen.getByText(/will be paid out/).query()).toBeNull();
   });
 
   it("counts several bounced payouts and sums them", async () => {
@@ -1003,18 +1039,104 @@ describe("dashboard — bounced payout notice", () => {
     await expect
       .element(
         page
-          .elementLocator(notice(screen).element())
+          .elementLocator(bounce_notice(screen).element())
           .getByText(
-            "2 payouts ($500.00) couldn't be delivered to your bank account and are on their way back to your balance. Check your bank details and update them if they're wrong. Payouts are paused until new ones are approved.",
+            "2 payouts ($500.00) couldn't be delivered to your bank account and are on their way back to your balance. Check your bank details and update them if they're wrong.",
             { exact: true }
           )
       )
       .toBeVisible();
   });
 
-  it("is absent for a Sending payout alone, and shows the usual payout strip", async () => {
+  it("returned only: the returned notice and ReturnHold, unchanged", async () => {
     const npo = await seed_npo();
     await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await file_bank(npo.id);
+    await test_db.current!.db.insert(settlements).values({
+      id: "set-r",
+      npo_id: npo.id,
+      date: "2026-11-09T15:00:00.000Z",
+      amount: 250,
+      status: "returned",
+      recipient_id: "bank-old",
+    });
+    await seed_returned_payout(npo.id, "p-r", 250);
+
+    const screen = await render_dashboard(npo.id);
+
+    await expect
+      .element(notice(screen, "Your bank sent a payout back"))
+      .toBeVisible();
+    await expect.element(return_hold(screen)).toBeVisible();
+    expect(bounce_notice(screen).query()).toBeNull();
+    expect(bounce_hold(screen).query()).toBeNull();
+  });
+
+  it("bounced and returned: one notice with the mixed copy and summed total, and ReturnHold", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await file_bank(npo.id);
+    await seed_returned_payout(npo.id, "p-r", 250);
+    await seed_bounced(npo.id, "p-b", 481.5);
+
+    const screen = await render_dashboard(npo.id);
+
+    expect(screen.container.querySelectorAll('[role="region"]')).toHaveLength(
+      1
+    );
+    await expect
+      .element(
+        page
+          .elementLocator(
+            notice(screen, "Your bank sent a payout back").element()
+          )
+          .getByText(
+            "2 payouts ($731.50) didn't reach your bank account: 1 back in your balance and 1 still on the way back. Update your bank details, and they go out again once the new ones are approved.",
+            { exact: true }
+          )
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        screen.getByRole("link", { name: "Update bank details", exact: true })
+      )
+      .toBeVisible();
+    expect(bounce_notice(screen).query()).toBeNull();
+    await expect.element(return_hold(screen)).toBeVisible();
+    expect(bounce_hold(screen).query()).toBeNull();
+  });
+
+  it("awaiting repair: only the awaiting notice and ReturnHold, however much is bounced", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await file_bank(npo.id);
+    await seed_bounced(npo.id, "p-b", 481.5);
+    await test_db.current!.db.insert(settlements).values({
+      id: "set-ar",
+      other_id: "ref-ar",
+      npo_id: npo.id,
+      date: new Date().toISOString(),
+      amount: 300,
+      status: "awaiting_repair",
+      recipient_id: "bank-old",
+    });
+
+    const screen = await render_dashboard(npo.id);
+
+    expect(screen.container.querySelectorAll('[role="region"]')).toHaveLength(
+      1
+    );
+    await expect
+      .element(notice(screen, "Your bank sent a payout back"))
+      .toBeVisible();
+    expect(bounce_notice(screen).query()).toBeNull();
+    await expect.element(return_hold(screen)).toBeVisible();
+  });
+
+  it("a Sending payout alone: no notice, and the usual payout strip", async () => {
+    const npo = await seed_npo();
+    await seed_nav_log({ price: 1, units: 0, value: 0 });
+    await file_bank(npo.id);
     await seed_bounced(npo.id, "p-s", 300, "processing");
 
     const screen = await render_dashboard(npo.id);
@@ -1023,40 +1145,35 @@ describe("dashboard — bounced payout notice", () => {
     await expect
       .element(screen.getByText("Sending", { exact: true }).first())
       .toBeVisible();
-    expect(
-      screen.getByText("Your bank didn't accept a payout").query()
-    ).toBeNull();
-    expect(
-      screen.getByText(/Payouts are on hold until your/).query()
-    ).toBeNull();
+    expect(screen.container.querySelectorAll('[role="region"]')).toHaveLength(
+      0
+    );
+    expect(bounce_hold(screen).query()).toBeNull();
+    expect(return_hold(screen).query()).toBeNull();
+    await expect.element(screen.getByText(/will be paid out/)).toBeVisible();
   });
 
-  it("is absent once a different bank is approved after the bounce, which lifts the hold", async () => {
+  it("a different bank approved after the bounce lifts the hold: the notice stays, BounceHold gives way to the payout strip", async () => {
     const npo = await seed_npo();
     await seed_nav_log({ price: 1, units: 0, value: 0 });
     await seed_bounced(npo.id, "p-n", 481.5);
-    await test_db
-      .current!.db.update(settlements)
-      .set({ recipient_id: "bank-old" });
-    const now = new Date().toISOString();
     await test_db.current!.db.insert(banking_apps).values({
       id: "bank-new",
       npo_id: npo.id,
       status: "default",
       bank_summary: "Chase ••9999",
-      date_created: now,
-      updated_at: now,
+      date_created: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     });
 
     const screen = await render_dashboard(npo.id);
 
-    await expect.element(screen.getByText("Savings")).toBeVisible();
-    expect(
-      screen.getByText("Your bank didn't accept a payout").query()
-    ).toBeNull();
+    await expect.element(bounce_notice(screen)).toBeVisible();
+    expect(bounce_hold(screen).query()).toBeNull();
+    await expect.element(screen.getByText(/will be paid out/)).toBeVisible();
   });
 
-  it("is absent once wise delivers the bounce late", async () => {
+  it("is absent once the bounce is delivered late", async () => {
     const npo = await seed_npo();
     await seed_nav_log({ price: 1, units: 0, value: 0 });
     await seed_bounced(npo.id, "p-d", 481.5, "settled");
@@ -1064,9 +1181,7 @@ describe("dashboard — bounced payout notice", () => {
     const screen = await render_dashboard(npo.id);
 
     await expect.element(screen.getByText("Savings")).toBeVisible();
-    expect(
-      screen.getByText("Your bank didn't accept a payout").query()
-    ).toBeNull();
+    expect(bounce_notice(screen).query()).toBeNull();
   });
 });
 

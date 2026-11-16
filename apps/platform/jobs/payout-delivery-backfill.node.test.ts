@@ -21,7 +21,6 @@ const { create_test_db } = await import("$/pg/test-utils/pglite");
 const { npos } = await import("$/pg/schema/npo");
 const { payouts, settlements } = await import("$/pg/schema/payout");
 
-const NOW = Date.parse("2026-11-16T00:00:00.000Z");
 let npo_id = 0;
 const db = () => test_db.current!.db;
 
@@ -93,22 +92,19 @@ describe("target_for", () => {
     ["processing", "processing"],
     ["funds_converted", "processing"],
     ["bounced_back", "bounced"],
-    ["cancelled", "bounced"],
     ["charged_back", "bounced"],
+    // stored before wise's own states were kept, and a manual cancel: history
+    ["settled", null],
+    ["cancelled", null],
     ["something_new", "bounced"],
   ])("state %s", (state, to) => {
-    expect(target_for(state, "2026-11-11T00:00:00.000Z", NOW)).toBe(to);
+    expect(target_for(state)).toBe(to);
   });
 
-  it("a run is processing or bounced inside the poll window and stale outside it, whatever its state", () => {
-    expect(target_for("", "2026-11-11T00:00:00.000Z", NOW)).toBe("processing");
-    for (const state of ["", "processing", "bounced_back"]) {
-      expect(target_for(state, "2026-01-01T00:00:00.000Z", NOW)).toBe("stale");
-    }
-    // delivered history stays settled however old
-    expect(
-      target_for("outgoing_payment_sent", "2026-01-01T00:00:00.000Z", NOW)
-    ).toBeNull();
+  it("age plays no part: an old open run moves on like a new one, delivered history stays", () => {
+    expect(target_for("")).toBe("processing");
+    expect(target_for("bounced_back")).toBe("bounced");
+    expect(target_for("outgoing_payment_sent")).toBeNull();
   });
 });
 
@@ -119,17 +115,20 @@ describe("run", () => {
     await seed("t-bounce", "bounced_back");
     await seed("t-returned", "returned", { payout_type: "returned" });
     await seed("t-recovered", "", { other_id: null });
+    // blank-status and bounced runs of any age move on: the poll resolves them
     await seed("t-old", "", { date: "2026-01-01T00:00:00.000Z" });
     await seed("t-old-bounce", "bounced_back", {
       date: "2026-01-01T00:00:00.000Z",
     });
+    await seed("t-legacy", "settled", { date: "2026-03-01T00:00:00.000Z" });
+    await seed("t-cancel", "cancelled");
   };
 
   it("a dry run lists what it would change and writes nothing", async () => {
     await seed_all();
     const lines: string[] = [];
 
-    const sum = await run({ commit: false, now: NOW }, { log: (l) => lines.push(l) });
+    const sum = await run({ commit: false }, { log: (l) => lines.push(l) });
 
     expect(await types()).toEqual({
       "p-t-sent": "settled",
@@ -139,11 +138,12 @@ describe("run", () => {
       "p-t-recovered": "settled",
       "p-t-old": "settled",
       "p-t-old-bounce": "settled",
+      "p-t-legacy": "settled",
+      "p-t-cancel": "settled",
     });
     expect(sum).toMatchObject({
-      to_change: 2,
+      to_change: 4,
       changed: 0,
-      stale: 2,
       bounced_npos: [npo_id],
     });
     const changes = lines
@@ -169,14 +169,32 @@ describe("run", () => {
         to: "processing",
         amount: 100,
       },
+      {
+        payout_id: "p-t-old",
+        npo_id,
+        settlement_id: "t-old",
+        state: "",
+        from: "settled",
+        to: "processing",
+        amount: 100,
+      },
+      {
+        payout_id: "p-t-old-bounce",
+        npo_id,
+        settlement_id: "t-old-bounce",
+        state: "bounced_back",
+        from: "settled",
+        to: "bounced",
+        amount: 100,
+      },
     ]);
   });
 
   it("a commit keeps delivered history settled, moves in-flight and bounced runs, and a rerun changes nothing", async () => {
     await seed_all();
 
-    const first = await run({ commit: true, now: NOW }, { log: () => {} });
-    expect(first).toMatchObject({ to_change: 2, changed: 2 });
+    const first = await run({ commit: true }, { log: () => {} });
+    expect(first).toMatchObject({ to_change: 4, changed: 4 });
     const rows = Object.fromEntries(
       (await db().select().from(payouts)).map((p) => [p.id, p])
     );
@@ -196,11 +214,13 @@ describe("run", () => {
       "p-t-bounce": "bounced",
       "p-t-returned": "returned",
       "p-t-recovered": "settled",
-      "p-t-old": "settled",
-      "p-t-old-bounce": "settled",
+      "p-t-old": "processing",
+      "p-t-old-bounce": "bounced",
+      "p-t-legacy": "settled",
+      "p-t-cancel": "settled",
     });
 
-    const second = await run({ commit: true, now: NOW }, { log: () => {} });
+    const second = await run({ commit: true }, { log: () => {} });
     expect(second).toMatchObject({ to_change: 0, changed: 0 });
   });
 });

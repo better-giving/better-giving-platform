@@ -864,7 +864,7 @@ describe("poll_wise_returns", () => {
     });
   });
 
-  test("asks wise only of real transfers from the last 90 days whose stored state is not final", async () => {
+  test("asks wise of every open real transfer whatever its age, and of a delivered one only for 90 days", async () => {
     const npo = await seed_npo(0);
     await seed_settlement(npo.id, "1001");
     await seed_settlement(npo.id, "1002", { status: "outgoing_payment_sent" });
@@ -873,21 +873,39 @@ describe("poll_wise_returns", () => {
       recipient_id: "555",
     });
     await seed_settlement(npo.id, "1004", { status: "charged_back" });
-    // funded, so on wise's way to `funds_refunded`
+    // a manual cancel with no payout waiting on wise: history, never polled
     await seed_settlement(npo.id, "1005", { status: "cancelled" });
-    await seed_settlement(npo.id, "1006", { date: "2026-08-13T00:00:00.000Z" });
+    // never read, and old: open, so polled
+    await seed_settlement(npo.id, "1006", { date: "2026-01-13T00:00:00.000Z" });
     await seed_settlement(npo.id, "1007", { date: "2026-08-14T12:00:00.000Z" });
     // one per guard on a row with no transfer behind it: no ref, nothing sent
     await seed_settlement(npo.id, "1008", { other_id: null });
     await seed_settlement(npo.id, "1009", { amount: 0 });
+    // delivered: polled for 90 days only, and the state written before wise's own were kept
+    await seed_settlement(npo.id, "1010", {
+      status: "outgoing_payment_sent",
+      date: "2026-05-01T00:00:00.000Z",
+    });
+    await seed_settlement(npo.id, "1011", {
+      status: "settled",
+      date: "2026-03-01T00:00:00.000Z",
+    });
+    // funded then cancelled by wise, its payout bounced: on the way to a refund
+    await seed_settlement(npo.id, "1012", {
+      status: "cancelled",
+      date: "2026-05-01T00:00:00.000Z",
+    });
+    await seed_payout(npo.id, "p-1012", 100);
+    await db()
+      .update(payouts)
+      .set({ type: "bounced", settled_id: "1012" })
+      .where(eq(payouts.id, "p-1012"));
     const lookup = vi.fn(async (_: number) => "outgoing_payment_sent");
 
     await poll_wise_returns(lookup);
 
-    // 1004 is final, but a bounce inside the window holds its npo, so its
-    // recipient is read once
     expect(lookup.mock.calls.map(([id]) => id).sort()).toEqual([
-      1001, 1002, 1004, 1005, 1007,
+      1001, 1002, 1006, 1007, 1012,
     ]);
   });
 

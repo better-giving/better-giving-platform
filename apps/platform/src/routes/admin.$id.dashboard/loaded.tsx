@@ -36,14 +36,20 @@ export function Loaded({ classes = "", ...props }: Props) {
 
   return (
     <div className={classes}>
-      {props.bounced && props.bounce_hold && (
-        <BouncedNotice bounced={props.bounced} classes="mb-4" />
-      )}
-      {props.returned && (
-        <ReturnedNotice returned={props.returned} classes="mb-4" />
-      )}
-      {props.awaiting_repair && (
+      {/* one notice at a time: awaiting repair, then returned (with any
+          bounced beside it), then bounced */}
+      {props.awaiting_repair ? (
         <AwaitingNotice {...props.awaiting_repair} classes="mb-4" />
+      ) : props.returned ? (
+        <ReturnedNotice
+          returned={props.returned}
+          bounced={props.bounced}
+          classes="mb-4"
+        />
+      ) : (
+        props.bounced && (
+          <BouncedNotice bounced={props.bounced} classes="mb-4" />
+        )
       )}
       <div className="grid gap-4 @lg:grid-cols-2">
         <Figure
@@ -166,8 +172,13 @@ export function Loaded({ classes = "", ...props }: Props) {
           {/* no bank: what is held is news before any payout exists */}
           {(props.recent_payouts.items.length > 0 ||
             props.payout_to.kind !== "bank") &&
-            (props.return_hold && props.payout_to.kind === "bank" ? (
+            (props.payout_to.kind === "bank" &&
+            (props.return_hold ||
+              props.awaiting_repair ||
+              (props.bounce_hold && props.returned)) ? (
               <ReturnHold />
+            ) : props.payout_to.kind === "bank" && props.bounce_hold ? (
+              <BounceHold />
             ) : (
               <Payout
                 next_payout={props.next_payout}
@@ -203,11 +214,13 @@ export function Loaded({ classes = "", ...props }: Props) {
 
 interface IReturnedNotice {
   returned: IReturnedPayouts;
+  /** payouts still on their way back: the one notice counts them too */
+  bounced?: IReturnedPayouts | null;
   classes?: string;
 }
 
-function ReturnedNotice({ returned, classes = "" }: IReturnedNotice) {
-  const total = to_usd(returned.total, 2);
+function ReturnedNotice({ returned, bounced, classes = "" }: IReturnedNotice) {
+  const total = to_usd(returned.total + (bounced?.total ?? 0), 2);
   return (
     <WarningCallout
       title="Your bank sent a payout back"
@@ -218,9 +231,11 @@ function ReturnedNotice({ returned, classes = "" }: IReturnedNotice) {
         </Link>
       }
     >
-      {returned.count === 1
-        ? `${total} from ${format(returned.latest_date, "MMM d")} didn't reach your bank account, so it's back in your balance. Update your bank details, and it goes out again once the new ones are approved.`
-        : `${returned.count} payouts (${total}) didn't reach your bank account, so they're back in your balance. Update your bank details, and they go out again once the new ones are approved.`}
+      {bounced
+        ? `${returned.count + bounced.count} payouts (${total}) didn't reach your bank account: ${returned.count} back in your balance and ${bounced.count} still on the way back. Update your bank details, and they go out again once the new ones are approved.`
+        : returned.count === 1
+          ? `${total} from ${format(returned.latest_date, "MMM d")} didn't reach your bank account, so it's back in your balance. Update your bank details, and it goes out again once the new ones are approved.`
+          : `${returned.count} payouts (${total}) didn't reach your bank account, so they're back in your balance. Update your bank details, and they go out again once the new ones are approved.`}
     </WarningCallout>
   );
 }
@@ -244,8 +259,8 @@ function BouncedNotice({ bounced, classes = "" }: IBouncedNotice) {
       }
     >
       {bounced.count === 1
-        ? `${total} from ${format(bounced.latest_date, "MMM d")} couldn't be delivered to your bank account and is on its way back to your balance. Check your bank details and update them if they're wrong. Payouts are paused until new ones are approved.`
-        : `${bounced.count} payouts (${total}) couldn't be delivered to your bank account and are on their way back to your balance. Check your bank details and update them if they're wrong. Payouts are paused until new ones are approved.`}
+        ? `${total} from ${format(bounced.latest_date, "MMM d")} couldn't be delivered to your bank account and is on its way back to your balance. Check your bank details and update them if they're wrong.`
+        : `${bounced.count} payouts (${total}) couldn't be delivered to your bank account and are on their way back to your balance. Check your bank details and update them if they're wrong.`}
     </WarningCallout>
   );
 }
@@ -274,6 +289,16 @@ export function AwaitingNotice({
     >
       {`${to_usd(amount, 2)} from ${format(date, "MMM d")} didn't reach your bank account. We're checking which donations it covered and will add them back to your balance. Payouts are paused until you update your bank details and the new ones are approved.`}
     </WarningCallout>
+  );
+}
+
+/** a bounce is open: payouts wait on how it resolves, which needs nothing new approved yet */
+function BounceHold() {
+  return (
+    <p className="text-sm">
+      Payouts are paused while this payout comes back to your balance. Donations
+      wait in your Better Giving balance. Nothing is lost.
+    </p>
   );
 }
 

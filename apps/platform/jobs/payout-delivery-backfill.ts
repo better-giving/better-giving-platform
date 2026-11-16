@@ -1,7 +1,7 @@
-import { and, asc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, notInArray, sql } from "drizzle-orm";
 import { db } from "../.server/pg/db";
 import { payouts, settlements } from "../.server/pg/schema/payout";
-import { DELIVERED, in_window, ON_PATH } from "../lib/payouts/wise-path";
+import { CANCELLED, DELIVERED_STATES, ON_PATH } from "../lib/payouts/wise-path";
 
 /**
  * brings the payout history from before "a payout settles when Wise reports it
@@ -13,15 +13,13 @@ import { DELIVERED, in_window, ON_PATH } from "../lib/payouts/wise-path";
  * for every settlement of a real transfer (`other_id` set, amount above 0)
  * whose payouts (`settled_id`) are still `settled`:
  *
- * - stored state `outgoing_payment_sent`: delivered history, left `settled`.
- * - a run older than the poll window: left `settled` and listed under `stale`,
- *   whatever its stored state, because nothing reads its state again and a
- *   `processing` or `bounced` payout there would never move. the grants page
- *   shows such a run as settled too (`grant_state`).
+ * - stored state `outgoing_payment_sent`, or the older `settled`: delivered
+ *   history, left `settled`.
+ * - stored state `cancelled`: a manual cancel, left as it is.
  * - stored state on the ordinary path before delivery (`incoming_payment_*`,
  *   `processing`, `funds_converted`), or never read (`""`): `processing`; the
  *   next poll settles or bounces it.
- * - stored state off the ordinary path (`bounced_back`, `cancelled`,
+ * - stored state off the ordinary path (`bounced_back`,
  *   `charged_back`, anything Wise adds): `bounced`.
  * - `returned`, `awaiting_repair`, `funds_refunded`: nothing to do, their
  *   payouts are already taken back or being repaired.
@@ -50,18 +48,18 @@ import { DELIVERED, in_window, ON_PATH } from "../lib/payouts/wise-path";
 
 export type Target = "processing" | "bounced";
 
-/** what a `settled` payout of a run in `state` is now, `stale` for one the
- * poll no longer reads, null to leave it */
-export function target_for(
-  state: string,
-  run_date: string,
-  now: number
-): Target | "stale" | null {
-  if (state === DELIVERED) return null;
-  if (["returned", "awaiting_repair", "funds_refunded"].includes(state)) {
+/** what a `settled` payout of a run in `state` is now, null to leave it. age
+ * plays no part: the poll reads every open run until Wise delivers or refunds
+ * it, so a processing or bounced payout of any age moves on */
+export function target_for(state: string): Target | null {
+  // `settled` is the state written before wise's own were kept: delivered.
+  // `cancelled` is a manual cancel ops recorded: history, no change
+  if (DELIVERED_STATES.includes(state)) return null;
+  if (
+    ["returned", "awaiting_repair", "funds_refunded", CANCELLED].includes(state)
+  ) {
     return null;
   }
-  if (!in_window(run_date, now)) return "stale";
   return state === "" || ON_PATH.includes(state) ? "processing" : "bounced";
 }
 
@@ -77,7 +75,6 @@ export interface IChange {
 
 export interface IOpts {
   commit: boolean;
-  now: number;
 }
 
 export interface ISummary {
@@ -85,8 +82,6 @@ export interface ISummary {
   changed: number;
   /** moved on since it was read, so left as it is */
   skipped: number;
-  /** settled payouts of a run out of the poll window, left settled */
-  stale: number;
   bounced_npos: number[];
 }
 
@@ -99,7 +94,6 @@ export async function run(opts: IOpts, deps: IDeps): Promise<ISummary> {
     to_change: 0,
     changed: 0,
     skipped: 0,
-    stale: 0,
     bounced_npos: [],
   };
   const runs = await db
@@ -110,14 +104,14 @@ export async function run(opts: IOpts, deps: IDeps): Promise<ISummary> {
         isNotNull(settlements.other_id),
         isNotNull(settlements.npo_id),
         sql`${settlements.amount} > 0`,
-        ne(settlements.status, DELIVERED)
+        notInArray(settlements.status, [...DELIVERED_STATES])
       )
     )
     .orderBy(asc(settlements.date), asc(settlements.id));
   const bounced = new Set<number>();
 
   for (const s of runs) {
-    const to = target_for(s.status, s.date, opts.now);
+    const to = target_for(s.status);
     if (to === null) continue;
     const rows = await db
       .select({ id: payouts.id, amount: payouts.amount })
@@ -125,19 +119,6 @@ export async function run(opts: IOpts, deps: IDeps): Promise<ISummary> {
       .where(and(eq(payouts.settled_id, s.id), eq(payouts.type, "settled")))
       .orderBy(asc(payouts.id));
     if (rows.length === 0) continue;
-    if (to === "stale") {
-      sum.stale += rows.length;
-      deps.log(
-        JSON.stringify({
-          stale: true,
-          state: s.status,
-          settlement_id: s.id,
-          npo_id: s.npo_id,
-          payout_ids: rows.map((r) => r.id),
-        })
-      );
-      continue;
-    }
     for (const r of rows) {
       const change: IChange = {
         payout_id: r.id,
@@ -198,7 +179,7 @@ export async function run(opts: IOpts, deps: IDeps): Promise<ISummary> {
     })
   );
   deps.log(
-    `${opts.commit ? "commit" : "dry run"}: ${sum.to_change} to change, ${sum.changed} changed, ${sum.skipped} moved on since read, ${sum.stale} stale and left settled, ${sum.bounced_npos.length} npos held by a bounce`
+    `${opts.commit ? "commit" : "dry run"}: ${sum.to_change} to change, ${sum.changed} changed, ${sum.skipped} moved on since read, ${sum.bounced_npos.length} npos held by a bounce`
   );
   return sum;
 }
@@ -210,6 +191,6 @@ if (import.meta.main) {
     ? new URL(process.env.DATABASE_URL!).host
     : "unparsed DATABASE_URL";
   console.info(`${commit ? "COMMIT" : "dry run"} against ${host}`);
-  await run({ commit, now: Date.now() }, { log: (l) => console.info(l) });
+  await run({ commit }, { log: (l) => console.info(l) });
   process.exit(0);
 }

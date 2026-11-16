@@ -345,8 +345,8 @@ async function announce(
 }
 
 /**
- * asks wise the state of every grants-run transfer from the last 90 days not
- * yet final, and stores it on its settlement when it changed: the stored state
+ * asks wise the state of every grants-run transfer not yet final (an open one
+ * whatever its age; a delivered one for 90 days), and stores it on its settlement when it changed: the stored state
  * is what makes each change act and alert once. a transfer reported sent
  * settles its payouts; money back takes the run back (`return_settlement`);
  * any other state off the ordinary path bounces its payouts, holds the npo

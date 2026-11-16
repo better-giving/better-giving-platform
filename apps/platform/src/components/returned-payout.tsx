@@ -6,11 +6,11 @@ import { grant_state } from "@/payouts/wise-path";
 
 const TIPS = {
   sending:
-    "Your bank hasn't confirmed it received this payout yet. Nothing is needed from you. It shows as Settled once the bank confirms.",
+    "This payout is on its way to your bank. It counts as Settled once it has been sent. Nothing is needed from you.",
   bounced:
     "Your bank didn't accept this payout, and the money is on its way back to your balance. Check that your bank details are right and update them if not. It goes out again once the new ones are approved.",
   grant_sending:
-    "Not counted in your grant totals yet. It counts once your bank confirms it received this grant.",
+    "On its way to your bank, so not counted in your grant totals yet. It counts once it has been sent.",
   grant_bounced:
     "Your bank didn't accept this grant, so it isn't counted in your grant totals. The money is on its way back to your balance. Check your bank details.",
   returned:

@@ -114,7 +114,7 @@ describe("grants table — sending and bounced grants", () => {
     await expect
       .element(
         screen.getByRole("tooltip", {
-          name: "Not counted in your grant totals yet. It counts once your bank confirms it received this grant.",
+          name: "On its way to your bank, so not counted in your grant totals yet. It counts once it has been sent.",
         })
       )
       .toBeVisible();
@@ -153,13 +153,21 @@ describe("grants table — sending and bounced grants", () => {
     }
   );
 
-  test("a grant past the poll window with a state never settled reads as plain history", async () => {
+  test("an old run still on its way keeps reading Sending, and an old bounce Bounced", async () => {
     const screen = await render(
-      <GrantsTable items={[sent("g1", 75, "funds_converted", 120)]} />
+      <GrantsTable
+        items={[
+          sent("g1", 75, "funds_converted", 120),
+          sent("g2", 481.5, "bounced_back", 120),
+        ]}
+      />
     );
-    await expect.element(screen.getByText("$75.00")).toBeVisible();
-    expect(screen.getByText("Sending").query()).toBeNull();
-    expect(screen.getByRole("button").query()).toBeNull();
+    await expect
+      .element(screen.getByText("Sending", { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText("Bounced", { exact: true }))
+      .toBeVisible();
   });
 
   test("a grant whose money is refunded reads Returned, not Sending", async () => {

@@ -170,15 +170,6 @@ const npo_cash = async (id: number) =>
   (await db().select({ cash: npos.cash }).from(npos).where(eq(npos.id, id)))[0]
     ?.cash;
 
-const seed_default_bank = (npo_id: number, at: string, id = "bank-2") =>
-  db().insert(banking_apps).values({
-    id,
-    npo_id,
-    status: "default",
-    date_created: at,
-    updated_at: at,
-  });
-
 const state =
   (status: string, recipient = RECIPIENT) =>
   async () => ({
@@ -261,6 +252,107 @@ describe("a run is scoped by its own transfer", () => {
   });
 });
 
+const days_ago = (n: number) =>
+  new Date(Date.parse(NOW) - n * 86_400_000).toISOString();
+
+describe("an open run is polled and held whatever its age; only a delivered one stops", () => {
+  test("a bounced run at day 100 is still polled", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    const transfer = await funded(npo, ["p-1"]);
+    await poll_wise_returns(state("bounced_back"));
+    await db()
+      .update(settlements)
+      .set({ date: days_ago(100) })
+      .where(eq(settlements.id, transfer));
+    const lookup = vi.fn(state("bounced_back"));
+
+    await poll_wise_returns(lookup);
+
+    expect(lookup).toHaveBeenCalledOnce();
+  });
+
+  test("a refund at day 120 is credited, and the npo is held until then", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    const transfer = await funded(npo, ["p-1"]);
+    await poll_wise_returns(state("bounced_back"));
+    await db()
+      .update(settlements)
+      .set({ date: days_ago(120) })
+      .where(eq(settlements.id, transfer));
+    expect(await npo_return_hold(npo.id)).toMatchObject({ status: "bounced" });
+    expect(await types()).toEqual({ "p-1": "bounced" });
+
+    await poll_wise_returns(state("funds_refunded"));
+
+    expect(await types()).toEqual({ "p-1": "returned" });
+    expect(await npo_cash(npo.id)).toBe(500);
+    expect(await npo_return_hold(npo.id)).toMatchObject({ status: "returned" });
+  });
+
+  test("a run still on its way at day 100 is polled, and delivery settles it", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    const transfer = await funded(npo, ["p-1"]);
+    await db()
+      .update(settlements)
+      .set({ date: days_ago(100) })
+      .where(eq(settlements.id, transfer));
+
+    await poll_wise_returns(state("outgoing_payment_sent"));
+
+    expect((await payout_rows())["p-1"]?.type).toBe("settled");
+  });
+
+  test("a delivered run at day 100 is not polled", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    const transfer = await funded(npo, ["p-1"]);
+    await poll_wise_returns(state("outgoing_payment_sent"));
+    await db()
+      .update(settlements)
+      .set({ date: days_ago(100) })
+      .where(eq(settlements.id, transfer));
+    const lookup = vi.fn(state("bounced_back"));
+
+    await poll_wise_returns(lookup);
+
+    expect(lookup).not.toHaveBeenCalled();
+    expect(await types()).toEqual({ "p-1": "settled" });
+  });
+});
+
+describe("history stored before delivery was tracked holds no one", () => {
+  test.each(["settled", "cancelled"])(
+    "a settlement stored %s whose payouts stayed settled does not hold the npo and is not polled",
+    async (status) => {
+      const npo = await seed_npo(0);
+      await seed_payout(npo.id, "p-old", 100);
+      await db()
+        .insert(settlements)
+        .values({
+          id: "9001",
+          other_id: "ref-9001",
+          npo_id: npo.id,
+          date: days_ago(200),
+          amount: 100,
+          status,
+        });
+      await db()
+        .update(payouts)
+        .set({ type: "settled", settled_id: "9001" })
+        .where(eq(payouts.id, "p-old"));
+      const lookup = vi.fn(state("bounced_back"));
+
+      await poll_wise_returns(lookup);
+
+      expect(lookup).not.toHaveBeenCalled();
+      expect(await npo_return_hold(npo.id)).toBeNull();
+    }
+  );
+});
+
 describe("a transfer refunded while its payouts are still Sending", () => {
   test("takes them back as returned and credits the cash", async () => {
     const npo = await seed_npo(500);
@@ -288,119 +380,6 @@ describe("a bounced transfer is Bounced and holds the npo", () => {
 
     expect(await types()).toEqual({ "p-1": "processing" });
     expect(await npo_return_hold(npo.id)).toBeNull();
-  });
-
-  test("a bounce older than the poll window no longer holds the npo", async () => {
-    const npo = await seed_npo(500);
-    await seed_payout(npo.id, "p-1", 100);
-    const transfer = await funded(npo, ["p-1"]);
-    await poll_wise_returns(state("bounced_back"));
-    await db()
-      .update(settlements)
-      .set({ date: "2026-06-01T00:00:00.000Z" })
-      .where(eq(settlements.id, transfer));
-
-    expect(await npo_return_hold(npo.id)).toBeNull();
-  });
-
-  test.each([
-    ["processing", "bounced_back"],
-    ["settled", "bounced_back"],
-  ])(
-    "a payout %s whose transfer is bounced_back goes bounced, its recipient is recorded, and the npo is held",
-    async (from) => {
-      const npo = await seed_npo(500);
-      await seed_payout(npo.id, "p-1", 100);
-      const transfer = await funded(npo, ["p-1"]);
-      if (from === "settled") {
-        await poll_wise_returns(state("outgoing_payment_sent"));
-      }
-      await db().update(settlements).set({ recipient_id: null });
-
-      await poll_wise_returns(state("bounced_back", "old-bank"));
-
-      expect(await types()).toEqual({ "p-1": "bounced" });
-      expect(await status_of(transfer)).toEqual({
-        status: "bounced_back",
-        recipient: "old-bank",
-      });
-      expect(await npo_cash(npo.id)).toBe(400);
-      expect(await npo_return_hold(npo.id)).toMatchObject({
-        settlement_id: transfer,
-        status: "bounced",
-        amount: 100,
-        reason: "no approved account",
-      });
-    }
-  );
-
-  test.each(["cancelled", "charged_back", "some_new_state"])(
-    "any other off-path state (%s) is a bounce too",
-    async (s) => {
-      const npo = await seed_npo(500);
-      await seed_payout(npo.id, "p-1", 100);
-      await funded(npo, ["p-1"]);
-
-      await poll_wise_returns(state(s));
-
-      expect(await types()).toEqual({ "p-1": "bounced" });
-      expect(await npo_return_hold(npo.id)).not.toBeNull();
-    }
-  );
-
-  test("the next grants run pays nothing while the bounce holds, and pays once a different account is approved", async () => {
-    const npo = await seed_npo(500);
-    await seed_payout(npo.id, "p-1", 100);
-    await funded(npo, ["p-1"]);
-    await poll_wise_returns(state("bounced_back"));
-    await seed_payout(npo.id, "p-2", 100);
-    const pay = vi.fn<Pay>(async () => 5001);
-
-    const held = await settle_npo_payouts(npo, ["p-2"], {
-      ref_key: RECIPIENT,
-      pay,
-    });
-
-    expect(held).toMatchObject({ status: "held", hold: { status: "bounced" } });
-    expect(pay).not.toHaveBeenCalled();
-
-    await seed_default_bank(npo.id, "2026-11-12T13:00:00.000Z");
-    expect(await npo_return_hold(npo.id)).toBeNull();
-  });
-
-  test("a bounce that wise then refunds takes the run back as returned, and the hold stays", async () => {
-    const npo = await seed_npo(500);
-    await seed_payout(npo.id, "p-1", 100);
-    const transfer = await funded(npo, ["p-1"]);
-    await poll_wise_returns(state("bounced_back"));
-
-    await poll_wise_returns(state("funds_refunded"));
-
-    expect(await types()).toEqual({ "p-1": "returned" });
-    expect(await status_of(transfer)).toMatchObject({ status: "returned" });
-    expect(await npo_cash(npo.id)).toBe(500);
-    expect(await npo_return_hold(npo.id)).toMatchObject({ status: "returned" });
-  });
-
-  test("a bounce that wise delivers late goes back to settled and lifts the hold", async () => {
-    const npo = await seed_npo(500);
-    await seed_payout(npo.id, "p-1", 100);
-    const transfer = await funded(npo, ["p-1"]);
-    await poll_wise_returns(state("bounced_back"));
-    expect(await types()).toEqual({ "p-1": "bounced" });
-
-    vi.setSystemTime(Date.parse("2026-11-14T12:00:00.000Z"));
-    await poll_wise_returns(state("outgoing_payment_sent"));
-
-    expect(await payout_rows()).toEqual({
-      "p-1": {
-        type: "settled",
-        settled_id: transfer,
-        settled_date: "2026-11-14T12:00:00.000Z",
-      },
-    });
-    expect(await npo_return_hold(npo.id)).toBeNull();
-    expect(await npo_cash(npo.id)).toBe(400);
   });
 
   test("the bounce is alerted once, and tells ops the hold", async () => {

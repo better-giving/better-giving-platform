@@ -124,7 +124,7 @@ describe("payouts table — sending and bounced", () => {
     await expect
       .element(
         screen.getByRole("tooltip", {
-          name: "Your bank hasn't confirmed it received this payout yet. Nothing is needed from you. It shows as Settled once the bank confirms.",
+          name: "This payout is on its way to your bank. It counts as Settled once it has been sent. Nothing is needed from you.",
         })
       )
       .toBeVisible();

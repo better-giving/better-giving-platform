@@ -22,7 +22,7 @@ import {
   type PayoutStatus,
   UNSENT_TYPES,
 } from "@/payouts";
-import { ON_PATH, WINDOW_DAYS } from "@/payouts/wise-path";
+import { CANCELLED, DELIVERED_STATES, ON_PATH } from "@/payouts/wise-path";
 import { db } from "../db";
 import { payouts, settlements } from "../schema/payout";
 import type { DbOrTx, IPage } from "./helpers";
@@ -394,14 +394,10 @@ export async function settlement_recipient_fill(
     .where(and(eq(settlements.id, id), isNull(settlements.recipient_id)));
 }
 
-/** the oldest send date the poll still reads */
-const window_start = () =>
-  new Date(Date.now() - WINDOW_DAYS * 86_400_000).toISOString();
-
-/** returned or awaiting-repair settlements of a real wise transfer, of any age,
- * and bounced ones still inside the poll window, whose recipient was never
- * stored (a run from before it was): the hold refuses every account until it
- * is known. the poll reads it off the transfer */
+/** returned, awaiting-repair or bounced settlements of a real wise transfer,
+ * of any age, whose recipient was never stored (a run from before it was): the
+ * hold refuses every account until it is known. the poll reads it off the
+ * transfer */
 export async function returned_missing_recipient(): Promise<SettlementRow[]> {
   return db
     .select()
@@ -412,10 +408,7 @@ export async function returned_missing_recipient(): Promise<SettlementRow[]> {
         gt(settlements.amount, 0),
         or(
           inArray(settlements.status, ["returned", "awaiting_repair"]),
-          and(
-            notInArray(settlements.status, [...ON_PATH]),
-            gte(settlements.date, window_start())
-          )
+          and(notInArray(settlements.status, [...ON_PATH]), bounced_payouts())
         ),
         isNull(settlements.recipient_id)
       )
@@ -423,10 +416,23 @@ export async function returned_missing_recipient(): Promise<SettlementRow[]> {
     .orderBy(asc(settlements.date), asc(settlements.id));
 }
 
+/** wise bounced one of the settlement's payouts: what makes a state off the
+ * ordinary path a hold */
+const bounced_payouts = () =>
+  sql`exists (select 1 from ${payouts} where ${payouts.settled_id} = ${settlements.id} and ${payouts.type} = 'bounced')`;
+
+/** one of the settlement's payouts is waiting on wise: sent and not settled,
+ * or bounced. a run stored before this was tracked has neither, so it is
+ * history whatever state it was left in */
+const open_payouts = () =>
+  sql`exists (select 1 from ${payouts} where ${payouts.settled_id} = ${settlements.id} and ${payouts.type} in ('processing', 'bounced'))`;
+
 /**
  * the settlements of a real wise transfer (a grants run's: `other_id` is its
- * ref, the amount what it sent) dated since `since`, whose stored state is
- * not one of `final`
+ * ref, the amount what it sent) whose stored state is not one of `final`:
+ * every open one whatever its age, since wise may still deliver or refund it,
+ * and a delivered one only while sent since `since` (a delivered transfer can
+ * still bounce soon after, never long after)
  */
 export async function settlements_to_poll(
   since: string,
@@ -439,8 +445,18 @@ export async function settlements_to_poll(
       and(
         isNotNull(settlements.other_id),
         gt(settlements.amount, 0),
-        gte(settlements.date, since),
-        notInArray(settlements.status, [...final])
+        notInArray(settlements.status, [...final]),
+        or(
+          // open: on its way, bounced, awaiting repair, any age
+          notInArray(settlements.status, [...DELIVERED_STATES, CANCELLED]),
+          // delivered: only while it could still bounce
+          and(
+            inArray(settlements.status, [...DELIVERED_STATES]),
+            gte(settlements.date, since)
+          ),
+          // cancelled: open only while one of its payouts is
+          and(eq(settlements.status, CANCELLED), open_payouts())
+        )
       )
     )
     .orderBy(asc(settlements.date), asc(settlements.id));
@@ -448,8 +464,8 @@ export async function settlements_to_poll(
 
 /** the npo's latest settlement whose transfer came back, came back and waits
  * on ownership to be repaired (`AWAITING_REPAIR` in ../../payouts/wise-return),
- * or is bounced within the poll window (any wise state off the ordinary path
- * that is not the money back, until wise delivers it late): in each its bank
+ * or is bounced (any wise state off the ordinary path that is not the money
+ * back, until wise delivers it late or refunds it, however old): in each its bank
  * account is the one that bounced. null when none did */
 export async function npo_last_return(
   npo_id: number,
@@ -470,14 +486,16 @@ export async function npo_last_return(
     .where(
       and(
         eq(settlements.npo_id, npo_id),
+        // a bounce holds while it is open, whatever its age: the poll reads
+        // it until wise delivers or refunds it
         or(
           inArray(settlements.status, ["returned", "awaiting_repair"]),
-          // a bounce is news only while the poll still reads the transfer
-          // and could see it delivered; older, it is history
           and(
             isNotNull(settlements.other_id),
             notInArray(settlements.status, [...ON_PATH]),
-            gte(settlements.date, window_start())
+            // a state off the ordinary path holds only for a run whose payouts
+            // wise bounced: history stored before this (a manual cancel) did not
+            bounced_payouts()
           )
         )
       )
