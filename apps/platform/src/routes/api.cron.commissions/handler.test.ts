@@ -285,6 +285,26 @@ describe("commissions cron", () => {
     expect(await statuses()).toEqual({ "d-1": "paid" });
   });
 
+  test("a payout to one of our own wise accounts is refused before any quote: back to pending, nothing paid, ops told", async () => {
+    await seed("d-1", 60);
+    wise.v2_account.mockResolvedValueOnce({
+      currency: "USD",
+      ownedByCustomer: true,
+    } as never);
+
+    await index();
+
+    expect(wise.quote).not.toHaveBeenCalled();
+    expect(wise.transfer).not.toHaveBeenCalled();
+    expect(await statuses()).toEqual({ "d-1": "pending" });
+    const refused = send_alert.mock.calls
+      .map(([a]) => a)
+      .find((a) => a.title === `commission payout refused for ${REFERRER}`);
+    expect(refused?.fields).toEqual(
+      expect.arrayContaining([{ name: "recipient", value: "42" }])
+    );
+  });
+
   test("a retry over a grown set after an unknown funding outcome pays only the new commission", async () => {
     await seed("d-1", 25);
     await seed("d-2", 30);
