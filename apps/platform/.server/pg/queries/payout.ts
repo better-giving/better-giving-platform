@@ -478,8 +478,8 @@ export async function settlements_to_poll(
 /** the npo's latest settlement whose transfer came back, came back and waits
  * on ownership to be repaired (`AWAITING_REPAIR` in ../../payouts/wise-return),
  * or is bounced (any wise state off the ordinary path that is not the money
- * back, until wise delivers it late or refunds it, however old): in each its bank
- * account is the one that bounced. null when none did */
+ * back, until wise delivers it late or refunds it, however old): in each its
+ * bank account is the one that bounced. null when none did */
 export async function npo_last_return(
   npo_id: number,
   db_: DbOrTx = db

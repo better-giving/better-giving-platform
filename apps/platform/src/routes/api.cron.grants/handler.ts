@@ -56,8 +56,8 @@ export async function index(event?: IInput) {
  * a processing row was claimed and never settled or released: a killed run, a
  * failed release, a transfer whose funding or record is unknown, or a
  * concurrent run still in flight. a funded one is no longer this: it waits on
- * wise's delivery under its transfer. `pending_payouts` never returns these rows,
- * so without this they sit unpaid and unannounced
+ * wise's delivery under its transfer. `pending_payouts` never returns these
+ * rows, so without this they sit unpaid and unannounced
  */
 async function alert_unsettled_claims() {
   try {
