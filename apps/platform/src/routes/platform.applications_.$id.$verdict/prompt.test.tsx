@@ -5,7 +5,11 @@ import Prompt from "./prompt";
 
 const render_prompt = (
   verdict: string,
-  review: { o_bank_id?: string; own_account: boolean | "unknown" }
+  review: {
+    o_bank_id?: string;
+    own_account: boolean;
+    own_account_unknown?: boolean;
+  }
 ) => {
   const Stub = createRoutesStub([
     {
@@ -14,6 +18,7 @@ const render_prompt = (
       loader: () => ({
         reg: { o_name: "Acme Relief", o_bank_id: review.o_bank_id ?? "" },
         own_account: review.own_account,
+        own_account_unknown: review.own_account_unknown ?? false,
       }),
       Component: Outlet,
       HydrateFallback: () => null,
@@ -78,7 +83,8 @@ describe("registration approve prompt: own-account warning", () => {
   test("a check that could not run is said to staff", async () => {
     const screen = await render_prompt("approved", {
       o_bank_id: "40000001",
-      own_account: "unknown",
+      own_account: false,
+      own_account_unknown: true,
     });
 
     await expect

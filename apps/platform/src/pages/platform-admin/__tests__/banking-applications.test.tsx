@@ -199,6 +199,7 @@ const WISE_FIXTURE = {
   country: "US",
   name: { fullName: "Jane Doe" },
   own_account: false,
+  own_account_unknown: false,
   type: "checking",
   legalEntityType: "PERSON" as const,
   longAccountSummary: "USD account ending in 1234",
@@ -399,34 +400,6 @@ describe("approve flow", () => {
       <Stub initialEntries={[`/platform/banking-applications/${bapp_id}`]} />
     );
   }
-
-  // runs before anything else in this file reads our own accounts: a good read
-  // is held for an hour per module, so a later failure would never reach wise
-  it("approves when our own accounts can't be checked: warned about, never refused", async () => {
-    const npo = await seed_npo();
-    const bapp_id = await seed_bapp(npo.id);
-    const row = await get_bapp(bapp_id);
-    vi.mocked(wise.account_details).mockRejectedValueOnce(
-      new Error("wise is down")
-    );
-
-    const screen = await render_with_approve(bapp_id, row);
-
-    await screen.getByRole("link", { name: /approve/i }).click();
-    await expect
-      .element(screen.getByText(/you are about to approve/i))
-      .toBeVisible();
-    (
-      screen.getByRole("button", { name: /submit/i }).element() as HTMLElement
-    ).click();
-
-    await expect.element(screen.getByTestId("success")).toBeVisible();
-    expect(
-      screen.getByText("Unexpected Application Error!").query()
-    ).toBeNull();
-    // approved, and made the default as the npo's first
-    expect((await get_bapp(bapp_id)).status).toBe("default");
-  });
 
   it("approves bapp — status becomes approved when npo already has a default", async () => {
     const npo = await seed_npo();

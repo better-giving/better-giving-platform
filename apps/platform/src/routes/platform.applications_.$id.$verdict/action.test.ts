@@ -93,11 +93,6 @@ const report_error = vi.hoisted(() => vi.fn());
 vi.mock("#/errors/report", () => ({ report_error }));
 const accounts = vi.hoisted(() => ({ retrieve: vi.fn() }));
 vi.mock("$/kit/stripe", () => ({ stripe: { accounts } }));
-const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
-vi.mock("$/payouts/own-accounts", async (io) => ({
-  ...(await io<typeof import("$/payouts/own-accounts")>()),
-  ...own,
-}));
 
 import type { ReactNode } from "react";
 import { render } from "react-email";
@@ -161,7 +156,6 @@ beforeEach(async () => {
   report_error.mockClear();
   vi.mocked(wise.v2_account).mockClear();
   accounts.retrieve.mockReset().mockResolvedValue(NOT_READY);
-  own.is_own_recipient.mockReset().mockResolvedValue(false);
 
   await db.insert(user).values({
     id: "u-1",
@@ -214,29 +208,16 @@ const dedupe_keys = (kind: string) =>
   new Set(enqueued.filter((m) => m.id === kind).map((m) => m.dedupe));
 
 describe("approve", () => {
-  describe("a bank that may be Better Giving's own", () => {
-    /** approved all the same, the bank filed as the default */
-    const approved_with_bank = async (res: Response) => {
-      expect(res.status).toBe(302);
-      const db = test_db.current!.db;
-      expect(await db.select().from(npos)).toHaveLength(1);
-      const banks = await db.select().from(banking_apps);
-      expect(banks).toHaveLength(1);
-      expect(banks[0]?.status).toBe("default");
-      expect((await reg_get(RID))?.status).toBe("03");
-    };
+  test("approval files the registration's bank as the default, and refuses nothing over whose account it is", async () => {
+    const res = await verdict("approved");
 
-    test("one of our own accounts is approved, and the bank is filed as default", async () => {
-      own.is_own_recipient.mockResolvedValueOnce(true);
-
-      await approved_with_bank(await verdict("approved"));
-    });
-
-    test("a check that fails is approved too", async () => {
-      own.is_own_recipient.mockRejectedValueOnce(new Error("wise 503"));
-
-      await approved_with_bank(await verdict("approved"));
-    });
+    expect(res.status).toBe(302);
+    const db = test_db.current!.db;
+    expect(await db.select().from(npos)).toHaveLength(1);
+    const banks = await db.select().from(banking_apps);
+    expect(banks).toHaveLength(1);
+    expect(banks[0]?.status).toBe("default");
+    expect((await reg_get(RID))?.status).toBe("03");
   });
 
   test("enqueues the approved row, which mails the approval", async () => {

@@ -260,8 +260,20 @@ describe("grants cron execute", () => {
       ownedByCustomer: true,
       name: { fullName: "Better Giving Inc" },
     } as never);
+    // what the books say at the moment the warning goes out
+    const at_warning: { cash: number | undefined; settlements: number }[] = [];
+    send_alert.mockImplementation(async (a: { title: string }) => {
+      if (a.title.startsWith("payout to one of"))
+        at_warning.push({
+          cash: await npo_cash(npo_id),
+          settlements: (await db().select().from(settlements)).length,
+        });
+    });
 
     await index();
+
+    // recorded first: the cash is taken and the settlement exists before the alert
+    expect(at_warning).toEqual([{ cash: 440, settlements: 1 }]);
 
     expect(wise.transfer).toHaveBeenCalledOnce();
     expect(wise.fund_transfer).toHaveBeenCalledOnce();
@@ -277,9 +289,6 @@ describe("grants cron execute", () => {
     expect(warned[0]!.fields).toEqual(
       expect.arrayContaining([{ name: "holder", value: "Better Giving Inc" }])
     );
-    expect(
-      send_alert.mock.calls.filter(([a]) => /refused/.test(a.title))
-    ).toEqual([]);
   });
 
   test("pays the npo its full pending total and settles every payout", async () => {

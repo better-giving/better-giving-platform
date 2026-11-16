@@ -126,7 +126,7 @@ describe("regs: every sort pages without repeating or skipping a row", () => {
     expect(ids).toHaveLength(40);
   });
 
-  test("a status-sorted second page continues the order, nulls last", async () => {
+  test("a name-sorted second page continues the order, nulls last", async () => {
     await seed_many(40);
 
     const first = await regs({ sort_key: "o_name", sort_dir: "asc" });

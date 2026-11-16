@@ -32,9 +32,11 @@ export type LoaderData = Partial<V2RecipientAccount> & {
   wacc_unavailable: boolean;
   /** absent when the npo row is gone */
   npo_name?: string;
-  /** the account is one of Better Giving's own wise balances: `"unknown"` when
-   * it loaded but the check could not run. a warning, never a block */
-  own_account: boolean | "unknown";
+  /** the account is one of Better Giving's own wise balances: true only on a
+   * confirmed match. a warning, never a block */
+  own_account: boolean;
+  /** the account loaded but the own-account check could not run */
+  own_account_unknown: boolean;
 };
 
 export const loader = async ({ params }: LoaderFunctionArgs) => {
@@ -53,10 +55,10 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
     wise.v2_account(bank_id).catch(report_degraded_null),
     npos_batch_get([x.npo_id]),
   ]);
-  const own_account: LoaderData["own_account"] = y
+  const own: boolean | null = y
     ? await is_own_recipient(y).catch((err) => {
         report_degraded(err);
-        return "unknown" as const;
+        return null;
       })
     : false;
   return {
@@ -65,7 +67,8 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
     ...(y ?? {}),
     wacc_unavailable: !y,
     npo_name: npo?.name,
-    own_account,
+    own_account: own === true,
+    own_account_unknown: own === null,
   } satisfies LoaderData;
 };
 

@@ -19,6 +19,12 @@ import {
 import { reverse_unfunded_payout_loss } from "../refund/unfunded";
 import { net_owed } from "./net-owed";
 import { deduct, lock_run, owed_netting_on, undo_deductions } from "./owed-run";
+import {
+  type IPaid,
+  type IPayWarning,
+  send_pay_warning,
+  warning_of,
+} from "./pay-warning";
 import { type IReturnHold, npo_return_hold } from "./resend-returned";
 import {
   NotFundedError,
@@ -32,7 +38,10 @@ import {
  * `NotFundedError` only when wise was never asked to fund or refused funding
  * outright; any other throw means the money may have moved.
  */
-export type Pay = (ref: string, total: number) => Promise<number | string>;
+export type Pay = (
+  ref: string,
+  total: number
+) => Promise<number | string | IPaid>;
 
 export type SettleResult =
   | { status: "none_pending" }
@@ -136,8 +145,11 @@ export async function settle_npo_payouts(
   ];
 
   let transfer_id: string;
+  let warning: IPayWarning | undefined;
   try {
-    transfer_id = String(await recipient.pay(ref, total));
+    const paid = await recipient.pay(ref, total);
+    transfer_id = String(typeof paid === "object" ? paid.id : paid);
+    warning = typeof paid === "object" ? paid.warning : undefined;
   } catch (err) {
     const ctx = { npo_id: npo.id, ref, payout_ids: ids };
     if (err instanceof NotFundedError) {
@@ -190,6 +202,8 @@ export async function settle_npo_payouts(
       body: `do not reset these payouts to pending or pay them again; reconcile in Wise by customerTransactionId ${ref}`,
       fields,
     });
+    // after our own alert: a warning that rode on the throw (an own-account match)
+    await send_pay_warning(warning_of(err));
     return { status: "fund_unknown", ref };
   }
 
@@ -239,6 +253,7 @@ export async function settle_npo_payouts(
       body: `do not reset these payouts to pending or pay them again; Wise transfer ${transfer_id} (customerTransactionId ${ref}) was funded. if the payouts are still processing and name no settled_id, record the settlement by hand: its settlement amount is the net, ${total}; debit the npo's cash by the gross, ${gross}; also set settled_id to ${transfer_id} on any of these payouts a refund moved to refunded_loss while the transfer was in flight, or a return of the transfer will not find them`,
       fields: [...fields, { name: "gross", value: gross.toString() }],
     });
+    await send_pay_warning(warning);
     return { status: "unrecorded", ref, transfer_id };
   }
   if (unsettled.length > 0) {
@@ -248,6 +263,8 @@ export async function settle_npo_payouts(
       fields: [...fields, { name: "unsettled", value: unsettled.join(", ") }],
     });
   }
+  // last, and unable to throw: the payout is already recorded
+  await send_pay_warning(warning);
   return { status: "settled", ref, total, transfer_id };
 }
 

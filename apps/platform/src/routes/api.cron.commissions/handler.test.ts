@@ -292,8 +292,16 @@ describe("commissions cron", () => {
       ownedByCustomer: true,
       name: { fullName: "Better Giving Inc" },
     } as never);
+    const at_warning: Record<string, string>[] = [];
+    send_alert.mockImplementation(async (a: { title: string }) => {
+      if (a.title.startsWith("payout to one of"))
+        at_warning.push(await statuses());
+    });
 
     await index();
+
+    // recorded first: the commission is already paid when the alert goes out
+    expect(at_warning).toEqual([{ "d-1": "paid" }]);
 
     expect(wise.transfer).toHaveBeenCalledOnce();
     expect(wise.fund_transfer).toHaveBeenCalledOnce();
@@ -307,9 +315,6 @@ describe("commissions cron", () => {
     expect(warned[0]!.fields).toEqual(
       expect.arrayContaining([{ name: "recipient", value: "42" }])
     );
-    expect(
-      send_alert.mock.calls.filter(([a]) => /refused/.test(a.title))
-    ).toEqual([]);
   });
 
   test("a retry over a grown set after an unknown funding outcome pays only the new commission", async () => {

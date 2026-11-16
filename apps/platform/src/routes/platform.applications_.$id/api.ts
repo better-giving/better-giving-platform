@@ -18,10 +18,11 @@ export interface LoaderData {
   wacc_unavailable: boolean;
   /** what the approve prompt's loader and action will take */
   approvable: boolean;
-  /** the bank on file is one of Better Giving's own wise balances; `"unknown"`
-   * when the check could not run; false with no bank. a warning on the approve
-   * prompt, never a block */
-  own_account: boolean | "unknown";
+  /** the bank on file is one of Better Giving's own wise balances: true only
+   * on a confirmed match. a warning on the approve prompt, never a block */
+  own_account: boolean;
+  /** a bank is on file and loaded, but the own-account check could not run */
+  own_account_unknown: boolean;
 }
 
 export const loader = ({ params }: Route.LoaderArgs) => review_get(params.id);
@@ -44,10 +45,10 @@ export const review_get = async (raw_id: string): Promise<LoaderData> => {
     ? await wise.v2_account(+reg.o_bank_id).catch(report_degraded_null)
     : null;
 
-  const own_account: LoaderData["own_account"] = wacc
+  const own: boolean | null = wacc
     ? await is_own_recipient(wacc).catch((err) => {
         report_degraded(err);
-        return "unknown" as const;
+        return null;
       })
     : false;
 
@@ -55,7 +56,8 @@ export const review_get = async (raw_id: string): Promise<LoaderData> => {
     reg,
     wacc,
     wacc_unavailable: !!reg.o_bank_id && !wacc,
-    own_account,
+    own_account: own === true,
+    own_account_unknown: own === null,
     approvable: is_approvable(reg, wacc, stripe_env.connect_routing),
   };
 };

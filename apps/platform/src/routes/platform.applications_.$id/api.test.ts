@@ -34,23 +34,35 @@ describe("registration review: own-account flag", () => {
       "a confirmed match",
       () => own.is_own_recipient.mockResolvedValue(true),
       true,
+      false,
     ],
-    ["no match", () => own.is_own_recipient.mockResolvedValue(false), false],
+    [
+      "no match",
+      () => own.is_own_recipient.mockResolvedValue(false),
+      false,
+      false,
+    ],
     [
       "a check that could not run",
       () => own.is_own_recipient.mockRejectedValue(new Error("503")),
-      "unknown",
+      false,
+      true,
     ],
-  ])("is %s", async (_name, arrange, expected) => {
+  ])("is %s", async (_name, arrange, own_account, own_account_unknown) => {
     arrange();
 
-    expect((await review_get(REG_ID)).own_account).toBe(expected);
+    const d = await review_get(REG_ID);
+
+    expect(d.own_account).toBe(own_account);
+    expect(d.own_account_unknown).toBe(own_account_unknown);
   });
 
   it("is false when the registration has no bank (Stripe only), and asks nothing", async () => {
     reg_get.mockResolvedValue({ id: REG_ID, status: "02", o_bank_id: "" });
 
-    expect((await review_get(REG_ID)).own_account).toBe(false);
+    const d = await review_get(REG_ID);
+    expect(d.own_account).toBe(false);
+    expect(d.own_account_unknown).toBe(false);
     expect(own.is_own_recipient).not.toHaveBeenCalled();
   });
 
@@ -61,5 +73,6 @@ describe("registration review: own-account flag", () => {
 
     expect(d.wacc_unavailable).toBe(true);
     expect(d.own_account).toBe(false);
+    expect(d.own_account_unknown).toBe(false);
   });
 });

@@ -1,9 +1,12 @@
-import { report_error } from "#/errors/report";
-import type { Alert } from "@/slack";
-import { stage, wise as wise_env } from "../env";
-import { aws_monitor } from "../kit/slack";
+import { wise as wise_env } from "../env";
 import { wise } from "../kit/wise";
 import { is_own_recipient } from "./own-accounts";
+import {
+  attach_warning,
+  type IPaid,
+  type IPayWarning,
+  within,
+} from "./pay-warning";
 import { NotFundedError } from "./transfer";
 
 /** awaiting our funding: the one status in which funding is ours to ask for */
@@ -19,16 +22,19 @@ const FUNDED = new Set([
 /**
  * pays `amount` USD to wise recipient `to` under `ref`, wise's idempotency key:
  * quote → transfer → fund. resolves with the transfer id once funding was
- * accepted. throws `NotFundedError` only when no money moved; any other throw
+ * accepted, and any warning for the caller to send after it has recorded the
+ * payout: nothing here waits between accepted funding and that write. throws `NotFundedError` only when no money moved; any other throw
  * means it may have. a recipient that is one of our own accounts, or whose
  * check could not run, is paid all the same: Better Giving does not pry into
- * where a nonprofit sends its funds, so ops is warned, never blocked.
+ * where a nonprofit sends its funds, so ops is warned, never blocked. a throw
+ * from the funding call is rethrown as it is, carrying the warning
+ * (`warning_of`) as "funding status unknown".
  */
 export async function wise_pay(
   to: number,
   amount: number,
   ref: string
-): Promise<number> {
+): Promise<IPaid> {
   const { transfer, warning } = await create_transfer(to, amount, ref).catch(
     (err) => {
       throw new NotFundedError(err);
@@ -39,7 +45,7 @@ export async function wise_pay(
   // its original transfer, funded or cancelled. the crons never reach these on
   // their own: each claim draws a fresh ref, and a claim left processing is
   // not retried, so only a caller re-sending a claim's stored ref meets them.
-  if (FUNDED.has(transfer.status ?? "")) return transfer.id;
+  if (FUNDED.has(transfer.status ?? "")) return { id: transfer.id };
   if (transfer.status === "cancelled") {
     // cancelled before it was funded: no money moved
     throw new NotFundedError(
@@ -56,11 +62,11 @@ export async function wise_pay(
   }
   const funding = await wise
     .fund_transfer(transfer.id, +wise_env.profile_id, { type: "BALANCE" })
-    .catch(async (err: unknown) => {
-      // the transfer exists and funding may have landed: ops still hears of the
-      // own-account match, with the outcome said to be unknown
+    .catch((err: unknown) => {
+      // the transfer exists and funding may have landed: the own-account
+      // warning rides on the error, saying the outcome is unknown
       if (warning) {
-        await warn_ops({
+        attach_warning(err, {
           ...warning,
           body: warning.body.replace(
             "the payout went ahead",
@@ -74,33 +80,20 @@ export async function wise_pay(
   if (funding.status === "REJECTED") {
     throw new NotFundedError(new Error(`funding failed ${funding.errorCode}`));
   }
-  // only now is it true that the payout went ahead
-  if (warning) await warn_ops(warning);
-  return transfer.id;
+  return { id: transfer.id, warning };
 }
 
 type Transfer = Awaited<ReturnType<typeof wise.transfer>>;
-type Warning = Parameters<typeof warn_ops>[0];
 
 /** the own-account lookup is given this long: a stalled one must not hold a
  * batch of payouts, and counts as a check that could not run */
 const CHECK_MS = 5_000;
-/** an ops alert is given this long, so a stalled Slack cannot stall a payout */
-const ALERT_MS = 3_000;
-
-/** `p`'s answer, or `on_timeout` once `ms` pass */
-const within = <T>(ms: number, p: Promise<T>, on_timeout: () => T) =>
-  new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => resolve(on_timeout()), ms);
-    p.then(resolve, reject).finally(() => clearTimeout(t));
-  });
-
 /** the transfer, and the warning to send ops once it is funded */
 async function create_transfer(
   to: number,
   amount: number,
   ref: string
-): Promise<{ transfer: Transfer; warning?: Warning }> {
+): Promise<{ transfer: Transfer; warning?: IPayWarning }> {
   const recipient = await wise.v2_account(to);
   const checked = await within(
     CHECK_MS,
@@ -115,7 +108,7 @@ async function create_transfer(
     { name: "holder", value: recipient.name?.fullName ?? "no name" },
     { name: "customerTransactionId", value: ref },
   ];
-  const warning: Warning | undefined =
+  const warning: IPayWarning | undefined =
     checked.err !== null
       ? {
           title: "own-account check could not run before a payout",
@@ -153,27 +146,4 @@ async function create_transfer(
 
   if (transfer.errors) throw transfer.errors;
   return { transfer, warning };
-}
-
-/** an alert that fails or stalls is reported, never thrown past the money */
-async function warn_ops(a: {
-  title: string;
-  body: string;
-  fields: NonNullable<Alert["fields"]>;
-}) {
-  try {
-    await within<unknown>(
-      ALERT_MS,
-      aws_monitor.send_alert({
-        ...a,
-        type: "ERROR",
-        from: `wise-pay:${stage}`,
-      }),
-      () => {
-        report_error(new Error("ops alert timed out"), { alert: a.title });
-      }
-    );
-  } catch (err) {
-    report_error(err, { alert: a.title });
-  }
 }

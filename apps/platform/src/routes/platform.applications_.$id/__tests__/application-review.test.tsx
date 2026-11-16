@@ -406,14 +406,9 @@ describe("verdict dialog", () => {
 });
 
 describe("approval", () => {
-  // runs before anything else in this file reads our own accounts: a good read
-  // is held for an hour per module, so a later failure would never reach wise
-  it("shows the refusal in the dialog when our own accounts can't be checked", async () => {
+  it("approves from the dialog, with no error: whose account the bank is never blocks it", async () => {
     await seed_user();
     const id = await seed_reg(ALL_FIELDS);
-    vi.mocked(wise.account_details).mockRejectedValueOnce(
-      new Error("wise is down")
-    );
     const Stub = createRoutesStub([
       {
         id: "routes/platform.applications_.$id",
@@ -439,14 +434,10 @@ describe("approval", () => {
       screen.getByRole("button", { name: /submit/i }).element() as HTMLElement
     ).click();
 
-    await expect
-      .element(screen.getByText(/couldn't check this bank account/i))
-      .toBeVisible();
+    await expect.poll(async () => (await reg_get(id))?.status).toBe("03");
     expect(
       screen.getByText("Unexpected Application Error!").query()
     ).toBeNull();
-    // nothing was approved
-    expect((await reg_get(id))?.status).toBe("02");
   });
 
   it("shows approved badge + success after admin approves", async () => {

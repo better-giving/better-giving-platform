@@ -19,6 +19,7 @@ vi.mock("./own-accounts", () => own);
 
 const { wise_pay } = await import("./wise-pay");
 const { NotFundedError } = await import("./transfer");
+const { warning_of } = await import("./pay-warning");
 
 const TRANSFER_ID = 9001;
 const REF = "0d3c1b52-7a4e-5c1f-9a2b-3c4d5e6f7a8b";
@@ -45,7 +46,9 @@ beforeEach(() => {
 
 describe("wise_pay", () => {
   test("funds the transfer keyed on the ref and returns its id", async () => {
-    await expect(wise_pay(777, 100, REF)).resolves.toBe(TRANSFER_ID);
+    await expect(wise_pay(777, 100, REF)).resolves.toMatchObject({
+      id: TRANSFER_ID,
+    });
     expect(wise.transfer).toHaveBeenCalledWith(
       expect.objectContaining({ customerTransactionId: REF })
     );
@@ -103,7 +106,9 @@ describe("wise_pay", () => {
     async (status) => {
       wise.transfer.mockResolvedValue({ id: TRANSFER_ID, status });
 
-      await expect(wise_pay(777, 100, REF)).resolves.toBe(TRANSFER_ID);
+      await expect(wise_pay(777, 100, REF)).resolves.toMatchObject({
+        id: TRANSFER_ID,
+      });
       expect(wise.fund_transfer).not.toHaveBeenCalled();
     }
   );
@@ -156,49 +161,51 @@ describe("wise_pay", () => {
       status: "incoming_payment_waiting",
     });
 
-    await expect(wise_pay(777, 100, REF)).resolves.toBe(TRANSFER_ID);
+    await expect(wise_pay(777, 100, REF)).resolves.toMatchObject({
+      id: TRANSFER_ID,
+    });
 
     expect(wise.cancel_transfer).not.toHaveBeenCalled();
     expect(wise.fund_transfer).toHaveBeenCalledOnce();
   });
 
-  test("a recipient that is one of our own wise accounts is paid as normal, and ops is warned once", async () => {
+  test("a recipient that is one of our own wise accounts is paid as normal, and the warning comes back with the id, sent by no one yet", async () => {
     own.is_own_recipient.mockResolvedValue(true);
     wise.v2_account.mockResolvedValue({
       currency: "EUR",
       name: { fullName: "Better Giving Inc" },
     });
 
-    await expect(wise_pay(881063184, 72.82, REF)).resolves.toBe(TRANSFER_ID);
+    const paid = await wise_pay(881063184, 72.82, REF);
 
+    expect(paid.id).toBe(TRANSFER_ID);
     expect(wise.quote).toHaveBeenCalledOnce();
-    expect(wise.transfer).toHaveBeenCalledOnce();
     expect(wise.fund_transfer).toHaveBeenCalledOnce();
-    expect(slack.send_alert).toHaveBeenCalledOnce();
-    const [alert] = slack.send_alert.mock.calls[0]!;
-    expect(alert.title).toBe(
-      "payout to one of Better Giving's own Wise accounts"
-    );
-    expect(alert.fields).toEqual(
-      expect.arrayContaining([
+    // nothing waits between accepted funding and the caller's write
+    expect(slack.send_alert).not.toHaveBeenCalled();
+    expect(paid.warning).toMatchObject({
+      title: "payout to one of Better Giving's own Wise accounts",
+      fields: expect.arrayContaining([
         { name: "recipient", value: "881063184" },
         { name: "holder", value: "Better Giving Inc" },
         { name: "customerTransactionId", value: REF },
-      ])
-    );
+      ]),
+    });
   });
 
-  test("a failed lookup of our own accounts pays as normal and tells ops the check could not run", async () => {
+  test("a failed lookup of our own accounts pays as normal and returns a warning that the check could not run", async () => {
     own.is_own_recipient.mockRejectedValue("account-details 503");
 
-    await expect(wise_pay(777, 100, REF)).resolves.toBe(TRANSFER_ID);
+    const paid = await wise_pay(777, 100, REF);
 
+    expect(paid.id).toBe(TRANSFER_ID);
     expect(wise.fund_transfer).toHaveBeenCalledOnce();
-    expect(slack.send_alert).toHaveBeenCalledOnce();
-    const [alert] = slack.send_alert.mock.calls[0]!;
-    expect(alert.title).toBe("own-account check could not run before a payout");
-    expect(alert.body).toContain("account-details 503");
-    expect(alert.fields).toEqual(
+    expect(slack.send_alert).not.toHaveBeenCalled();
+    expect(paid.warning?.title).toBe(
+      "own-account check could not run before a payout"
+    );
+    expect(paid.warning?.body).toContain("account-details 503");
+    expect(paid.warning?.fields).toEqual(
       expect.arrayContaining([
         { name: "recipient", value: "777" },
         { name: "customerTransactionId", value: REF },
@@ -206,32 +213,9 @@ describe("wise_pay", () => {
     );
   });
 
-  test("an ordinary recipient raises no alert", async () => {
-    await wise_pay(777, 100, REF);
-    expect(slack.send_alert).not.toHaveBeenCalled();
-  });
-
-  test("a warning that fails to send never blocks the payout, and is reported", async () => {
-    own.is_own_recipient.mockResolvedValue(true);
-    slack.send_alert.mockRejectedValue(new Error("slack down"));
-
-    await expect(wise_pay(881063184, 72.82, REF)).resolves.toBe(TRANSFER_ID);
-
-    expect(wise.fund_transfer).toHaveBeenCalledOnce();
-    expect(slack.send_alert).toHaveBeenCalledOnce();
-    expect(report_error).toHaveBeenCalledWith(expect.any(Error), {
-      alert: "payout to one of Better Giving's own Wise accounts",
-    });
-  });
-
-  test("the warning goes out after funding was accepted, not before the money moves", async () => {
-    own.is_own_recipient.mockResolvedValue(true);
-
-    await wise_pay(881063184, 72.82, REF);
-
-    expect(wise.fund_transfer.mock.invocationCallOrder[0]!).toBeLessThan(
-      slack.send_alert.mock.invocationCallOrder[0]!
-    );
+  test("an ordinary recipient has no warning", async () => {
+    const paid = await wise_pay(777, 100, REF);
+    expect(paid.warning).toBeUndefined();
   });
 
   test.each([
@@ -252,36 +236,46 @@ describe("wise_pay", () => {
         }),
     ],
   ])(
-    "no warning goes out when %s: nothing was paid",
+    "no warning is carried when %s: nothing was paid",
     async (_name, arrange) => {
       own.is_own_recipient.mockResolvedValue(true);
       arrange();
 
-      await expect(wise_pay(881063184, 72.82, REF)).rejects.toBeInstanceOf(
-        NotFundedError
-      );
+      const err = await wise_pay(881063184, 72.82, REF).catch((e) => e);
 
+      expect(err).toBeInstanceOf(NotFundedError);
+      expect(warning_of(err)).toBeUndefined();
       expect(slack.send_alert).not.toHaveBeenCalled();
     }
   );
 
-  test("a funding call that throws after the transfer exists still warns ops, saying the outcome is unknown", async () => {
+  test("a funding call that throws rethrows that same error, carrying the warning as 'funding status unknown', and sends nothing itself", async () => {
     own.is_own_recipient.mockResolvedValue(true);
-    wise.fund_transfer.mockRejectedValue(new Error("fetch timed out"));
+    const boom = new Error("fetch timed out");
+    wise.fund_transfer.mockRejectedValue(boom);
+    slack.send_alert.mockRejectedValue(new Error("slack down too"));
 
-    await expect(wise_pay(881063184, 72.82, REF)).rejects.toThrow(
-      "fetch timed out"
-    );
+    const err = await wise_pay(881063184, 72.82, REF).catch((e) => e);
 
-    expect(slack.send_alert).toHaveBeenCalledOnce();
-    const [alert] = slack.send_alert.mock.calls[0]!;
-    expect(alert.title).toBe(
-      "payout to one of Better Giving's own Wise accounts"
-    );
-    expect(alert.body).toContain("funding status unknown");
+    expect(err).toBe(boom);
+    expect(warning_of(err)?.body).toContain("funding status unknown");
+    expect(slack.send_alert).not.toHaveBeenCalled();
   });
 
-  describe("a hung dependency never strands a payout", () => {
+  test("a funding call that throws a bare string still throws it, and the warning is sent without being awaited", async () => {
+    own.is_own_recipient.mockResolvedValue(true);
+    wise.fund_transfer.mockRejectedValue("fetch failed");
+
+    await expect(wise_pay(881063184, 72.82, REF)).rejects.toBe("fetch failed");
+    await Promise.resolve();
+
+    expect(slack.send_alert).toHaveBeenCalledOnce();
+    expect(slack.send_alert.mock.calls[0]![0].body).toContain(
+      "funding status unknown"
+    );
+  });
+
+  describe("a hung own-account lookup never strands a payout", () => {
     beforeEach(() => {
       vi.useFakeTimers();
     });
@@ -289,31 +283,31 @@ describe("wise_pay", () => {
       vi.useRealTimers();
     });
 
-    test("a Slack call that never answers is given up on after a few seconds", async () => {
-      own.is_own_recipient.mockResolvedValue(true);
-      slack.send_alert.mockReturnValue(new Promise(() => {}));
-
-      const paid = wise_pay(881063184, 72.82, REF);
-      await vi.advanceTimersByTimeAsync(10_000);
-
-      await expect(paid).resolves.toBe(TRANSFER_ID);
-      // given up on, and said so: the stall is reported
-      expect(report_error).toHaveBeenCalledWith(expect.any(Error), {
-        alert: "payout to one of Better Giving's own Wise accounts",
-      });
-    });
-
-    test("an own-account lookup that never answers is treated as a check that could not run, and the payout goes ahead", async () => {
+    test("is treated as a check that could not run, and the payout goes ahead", async () => {
       own.is_own_recipient.mockReturnValue(new Promise(() => {}));
 
       const paid = wise_pay(777, 100, REF);
-      await vi.advanceTimersByTimeAsync(20_000);
+      await vi.advanceTimersByTimeAsync(5_000);
 
-      await expect(paid).resolves.toBe(TRANSFER_ID);
-      expect(slack.send_alert).toHaveBeenCalledOnce();
-      expect(slack.send_alert.mock.calls[0]![0].title).toBe(
-        "own-account check could not run before a payout"
-      );
+      await expect(paid).resolves.toMatchObject({
+        id: TRANSFER_ID,
+        warning: { title: "own-account check could not run before a payout" },
+      });
+    });
+
+    test("is waited for just under its bound, not past it", async () => {
+      own.is_own_recipient.mockReturnValue(new Promise(() => {}));
+
+      const paid = wise_pay(777, 100, REF);
+      let settled = false;
+      paid.then(() => {
+        settled = true;
+      });
+      await vi.advanceTimersByTimeAsync(4_900);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(200);
+      await paid;
+      expect(settled).toBe(true);
     });
   });
 });

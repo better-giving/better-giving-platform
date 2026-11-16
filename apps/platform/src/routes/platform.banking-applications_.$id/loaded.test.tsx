@@ -22,6 +22,7 @@ const data = (o: Partial<LoaderData>): LoaderData => ({
   npo_name: "Riverbend Youth Coding Collective",
   name: { fullName: "Harbor Light Food Pantry Inc." },
   own_account: false,
+  own_account_unknown: false,
   ...o,
 });
 
@@ -85,7 +86,7 @@ describe("banking application review — Better Giving's own account", () => {
   });
 
   test("a check that could not run says so before a verdict, and Approve stays enabled", async () => {
-    const screen = await render_page(data({ own_account: "unknown" }));
+    const screen = await render_page(data({ own_account_unknown: true }));
     await expect
       .element(screen.getByRole("region", { name: UNKNOWN_TITLE }))
       .toBeVisible();
@@ -102,7 +103,7 @@ describe("banking application review — Better Giving's own account", () => {
   });
 
   test("a check that could not run says nothing after a verdict", async () => {
-    const d = data({ own_account: "unknown" });
+    const d = data({ own_account_unknown: true });
     const screen = await render_page({
       ...d,
       ba: { ...d.ba, status: "approved" },
