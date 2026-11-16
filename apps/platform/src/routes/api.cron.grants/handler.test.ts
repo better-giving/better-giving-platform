@@ -44,29 +44,18 @@ vi.mock("$/kit/slack", () => ({ aws_monitor: { send_alert } }));
 // replaces `wise_pay_mock`'s implementation
 const wise = vi.hoisted(() => ({
   v2_account: vi.fn(async () => ({ currency: "USD" })),
-  // fee-free balance option: the transfer sends the whole quoted amount
   quote: vi.fn(async (_: string, q: { sourceAmount: number }) => ({
     id: `q-${q.sourceAmount}`,
     sourceAmount: q.sourceAmount,
     sourceCurrency: "USD",
     payOut: "BANK_TRANSFER",
-    paymentOptions: [
-      {
-        disabled: false,
-        payIn: "BALANCE",
-        payOut: "BANK_TRANSFER",
-        sourceAmount: q.sourceAmount,
-        fee: { total: 0 },
-      },
-    ],
   })),
   // none of ours: no recipient here is one of our own balances
   account_details: vi.fn(async () => []),
   transfer: vi.fn(
-    async (t: { customerTransactionId: string; quoteUuid: string }) => ({
+    async (_: { customerTransactionId: string; quoteUuid: string }) => ({
       id: 9001,
       status: "incoming_payment_waiting",
-      sourceValue: Number(t.quoteUuid.slice(2)),
     })
   ),
   fund_transfer: vi.fn(async () => ({ status: "COMPLETED" })),

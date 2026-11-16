@@ -211,10 +211,22 @@ export async function reg_stripe_deauthorize(
 const PAGE = 15;
 /** what the database writes for a timestamptz: a cursor for another sort is not one */
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+/** a string postgres accepts as a parameter, which a NUL is not */
+const sound = (x: unknown): x is string =>
+  typeof x === "string" && !x.includes("\u0000");
+/** a timestamp the database would read */
+const is_timestamp = (x: string) =>
+  ISO_TIMESTAMP.test(x) && !Number.isNaN(Date.parse(x));
 
-/** a keyset cursor: the last row's sort value and id, utf-8 safe */
-function encode_regs_cursor(value: string | null, id: string) {
-  return encode_cursor({ v: value, i: id });
+/** a keyset cursor: the last row's sort value and id, and the sort it was
+ * made under, utf-8 safe */
+function encode_regs_cursor(
+  sort_key: string,
+  sort_dir: string,
+  value: string | null,
+  id: string
+) {
+  return encode_cursor({ k: sort_key, d: sort_dir, v: value, i: id });
 }
 
 type RegsCursor =
@@ -222,33 +234,34 @@ type RegsCursor =
   /** a bare date from before keyset paging */
   | { kind: "date"; date: string };
 
-/** what `next` holds, or undefined for anything unreadable: a stale or edited
- * cursor starts the list over rather than failing it */
+/** what `next` holds, or undefined for anything unreadable or made under
+ * another sort: such a cursor starts the list over rather than failing it */
 function decode_regs_cursor(
   next: string,
-  sort_key: string
+  sort_key: string,
+  sort_dir: string
 ): RegsCursor | undefined {
   try {
     const x = decode_cursor(next);
-    if (
-      x &&
-      typeof x.i === "string" &&
-      (x.v === null || typeof x.v === "string")
-    ) {
-      // a timestamp must read as one, or the comparison would fail in postgres
+    if (x && typeof x === "object" && "i" in x) {
       if (
-        sort_key === "updated_at" &&
-        x.v !== null &&
-        !ISO_TIMESTAMP.test(x.v)
+        x.k === sort_key &&
+        x.d === sort_dir &&
+        sound(x.i) &&
+        (x.v === null || sound(x.v)) &&
+        // a timestamp must read as one, or the comparison fails in postgres
+        (sort_key !== "updated_at" ||
+          x.v === null ||
+          is_timestamp(x.v as string))
       ) {
-        return undefined;
+        return { kind: "keyset", value: x.v as string | null, id: x.i };
       }
-      return { kind: "keyset", value: x.v, id: x.i };
+      return undefined;
     }
   } catch {}
   try {
     const date = decode_date_cursor(next);
-    if (date && !Number.isNaN(Date.parse(date))) return { kind: "date", date };
+    if (date && is_timestamp(date)) return { kind: "date", date };
   } catch {}
   return undefined;
 }
@@ -281,7 +294,9 @@ export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
   const desc_ = sort_dir !== "asc";
   const dir = desc_ ? desc : asc;
 
-  const cursor = next ? decode_regs_cursor(next, sort_key) : undefined;
+  const cursor = next
+    ? decode_regs_cursor(next, sort_key, desc_ ? "desc" : "asc")
+    : undefined;
   // a tab from before this default changed pages with a bare date and no
   // status, which then meant under review
   const status =
@@ -339,6 +354,8 @@ export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
     next:
       has_more && last
         ? encode_regs_cursor(
+            sort_key,
+            desc_ ? "desc" : "asc",
             (last[sort_key] as string | null | undefined) ?? null,
             last.id
           )

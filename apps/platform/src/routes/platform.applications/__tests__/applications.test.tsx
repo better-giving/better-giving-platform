@@ -209,6 +209,26 @@ describe("applications — reset clears the search", () => {
   });
 });
 
+describe("applications — search box focus", () => {
+  it("keeps focus after a search, so the next keystrokes land in it", async () => {
+    const screen = await render_applications();
+    const search_input = screen.getByPlaceholder(/search applications/i);
+
+    await search_input.click();
+    await userEvent.keyboard("Zebra{Enter}");
+
+    await expect
+      .element(screen.getByText("Pending Org"))
+      .not.toBeInTheDocument();
+    await expect
+      .element(screen.getByPlaceholder(/search applications/i))
+      .toHaveFocus();
+    await expect
+      .element(screen.getByPlaceholder(/search applications/i))
+      .toHaveValue("Zebra");
+  });
+});
+
 describe("applications — empty states", () => {
   it("says No applications yet when nothing is filtered and the list is empty", async () => {
     await test_db.current!.db.delete(registrations);

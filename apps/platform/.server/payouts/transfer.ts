@@ -10,8 +10,8 @@ export class NotFundedError extends Error {
   }
 }
 
-/** `wise_pay` refused to fund: the transfer would not pay the run's total, or
- * would pay one of our own accounts. the cause of a `NotFundedError`; its
+/** `wise_pay` refused to fund: the transfer would pay one of our own accounts
+ * (or the check could not be made). the cause of a `NotFundedError`; its
  * message is what ops needs to act on */
 export class PayRefused extends Error {
   constructor(message: string) {

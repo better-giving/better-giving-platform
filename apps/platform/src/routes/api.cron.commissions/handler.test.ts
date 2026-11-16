@@ -37,21 +37,11 @@ const wise = vi.hoisted(() => {
     by_ref,
     by_id,
     v2_account: vi.fn(async () => ({ currency: "USD" })),
-    // fee-free balance option: the transfer sends the whole quoted amount
     quote: vi.fn(async (_: string, q: { sourceAmount: number }) => ({
       id: `q-${q.sourceAmount}`,
       sourceAmount: q.sourceAmount,
       sourceCurrency: "USD",
       payOut: "BANK_TRANSFER",
-      paymentOptions: [
-        {
-          disabled: false,
-          payIn: "BALANCE",
-          payOut: "BANK_TRANSFER",
-          sourceAmount: q.sourceAmount,
-          fee: { total: 0 },
-        },
-      ],
     })),
     // none of ours: no recipient here is one of our own balances
     account_details: vi.fn(async () => []),
@@ -66,7 +56,6 @@ const wise = vi.hoisted(() => {
         const created = {
           id: 9000 + by_ref.size,
           status: "incoming_payment_waiting",
-          sourceValue: Number(t.quoteUuid.slice(2)),
         };
         by_ref.set(t.customerTransactionId, created);
         by_id.set(created.id, created);

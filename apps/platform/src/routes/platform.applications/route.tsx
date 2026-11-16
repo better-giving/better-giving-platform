@@ -1,4 +1,5 @@
 import { Search } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { useSearchParams } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { metas } from "#/helpers/seo";
@@ -18,6 +19,15 @@ export const meta: Route.MetaFunction = () =>
 export default CacheRoute(Applications);
 function Applications({ loaderData: page1 }: Route.ComponentProps) {
   const [params, setParams] = useSearchParams();
+  const query_ref = useRef<HTMLInputElement>(null);
+  const query = params.get("query") ?? "";
+  // the box is uncontrolled, so it follows a query changed elsewhere (Reset
+  // filters, back/forward) without being remounted, which would drop its focus
+  useEffect(() => {
+    if (query_ref.current && query_ref.current.value !== query) {
+      query_ref.current.value = query;
+    }
+  }, [query]);
   // any filter or search narrows the list, so an empty one is "found", not "yet"
   const any_filter = [
     "status",
@@ -69,8 +79,7 @@ function Applications({ loaderData: page1 }: Route.ComponentProps) {
         >
           <Search className="absolute top-1/2 -translate-y-1/2 left-3 icon-xl" />
           <input
-            // uncontrolled, so a query cleared elsewhere (Reset filters) remounts it
-            key={params.get("query") ?? ""}
+            ref={query_ref}
             disabled={loading}
             name="query"
             defaultValue={params.get("query") ?? ""}

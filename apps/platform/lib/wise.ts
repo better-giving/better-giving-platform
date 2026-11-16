@@ -100,16 +100,6 @@ namespace Res {
     sourceAmount: number;
     sourceCurrency: string;
     payOut: string;
-    paymentOptions: PaymentOption[];
-  }
-
-  /** @link https://docs.wise.com/api-reference/quote/quoteget */
-  export interface PaymentOption {
-    disabled: boolean;
-    payIn: string;
-    payOut: string;
-    sourceAmount: number;
-    fee: { total: number };
   }
 
   /**
@@ -127,8 +117,6 @@ namespace Res {
     status?: string;
     /** the recipient account the transfer pays (the id `v2_account` takes) */
     targetAccount?: number | string;
-    /** the amount sent: the quote's source amount less its fee */
-    sourceValue?: number;
     sourceCurrency?: string;
     /** Optional but present when a transfer error occurs */
     errors?: any;

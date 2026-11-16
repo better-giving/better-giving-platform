@@ -26,6 +26,7 @@ vi.mock("../db", () => ({
 
 import { registrations } from "../schema/registration";
 import { create_test_db } from "../test-utils/pglite";
+import { encode_cursor } from "./helpers";
 import { regs } from "./registration";
 
 const iso = (days_ago: number) =>
@@ -222,6 +223,60 @@ describe("regs: cursor edge cases", () => {
     const page = await regs({ sort_key: "updated_at", next: by_name.next });
 
     expect(page.items.length).toBeGreaterThan(0);
+  });
+
+  test("a cursor made under another sort or direction starts the list over", async () => {
+    await seed_many(40);
+    const by_name = await regs({ sort_key: "o_name", sort_dir: "asc" });
+    const newest_first = await regs();
+
+    // another sort key
+    const wrong_key = await regs({
+      sort_key: "updated_at",
+      next: by_name.next,
+    });
+    expect(wrong_key.items.map((r) => r.id)).toEqual(
+      newest_first.items.map((r) => r.id)
+    );
+    // the same key flipped
+    const flipped = await regs({
+      sort_key: "o_name",
+      sort_dir: "desc",
+      next: by_name.next,
+    });
+    const desc_first = await regs({ sort_key: "o_name", sort_dir: "desc" });
+    expect(flipped.items.map((r) => r.id)).toEqual(
+      desc_first.items.map((r) => r.id)
+    );
+  });
+
+  test.each([
+    ["a number that reads as a date", "MQ"],
+    ["an impossible timestamp", btoa("2026-13-45T99:99").replace(/=+$/, "")],
+    [
+      "text with a NUL",
+      encode_cursor({ k: "o_name", d: "asc", v: "a\u0000b", i: "reg-001" })!,
+    ],
+    [
+      "a keyset with a NUL id",
+      encode_cursor({ k: "o_name", d: "asc", v: "a", i: "x\u0000" })!,
+    ],
+    [
+      "a timestamp that is not one",
+      encode_cursor({
+        k: "updated_at",
+        d: "desc",
+        v: "2026-13-45T99:99",
+        i: "r",
+      })!,
+    ],
+  ])("an unreadable cursor (%s) starts the list over", async (_name, next) => {
+    await seed_many(20);
+    const first = await regs();
+
+    const page = await regs({ next, sort_key: "updated_at" });
+
+    expect(page.items.map((r) => r.id)).toEqual(first.items.map((r) => r.id));
   });
 
   test("a keyset cursor is followed under a filter that matches more than a page", async () => {
