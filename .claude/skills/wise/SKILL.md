@@ -40,7 +40,7 @@ curl -s "$WISE_API_URL/v4/profiles/$WISE_PROFILE_ID/balances?types=STANDARD" \
 
 ## Server surface
 
-`lib/wise.ts` is the whole client: 8 methods over `fetch`. Errors throw the raw response **text**, not a parsed body. Every call rejects with a `TimeoutError` after `TIMEOUT_MS` (30s).
+`lib/wise.ts` is the whole client, no SDK, over `fetch`. Errors throw the raw response **text**, not a parsed body. Every call rejects with a `TimeoutError` after `TIMEOUT_MS` (30s).
 
 | method | endpoint | called from |
 |---|---|---|
