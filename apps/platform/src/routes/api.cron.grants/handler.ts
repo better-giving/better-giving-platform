@@ -104,7 +104,7 @@ async function alert_held(el: Extract<GrantEligibility, { status: "held" }>) {
       body: repair
         ? "its last transfer came back but which payouts it covered is unclear, so nothing more is sent until ops repairs the settlement and a new bank account is approved and made its default. if a new account lifts the hold first, the repair is still pending"
         : bounced && hold.wise_state === CHARGED_BACK
-          ? "its last transfer was charged back, so nothing more is sent until a new bank account is approved and made its default. nothing was credited and the payouts stay bounced: resolve them by hand (do not cancel, settle or return them before a different account is approved: that ends the hold and re-sends them to that account)"
+          ? "its last transfer was charged back, so nothing more is sent until a new bank account is approved and made its default. nothing was credited and the payouts stay bounced: resolve them by hand (do not cancel, settle or return them before a different account is approved: that ends the hold, so the next run pays the npo's other pending payouts to that account)"
           : bounced
             ? "its last transfer bounced (Wise may still deliver it late or refund it), so nothing more is sent until a new bank account is approved and made its default, or Wise delivers it. if Wise refunds it, the payouts become returned and go out once a new account is approved"
             : "its last transfer came back, so nothing more is sent until a new bank account is approved and made its default; the returned payouts then go out with the next run",

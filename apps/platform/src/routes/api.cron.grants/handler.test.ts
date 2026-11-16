@@ -767,7 +767,9 @@ describe("grants cron execute", () => {
       .filter((a) => a.title.startsWith("Grants held"));
     expect(held).toEqual([
       expect.objectContaining({
-        body: expect.stringContaining("charged back"),
+        body: expect.stringMatching(
+          /charged back.*ends the hold, so the next run pays/
+        ),
         fields: expect.arrayContaining([
           {
             name: "returned",

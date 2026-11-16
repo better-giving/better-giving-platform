@@ -549,6 +549,9 @@ describe("a charged-back transfer", () => {
     expect(alert.body).toMatch(
       /do not cancel, settle or return these payouts until the npo has a different bank account approved/
     );
+    expect(alert.body).toMatch(
+      /ends the hold, so the next grants run pays the npo's other pending payouts to the account that was charged back/
+    );
     expect(alert.body).toMatch(/do not move the payouts to returned/);
     expect(alert.body).toMatch(/once the new account is approved/);
     expect(alert.body).not.toMatch(/go out again/);
