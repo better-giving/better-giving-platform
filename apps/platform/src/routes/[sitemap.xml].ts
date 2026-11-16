@@ -1,6 +1,7 @@
 import type { LoaderFunction } from "react-router";
 import { post_path } from "#/api/get/posts";
 import { sanity } from "#/api/sanity";
+import { compare_pages } from "#/content/compare/data";
 
 interface SitemapUrl {
   url: string;
@@ -29,6 +30,7 @@ const staticUrls: SitemapUrl[] = [
   { url: "/fiscal-sponsorship", changeFrequency: "weekly", priority: 0.8 },
   { url: "/open-source", changeFrequency: "weekly", priority: 0.7 },
   { url: "/pricing", changeFrequency: "weekly", priority: 0.7 },
+  { url: "/compare", changeFrequency: "monthly", priority: 0.7 },
   { url: "/donor", changeFrequency: "weekly", priority: 0.8 },
   { url: "/donation-calculator", changeFrequency: "monthly", priority: 0.7 },
   { url: "/giving-tuesday", changeFrequency: "monthly", priority: 0.6 },
@@ -75,6 +77,19 @@ export const loader: LoaderFunction = async ({ url }) => {
     )
     .join("\n");
 
+  // each comparison states the date its sources were last checked, which is
+  // the honest lastmod; slugs are a fixed kebab-case set, so no encoding needed
+  const compare_entries = compare_pages
+    .map(
+      (p) => `  <url>
+    <loc>${base_url}/compare/${p.slug}</loc>
+    <lastmod>${p.last_verified}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>`
+    )
+    .join("\n");
+
   // post_path's encoded segment leaves no `&`/`<`/`>` to break the xml
   const postEntries = posts
     .flatMap((p) => {
@@ -94,7 +109,7 @@ export const loader: LoaderFunction = async ({ url }) => {
 
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${[staticEntries, postEntries].filter(Boolean).join("\n")}
+${[staticEntries, compare_entries, postEntries].filter(Boolean).join("\n")}
 </urlset>`;
 
   return new Response(sitemap.trim(), {

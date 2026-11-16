@@ -4,6 +4,7 @@ import { doc_args } from "#/__tests__/fixtures/route-args";
 const fetch_mock = vi.hoisted(() => vi.fn());
 vi.mock("#/api/sanity", () => ({ sanity: { fetch: fetch_mock } }));
 
+import { compare_pages } from "#/content/compare/data";
 import { loader } from "./[sitemap.xml]";
 
 const sitemap = async () => {
@@ -26,6 +27,17 @@ describe("sitemap", () => {
       "https://better.giving/blog/tips%20%26%20%3Ctricks%3E"
     );
     expect(xml).not.toMatch(/&(?!amp;|lt;|gt;|quot;|apos;)/);
+  });
+
+  test("the compare index and all eighteen comparisons are listed", async () => {
+    fetch_mock.mockResolvedValue([]);
+    const xml = await sitemap();
+    const locs = [...xml.matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
+    expect(locs).toContain("https://better.giving/compare");
+    const slugs = compare_pages.map((p) => p.slug);
+    expect(slugs).toHaveLength(18);
+    for (const slug of slugs)
+      expect(locs).toContain(`https://better.giving/compare/${slug}`);
   });
 
   test("a post slug no url can carry is skipped and logged; the rest still list", async () => {

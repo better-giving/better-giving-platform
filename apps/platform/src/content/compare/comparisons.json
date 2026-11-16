@@ -306,167 +306,105 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "0% on the Free Forever plan with an optional donor contribution. Paid plans from 1% to 5%",
-          "competitor_sources": [
-            "bw_pricing",
-            "bw_cost"
-          ],
+          "competitor_sources": ["bw_pricing", "bw_cost"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "2.9% + $0.30 per card through Stripe, ACH 1.5% + $0.30",
-          "competitor_sources": [
-            "bw_cost"
-          ],
+          "competitor_sources": ["bw_cost"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "Company that describes itself as a social impact venture",
-          "competitor_sources": [
-            "bw_mission"
-          ],
+          "competitor_sources": ["bw_mission"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Withdraw six days after funds arrive. Automatic payouts need a paid plan",
-          "competitor_sources": [
-            "bw_receive",
-            "bw_auto"
-          ],
+          "competitor_sources": ["bw_receive", "bw_auto"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "bw_pricing"
-          ],
+          "competitor_sources": ["bw_pricing"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "bw_pricing"
-          ],
+          "competitor_sources": ["bw_pricing"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "DAF through DAFpay. Crypto, stock and IRA not listed",
-          "competitor_sources": [
-            "bw_cost"
-          ],
+          "competitor_sources": ["bw_cost"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "bw_pricing"
-          ],
+          "competitor_sources": ["bw_pricing"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, online, mobile and live auctions",
-          "competitor_sources": [
-            "bw_auctions",
-            "bw_pricing"
-          ],
+          "competitor_sources": ["bw_auctions", "bw_pricing"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, online giveaways",
-          "competitor_sources": [
-            "bw_giveaways"
-          ],
+          "competitor_sources": ["bw_giveaways"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "bw_pricing"
-          ],
+          "competitor_sources": ["bw_pricing"],
           "core": true
         },
         {
           "feature": "Events & ticketing",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, event pages, tickets, tables and check-in",
-          "competitor_sources": [
-            "bw_pricing"
-          ],
+          "competitor_sources": ["bw_pricing"],
           "core": false
         },
         {
@@ -478,22 +416,15 @@
             "bg_product"
           ],
           "competitor": "Yes, on every plan",
-          "competitor_sources": [
-            "bw_pricing"
-          ],
+          "competitor_sources": ["bw_pricing"],
           "core": false
         },
         {
           "feature": "Monthly cost",
           "better_giving": "$0",
-          "better_giving_sources": [
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_pricing"],
           "competitor": "$0 on Free Forever. Partner plan $1,550 a year plus 1.25%. Keystone $5,950 a year plus 1%",
-          "competitor_sources": [
-            "bw_pricing",
-            "bw_cost"
-          ],
+          "competitor_sources": ["bw_pricing", "bw_cost"],
           "core": false
         }
       ],
@@ -765,178 +696,113 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "Subscription. Fundraising from $40 a month and CRM from $125 a month, billed annually, checked October 26, 2026. Bloomerang now quotes on its pricing page",
-          "competitor_sources": [
-            "bl_pricing_oct26",
-            "bl_pricing"
-          ],
+          "competitor_sources": ["bl_pricing_oct26", "bl_pricing"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "3.95% + $0.30 per card on Bloomerang Fundraising donation forms, 3.2% + $0.30 on CRM donation forms",
-          "competitor_sources": [
-            "bl_pp"
-          ],
+          "competitor_sources": ["bl_pp"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "Software company",
-          "competitor_sources": [
-            "bl_pricing"
-          ],
+          "competitor_sources": ["bl_pricing"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Daily by default once a transaction is two business days old",
-          "competitor_sources": [
-            "bl_payouts"
-          ],
+          "competitor_sources": ["bl_payouts"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "bl_pricing"
-          ],
+          "competitor_sources": ["bl_pricing"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "bl_pricing"
-          ],
+          "competitor_sources": ["bl_pricing"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "bl_pricing",
-            "bl_pp"
-          ],
+          "competitor_sources": ["bl_pricing", "bl_pp"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "bl_pricing"
-          ],
+          "competitor_sources": ["bl_pricing"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, in Bloomerang Fundraising",
-          "competitor_sources": [
-            "bl_pricing"
-          ],
+          "competitor_sources": ["bl_pricing"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "bl_pricing"
-          ],
+          "competitor_sources": ["bl_pricing"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "bl_pricing"
-          ],
+          "competitor_sources": ["bl_pricing"],
           "core": true
         },
         {
           "feature": "Donor CRM",
           "better_giving": "Donor records with CSV and API export",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, full CRM with donor insights, segments and journeys",
-          "competitor_sources": [
-            "bl_pricing"
-          ],
+          "competitor_sources": ["bl_pricing"],
           "core": false
         },
         {
           "feature": "Monthly cost",
           "better_giving": "$0",
-          "better_giving_sources": [
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_pricing"],
           "competitor": "From $40 a month for fundraising, which requires the CRM from $125 a month, checked October 26, 2026",
-          "competitor_sources": [
-            "bl_pricing_oct26"
-          ],
+          "competitor_sources": ["bl_pricing_oct26"],
           "core": false
         },
         {
@@ -948,9 +814,7 @@
             "bg_product"
           ],
           "competitor": "Yes, in Bloomerang Fundraising",
-          "competitor_sources": [
-            "bl_pricing"
-          ],
+          "competitor_sources": ["bl_pricing"],
           "core": false
         }
       ],
@@ -1180,164 +1044,105 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "2.95% to 3.95% on the free Standard plan, 1.75% to 2% on Pro, 1.6% to 2% on Premium",
-          "competitor_sources": [
-            "db_pricing"
-          ],
+          "competitor_sources": ["db_pricing"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "Stripe 2.2% + $0.30 or PayPal 1.99% + $0.49 at US nonprofit rates",
-          "competitor_sources": [
-            "db_pricing"
-          ],
+          "competitor_sources": ["db_pricing"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "Software company",
-          "competitor_sources": [
-            "db_pricing"
-          ],
+          "competitor_sources": ["db_pricing"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Your own Stripe or PayPal account pays out on its own schedule",
-          "competitor_sources": [
-            "db_pricing"
-          ],
+          "competitor_sources": ["db_pricing"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "db_pricing"
-          ],
+          "competitor_sources": ["db_pricing"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "db_pricing"
-          ],
+          "competitor_sources": ["db_pricing"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "Crypto, stock and DAFpay on Pro and Premium only. Crypto and stock cost 3.95%",
-          "competitor_sources": [
-            "db_pricing"
-          ],
+          "competitor_sources": ["db_pricing"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "db_pricing"
-          ],
+          "competitor_sources": ["db_pricing"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "db_pricing"
-          ],
+          "competitor_sources": ["db_pricing"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "db_pricing"
-          ],
+          "competitor_sources": ["db_pricing"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "db_pricing"
-          ],
+          "competitor_sources": ["db_pricing"],
           "core": true
         },
         {
           "feature": "Monthly cost",
           "better_giving": "$0",
-          "better_giving_sources": [
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_pricing"],
           "competitor": "$0 Standard, $150 a month Pro, Premium on request",
-          "competitor_sources": [
-            "db_pricing"
-          ],
+          "competitor_sources": ["db_pricing"],
           "core": false
         },
         {
@@ -1349,21 +1154,15 @@
             "bg_product"
           ],
           "competitor": "Yes, on every plan",
-          "competitor_sources": [
-            "db_pricing"
-          ],
+          "competitor_sources": ["db_pricing"],
           "core": false
         },
         {
           "feature": "Events & ticketing",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, 3.95% platform fee on Standard",
-          "competitor_sources": [
-            "db_pricing"
-          ],
+          "competitor_sources": ["db_pricing"],
           "core": false
         }
       ],
@@ -1603,189 +1402,121 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "No nonprofit platform fee listed. Donors pay 1.5% on direct gifts",
-          "competitor_sources": [
-            "en_fees"
-          ],
+          "competitor_sources": ["en_fees"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "May apply on some cash rails, shown in the app",
-          "competitor_sources": [
-            "en_fees"
-          ],
+          "competitor_sources": ["en_fees"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "501(c)(3) public charity, EIN 84-4661797",
-          "competitor_sources": [
-            "en_orgfaq"
-          ],
+          "competitor_sources": ["en_orgfaq"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Chariot pays out in US dollars. Timing not published",
-          "competitor_sources": [
-            "en_orgfaq"
-          ],
+          "competitor_sources": ["en_orgfaq"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "No account for nonprofits. Donors can invest DAF balances",
-          "competitor_sources": [
-            "en_home"
-          ],
+          "competitor_sources": ["en_home"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed for nonprofits",
-          "competitor_sources": [
-            "en_orgs"
-          ],
+          "competitor_sources": ["en_orgs"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "Crypto, stock, cash and DAF grants. IRA not listed",
-          "competitor_sources": [
-            "en_orgs",
-            "en_home"
-          ],
+          "competitor_sources": ["en_orgs", "en_home"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "International nonprofits through a GlobalGiving partnership, which keeps 5%",
-          "competitor_sources": [
-            "en_fees"
-          ],
+          "competitor_sources": ["en_fees"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "No",
-          "competitor_sources": [
-            "en_home"
-          ],
+          "competitor_sources": ["en_home"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "No",
-          "competitor_sources": [
-            "en_home"
-          ],
+          "competitor_sources": ["en_home"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not published",
-          "competitor_sources": [
-            "en_home"
-          ],
+          "competitor_sources": ["en_home"],
           "core": true
         },
         {
           "feature": "Donor fee",
           "better_giving": "None required, donors can add an optional donation",
-          "better_giving_sources": [
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_pricing"],
           "competitor": "0.5% tiered fee in, 1% on grants, 1.5% on direct gifts",
-          "competitor_sources": [
-            "en_fees"
-          ],
+          "competitor_sources": ["en_fees"],
           "core": false
         },
         {
           "feature": "Card and bank gifts",
           "better_giving": "Yes, card, bank, PayPal and wallets",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Cards and banks listed as a donation option",
-          "competitor_sources": [
-            "en_home"
-          ],
+          "competitor_sources": ["en_home"],
           "core": false
         },
         {
           "feature": "Embeddable donation form for your site",
           "better_giving": "Yes, brandable and embeddable",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed for nonprofits",
-          "competitor_sources": [
-            "en_orgs"
-          ],
+          "competitor_sources": ["en_orgs"],
           "core": false
         }
       ],
@@ -2011,189 +1742,121 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "4% on Standard. 3% plus $150 a month or $1,500 a year on Premium",
-          "competitor_sources": [
-            "eg_learn"
-          ],
+          "competitor_sources": ["eg_learn"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "Included in the service fee. Custody adds 1.5% in and 1.5% on exchange",
-          "competitor_sources": [
-            "eg_learn"
-          ],
+          "competitor_sources": ["eg_learn"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "Company, Engiven, Inc.",
-          "competitor_sources": [
-            "eg_home"
-          ],
+          "competitor_sources": ["eg_home"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Not published. Engiven describes fast deposits to your bank",
-          "competitor_sources": [
-            "eg_learn"
-          ],
+          "competitor_sources": ["eg_learn"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "eg_learn"
-          ],
+          "competitor_sources": ["eg_learn"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "eg_learn"
-          ],
+          "competitor_sources": ["eg_learn"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "Crypto, stock and legacy giving. DAF and IRA not listed",
-          "competitor_sources": [
-            "eg_home"
-          ],
+          "competitor_sources": ["eg_home"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "eg_home"
-          ],
+          "competitor_sources": ["eg_home"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "No",
-          "competitor_sources": [
-            "eg_home"
-          ],
+          "competitor_sources": ["eg_home"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "No",
-          "competitor_sources": [
-            "eg_home"
-          ],
+          "competitor_sources": ["eg_home"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "eg_home"
-          ],
+          "competitor_sources": ["eg_home"],
           "core": true
         },
         {
           "feature": "Crypto tax paperwork",
           "better_giving": "Better Giving receives crypto as the 501(c)(3) and sends automatic receipts",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_product", "bg_cost"],
           "competitor": "Automatic Form 8282 and donor Form 8283 appraisals",
-          "competitor_sources": [
-            "eg_home"
-          ],
+          "competitor_sources": ["eg_home"],
           "core": false
         },
         {
           "feature": "Holding crypto instead of selling",
           "better_giving": "Not listed",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, custody on Premium",
-          "competitor_sources": [
-            "eg_learn"
-          ],
+          "competitor_sources": ["eg_learn"],
           "core": false
         },
         {
           "feature": "Card and bank gifts",
           "better_giving": "Yes, card, bank, PayPal and wallets",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "eg_home"
-          ],
+          "competitor_sources": ["eg_home"],
           "core": false
         }
       ],
@@ -2425,155 +2088,97 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "$0, supported by optional donations and philanthropy",
-          "competitor_sources": [
-            "eo_pricing",
-            "eo_np"
-          ],
+          "competitor_sources": ["eo_pricing", "eo_np"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "Cards 2.2% + $0.30. ACH, stock, DAF and IRA free. Crypto 1%",
-          "competitor_sources": [
-            "eo_pricing",
-            "eo_disb"
-          ],
+          "competitor_sources": ["eo_pricing", "eo_disb"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "501(c)(3) public charity, EIN 61-1913297",
-          "competitor_sources": [
-            "eo_np"
-          ],
+          "competitor_sources": ["eo_np"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "Yes",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Weekly by direct deposit, or monthly by other routes",
-          "competitor_sources": [
-            "eo_pricing",
-            "eo_disb"
-          ],
+          "competitor_sources": ["eo_pricing", "eo_disb"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "eo_pricing"
-          ],
+          "competitor_sources": ["eo_pricing"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "eo_pricing"
-          ],
+          "competitor_sources": ["eo_pricing"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "All four",
-          "competitor_sources": [
-            "eo_pricing"
-          ],
+          "competitor_sources": ["eo_pricing"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "eo_pricing"
-          ],
+          "competitor_sources": ["eo_pricing"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "eo_pricing"
-          ],
+          "competitor_sources": ["eo_pricing"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "eo_pricing"
-          ],
+          "competitor_sources": ["eo_pricing"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "eo_pricing"
-          ],
+          "competitor_sources": ["eo_pricing"],
           "core": true
         },
         {
@@ -2585,21 +2190,15 @@
             "bg_product"
           ],
           "competitor": "Yes, official and peer-to-peer fundraisers",
-          "competitor_sources": [
-            "eo_pricing"
-          ],
+          "competitor_sources": ["eo_pricing"],
           "core": false
         },
         {
           "feature": "Fees on stock, DAF and ACH",
           "better_giving": "Donors can choose to cover third-party fees",
-          "better_giving_sources": [
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_cost"],
           "competitor": "Every.org covers them",
-          "competitor_sources": [
-            "eo_pricing"
-          ],
+          "competitor_sources": ["eo_pricing"],
           "core": false
         }
       ],
@@ -2833,189 +2432,121 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "Share of each donation, rate not published. About 1% effective on average after donor coverage",
-          "competitor_sources": [
-            "fu_pricing"
-          ],
+          "competitor_sources": ["fu_pricing"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "Third-party fees such as Stripe's, which donors can cover",
-          "competitor_sources": [
-            "fu_pricing"
-          ],
+          "competitor_sources": ["fu_pricing"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "Company, Fundraise Up, Inc.",
-          "competitor_sources": [
-            "fu_pricing"
-          ],
+          "competitor_sources": ["fu_pricing"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Not published",
-          "competitor_sources": [
-            "fu_pricing"
-          ],
+          "competitor_sources": ["fu_pricing"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "fu_pricing"
-          ],
+          "competitor_sources": ["fu_pricing"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "fu_pricing"
-          ],
+          "competitor_sources": ["fu_pricing"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "Crypto and DAF. Stock through a partner. IRA not listed",
-          "competitor_sources": [
-            "fu_pricing",
-            "fu_methods"
-          ],
+          "competitor_sources": ["fu_pricing", "fu_methods"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "fu_pricing"
-          ],
+          "competitor_sources": ["fu_pricing"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "fu_pricing"
-          ],
+          "competitor_sources": ["fu_pricing"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "fu_pricing"
-          ],
+          "competitor_sources": ["fu_pricing"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "fu_pricing"
-          ],
+          "competitor_sources": ["fu_pricing"],
           "core": true
         },
         {
           "feature": "Contract",
           "better_giving": "None",
-          "better_giving_sources": [
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_pricing"],
           "competitor": "None, no setup fee or subscription",
-          "competitor_sources": [
-            "fu_pricing"
-          ],
+          "competitor_sources": ["fu_pricing"],
           "core": false
         },
         {
           "feature": "Onboarding",
           "better_giving": "Self sign-up with step-by-step guides",
-          "better_giving_sources": [
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_home"],
           "competitor": "White-glove onboarding and migration included",
-          "competitor_sources": [
-            "fu_pricing"
-          ],
+          "competitor_sources": ["fu_pricing"],
           "core": false
         },
         {
           "feature": "Global payment methods",
           "better_giving": "Card, bank, PayPal, wallets, stock, DAF, IRA and crypto",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Cards, wallets, bank transfers, iDEAL and crypto",
-          "competitor_sources": [
-            "fu_pricing"
-          ],
+          "competitor_sources": ["fu_pricing"],
           "core": false
         }
       ],
@@ -3241,166 +2772,105 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "$0 for member nonprofits",
-          "competitor_sources": [
-            "gl_pricing"
-          ],
+          "competitor_sources": ["gl_pricing"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "Third-party fees from Stripe, Shift4 and PayPal, as low as 1.99% + $0.25",
-          "competitor_sources": [
-            "gl_pricing",
-            "gl_fees"
-          ],
+          "competitor_sources": ["gl_pricing", "gl_fees"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "Philanthropist-funded tech company",
-          "competitor_sources": [
-            "gl_about"
-          ],
+          "competitor_sources": ["gl_about"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Within seven business days, no holding period",
-          "competitor_sources": [
-            "gl_fees",
-            "gl_pricing"
-          ],
+          "competitor_sources": ["gl_fees", "gl_pricing"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gl_pricing"
-          ],
+          "competitor_sources": ["gl_pricing"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gl_pricing"
-          ],
+          "competitor_sources": ["gl_pricing"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "DAF through DAFpay. Crypto, stock and IRA not listed",
-          "competitor_sources": [
-            "gl_fees"
-          ],
+          "competitor_sources": ["gl_fees"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gl_pricing"
-          ],
+          "competitor_sources": ["gl_pricing"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gl_pricing"
-          ],
+          "competitor_sources": ["gl_pricing"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gl_pricing"
-          ],
+          "competitor_sources": ["gl_pricing"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gl_pricing"
-          ],
+          "competitor_sources": ["gl_pricing"],
           "core": true
         },
         {
           "feature": "Events & ticketing",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, event ticketing and live display",
-          "competitor_sources": [
-            "gl_pricing"
-          ],
+          "competitor_sources": ["gl_pricing"],
           "core": false
         },
         {
@@ -3412,21 +2882,15 @@
             "bg_product"
           ],
           "competitor": "Yes, with teams and leaderboards",
-          "competitor_sources": [
-            "gl_pricing"
-          ],
+          "competitor_sources": ["gl_pricing"],
           "core": false
         },
         {
           "feature": "Who can join",
           "better_giving": "Registered nonprofits of any size, after an eligibility and values review",
-          "better_giving_sources": [
-            "bg_join"
-          ],
+          "better_giving_sources": ["bg_join"],
           "competitor": "Nonprofits that share its progressive values",
-          "competitor_sources": [
-            "gl_pricing"
-          ],
+          "competitor_sources": ["gl_pricing"],
           "core": false
         }
       ],
@@ -3682,189 +3146,121 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "0% with optional donor tips on, or 3% flat if you turn them off",
-          "competitor_sources": [
-            "gb_pricing"
-          ],
+          "competitor_sources": ["gb_pricing"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "Covered by Givebutter or donors while the ask is on, 2.9% + $0.30 otherwise",
-          "competitor_sources": [
-            "gb_pricing"
-          ],
+          "competitor_sources": ["gb_pricing"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "Financial technology company",
-          "competitor_sources": [
-            "gb_wallet"
-          ],
+          "competitor_sources": ["gb_wallet"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "2 to 3 business days by direct deposit",
-          "competitor_sources": [
-            "gb_pricing"
-          ],
+          "competitor_sources": ["gb_pricing"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "2.5% APY rewards in Givebutter Wallet, variable",
-          "competitor_sources": [
-            "gb_wallet"
-          ],
+          "competitor_sources": ["gb_wallet"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gb_pricing"
-          ],
+          "competitor_sources": ["gb_pricing"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "DAF gifts. Admins can only record stock by hand. Crypto and IRA not listed",
-          "competitor_sources": [
-            "gb_pricing",
-            "gb_methods"
-          ],
+          "competitor_sources": ["gb_pricing", "gb_methods"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gb_pricing"
-          ],
+          "competitor_sources": ["gb_pricing"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, silent auctions",
-          "competitor_sources": [
-            "gb_pricing"
-          ],
+          "competitor_sources": ["gb_pricing"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, raffle tickets",
-          "competitor_sources": [
-            "gb_raffles"
-          ],
+          "competitor_sources": ["gb_raffles"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gb_pricing"
-          ],
+          "competitor_sources": ["gb_pricing"],
           "core": true
         },
         {
           "feature": "Donor CRM",
           "better_giving": "Donor records with CSV and API export",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, free CRM with unlimited contacts",
-          "competitor_sources": [
-            "gb_pricing"
-          ],
+          "competitor_sources": ["gb_pricing"],
           "core": false
         },
         {
           "feature": "Monthly cost",
           "better_giving": "$0",
-          "better_giving_sources": [
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_pricing"],
           "competitor": "$0. Givebutter Plus from $29 a month",
-          "competitor_sources": [
-            "gb_pricing"
-          ],
+          "competitor_sources": ["gb_pricing"],
           "core": false
         },
         {
           "feature": "Events & ticketing",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, virtual, in-person and hybrid",
-          "competitor_sources": [
-            "gb_pricing"
-          ],
+          "competitor_sources": ["gb_pricing"],
           "core": false
         }
       ],
@@ -4102,176 +3498,113 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "Support fee of 5% for US or UK groups and 7% elsewhere, 12% on the first $5,000",
-          "competitor_sources": [
-            "gg_fee"
-          ],
+          "competitor_sources": ["gg_fee"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "3% third-party processing fee on each donation",
-          "competitor_sources": [
-            "gg_fee"
-          ],
+          "competitor_sources": ["gg_fee"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "501(c)(3) nonprofit, EIN 30-0108263",
-          "competitor_sources": [
-            "gg_legit"
-          ],
+          "competitor_sources": ["gg_legit"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Monthly, on the 25th of the month after the gift",
-          "competitor_sources": [
-            "gg_when"
-          ],
+          "competitor_sources": ["gg_when"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gg_fee"
-          ],
+          "competitor_sources": ["gg_fee"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gg_fee"
-          ],
+          "competitor_sources": ["gg_fee"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "Crypto through Endaoment, stock and DAF. IRA not listed",
-          "competitor_sources": [
-            "gg_methods"
-          ],
+          "competitor_sources": ["gg_methods"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Vetted partners worldwide raise US tax-deductible gifts",
-          "competitor_sources": [
-            "gg_fee"
-          ],
+          "competitor_sources": ["gg_fee"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "No",
-          "competitor_sources": [
-            "gg_methods"
-          ],
+          "competitor_sources": ["gg_methods"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "No",
-          "competitor_sources": [
-            "gg_methods"
-          ],
+          "competitor_sources": ["gg_methods"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gg_legit"
-          ],
+          "competitor_sources": ["gg_legit"],
           "core": true
         },
         {
           "feature": "Total cost on a sponsored gift",
           "better_giving": "2.9%",
-          "better_giving_sources": [
-            "bg_fs"
-          ],
+          "better_giving_sources": ["bg_fs"],
           "competitor": "8% to 10% after the first $5,000, 15% before",
-          "competitor_sources": [
-            "gg_fee"
-          ],
+          "competitor_sources": ["gg_fee"],
           "core": false
         },
         {
           "feature": "Donor marketplace",
           "better_giving": "Yes, the Better Giving marketplace",
-          "better_giving_sources": [
-            "bg_mkt"
-          ],
+          "better_giving_sources": ["bg_mkt"],
           "competitor": "Yes, a large donor site with project pages",
-          "competitor_sources": [
-            "gg_fee"
-          ],
+          "competitor_sources": ["gg_fee"],
           "core": false
         }
       ],
@@ -4519,153 +3852,97 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "$0 for certified nonprofit fundraisers. GoFundMe Pro uses custom pricing with an annual subscription",
-          "competitor_sources": [
-            "gf_pricing",
-            "gf_pro"
-          ],
+          "competitor_sources": ["gf_pricing", "gf_pro"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "2.2% + $0.30 per US donation to a certified nonprofit",
-          "competitor_sources": [
-            "gf_pricing"
-          ],
+          "competitor_sources": ["gf_pricing"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "Company, GoFundMe",
-          "competitor_sources": [
-            "gf_pricing"
-          ],
+          "competitor_sources": ["gf_pricing"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Not published on the pricing page",
-          "competitor_sources": [
-            "gf_pricing"
-          ],
+          "competitor_sources": ["gf_pricing"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gf_pricing"
-          ],
+          "competitor_sources": ["gf_pricing"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gf_pricing"
-          ],
+          "competitor_sources": ["gf_pricing"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "Not listed for nonprofit fundraisers",
-          "competitor_sources": [
-            "gf_pricing"
-          ],
+          "competitor_sources": ["gf_pricing"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gf_pricing"
-          ],
+          "competitor_sources": ["gf_pricing"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gf_pro"
-          ],
+          "competitor_sources": ["gf_pro"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gf_pro"
-          ],
+          "competitor_sources": ["gf_pro"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "gf_pricing"
-          ],
+          "competitor_sources": ["gf_pricing"],
           "core": true
         },
         {
@@ -4677,22 +3954,15 @@
             "bg_product"
           ],
           "competitor": "Yes, with a community of 200+ million",
-          "competitor_sources": [
-            "gf_pro"
-          ],
+          "competitor_sources": ["gf_pro"],
           "core": false
         },
         {
           "feature": "Monthly cost",
           "better_giving": "$0",
-          "better_giving_sources": [
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_pricing"],
           "competitor": "$0 on GoFundMe. GoFundMe Pro on a custom annual plan",
-          "competitor_sources": [
-            "gf_pricing",
-            "gf_pro"
-          ],
+          "competitor_sources": ["gf_pricing", "gf_pro"],
           "core": false
         }
       ],
@@ -4924,188 +4194,121 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "Flat monthly fee for donation services, quoted. Tiered AUM fees on investments",
-          "competitor_sources": [
-            "ig_pricing"
-          ],
+          "competitor_sources": ["ig_pricing"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "0% on stock and DAF gifts, 1% on crypto",
-          "competitor_sources": [
-            "ig_pricing"
-          ],
+          "competitor_sources": ["ig_pricing"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "SEC-registered investment adviser",
-          "competitor_sources": [
-            "ig_pricing"
-          ],
+          "competitor_sources": ["ig_pricing"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Not published",
-          "competitor_sources": [
-            "ig_pricing"
-          ],
+          "competitor_sources": ["ig_pricing"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Yes, FDIC sweep, money market and Treasuries. Rates not published",
-          "competitor_sources": [
-            "ig_home"
-          ],
+          "competitor_sources": ["ig_home"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Yes, endowment creation and oversight",
-          "competitor_sources": [
-            "ig_pricing"
-          ],
+          "competitor_sources": ["ig_pricing"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "Crypto, stock, DAF and cash. IRA not listed",
-          "competitor_sources": [
-            "ig_pricing"
-          ],
+          "competitor_sources": ["ig_pricing"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "ig_pricing"
-          ],
+          "competitor_sources": ["ig_pricing"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "No",
-          "competitor_sources": [
-            "ig_home"
-          ],
+          "competitor_sources": ["ig_home"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "No",
-          "competitor_sources": [
-            "ig_home"
-          ],
+          "competitor_sources": ["ig_home"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "ig_pricing"
-          ],
+          "competitor_sources": ["ig_pricing"],
           "core": true
         },
         {
           "feature": "Investment advice",
           "better_giving": "Investment-committee governed fund, no individual advice",
-          "better_giving_sources": [
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_fund"],
           "competitor": "Yes, a fiduciary advisor team and custom strategy",
-          "competitor_sources": [
-            "ig_pricing"
-          ],
+          "competitor_sources": ["ig_pricing"],
           "core": false
         },
         {
           "feature": "Contract",
           "better_giving": "None",
-          "better_giving_sources": [
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_pricing"],
           "competitor": "12-month contract for asset gifting",
-          "competitor_sources": [
-            "ig_pricing"
-          ],
+          "competitor_sources": ["ig_pricing"],
           "core": false
         },
         {
           "feature": "Minimum",
           "better_giving": "None",
-          "better_giving_sources": [
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_pricing"],
           "competitor": "None with the donation platform, $100,000 for investment alone",
-          "competitor_sources": [
-            "ig_pricing"
-          ],
+          "competitor_sources": ["ig_pricing"],
           "core": false
         }
       ],
@@ -5331,189 +4534,121 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "Subscription. Neon CRM from $99 a month, priced on revenue",
-          "competitor_sources": [
-            "ne_pricing",
-            "ne_crm"
-          ],
+          "competitor_sources": ["ne_pricing", "ne_crm"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "Neon Pay 3.25% + $0.35 per card, 1% + $1.25 per ACH, $6.99 a month",
-          "competitor_sources": [
-            "ne_ccblog"
-          ],
+          "competitor_sources": ["ne_ccblog"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "Software company",
-          "competitor_sources": [
-            "ne_pricing"
-          ],
+          "competitor_sources": ["ne_pricing"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Daily, weekly or monthly, on a schedule you set",
-          "competitor_sources": [
-            "ne_pay"
-          ],
+          "competitor_sources": ["ne_pay"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "ne_pricing"
-          ],
+          "competitor_sources": ["ne_pricing"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "ne_pricing"
-          ],
+          "competitor_sources": ["ne_pricing"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "DAF gifts in Neon CRM. Crypto, stock and IRA not listed",
-          "competitor_sources": [
-            "ne_pricing"
-          ],
+          "competitor_sources": ["ne_pricing"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "ne_pricing"
-          ],
+          "competitor_sources": ["ne_pricing"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "ne_pricing"
-          ],
+          "competitor_sources": ["ne_pricing"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "ne_pricing"
-          ],
+          "competitor_sources": ["ne_pricing"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "ne_pricing"
-          ],
+          "competitor_sources": ["ne_pricing"],
           "core": true
         },
         {
           "feature": "Donor CRM",
           "better_giving": "Donor records with CSV and API export",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, full CRM with events, volunteer and membership modules",
-          "competitor_sources": [
-            "ne_crm"
-          ],
+          "competitor_sources": ["ne_crm"],
           "core": false
         },
         {
           "feature": "Monthly cost",
           "better_giving": "$0",
-          "better_giving_sources": [
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_pricing"],
           "competitor": "CRM from $99, websites from $69, peer-to-peer from $158",
-          "competitor_sources": [
-            "ne_pricing"
-          ],
+          "competitor_sources": ["ne_pricing"],
           "core": false
         },
         {
           "feature": "Using another processor",
           "better_giving": "Stripe built in, no extra charge",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "From $50 a month",
-          "competitor_sources": [
-            "ne_pay"
-          ],
+          "competitor_sources": ["ne_pay"],
           "core": false
         }
       ],
@@ -5759,164 +4894,105 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "Subscription, quoted per organization",
-          "competitor_sources": [
-            "nf_pricing"
-          ],
+          "competitor_sources": ["nf_pricing"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "2.9% + $0.30 per card through Bonterra Payments, 5.9% + $0.30 on auctions",
-          "competitor_sources": [
-            "nf_payfaq"
-          ],
+          "competitor_sources": ["nf_payfaq"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "Software company, Bonterra",
-          "competitor_sources": [
-            "nf_home"
-          ],
+          "competitor_sources": ["nf_home"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Five business days by direct deposit",
-          "competitor_sources": [
-            "nf_payfaq"
-          ],
+          "competitor_sources": ["nf_payfaq"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "nf_pricing"
-          ],
+          "competitor_sources": ["nf_pricing"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "nf_pricing"
-          ],
+          "competitor_sources": ["nf_pricing"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "DAFpay. Crypto, stock and IRA not listed",
-          "competitor_sources": [
-            "nf_pricing"
-          ],
+          "competitor_sources": ["nf_pricing"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "nf_pricing"
-          ],
+          "competitor_sources": ["nf_pricing"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, mobile bidding and self-checkout",
-          "competitor_sources": [
-            "nf_pricing"
-          ],
+          "competitor_sources": ["nf_pricing"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "nf_pricing"
-          ],
+          "competitor_sources": ["nf_pricing"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "nf_pricing"
-          ],
+          "competitor_sources": ["nf_pricing"],
           "core": true
         },
         {
           "feature": "Donor CRM",
           "better_giving": "Donor records with CSV and API export",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, with email and texting",
-          "competitor_sources": [
-            "nf_pricing"
-          ],
+          "competitor_sources": ["nf_pricing"],
           "core": false
         },
         {
@@ -5928,21 +5004,15 @@
             "bg_product"
           ],
           "competitor": "Yes",
-          "competitor_sources": [
-            "nf_pricing"
-          ],
+          "competitor_sources": ["nf_pricing"],
           "core": false
         },
         {
           "feature": "Monthly cost",
           "better_giving": "$0",
-          "better_giving_sources": [
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_pricing"],
           "competitor": "Quoted, based on size and features",
-          "competitor_sources": [
-            "nf_pricing"
-          ],
+          "competitor_sources": ["nf_pricing"],
           "core": false
         }
       ],
@@ -6172,189 +5242,121 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "Annual subscription plus transaction fees, both quoted",
-          "competitor_sources": [
-            "tg_packages",
-            "tg_terms"
-          ],
+          "competitor_sources": ["tg_packages", "tg_terms"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "Set in your quote",
-          "competitor_sources": [
-            "tg_terms"
-          ],
+          "competitor_sources": ["tg_terms"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "Company, The Giving Block Holdings, LLC",
-          "competitor_sources": [
-            "tg_terms"
-          ],
+          "competitor_sources": ["tg_terms"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Not published",
-          "competitor_sources": [
-            "tg_packages"
-          ],
+          "competitor_sources": ["tg_packages"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Not listed. You can choose to hold crypto",
-          "competitor_sources": [
-            "tg_packages"
-          ],
+          "competitor_sources": ["tg_packages"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "tg_packages"
-          ],
+          "competitor_sources": ["tg_packages"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "Crypto, stock and DAF. IRA not listed",
-          "competitor_sources": [
-            "tg_packages"
-          ],
+          "competitor_sources": ["tg_packages"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "tg_packages"
-          ],
+          "competitor_sources": ["tg_packages"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "No",
-          "competitor_sources": [
-            "tg_packages"
-          ],
+          "competitor_sources": ["tg_packages"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "No",
-          "competitor_sources": [
-            "tg_packages"
-          ],
+          "competitor_sources": ["tg_packages"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "tg_packages"
-          ],
+          "competitor_sources": ["tg_packages"],
           "core": true
         },
         {
           "feature": "Monthly cost",
           "better_giving": "$0",
-          "better_giving_sources": [
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_pricing"],
           "competitor": "Annual subscription, quoted",
-          "competitor_sources": [
-            "tg_packages"
-          ],
+          "competitor_sources": ["tg_packages"],
           "core": false
         },
         {
           "feature": "Card and bank gifts",
           "better_giving": "Yes, card, bank, PayPal and wallets",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Card gifts in packages",
-          "competitor_sources": [
-            "tg_packages"
-          ],
+          "competitor_sources": ["tg_packages"],
           "core": false
         },
         {
           "feature": "Crypto donor marketplace",
           "better_giving": "Yes, the Better Giving marketplace",
-          "better_giving_sources": [
-            "bg_mkt"
-          ],
+          "better_giving_sources": ["bg_mkt"],
           "competitor": "Yes, a profile on its crypto donor marketplace",
-          "competitor_sources": [
-            "tg_packages"
-          ],
+          "competitor_sources": ["tg_packages"],
           "core": false
         }
       ],
@@ -6600,178 +5602,113 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "$0, because donors can leave an optional tip at checkout",
-          "competitor_sources": [
-            "zf_pricing"
-          ],
+          "competitor_sources": ["zf_pricing"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "$0, Zeffy covers card and transaction fees",
-          "competitor_sources": [
-            "zf_pricing"
-          ],
+          "competitor_sources": ["zf_pricing"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "Company, a registered B Corp",
-          "competitor_sources": [
-            "zf_home"
-          ],
+          "competitor_sources": ["zf_home"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Weekly on Mondays by default, next day for eligible accounts",
-          "competitor_sources": [
-            "zf_payouts"
-          ],
+          "competitor_sources": ["zf_payouts"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "zf_pricing"
-          ],
+          "competitor_sources": ["zf_pricing"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "zf_pricing"
-          ],
+          "competitor_sources": ["zf_pricing"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "DAF for US 501(c) organizations on gifts over $1,000. Stock, crypto and IRA not listed. Cards, Apple Pay, Google Pay and bank",
-          "competitor_sources": [
-            "zf_home",
-            "zf_pricing",
-            "zf_daf"
-          ],
+          "competitor_sources": ["zf_home", "zf_pricing", "zf_daf"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "zf_pricing"
-          ],
+          "competitor_sources": ["zf_pricing"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes",
-          "competitor_sources": [
-            "zf_pricing"
-          ],
+          "competitor_sources": ["zf_pricing"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, raffles",
-          "competitor_sources": [
-            "zf_pricing"
-          ],
+          "competitor_sources": ["zf_pricing"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "zf_pricing"
-          ],
+          "competitor_sources": ["zf_pricing"],
           "core": true
         },
         {
           "feature": "Events & ticketing",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes",
-          "competitor_sources": [
-            "zf_pricing"
-          ],
+          "competitor_sources": ["zf_pricing"],
           "core": false
         },
         {
           "feature": "Donor CRM",
           "better_giving": "Donor records with CSV and API export",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Yes, with free newsletters",
-          "competitor_sources": [
-            "zf_pricing"
-          ],
+          "competitor_sources": ["zf_pricing"],
           "core": false
         }
       ],
@@ -7021,190 +5958,121 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "$0. PayPal Giving Fund takes no fee from gifts made in PayPal",
-          "competitor_sources": [
-            "ppgf_hub",
-            "pp_fees"
-          ],
+          "competitor_sources": ["ppgf_hub", "pp_fees"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "Donate button 2.89% + $0.49. Confirmed charities 1.99% + $0.49. Add 1.5% for international gifts",
-          "competitor_sources": [
-            "pp_fees"
-          ],
+          "competitor_sources": ["pp_fees"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "PayPal, a payments company. PayPal Giving Fund is a registered charity and DAF",
-          "competitor_sources": [
-            "ppgf_enroll"
-          ],
+          "competitor_sources": ["ppgf_enroll"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "Button gifts land in your PayPal balance. Giving Fund grants monthly, 15 to 45 days after the gift",
-          "competitor_sources": [
-            "ppgf_when"
-          ],
+          "competitor_sources": ["ppgf_when"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "Not listed",
-          "competitor_sources": [
-            "pp_fees"
-          ],
+          "competitor_sources": ["pp_fees"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "No",
-          "competitor_sources": [
-            "ppgf_org"
-          ],
+          "competitor_sources": ["ppgf_org"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "DAF grants through PayPal Grants, no fee. Crypto, stock and IRA not listed for charities",
-          "competitor_sources": [
-            "pp_grants"
-          ],
+          "competitor_sources": ["pp_grants"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "No",
-          "competitor_sources": [
-            "ppgf_enroll"
-          ],
+          "competitor_sources": ["ppgf_enroll"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "No",
-          "competitor_sources": [
-            "ppgf_org"
-          ],
+          "competitor_sources": ["ppgf_org"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "No",
-          "competitor_sources": [
-            "ppgf_org"
-          ],
+          "competitor_sources": ["ppgf_org"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "No",
-          "competitor_sources": [
-            "pp_fees"
-          ],
+          "competitor_sources": ["pp_fees"],
           "core": true
         },
         {
           "feature": "Donor data",
           "better_giving": "Full donor-level data, exportable any time",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Giving Fund shares donor details only where donors consent",
-          "competitor_sources": [
-            "ppgf_when"
-          ],
+          "competitor_sources": ["ppgf_when"],
           "core": false
         },
         {
           "feature": "Reach",
           "better_giving": "Your own site plus the Better Giving marketplace",
-          "better_giving_sources": [
-            "bg_mkt",
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_mkt", "bg_product"],
           "competitor": "Listed in PayPal, eBay, Meta, GoFundMe, Deed and Twitch",
-          "competitor_sources": [
-            "ppgf_enroll"
-          ],
+          "competitor_sources": ["ppgf_enroll"],
           "core": false
         },
         {
           "feature": "Recurring giving",
           "better_giving": "Yes, included",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Not listed for Giving Fund",
-          "competitor_sources": [
-            "ppgf_org"
-          ],
+          "competitor_sources": ["ppgf_org"],
           "core": false
         }
       ],
@@ -7470,203 +6338,129 @@
         {
           "feature": "Platform fee",
           "better_giving": "0% with the optional donor donation on, or 1.5% flat if you turn it off",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_home"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_home"],
           "competitor": "None from Stripe. You pay for building and maintaining the donation form",
-          "competitor_sources": [
-            "st_pricing"
-          ],
+          "competitor_sources": ["st_pricing"],
           "core": true
         },
         {
           "feature": "Payment processing",
           "better_giving": "Third-party card fees, which donors can choose to cover",
-          "better_giving_sources": [
-            "bg_pricing",
-            "bg_cost"
-          ],
+          "better_giving_sources": ["bg_pricing", "bg_cost"],
           "competitor": "2.9% + $0.30 per US card, plus 1.5% for international cards. ACH 0.8%, capped at $5. Nonprofit discount on request",
-          "competitor_sources": [
-            "st_pricing",
-            "st_np"
-          ],
+          "competitor_sources": ["st_pricing", "st_np"],
           "core": true
         },
         {
           "feature": "Who runs it",
           "better_giving": "501(c)(3) nonprofit, EIN 87-3758939",
-          "better_giving_sources": [
-            "bg_about"
-          ],
+          "better_giving_sources": ["bg_about"],
           "competitor": "Your nonprofit, on Stripe, a payments company",
-          "competitor_sources": [
-            "st_pricing"
-          ],
+          "competitor_sources": ["st_pricing"],
           "core": true
         },
         {
           "feature": "Endorsed the National Council of Nonprofits principles for ethical fundraising",
           "better_giving": "Yes",
-          "better_giving_sources": [
-            "ncn"
-          ],
+          "better_giving_sources": ["ncn"],
           "competitor": "No",
-          "competitor_sources": [
-            "ncn"
-          ],
+          "competitor_sources": ["ncn"],
           "core": true
         },
         {
           "feature": "Payout speed",
           "better_giving": "Within 5 working days",
-          "better_giving_sources": [
-            "bg_withdraw"
-          ],
+          "better_giving_sources": ["bg_withdraw"],
           "competitor": "First payout 7 to 14 days after your first payment, then on your schedule",
-          "competitor_sources": [
-            "st_payouts"
-          ],
+          "competitor_sources": ["st_payouts"],
           "core": true
         },
         {
           "feature": "Yield on balance",
           "better_giving": "Just over 3% on savings, variable",
-          "better_giving_sources": [
-            "bg_apy",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_apy", "bg_fund"],
           "competitor": "No",
-          "competitor_sources": [
-            "st_pricing"
-          ],
+          "competitor_sources": ["st_pricing"],
           "core": true
         },
         {
           "feature": "Built-in endowment",
           "better_giving": "Yes, the Sustainability Fund",
-          "better_giving_sources": [
-            "bg_sf",
-            "bg_fund"
-          ],
+          "better_giving_sources": ["bg_sf", "bg_fund"],
           "competitor": "No",
-          "competitor_sources": [
-            "st_pricing"
-          ],
+          "competitor_sources": ["st_pricing"],
           "core": true
         },
         {
           "feature": "Crypto, stock, DAF & IRA",
           "better_giving": "All four in one donation form, no platform fee",
-          "better_giving_sources": [
-            "bg_product",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_product", "bg_pricing"],
           "competitor": "Stablecoin payments where Stripe supports them. Stock, DAF and IRA need other providers",
-          "competitor_sources": [
-            "st_crypto",
-            "st_pricing"
-          ],
+          "competitor_sources": ["st_crypto", "st_pricing"],
           "core": true
         },
         {
           "feature": "Global fiscal sponsorship",
           "better_giving": "Yes, 2.9% per sponsored gift",
-          "better_giving_sources": [
-            "bg_fs",
-            "bg_pricing"
-          ],
+          "better_giving_sources": ["bg_fs", "bg_pricing"],
           "competitor": "No",
-          "competitor_sources": [
-            "st_np"
-          ],
+          "competitor_sources": ["st_np"],
           "core": true
         },
         {
           "feature": "Auctions",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Only if you build them",
-          "competitor_sources": [
-            "st_pricing"
-          ],
+          "competitor_sources": ["st_pricing"],
           "core": true
         },
         {
           "feature": "Raffles & giveaways",
           "better_giving": "No",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Only if you build them",
-          "competitor_sources": [
-            "st_pricing"
-          ],
+          "competitor_sources": ["st_pricing"],
           "core": true
         },
         {
           "feature": "Open-source code",
           "better_giving": "Yes, the full stack is public",
-          "better_giving_sources": [
-            "bg_os",
-            "bg_github"
-          ],
+          "better_giving_sources": ["bg_os", "bg_github"],
           "competitor": "Your own code, if you publish it",
-          "competitor_sources": [
-            "st_pricing"
-          ],
+          "competitor_sources": ["st_pricing"],
           "core": true
         },
         {
           "feature": "Build and maintenance",
           "better_giving": "Copy-paste embed, Better Giving maintains it",
-          "better_giving_sources": [
-            "bg_home",
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_home", "bg_product"],
           "competitor": "Your developers build, host and update the donation form",
-          "competitor_sources": [
-            "st_pci"
-          ],
+          "competitor_sources": ["st_pci"],
           "core": false
         },
         {
           "feature": "PCI compliance",
           "better_giving": "Stripe handles card data, PCI SAQ A",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "Your nonprofit attests every year. The scope depends on your integration",
-          "competitor_sources": [
-            "st_pci"
-          ],
+          "competitor_sources": ["st_pci"],
           "core": false
         },
         {
           "feature": "Tax receipts",
           "better_giving": "Automatic branded receipts",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "You write and send donation receipts yourself",
-          "competitor_sources": [
-            "st_pricing"
-          ],
+          "competitor_sources": ["st_pricing"],
           "core": false
         },
         {
           "feature": "Donor CRM",
           "better_giving": "Donor records with CSV and API export",
-          "better_giving_sources": [
-            "bg_product"
-          ],
+          "better_giving_sources": ["bg_product"],
           "competitor": "No donor management built in",
-          "competitor_sources": [
-            "st_pricing"
-          ],
+          "competitor_sources": ["st_pricing"],
           "core": false
         }
       ],
