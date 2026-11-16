@@ -462,8 +462,13 @@ export async function settlements_to_poll(
             inArray(settlements.status, [...DELIVERED_STATES]),
             gte(settlements.date, since)
           ),
-          // cancelled: open only while one of its payouts is
-          and(eq(settlements.status, CANCELLED), open_payouts())
+          // cancelled: a refund may still follow, so it is read for the window,
+          // or while a payout of it is open; an old one with settled payouts
+          // is history (ops' own cancel)
+          and(
+            eq(settlements.status, CANCELLED),
+            or(open_payouts(), gte(settlements.date, since))
+          )
         )
       )
     )

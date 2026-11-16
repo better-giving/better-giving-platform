@@ -24,9 +24,10 @@ export const read_transfer = async (state_of: TransferState, id: string) => {
 };
 
 /** stored states nothing polls again: ours once the money is back, and
- * `charged_back`. not `cancelled`: every polled transfer was funded, and a
+ * `charged_back`, whose payouts stay bounced for ops to resolve by hand. not `cancelled`: every polled transfer was funded, and a
  * funded one passes through `cancelled` on its way to `funds_refunded` */
-export const FINAL = [RETURNED, "charged_back"] as const;
+export const CHARGED_BACK = "charged_back";
+export const FINAL = [RETURNED, CHARGED_BACK] as const;
 /**
  * wise's transfer states (`@/payouts/wise-path`). `bounced_back` is not the
  * money back: wise may still deliver it late or move it on to

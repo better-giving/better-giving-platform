@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
@@ -16,7 +17,9 @@ vi.mock("$/pg/db", () => ({
   ),
 }));
 
-const { run, target_for } = await import("./payout-delivery-backfill");
+const { bounced_admitted, run, target_for } = await import(
+  "./payout-delivery-backfill"
+);
 const { create_test_db } = await import("$/pg/test-utils/pglite");
 const { npos } = await import("$/pg/schema/npo");
 const { payouts, settlements } = await import("$/pg/schema/payout");
@@ -105,6 +108,55 @@ describe("target_for", () => {
     expect(target_for("")).toBe("processing");
     expect(target_for("bounced_back")).toBe("bounced");
     expect(target_for("outgoing_payment_sent")).toBeNull();
+  });
+});
+
+describe("the deploy-order guard", () => {
+  const without_bounced = async () => {
+    await db().execute(
+      sql`alter table payouts drop constraint type_check`
+    );
+    await db().execute(
+      sql`alter table payouts add constraint type_check check (type in ('pending','processing','settled','error','refunded','refunded_loss','cancelled','returned','void'))`
+    );
+  };
+  const with_bounced = async () => {
+    await db().execute(sql`alter table payouts drop constraint type_check`);
+    await db().execute(
+      sql`alter table payouts add constraint type_check check (type in ('pending','processing','settled','error','refunded','refunded_loss','cancelled','returned','bounced','void'))`
+    );
+  };
+
+  it("sees whether the payouts type check admits bounced", async () => {
+    expect(await bounced_admitted()).toBe(true);
+    await without_bounced();
+    try {
+      expect(await bounced_admitted()).toBe(false);
+    } finally {
+      await with_bounced();
+    }
+  });
+
+  it("refuses --commit before migration 0081, writes nothing, and a dry run still lists and says so first", async () => {
+    await seed("t-flight", "funds_converted");
+    await without_bounced();
+    try {
+      await expect(run({ commit: true }, { log: () => {} })).rejects.toThrow(
+        /0081/
+      );
+      expect(await types()).toEqual({ "p-t-flight": "settled" });
+      const lines: string[] = [];
+      await run({ commit: false }, { log: (l) => lines.push(l) });
+      expect(lines[0]).toMatch(/does not admit 'bounced'.*0081/);
+    } finally {
+      await with_bounced();
+    }
+  });
+
+  it("says at the top of its output that the check admits bounced", async () => {
+    const lines: string[] = [];
+    await run({ commit: false }, { log: (l) => lines.push(l) });
+    expect(lines[0]).toMatch(/admits 'bounced'/);
   });
 });
 

@@ -355,6 +355,75 @@ describe("history stored before delivery was tracked holds no one", () => {
   );
 });
 
+describe("a cancelled transfer on its way to a refund", () => {
+  const seed_cancelled = async (npo_id: number, age_days: number) => {
+    await seed_payout(npo_id, "p-1", 100);
+    await db()
+      .insert(settlements)
+      .values({
+        id: "9003",
+        other_id: "ref-9003",
+        npo_id,
+        date: days_ago(age_days),
+        amount: 100,
+        status: "cancelled",
+      });
+    await db()
+      .update(payouts)
+      .set({ type: "settled", settled_id: "9003" })
+      .where(eq(payouts.id, "p-1"));
+  };
+
+  test("a cancelled run at day 10 that later reads funds_refunded is credited and taken back", async () => {
+    const npo = await seed_npo(400);
+    await seed_cancelled(npo.id, 10);
+
+    await poll_wise_returns(state("funds_refunded"));
+
+    expect(await types()).toEqual({ "p-1": "returned" });
+    expect(await npo_cash(npo.id)).toBe(500);
+    expect(await status_of("9003")).toMatchObject({ status: "returned" });
+  });
+
+  test("a cancelled run at day 200 is not polled, so its refund is not read", async () => {
+    const npo = await seed_npo(400);
+    await seed_cancelled(npo.id, 200);
+    const lookup = vi.fn(state("funds_refunded"));
+
+    await poll_wise_returns(lookup);
+
+    expect(lookup).not.toHaveBeenCalled();
+    expect(await npo_cash(npo.id)).toBe(400);
+  });
+});
+
+describe("a charged-back transfer", () => {
+  test("is final: its payouts stay Bounced, nothing is credited, the npo stays held, and ops is told to resolve it by hand", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    const transfer = await funded(npo, ["p-1"]);
+
+    await poll_wise_returns(state("charged_back"));
+    const lookup = vi.fn(state("funds_refunded"));
+    await poll_wise_returns(lookup);
+
+    expect(lookup).not.toHaveBeenCalled();
+    expect(await types()).toEqual({ "p-1": "bounced" });
+    expect(await npo_cash(npo.id)).toBe(400);
+    expect(await npo_return_hold(npo.id)).toMatchObject({
+      settlement_id: transfer,
+      status: "bounced",
+    });
+    expect(send_alert).toHaveBeenCalledOnce();
+    const [alert] = send_alert.mock.calls[0]!;
+    expect(alert.title).toBe(`Wise transfer charged_back: npo:${npo.id}`);
+    expect(alert.body).toMatch(/charged back/);
+    expect(alert.body).toMatch(/nothing was credited or re-sent/);
+    expect(alert.body).toMatch(/resolve it by hand/);
+    expect(alert.body).not.toMatch(/hold lifts when Wise delivers/);
+  });
+});
+
 describe("the grants list tells wise's bounce from ops' own cancel", () => {
   test("a settlement is flagged bounced only while one of its payouts is", async () => {
     const npo = await seed_npo(500);

@@ -873,8 +873,13 @@ describe("poll_wise_returns", () => {
       recipient_id: "555",
     });
     await seed_settlement(npo.id, "1004", { status: "charged_back" });
-    // a manual cancel with no payout waiting on wise: history, never polled
-    await seed_settlement(npo.id, "1005", { status: "cancelled" });
+    // a manual cancel past the window with no payout waiting on wise: history, never polled
+    await seed_settlement(npo.id, "1005", {
+      status: "cancelled",
+      date: "2026-01-13T00:00:00.000Z",
+    });
+    // cancelled inside the window: a refund may follow, so it is read
+    await seed_settlement(npo.id, "1013", { status: "cancelled" });
     // never read, and old: open, so polled
     await seed_settlement(npo.id, "1006", { date: "2026-01-13T00:00:00.000Z" });
     await seed_settlement(npo.id, "1007", { date: "2026-08-14T12:00:00.000Z" });
@@ -905,7 +910,7 @@ describe("poll_wise_returns", () => {
     await poll_wise_returns(lookup);
 
     expect(lookup.mock.calls.map(([id]) => id).sort()).toEqual([
-      1001, 1002, 1006, 1007, 1012,
+      1001, 1002, 1006, 1007, 1012, 1013,
     ]);
   });
 
@@ -1066,7 +1071,9 @@ describe("poll_wise_returns", () => {
       expect(alert.body).toMatch(
         state === "cancelled" || state === "bounced_back"
           ? /the next poll takes the run back by itself; if wise delivers it late.*Change nothing by hand/
-          : /show as Bounced.*hold lifts when Wise delivers it or refunds it/
+          : state === "charged_back"
+            ? /was charged back: nothing was credited or re-sent.*resolve it by hand/
+            : /show as Bounced.*hold lifts when Wise delivers it or refunds it/
       );
       expect(alert.fields).toEqual(
         expect.arrayContaining([

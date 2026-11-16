@@ -28,6 +28,18 @@ import { CANCELLED, DELIVERED_STATES, ON_PATH } from "../lib/payouts/wise-path";
  * never touched. a payout that is no longer `settled` when the write reaches
  * it (a refund, a return) is left as it is.
  *
+ * ## Order
+ *
+ * 1. deploy the PR that adds the `bounced` payout type (#293): its migration
+ *    0081 is what lets the table hold `bounced`, and its code is what polls
+ *    the transfers and reads the new types.
+ * 2. check the first poll's results (the wise-returns cron's alerts and the
+ *    npos it held).
+ * 3. dry-run this job, read the list, then commit it.
+ *
+ * `--commit` refuses to run until the payouts `type_check` constraint admits
+ * `bounced`, and every run says whether it does as its first line.
+ *
  * ## Running
  *
  * env (a `--env-file` or the shell): `DATABASE_URL`, the database to read and
@@ -89,7 +101,27 @@ export interface IDeps {
   log: (line: string) => void;
 }
 
+/** whether migration 0081 is applied: the payouts type check admits `bounced` */
+export async function bounced_admitted(): Promise<boolean> {
+  const res = await db.execute(
+    sql`select pg_get_constraintdef(oid) as def from pg_constraint where conname = 'type_check' and conrelid = 'payouts'::regclass`
+  );
+  const rows = (Array.isArray(res) ? res : res.rows) as { def: string }[];
+  return rows.some((r) => r.def.includes("'bounced'"));
+}
+
 export async function run(opts: IOpts, deps: IDeps): Promise<ISummary> {
+  const admitted = await bounced_admitted();
+  deps.log(
+    admitted
+      ? "payouts type_check admits 'bounced' (migration 0081 is applied)"
+      : "payouts type_check does not admit 'bounced': migration 0081 is not applied, so deploy the PR that carries it before committing this job"
+  );
+  if (opts.commit && !admitted) {
+    throw new Error(
+      "refusing --commit: payouts type_check does not admit 'bounced' (migration 0081 not applied)"
+    );
+  }
   const sum: ISummary = {
     to_change: 0,
     changed: 0,
