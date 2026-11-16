@@ -1463,6 +1463,10 @@ describe("dashboard — awaiting repair notice", () => {
   describe("charged_back", () => {
     const seed_bounced_run = async (npo_id: number, wise_state: string) => {
       await settle(npo_id, wise_state);
+      // a real transfer: the hold reads only runs that have one
+      await test_db
+        .current!.db.update(settlements)
+        .set({ other_id: `ref-${npo_id}` });
       await test_db.current!.db.insert(payouts).values({
         id: `p-${npo_id}`,
         source_id: `don-${npo_id}`,
@@ -1489,19 +1493,29 @@ describe("dashboard — awaiting repair notice", () => {
       });
     });
 
-    it("is null for a plain bounce, a return and no hold", async () => {
-      const bounce = await seed_npo();
-      await file_old_bank(bounce.id);
-      await seed_bounced_run(bounce.id, "bounced_back");
-      expect((await load(bounce.id)).charged_back).toBeNull();
+    it("is null for a plain bounce", async () => {
+      const npo = await seed_npo();
+      await file_old_bank(npo.id);
+      await seed_bounced_run(npo.id, "bounced_back");
 
-      const ret = await seed_npo();
-      await file_old_bank(ret.id);
-      await settle(ret.id, "returned");
-      expect((await load(ret.id)).charged_back).toBeNull();
+      const data = await load(npo.id);
 
-      const none = await seed_npo();
-      expect((await load(none.id)).charged_back).toBeNull();
+      expect(data.bounce_hold).toBe(true);
+      expect(data.charged_back).toBeNull();
+    });
+
+    it("is null for a return", async () => {
+      const npo = await seed_npo();
+      await file_old_bank(npo.id);
+      await settle(npo.id, "returned");
+
+      expect((await load(npo.id)).charged_back).toBeNull();
+    });
+
+    it("is null with no hold", async () => {
+      const npo = await seed_npo();
+
+      expect((await load(npo.id)).charged_back).toBeNull();
     });
   });
 
