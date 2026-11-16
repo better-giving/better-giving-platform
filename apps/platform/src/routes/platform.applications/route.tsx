@@ -6,7 +6,6 @@ import { use_table } from "#/hooks/use-table";
 import type { IReg } from "@/reg";
 import type { Route } from "./+types/route";
 import { Filter } from "./filter";
-import type { statuses } from "./filter/constants";
 import { Table } from "./table";
 
 export { loader } from "./api";
@@ -16,26 +15,26 @@ export { ErrorBoundary } from "#/components/error";
 export const meta: Route.MetaFunction = () =>
   metas({ title: "NPO applications" });
 
-const empty_msgs: Record<keyof typeof statuses, string> = {
-  "": "No applications",
-  "01": "No incomplete applications",
-  "02": "No applications under review",
-  "03": "No approved applications",
-  "04": "No rejected applications",
-};
-
 export default CacheRoute(Applications);
 function Applications({ loaderData: page1 }: Route.ComponentProps) {
   const [params, setParams] = useSearchParams();
-  const status_key = (
-    params.has("status") ? params.get("status")! : "02"
-  ) as keyof typeof statuses;
+  // any filter or search narrows the list, so an empty one is "found", not "yet"
+  const any_filter = [
+    "status",
+    "country",
+    "start_date",
+    "end_date",
+    "query",
+  ].some((k) => !!params.get(k));
 
   const { node, loading } = use_table<IReg>({
+    // a filter or sort change drops every loaded page: rows of the old view
+    // must never stay beside the new one
+    filter_key: params.toString(),
     table: ({ items, ...props }) => (
       <Table
         items={items}
-        empty_msg={empty_msgs[status_key] ?? empty_msgs[""]}
+        empty_msg={any_filter ? "No applications found" : "No applications yet"}
         connect_routing={page1.connect_routing}
         {...props}
       />

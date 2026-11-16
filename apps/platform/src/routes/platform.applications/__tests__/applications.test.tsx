@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { createRoutesStub } from "react-router";
 import {
   afterAll,
@@ -130,19 +131,150 @@ async function render_applications(search = "") {
 // --- tests ---
 
 describe("applications — default view", () => {
-  it("defaults to under-review when no status param", async () => {
+  it("shows every status, newest first, when there is no status param", async () => {
     const screen = await render_applications();
 
-    // only pending (status 02) shown by default
+    for (const name of [
+      "Pending Org",
+      "Approved Org",
+      "Rejected Org",
+      "Incomplete Org",
+    ]) {
+      await expect.element(screen.getByText(name)).toBeInTheDocument();
+    }
+    const order = [
+      ...screen.container.querySelectorAll("tbody tr td:first-child"),
+    ]
+      .map((td) => td.textContent)
+      .filter(Boolean);
+    // updated: approved 1d, rejected 2d, pending 3d, incomplete 5d
+    expect(order).toEqual([
+      "Approved Org",
+      "Rejected Org",
+      "Pending Org",
+      "Incomplete Org",
+    ]);
+  });
+
+  it("names the date column Last updated", async () => {
+    const screen = await render_applications();
+
+    await expect
+      .element(screen.getByRole("button", { name: "Last updated" }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText("Date submitted"))
+      .not.toBeInTheDocument();
+  });
+
+  it("the status select reads All statuses", async () => {
+    const screen = await render_applications();
+
+    await screen.getByRole("button", { name: /^filter$/i }).click();
+
+    await expect.element(screen.getByText("All statuses")).toBeVisible();
+  });
+});
+
+describe("applications — reset", () => {
+  it("Reset filters returns to every status", async () => {
+    const screen = await render_applications("?status=03");
+    await expect.element(screen.getByText("Approved Org")).toBeInTheDocument();
+    await expect
+      .element(screen.getByText("Pending Org"))
+      .not.toBeInTheDocument();
+
+    await screen.getByRole("button", { name: /^filter$/i }).click();
+    await screen.getByRole("button", { name: /reset filters/i }).click();
+
     await expect.element(screen.getByText("Pending Org")).toBeInTheDocument();
+    await expect.element(screen.getByText("Approved Org")).toBeInTheDocument();
+    await expect.element(screen.getByText("Rejected Org")).toBeInTheDocument();
+  });
+});
+
+describe("applications — empty states", () => {
+  it("says No applications yet when nothing is filtered and the list is empty", async () => {
+    await test_db.current!.db.delete(registrations);
+
+    const screen = await render_applications();
+
     await expect
-      .element(screen.getByText("Approved Org"))
+      .element(screen.getByText("No applications yet"))
+      .toBeInTheDocument();
+  });
+
+  it("says No applications found when a filter or search leaves nothing", async () => {
+    await test_db
+      .current!.db.delete(registrations)
+      .where(eq(registrations.status, "04"));
+
+    const screen = await render_applications("?status=04");
+
+    await expect
+      .element(screen.getByText("No applications found"))
+      .toBeInTheDocument();
+  });
+});
+
+describe("applications — view more", () => {
+  const seed_approved = (n: number) =>
+    test_db.current!.db.insert(registrations).values(
+      Array.from({ length: n }, (_, i) => ({
+        id: `reg-many-${String(i).padStart(2, "0")}`,
+        r_id: `user-many-${i}`,
+        status: "03" as const,
+        o_name: `Many Org ${String(i).padStart(2, "0")}`,
+        o_hq_country: "Kenya",
+        created_at: days_ago(10),
+        updated_at: days_ago(10),
+      }))
+    );
+
+  it("a status-sorted second page repeats no row of the first", async () => {
+    await seed_approved(20);
+
+    const screen = await render_applications("?sort_key=status&sort_dir=asc");
+    await screen.getByRole("button", { name: /view more/i }).click();
+
+    await expect.element(screen.getByText("Many Org 19")).toBeInTheDocument();
+    const names = [
+      ...screen.container.querySelectorAll("tbody tr td:first-child"),
+    ]
+      .map((td) => td.textContent)
+      .filter(Boolean);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("a filter change after View more leaves no row from the earlier filter", async () => {
+    await seed_approved(20);
+
+    await test_db.current!.db.insert(registrations).values({
+      id: "reg-zebra",
+      r_id: "user-zebra",
+      status: "03",
+      o_name: "Zebra Foundation",
+      o_hq_country: "Kenya",
+      created_at: days_ago(30),
+      updated_at: days_ago(30),
+    });
+    const screen = await render_applications("?status=03");
+    await screen.getByRole("button", { name: /view more/i }).click();
+    await expect.element(screen.getByText("Many Org 19")).toBeInTheDocument();
+
+    // a search that matches none of the loaded rows
+    const search_input = screen.getByPlaceholder(/search applications/i);
+    await search_input.fill("Zebra");
+    await userEvent.keyboard("{Enter}");
+
+    await expect
+      .element(screen.getByText("Zebra Foundation"))
+      .toBeInTheDocument();
+    await expect
+      .element(screen.getByText("Many Org 00"))
       .not.toBeInTheDocument();
     await expect
-      .element(screen.getByText("Rejected Org"))
-      .not.toBeInTheDocument();
-    await expect
-      .element(screen.getByText("Incomplete Org"))
+      .element(screen.getByText("Many Org 19"))
       .not.toBeInTheDocument();
   });
 });

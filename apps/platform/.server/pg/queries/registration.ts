@@ -24,7 +24,7 @@ import {
 import { db } from "../db";
 import { registrations } from "../schema/registration";
 import type { DbOrTx, IPage } from "./helpers";
-import { decode_date_cursor, encode_date_cursor } from "./helpers";
+import { decode_date_cursor } from "./helpers";
 
 export async function reg_get(id: string): Promise<IReg | undefined> {
   const [row] = await db
@@ -208,10 +208,42 @@ export async function reg_stripe_deauthorize(
   return { status: "stale", reg_id: row.id };
 }
 
-/** paginated registrations with status/date/country filters */
+const PAGE = 15;
+
+/** a keyset cursor: the last row's sort value and id, base64url of a json pair */
+function encode_regs_cursor(value: string | null, id: string): string {
+  return btoa(JSON.stringify([value, id]))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+/** a cursor's pair, or undefined for anything else (a bare date from before
+ * keyset paging included, which the caller reads as `updated_at <`) */
+function decode_regs_cursor(c: string): [string | null, string] | undefined {
+  try {
+    const x = JSON.parse(decode_date_cursor(c) ?? "");
+    if (
+      Array.isArray(x) &&
+      x.length === 2 &&
+      (x[0] === null || typeof x[0] === "string") &&
+      typeof x[1] === "string"
+    ) {
+      return [x[0], x[1]];
+    }
+  } catch {}
+  return undefined;
+}
+
+/**
+ * paginated registrations with status/date/country filters. no status is
+ * every status, newest first. paged by a keyset on (sort column, id), the id
+ * breaking ties and nulls last, so a "view more" under any sort continues
+ * where the page before it stopped
+ */
 export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
   const {
-    status = "02",
+    status,
     start_date,
     end_date,
     country,
@@ -221,8 +253,6 @@ export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
     sort_dir = "desc",
   } = opts || {};
 
-  const cursor = decode_date_cursor(next);
-
   const sort_col_map = {
     o_name: registrations.o_name,
     updated_at: registrations.updated_at,
@@ -230,7 +260,26 @@ export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
     status: registrations.status,
   } as const;
   const col = sort_col_map[sort_key];
-  const order = sort_dir === "asc" ? asc(col) : desc(col);
+  const desc_ = sort_dir !== "asc";
+  const dir = desc_ ? desc : asc;
+
+  const parsed = next ? decode_regs_cursor(next) : undefined;
+  let after: SQL | undefined;
+  if (parsed) {
+    const [value, id] = parsed;
+    // a timestamp column compares as one, whatever the cursor's text
+    const v =
+      sort_key === "updated_at" ? sql`${value}::timestamptz` : sql`${value}`;
+    const past = desc_ ? sql`<` : sql`>`;
+    after =
+      value === null
+        ? // nulls sort last: only nulls with a later id remain
+          sql`(${col} is null and ${registrations.id} ${past} ${id})`
+        : sql`(${col} ${past} ${v} or (${col} = ${v} and ${registrations.id} ${past} ${id}) or ${col} is null)`;
+  } else if (next) {
+    // a bare date cursor from before keyset paging: the newest-first view
+    after = sql`${registrations.updated_at} < ${decode_date_cursor(next)}`;
+  }
 
   const rows = await db
     .select()
@@ -251,20 +300,28 @@ export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
               sql`${registrations.id} ILIKE ${`%${query}%`}`
             )
           : undefined,
-        cursor ? sql`${registrations.updated_at} < ${cursor}` : undefined
+        after
       )
     )
-    .orderBy(order)
-    .limit(16);
+    .orderBy(
+      sql`${col} ${desc_ ? sql`desc` : sql`asc`} nulls last`,
+      dir(registrations.id)
+    )
+    .limit(PAGE + 1);
 
-  const has_more = rows.length > 15;
-  const items = rows.slice(0, 15);
+  const has_more = rows.length > PAGE;
+  const items = rows.slice(0, PAGE);
+  const last = items[items.length - 1];
   return {
     // IReg is composed of many sub-interfaces with field shape mismatches
     items: items as unknown as IReg[],
-    next: has_more
-      ? encode_date_cursor(items[items.length - 1]?.updated_at ?? undefined)
-      : undefined,
+    next:
+      has_more && last
+        ? encode_regs_cursor(
+            (last[sort_key] as string | null | undefined) ?? null,
+            last.id
+          )
+        : undefined,
   };
 }
 

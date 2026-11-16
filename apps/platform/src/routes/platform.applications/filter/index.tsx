@@ -57,7 +57,7 @@ export function Filter({ classes = "", isDisabled }: Props) {
             <Form
               params={parsed}
               onSubmit={onSubmit}
-              onReset={() => setParams({ status: "02" })}
+              onReset={() => setParams({})}
             />
           </Popover.Positioner>
         </Portal>

@@ -44,8 +44,11 @@ export default function Page({ loaderData: d, params }: Route.ComponentProps) {
       </div>
 
       {is_rejected && (
-        <p className="text-sm text-destructive-subtle-fg my-2">
-          <CircleAlert className="relative inline bottom-px mr-1" />
+        <p className="flex items-start gap-1.5 text-sm text-destructive-subtle-fg my-2">
+          {/* a one-line box, so the icon sits on the reason's first line */}
+          <span className="inline-flex items-center h-[1lh] shrink-0">
+            <CircleAlert className="icon-sm" aria-hidden />
+          </span>
           <span>{d.ba.rejection_reason}</span>
         </p>
       )}

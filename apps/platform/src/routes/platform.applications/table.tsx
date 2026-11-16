@@ -62,7 +62,7 @@ export function Table({
                 _sortKey={"updated_at" as any}
                 _sortDirection={sort_dir}
               >
-                Date submitted
+                Last updated
               </HeaderButton>
             </th>
             <th>

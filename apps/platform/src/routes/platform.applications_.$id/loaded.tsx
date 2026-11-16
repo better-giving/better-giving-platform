@@ -55,7 +55,7 @@ export default function Loaded(
         <span className="text-sm">{props.id}</span>
       </div>
       <div className="flex max-sm:flex-col gap-x-4 -mt-2 lg:-mt-4">
-        <span className="text-sm font-semibold">Date submitted:</span>
+        <span className="text-sm font-semibold">Last updated:</span>
         <span className="text-sm">
           {new Date(props.updated_at).toLocaleDateString()}
         </span>
