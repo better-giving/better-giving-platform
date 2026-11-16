@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   afterAll,
   afterEach,
@@ -250,6 +250,21 @@ async function sent(
   });
   const res = await settle_npo_payouts(npo, ids, { ref_key: RECIPIENT, pay });
   expect(res.status).toBe("settled");
+  // wise delivering it: the poll's job (`wise-delivery.test.ts`), done here so
+  // a return meets the payouts as a delivered run leaves them
+  await db()
+    .update(payouts)
+    .set({
+      type: "settled",
+      settled_date: new Date().toISOString(),
+      message: null,
+    })
+    .where(
+      and(
+        eq(payouts.settled_id, String(transfer_id)),
+        eq(payouts.type, "processing")
+      )
+    );
   return String(transfer_id);
 }
 
@@ -849,7 +864,7 @@ describe("poll_wise_returns", () => {
     });
   });
 
-  test("asks wise only of real transfers from the last 90 days whose stored state is not final", async () => {
+  test("asks wise of every open real transfer whatever its age, and of a delivered one only for 90 days", async () => {
     const npo = await seed_npo(0);
     await seed_settlement(npo.id, "1001");
     await seed_settlement(npo.id, "1002", { status: "outgoing_payment_sent" });
@@ -858,19 +873,44 @@ describe("poll_wise_returns", () => {
       recipient_id: "555",
     });
     await seed_settlement(npo.id, "1004", { status: "charged_back" });
-    // funded, so on wise's way to `funds_refunded`
-    await seed_settlement(npo.id, "1005", { status: "cancelled" });
-    await seed_settlement(npo.id, "1006", { date: "2026-08-13T00:00:00.000Z" });
+    // a manual cancel past the window with no payout waiting on wise: history, never polled
+    await seed_settlement(npo.id, "1005", {
+      status: "cancelled",
+      date: "2026-01-13T00:00:00.000Z",
+    });
+    // cancelled inside the window: a refund may follow, so it is read
+    await seed_settlement(npo.id, "1013", { status: "cancelled" });
+    // never read, and old: open, so polled
+    await seed_settlement(npo.id, "1006", { date: "2026-01-13T00:00:00.000Z" });
     await seed_settlement(npo.id, "1007", { date: "2026-08-14T12:00:00.000Z" });
     // one per guard on a row with no transfer behind it: no ref, nothing sent
     await seed_settlement(npo.id, "1008", { other_id: null });
     await seed_settlement(npo.id, "1009", { amount: 0 });
+    // delivered: polled for 90 days only, and the state written before wise's own were kept
+    await seed_settlement(npo.id, "1010", {
+      status: "outgoing_payment_sent",
+      date: "2026-05-01T00:00:00.000Z",
+    });
+    await seed_settlement(npo.id, "1011", {
+      status: "settled",
+      date: "2026-03-01T00:00:00.000Z",
+    });
+    // funded then cancelled by wise, its payout bounced: on the way to a refund
+    await seed_settlement(npo.id, "1012", {
+      status: "cancelled",
+      date: "2026-05-01T00:00:00.000Z",
+    });
+    await seed_payout(npo.id, "p-1012", 100);
+    await db()
+      .update(payouts)
+      .set({ type: "bounced", settled_id: "1012" })
+      .where(eq(payouts.id, "p-1012"));
     const lookup = vi.fn(async (_: number) => "outgoing_payment_sent");
 
     await poll_wise_returns(lookup);
 
     expect(lookup.mock.calls.map(([id]) => id).sort()).toEqual([
-      1001, 1002, 1005, 1007,
+      1001, 1002, 1006, 1007, 1012, 1013,
     ]);
   });
 
@@ -1007,7 +1047,7 @@ describe("poll_wise_returns", () => {
     "bounced_back",
     "some_new_state",
   ])(
-    "a transfer now %s is stored and alerted once, and changes nothing else",
+    "a transfer now %s is stored and alerted once, bounces its payouts and holds the npo",
     async (state) => {
       const npo = await seed_npo(0);
       await seed_payout(npo.id, "p-1", 100);
@@ -1023,15 +1063,17 @@ describe("poll_wise_returns", () => {
       await poll_wise_returns(async () => state);
 
       expect(await status_of("1001")).toBe(state);
-      expect(await payout_types()).toEqual({ "p-1": "settled" });
+      expect(await payout_types()).toEqual({ "p-1": "bounced" });
       expect(await npo_cash(npo.id)).toBe(0);
       expect(send_alert).toHaveBeenCalledOnce();
       const [alert] = send_alert.mock.calls[0]!;
       expect(alert.title).toBe(`Wise transfer ${state}: npo:${npo.id}`);
       expect(alert.body).toMatch(
         state === "cancelled" || state === "bounced_back"
-          ? /the next poll takes the run back by itself\. Change nothing by hand/
-          : /settle its payouts by hand if its money moved/
+          ? /the next poll takes the run back by itself; if Wise delivers it late.*Change nothing by hand/
+          : state === "charged_back"
+            ? /was charged back: nothing was credited or re-sent.*resolve it by hand/
+            : /show as Bounced.*hold lifts when Wise delivers it or refunds it/
       );
       expect(alert.fields).toEqual(
         expect.arrayContaining([

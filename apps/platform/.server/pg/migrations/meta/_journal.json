@@ -568,6 +568,13 @@
       "when": 1794743586482,
       "tag": "0080_campaign_total_settled_donations",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1794789188077,
+      "tag": "0081_payouts_bounced",
+      "breakpoints": true
     }
   ]
 }

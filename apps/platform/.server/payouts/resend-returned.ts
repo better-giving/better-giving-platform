@@ -6,11 +6,14 @@ import { lock_run } from "./owed-run";
 import { type HoldCause, return_hold_cause } from "./return-hold";
 
 export interface IReturnHold {
-  /** the npo's latest returned or awaiting-repair settlement: the hold alert dedupes on it */
+  /** the npo's latest returned, awaiting-repair or bounced settlement: the hold alert dedupes on it */
   settlement_id: string;
   /** `awaiting_repair`: its transfer came back but which payouts it covered
-   * is unclear, so nothing is credited yet */
-  status: "returned" | "awaiting_repair";
+   * is unclear, so nothing is credited yet; `bounced`: wise reports it off
+   * the ordinary path and may still deliver it late or refund it */
+  status: "returned" | "awaiting_repair" | "bounced";
+  /** the settlement's stored wise state: `charged_back` is final, any other bounce may still be delivered or refunded */
+  wise_state: string;
   /** what the settlement sent, in usd, and when */
   amount: number;
   date: string;
@@ -26,14 +29,15 @@ const REASONS: Record<HoldCause, string> = {
 
 /**
  * whether the npo's grants are held: its latest transfer came back (returned,
- * or awaiting repair because which payouts are its own is unclear), unless
- * the account the grants run pays (`npo_default_bapp`) is a different wise
- * recipient from the one that transfer paid and was approved or made default
- * since it was sent. an edit to the account that bounced changes neither, so
- * a run would pay it again. a transfer whose recipient is not on record
- * holds too: the poll stores it from wise. keyed on the settlement, not the
- * payouts: refunding or cancelling the returned payouts leaves it held. null
- * when not held
+ * or awaiting repair because which payouts are its own is unclear) or bounced
+ * and wise has not delivered it (so the next run would pay the same failing
+ * account), unless the account the grants run pays (`npo_default_bapp`) is a
+ * different wise recipient from the one that transfer paid and was approved or
+ * made default since it was sent. an edit to the account that bounced changes
+ * neither, so a run would pay it again. a transfer whose recipient is not on
+ * record holds too: the poll stores it from wise. keyed on the settlement, not
+ * the payouts: refunding or cancelling the returned payouts leaves it held.
+ * null when not held
  */
 export async function npo_return_hold(
   npo_id: number,
@@ -43,7 +47,11 @@ export async function npo_return_hold(
   if (!last) return null;
   const of = {
     settlement_id: last.id,
-    status: last.status === "awaiting_repair" ? "awaiting_repair" : "returned",
+    wise_state: last.status,
+    status:
+      last.status === "awaiting_repair" || last.status === "returned"
+        ? last.status
+        : "bounced",
     amount: last.amount,
     date: last.date,
   } as const;

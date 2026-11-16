@@ -23,25 +23,26 @@ export const read_transfer = async (state_of: TransferState, id: string) => {
   return typeof t === "string" ? { status: t, recipient: undefined } : t;
 };
 
-/** stored states nothing polls again: ours once the money is back, and
- * `charged_back`. not `cancelled`: every polled transfer was funded, and a
- * funded one passes through `cancelled` on its way to `funds_refunded` */
-export const FINAL = [RETURNED, "charged_back"] as const;
-export const WINDOW_DAYS = 90;
+export { CHARGED_BACK } from "@/payouts/wise-path";
 
+import { CHARGED_BACK } from "@/payouts/wise-path";
+/** stored states nothing polls again: ours once the money is back, and
+ * `charged_back`, whose payouts stay bounced for ops to resolve by hand. not
+ * `cancelled`: every polled transfer was funded, and a funded one passes
+ * through `cancelled` on its way to `funds_refunded` */
+export const FINAL = [RETURNED, CHARGED_BACK] as const;
 /**
- * wise's transfer states (https://docs.wise.com/guides/product/send-money/tracking-transfers).
- * `bounced_back` is not the money back: wise may still deliver it late or move
- * it on to `funds_refunded`, which alone is taken back
+ * wise's transfer states (`@/payouts/wise-path`). `bounced_back` is not the
+ * money back: wise may still deliver it late or move it on to
+ * `funds_refunded`, which alone is taken back. a payout is settled only from
+ * `DELIVERED`, and bounced from any state off the ordinary path
  */
-export const ORDINARY: ReadonlySet<string> = new Set([
-  "incoming_payment_waiting",
-  "incoming_payment_initiated",
-  "processing",
-  "funds_converted",
-  "outgoing_payment_sent",
-]);
-export const MONEY_BACK = "funds_refunded";
+export {
+  DELIVERED,
+  MONEY_BACK,
+  ORDINARY,
+  WINDOW_DAYS,
+} from "@/payouts/wise-path";
 /** off the ordinary path and possibly on to `MONEY_BACK`, where the poll takes
  * the run back by itself: settling the payouts by hand too would count the
  * money twice */

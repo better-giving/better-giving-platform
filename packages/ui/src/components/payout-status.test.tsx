@@ -13,13 +13,20 @@ const dot_of = (label: HTMLElement) =>
   getComputedStyle(label.firstElementChild as HTMLElement);
 
 describe("PayoutStatus", () => {
-  test("labels a processing payout 'Processing'", async () => {
+  test("labels a processing payout 'Sending'", async () => {
     const screen = await render(<PayoutStatus type="processing" />);
-    await expect.element(screen.getByText("Processing")).toBeVisible();
+    await expect.element(screen.getByText("Sending")).toBeVisible();
+    expect(screen.getByText("Processing").query()).toBeNull();
   });
 
-  test("paints processing in pending's in-flight ink, not the cancelled gray", async () => {
-    const processing = await ink("processing", "Processing");
+  test("labels a bounced payout 'Bounced' in pending's amber, apart from error's red", async () => {
+    const bounced = await ink("bounced", "Bounced");
+    expect(bounced).toBe(await ink("pending", "Pending"));
+    expect(bounced).not.toBe(await ink("error", "Error"));
+  });
+
+  test("paints sending in pending's in-flight ink, not the cancelled gray", async () => {
+    const processing = await ink("processing", "Sending");
     expect(processing).toBe(await ink("pending", "Pending"));
     expect(processing).not.toBe(await ink("cancelled", "Cancelled"));
   });

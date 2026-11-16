@@ -11,6 +11,7 @@ export type PayoutStatusType =
   | "refunded_loss"
   | "cancelled"
   | "returned"
+  | "bounced"
   | "void";
 
 interface IConfig {
@@ -25,11 +26,12 @@ const configs: Record<PayoutStatusType, IConfig> = {
     dot: "bg-warning",
     label: "Pending",
   },
-  // in flight like pending; the ledger has no separate in-progress pair
+  // funded and not yet reported received by the bank: owed and not settled,
+  // so the amber pair pending and returned use; only settled is green
   processing: {
     text: "text-warning-subtle-fg",
     dot: "bg-warning",
-    label: "Processing",
+    label: "Sending",
   },
   settled: {
     text: "text-success-subtle-fg",
@@ -62,6 +64,13 @@ const configs: Record<PayoutStatusType, IConfig> = {
     text: "text-warning-subtle-fg",
     dot: "bg-warning",
     label: "Returned",
+  },
+  // the bank didn't accept it and the money is coming back: not settled, and
+  // not an error, so the same amber as pending and returned
+  bounced: {
+    text: "text-warning-subtle-fg",
+    dot: "bg-warning",
+    label: "Bounced",
   },
   // never a payout: the hollow dot keeps it apart from cancelled's filled one
   void: {

@@ -11,9 +11,10 @@
  * - settlement: `status` 'returned', which ends polling and makes a second
  *   detection change nothing. amount, date and sources stay, so the grants page
  *   still lists it.
- * - payouts the run settled and still `settled`: 'returned'. `settled_id` and
- *   `settled_date` stay, naming the run that returned them. one moved on any
- *   other way (reset by hand, voided) is left as it is and named to ops.
+ * - payouts of the run still `processing`, `settled` or `bounced`: 'returned'.
+ *   `settled_id` and `settled_date` stay, naming the run that returned them.
+ *   one moved on any other way (reset by hand, voided) is left as it is and
+ *   named to ops.
  * - npo cash: credited payout_total of the payouts this transaction takes back:
  *   the ones it moves to 'returned' and the run's loss-refunded ones, which
  *   is G when nothing moved on. never a figure read off the settlement alone.
@@ -51,13 +52,13 @@ import { run_netted_usd, unrecover_owed } from "../pg/queries/owed";
 import {
   legacy_losses_locked,
   npos_with_returned_payouts,
-  payouts_move,
   payouts_own_loss,
   returned_missing_recipient,
   run_payouts_locked,
   type SettlementRow,
   settlement_locked,
   settlement_npo_id,
+  settlement_payouts_move,
   settlement_recipient_fill,
   settlement_status_set,
   settlements_to_poll,
@@ -70,6 +71,8 @@ import { poll_commission_returns } from "./wise-return-commission";
 import {
   AWAITING_REPAIR,
   alert,
+  CHARGED_BACK,
+  DELIVERED,
   FINAL,
   MONEY_BACK,
   ORDINARY,
@@ -206,10 +209,14 @@ async function take_back(
     legacy.rows.map((p) => p.id),
     s.id
   );
-  const settled = run.filter((p) => p.type === "settled").map((p) => p.id);
-  const returned = await payouts_move(tx, settled, "settled", {
-    type: "returned",
-  });
+  // sent, still on its way or bounced: the money is back whichever the payout
+  // had reached, and the npo was never paid it
+  const returned = await settlement_payouts_move(
+    tx,
+    s.id,
+    ["settled", "processing", "bounced"],
+    { type: "returned" }
+  );
   const losses = run.filter((p) => p.type === "refunded_loss").map((p) => p.id);
   const taken = new Set([...returned, ...losses]);
   const moved_on = run.map((p) => p.id).filter((id) => !taken.has(id));
@@ -340,10 +347,12 @@ async function announce(
 }
 
 /**
- * asks wise the state of every grants-run transfer from the last 90 days not
- * yet final, and stores it on its settlement when it changed: the stored state
- * is what makes each change act and alert once. money back takes the run back
- * (`return_settlement`); any other state off the ordinary path is told to ops
+ * asks wise the state of every grants-run transfer not yet final (an open one
+ * whatever its age; a delivered one for 90 days), and stores it on its
+ * settlement when it changed: the stored state is what makes each change act
+ * and alert once. a transfer reported sent settles its payouts; money back
+ * takes the run back (`return_settlement`); any other state off the ordinary
+ * path bounces its payouts, holds the npo and is told to ops
  */
 export async function poll_wise_returns(state_of: TransferState) {
   const since = new Date(
@@ -358,13 +367,16 @@ export async function poll_wise_returns(state_of: TransferState) {
         await return_settlement(s.id, recipient);
         continue;
       }
-      const changed = await settlement_status_set(db, s.id, s.status, state);
+      const changed = await record_state(s, state);
       if (changed && !ORDINARY.has(state)) {
         await alert({
           title: `Wise transfer ${state}: npo:${s.npo_id}`,
-          body: RETURNING.has(state)
-            ? `Wise is returning this transfer, or may still deliver it: if it reaches ${MONEY_BACK}, the next poll takes the run back by itself. Change nothing by hand`
-            : `nothing was changed but the stored state: check the transfer in Wise and settle its payouts by hand if its money moved`,
+          body:
+            state === CHARGED_BACK
+              ? `this transfer was charged back: nothing was credited or re-sent, and it is not polled again. its payouts stay Bounced and the npo's grants stay held until a different bank account is approved. resolve it by hand, but do not cancel, settle or return these payouts until the npo has a different bank account approved: doing so ends the hold, so the next grants run pays the npo's other pending payouts to the account that was charged back. do not move the payouts to returned: that would also re-send them there. once the new account is approved: if the money did not reach the npo, credit its cash by the payouts' total and cancel them; if it did, settle them`
+              : RETURNING.has(state)
+                ? `Wise is returning this transfer, or may still deliver it: its payouts show as Bounced and the npo's grants are held. if it reaches ${MONEY_BACK}, the next poll takes the run back by itself; if Wise delivers it late, they are Settled again and the hold lifts. Change nothing by hand`
+                : `its payouts show as Bounced and the npo's grants are held: check the transfer in Wise. the hold lifts when Wise delivers it or refunds it, or when a different bank account is approved`,
           fields: [
             { name: "settlement", value: s.id },
             { name: "state", value: state },
@@ -381,6 +393,40 @@ export async function poll_wise_returns(state_of: TransferState) {
   await poll_commission_returns(state_of);
   // after the returns above, so a slow or large re-send backlog never delays finding them
   await retry_resends();
+}
+
+/**
+ * stores the wise state a transfer is now in and moves the payouts it owns
+ * with it, in one transaction so the stored state never says what the payouts
+ * don't: `outgoing_payment_sent` settles those still `processing`, or
+ * `bounced` and delivered late; a state off the ordinary path bounces those
+ * `processing` or `settled`; back on the path short of delivery, a `bounced`
+ * one is `processing` again. false when another writer stored it first
+ */
+async function record_state(s: SettlementRow, state: string) {
+  return db.transaction(async (tx) => {
+    if (s.npo_id !== null) await lock_run(tx, `grant_run:npo:${s.npo_id}`);
+    const changed = await settlement_status_set(tx, s.id, s.status, state);
+    if (!changed) return false;
+    if (state === DELIVERED) {
+      await settlement_payouts_move(tx, s.id, ["processing", "bounced"], {
+        type: "settled",
+        settled_date: new Date().toISOString(),
+        settled_id: s.id,
+      });
+    } else if (ORDINARY.has(state)) {
+      // wise has it moving again: a bounce that is no longer one
+      await settlement_payouts_move(tx, s.id, ["bounced"], {
+        type: "processing",
+        ref: s.other_id ?? "",
+      });
+    } else {
+      await settlement_payouts_move(tx, s.id, ["processing", "settled"], {
+        type: "bounced",
+      });
+    }
+    return true;
+  });
 }
 
 /** a returned run recorded before its recipient was stored: the transfer
