@@ -84,7 +84,9 @@ async function create_transfer(
     sourceAmount: amount,
     targetAmount: null,
     payOut: null,
-    preferredPayIn: null,
+    // priced for the balance we fund it from: without it wise quotes a
+    // bank-transfer pay-in fee, and the balance then debits another total
+    preferredPayIn: "BALANCE",
     targetAccount: to.toString(),
   });
   const transfer = await wise.transfer({

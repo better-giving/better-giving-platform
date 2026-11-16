@@ -135,11 +135,11 @@ describe("wise_pay", () => {
     expect(err).toBe("fetch failed");
   });
 
-  test("the quote is asked for the run's total, with no payment method preferred", async () => {
+  test("the quote is asked for the run's total, priced for funding from the balance", async () => {
     await wise_pay(777, 100, REF);
     expect(wise.quote).toHaveBeenCalledWith(
       "42",
-      expect.objectContaining({ sourceAmount: 100, preferredPayIn: null })
+      expect.objectContaining({ sourceAmount: 100, preferredPayIn: "BALANCE" })
     );
   });
 

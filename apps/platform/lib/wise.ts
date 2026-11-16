@@ -65,7 +65,9 @@ namespace Req {
     sourceAmount: number;
     targetAmount: null;
     payOut: null;
-    preferredPayIn: null;
+    /** without it wise prices the fee for a bank transfer, and funding from
+     * the balance then debits a different total than the quote */
+    preferredPayIn: "BALANCE";
     targetAccount: string;
   }
 
