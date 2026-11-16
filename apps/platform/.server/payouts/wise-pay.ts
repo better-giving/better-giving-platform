@@ -102,12 +102,11 @@ async function create_transfer(
     { name: "holder", value: recipient.name?.fullName ?? "no name" },
     { name: "customerTransactionId", value: ref },
   ];
-  // a warning, never a refusal: sent once the payout is funded
   const warning: Warning | undefined =
     checked.err !== null
       ? {
           title: "own-account check could not run before a payout",
-          body: `could not read Better Giving's own Wise account details to check recipient ${to} against (${String(checked.err)}). the payout went ahead`,
+          body: `could not read Better Giving's own Wise account details to check recipient ${to}: ${String(checked.err)}. the payout went ahead`,
           fields,
         }
       : checked.own
