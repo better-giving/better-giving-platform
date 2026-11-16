@@ -54,9 +54,22 @@ export async function wise_pay(
       `transfer ${transfer.id} (customerTransactionId ${ref}) is ${transfer.status}`
     );
   }
-  const funding = await wise.fund_transfer(transfer.id, +wise_env.profile_id, {
-    type: "BALANCE",
-  });
+  const funding = await wise
+    .fund_transfer(transfer.id, +wise_env.profile_id, { type: "BALANCE" })
+    .catch(async (err: unknown) => {
+      // the transfer exists and funding may have landed: ops still hears of the
+      // own-account match, with the outcome said to be unknown
+      if (warning) {
+        await warn_ops({
+          ...warning,
+          body: warning.body.replace(
+            "the payout went ahead",
+            "the payout may have gone ahead: funding status unknown"
+          ),
+        });
+      }
+      throw err;
+    });
 
   if (funding.status === "REJECTED") {
     throw new NotFundedError(new Error(`funding failed ${funding.errorCode}`));
@@ -149,14 +162,16 @@ async function warn_ops(a: {
   fields: NonNullable<Alert["fields"]>;
 }) {
   try {
-    await within(
+    await within<unknown>(
       ALERT_MS,
       aws_monitor.send_alert({
         ...a,
         type: "ERROR",
         from: `wise-pay:${stage}`,
       }),
-      () => undefined
+      () => {
+        report_error(new Error("ops alert timed out"), { alert: a.title });
+      }
     );
   } catch (err) {
     report_error(err, { alert: a.title });

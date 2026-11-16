@@ -265,6 +265,22 @@ describe("wise_pay", () => {
     }
   );
 
+  test("a funding call that throws after the transfer exists still warns ops, saying the outcome is unknown", async () => {
+    own.is_own_recipient.mockResolvedValue(true);
+    wise.fund_transfer.mockRejectedValue(new Error("fetch timed out"));
+
+    await expect(wise_pay(881063184, 72.82, REF)).rejects.toThrow(
+      "fetch timed out"
+    );
+
+    expect(slack.send_alert).toHaveBeenCalledOnce();
+    const [alert] = slack.send_alert.mock.calls[0]!;
+    expect(alert.title).toBe(
+      "payout to one of Better Giving's own Wise accounts"
+    );
+    expect(alert.body).toContain("funding status unknown");
+  });
+
   describe("a hung dependency never strands a payout", () => {
     beforeEach(() => {
       vi.useFakeTimers();
@@ -281,6 +297,10 @@ describe("wise_pay", () => {
       await vi.advanceTimersByTimeAsync(10_000);
 
       await expect(paid).resolves.toBe(TRANSFER_ID);
+      // given up on, and said so: the stall is reported
+      expect(report_error).toHaveBeenCalledWith(expect.any(Error), {
+        alert: "payout to one of Better Giving's own Wise accounts",
+      });
     });
 
     test("an own-account lookup that never answers is treated as a check that could not run, and the payout goes ahead", async () => {
