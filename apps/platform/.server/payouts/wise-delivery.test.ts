@@ -53,6 +53,7 @@ vi.mock("../pg/db", () => ({
 
 const { poll_wise_returns } = await import("./wise-return");
 const { settle_npo_payouts } = await import("./settle");
+const { ON_PATH } = await import("@/payouts/wise-path");
 const { npo_return_hold, resend_returned } = await import("./resend-returned");
 const {
   npo_bounced_payouts,
@@ -505,22 +506,16 @@ describe("the pause survives a donor refund", () => {
     });
   });
 
-  test("a delivered or legacy-settled run's refunded payouts hold no one", async () => {
-    const npo = await seed_npo(0);
-    let n = 0;
-    for (const status of [
-      "outgoing_payment_sent",
-      "settled",
-      "processing",
-      "",
-    ]) {
-      const id = `p-d${n}`;
-      await seed_payout(npo.id, id, 10);
+  test.each([...ON_PATH, "outgoing_payment_sent", "settled"])(
+    "a run stored %j with a refunded payout holds no one",
+    async (status) => {
+      const npo = await seed_npo(0);
+      await seed_payout(npo.id, "p-d", 10);
       await db()
         .insert(settlements)
         .values({
-          id: `920${n}`,
-          other_id: `ref-920${n}`,
+          id: "9200",
+          other_id: "ref-9200",
           npo_id: npo.id,
           date: days_ago(5),
           amount: 10,
@@ -528,15 +523,14 @@ describe("the pause survives a donor refund", () => {
         });
       await db()
         .update(payouts)
-        .set({ type: "refunded_loss", settled_id: `920${n}` })
-        .where(eq(payouts.id, id));
-      n++;
+        .set({ type: "refunded_loss", settled_id: "9200" })
+        .where(eq(payouts.id, "p-d"));
+
+      expect(await npo_return_hold(npo.id)).toBeNull();
     }
+  );
 
-    expect(await npo_return_hold(npo.id)).toBeNull();
-  });
-
-  test("a cancelled run at day 120 with a refunded payout is still polled, and its refund is read", async () => {
+  test("a cancelled run at day 120 with a refunded payout is still polled and still holds", async () => {
     const npo = await seed_npo(500);
     await seed_payout(npo.id, "p-1", 100);
     const transfer = await funded(npo, ["p-1"]);
@@ -583,6 +577,23 @@ describe("the payouts list carries the charged-back flag", () => {
     expect(by_id["p-c"]).toMatchObject({ type: "bounced", charged_back: true });
     expect(by_id["p-b"]).toMatchObject({ type: "bounced" });
     expect(by_id["p-b"]).not.toHaveProperty("charged_back");
+  });
+});
+
+describe("a cancelled run that holds is flagged on the grants list", () => {
+  test("still flagged bounced after a donor refund took its payout", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    const transfer = await funded(npo, ["p-1"]);
+    await poll_wise_returns(state("cancelled"));
+    await db()
+      .update(payouts)
+      .set({ type: "refunded_loss" })
+      .where(eq(payouts.id, "p-1"));
+
+    const { items } = await npo_settlements(npo.id, {});
+
+    expect(items.find((i) => i.id === transfer)?.bounced).toBe(true);
   });
 });
 

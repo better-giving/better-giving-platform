@@ -336,8 +336,9 @@ export async function npos_with_returned_payouts(): Promise<number[]> {
 export type SettlementRow = typeof settlements.$inferSelect;
 type SettlementInsert = typeof settlements.$inferInsert;
 
-/** a grant as the npo's pages list it: `bounced` is set when wise bounced a
- * payout of it, which tells a transfer wise cancelled from one ops cancelled */
+/** a grant as the npo's pages list it: `bounced` is set when it holds the npo
+ * (a payout wise bounced, or one a donor refund then took), which tells a
+ * transfer wise cancelled from history ops cancelled */
 export type GrantRow = SettlementRow & { bounced: boolean };
 
 export async function npo_settlements(
@@ -350,7 +351,7 @@ export async function npo_settlements(
   const rows = await db
     .select({
       ...getTableColumns(settlements),
-      bounced: sql<boolean>`${bounced_payouts()}`,
+      bounced: sql<boolean>`${holding_payouts()}`,
     })
     .from(settlements)
     .where(
@@ -438,11 +439,6 @@ export async function returned_missing_recipient(): Promise<SettlementRow[]> {
     )
     .orderBy(asc(settlements.date), asc(settlements.id));
 }
-
-/** wise bounced one of the settlement's payouts: what makes a state off the
- * ordinary path a hold */
-const bounced_payouts = () =>
-  sql`exists (select 1 from ${payouts} where ${payouts.settled_id} = ${settlements.id} and ${payouts.type} = 'bounced')`;
 
 /**
  * what keeps a state off the ordinary path a hold: a payout wise bounced, or
