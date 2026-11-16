@@ -49,7 +49,7 @@ curl -s "$WISE_API_URL/v4/profiles/$WISE_PROFILE_ID/balances?types=STANDARD" \
 | `quote(profile_id, …)` | `POST /v3/profiles/{p}/quotes` | `.server/payouts/wise-pay.ts` |
 | `transfer(…)` | `POST /v1/transfers` | `.server/payouts/wise-pay.ts` |
 | `fund_transfer(…)` | `POST /v3/profiles/{p}/transfers/{t}/payments` | `.server/payouts/wise-pay.ts` |
-| `cancel_transfer(id)` | `PUT /v1/transfers/{t}/cancel` (only `incoming_payment_waiting`) | `.server/payouts/wise-pay.ts` |
+| `cancel_transfer(id)` | `PUT /v1/transfers/{t}/cancel` (only `incoming_payment_waiting`) | no caller in the app |
 | `transfer_get(id)` | `GET /v1/transfers/{t}` | `src/routes/api.cron.wise-returns/route.ts` |
 | `account_details(profile_id)` | `GET /v1/profiles/{p}/account-details` | `.server/payouts/own-accounts.ts` |
 

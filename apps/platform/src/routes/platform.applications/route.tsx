@@ -28,10 +28,9 @@ function Applications({ loaderData: page1 }: Route.ComponentProps) {
   ].some((k) => !!params.get(k));
 
   const { node, loading } = use_table<IReg>({
-    // a filter or sort change drops every loaded page: rows of the old view
-    // must never stay beside the new one
-    // the params plus what page 1 is: a cached page 1 swapped for a fresh one
-    // under the same URL must drop the pages loaded beside the stale one
+    // a filter or sort change drops every loaded page, and so does a cached
+    // page 1 swapped for a fresh one under the same URL: hence the params plus
+    // what page 1 is
     filter_key: `${params.toString()}|${page1.next ?? ""}|${page1.items[0]?.id ?? ""}`,
     table: ({ items, ...props }) => (
       <Table
