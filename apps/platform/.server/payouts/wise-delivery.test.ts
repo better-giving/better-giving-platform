@@ -446,7 +446,7 @@ describe("the pause survives a donor refund", () => {
       .update(payouts)
       .set({ type: "refunded_loss", settled_id: "9005" })
       .where(eq(payouts.id, "p-r"));
-    // the returned rule holds, as it did before: nothing is added or lifted
+    // the returned rule holds: nothing is added or lifted
     expect(await npo_return_hold(npo.id)).toMatchObject({
       settlement_id: "9005",
       status: "returned",
