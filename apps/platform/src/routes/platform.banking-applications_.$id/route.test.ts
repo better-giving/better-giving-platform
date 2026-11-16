@@ -48,8 +48,14 @@ describe("banking application detail loader", () => {
     expect((await call()).own_account).toBe(true);
   });
 
-  it("reads an account it can't check against ours as not flagged", async () => {
+  it('reads an account it can\'t check against ours as "unknown"', async () => {
     own.is_own_recipient.mockRejectedValue(new Error("account-details 503"));
+
+    expect((await call()).own_account).toBe("unknown");
+  });
+
+  it("flags an account that isn't one of ours as false", async () => {
+    own.is_own_recipient.mockResolvedValue(false);
 
     expect((await call()).own_account).toBe(false);
   });

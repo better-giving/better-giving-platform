@@ -8,11 +8,6 @@ import { msg } from "@/queue";
 import type { Progress, TStatus } from "@/reg";
 import { enqueue, in_dedupe_window } from "$/kit/queue";
 import { wise } from "$/kit/wise";
-import {
-  is_own_recipient,
-  OWN_ACCOUNT_REFUSAL,
-  OWN_LOOKUP_REFUSAL,
-} from "$/payouts/own-accounts";
 import { db } from "$/pg/db";
 import { is_unique_violation } from "$/pg/errors";
 import { bapp_put } from "$/pg/queries/banking";
@@ -118,16 +113,6 @@ export const npo_new = async (r: NonNullable<Progress["banking"]>) => {
           wacc: await wise.v2_account(+r.o_bank_id),
         }
       : null;
-  // the same check as a banking approval: this one files the bank as default
-  if (bank) {
-    const own = await is_own_recipient(bank.wacc).catch((err) => {
-      report_error(err);
-      return null;
-    });
-    if (own === null) throw resp.status(409, OWN_LOOKUP_REFUSAL);
-    if (own) throw resp.status(409, OWN_ACCOUNT_REFUSAL);
-  }
-
   const new_endow: NpoInsert = {
     ...ecfr,
     social_media_urls: {},

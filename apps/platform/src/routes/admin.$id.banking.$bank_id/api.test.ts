@@ -13,7 +13,10 @@ vi.mock("$/pg/queries/banking", () => ({
   bapp_set_default: q.bapp_set_default,
 }));
 vi.mock("$/kit/queue", () => ({ enqueue: q.enqueue }));
-vi.mock("$/kit/wise", () => ({ wise: { v2_account: vi.fn() } }));
+const wise = vi.hoisted(() => ({ v2_account: vi.fn() }));
+const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
+vi.mock("$/kit/wise", () => ({ wise }));
+vi.mock("$/payouts/own-accounts", () => own);
 vi.mock("#/.server/auth", async () =>
   (await import("$/auth/test-utils")).make_auth_mock()
 );
@@ -50,6 +53,8 @@ const row = (o: { npo_id?: number; status: string }) => ({
 beforeEach(() => {
   for (const f of Object.values(q)) f.mockReset();
   q.bapp_set_default.mockResolvedValue(true);
+  wise.v2_account.mockReset().mockResolvedValue({ currency: "USD" });
+  own.is_own_recipient.mockReset().mockResolvedValue(false);
 });
 
 describe("set default payout method", () => {
@@ -134,6 +139,51 @@ describe("payout method detail", () => {
     q.bapp_get.mockResolvedValue(undefined);
 
     await expect(read()).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("payout method detail: own-account flag", () => {
+  const read = () =>
+    (loader as any)({
+      request: new Request(
+        `https://app.test/admin/${OWN_NPO}/banking/${BANK_ID}`
+      ),
+      params: { id: String(OWN_NPO), bank_id: String(BANK_ID) },
+      context: { get: (k: unknown) => (k === admin_ctx ? OWN_NPO : undefined) },
+    });
+
+  it.each([
+    [
+      "a confirmed match",
+      () => own.is_own_recipient.mockResolvedValue(true),
+      true,
+    ],
+    ["no match", () => own.is_own_recipient.mockResolvedValue(false), false],
+    [
+      "a check that could not run",
+      () => own.is_own_recipient.mockRejectedValue(new Error("503")),
+      false,
+    ],
+    [
+      "an account wise could not return",
+      () => wise.v2_account.mockRejectedValue(new Error("503")),
+      false,
+    ],
+  ])("is %s -> own_account %s", async (_name, arrange, expected) => {
+    q.bapp_get.mockResolvedValue(row({ status: "under-review" }));
+    arrange();
+
+    const data = await read();
+
+    expect(data.own_account).toBe(expected);
+  });
+
+  it("flags a match for every status, so the warning shows while it applies", async () => {
+    own.is_own_recipient.mockResolvedValue(true);
+    for (const status of ["under-review", "approved", "default", "rejected"]) {
+      q.bapp_get.mockResolvedValue(row({ status }));
+      expect((await read()).own_account).toBe(true);
+    }
   });
 });
 

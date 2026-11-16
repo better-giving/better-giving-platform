@@ -189,16 +189,24 @@ describe("new banking application", () => {
     expect(q.enqueue).not.toHaveBeenCalled();
   });
 
-  it("refuses with 409 an account that is one of Better Giving's own, and files nothing", async () => {
+  it("files an account that is one of Better Giving's own, and sends the member to its page, which warns", async () => {
     own.is_own_recipient.mockResolvedValue(true);
 
     const res: Response = await call(body(OWN_NPO));
 
-    expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({
-      message: /belongs to Better Giving/i,
-    });
-    expect(q.bapp_put).not.toHaveBeenCalled();
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("../banking/40000001");
+    expect(q.bapp_put).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ npo_id: OWN_NPO, status: "under-review" })
+    );
+    expect(q.enqueue).toHaveBeenCalled();
+  });
+
+  it("sends a member whose account doesn't match to the list, as before", async () => {
+    const res: Response = await call(body(OWN_NPO));
+
+    expect(res.headers.get("location")).toBe("../banking");
   });
 
   it("still files when our own accounts can't be read: approval checks again", async () => {
@@ -208,5 +216,7 @@ describe("new banking application", () => {
 
     expect(res.status).toBe(302);
     expect(q.bapp_put).toHaveBeenCalled();
+    // the member is told nothing about a check that could not run
+    expect(res.headers.get("location")).toBe("../banking");
   });
 });

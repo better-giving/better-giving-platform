@@ -14,11 +14,7 @@ import { $int_gte1 } from "@/schemas";
 import type { V2RecipientAccount } from "@/wise";
 import { enqueue } from "$/kit/queue";
 import { wise } from "$/kit/wise";
-import {
-  is_own_recipient,
-  OWN_ACCOUNT_REFUSAL,
-  OWN_LOOKUP_REFUSAL,
-} from "$/payouts/own-accounts";
+import { is_own_recipient } from "$/payouts/own-accounts";
 import { npo_return_hold } from "$/payouts/resend-returned";
 import {
   bapp_approve,
@@ -36,9 +32,9 @@ export type LoaderData = Partial<V2RecipientAccount> & {
   wacc_unavailable: boolean;
   /** absent when the npo row is gone */
   npo_name?: string;
-  /** the account is one of Better Giving's own wise balances; false when
-   * that couldn't be checked, which the approve action refuses on */
-  own_account: boolean;
+  /** the account is one of Better Giving's own wise balances: `"unknown"` when
+   * it loaded but the check could not run. a warning, never a block */
+  own_account: boolean | "unknown";
 };
 
 export const loader = async ({ params }: LoaderFunctionArgs) => {
@@ -57,10 +53,10 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
     wise.v2_account(bank_id).catch(report_degraded_null),
     npos_batch_get([x.npo_id]),
   ]);
-  const own_account = y
+  const own_account: LoaderData["own_account"] = y
     ? await is_own_recipient(y).catch((err) => {
         report_degraded(err);
-        return false;
+        return "unknown" as const;
       })
     : false;
   return {
@@ -94,11 +90,8 @@ export const action: ActionFunction = async ({ params, request }) => {
     if (!wacc || !is_approvable({ ba: x, wacc_unavailable: false })) {
       throw resp.status(409);
     }
-    // fail closed: a payout to our own balance is the money never reaching the npo
-    const own = await is_own_recipient(wacc).catch(report_degraded_null);
-    if (own === null) throw resp.status(409, OWN_LOOKUP_REFUSAL);
-    if (own) throw resp.status(409, OWN_ACCOUNT_REFUSAL);
-
+    // an account that matches one of ours, or whose check could not run, is
+    // warned about on the page and approved all the same
     // a held npo's old default is the account that bounced: the replacement
     // has to be the one the grants run pays, or `banking-approved` releases
     // nothing. read before the write, which is safe: the hold keys on the

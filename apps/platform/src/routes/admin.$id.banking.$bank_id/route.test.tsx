@@ -18,7 +18,7 @@ const ba = {
   rejection_reason: "",
 };
 
-const render_page = (o: Partial<typeof ba>) => {
+const render_page = (o: Partial<typeof ba>, extra: object = {}) => {
   const Stub = createRoutesStub([
     {
       path: "/admin/:id/banking/:bank_id",
@@ -29,6 +29,8 @@ const render_page = (o: Partial<typeof ba>) => {
         currency: "USD",
         country: "US",
         wacc_unavailable: false,
+        own_account: false,
+        ...extra,
       }),
       HydrateFallback: () => null,
     },
@@ -104,5 +106,38 @@ describe("npo bank account detail — rejection reason", () => {
     const screen = await render_page({});
     await expect.element(screen.getByText("Currency")).toBeVisible();
     expect(screen.container.querySelector("svg.icon-sm")).toBeNull();
+  });
+});
+
+describe("npo bank account detail: own-account warning", () => {
+  const TITLE = "This matches a Better Giving bank account";
+
+  test.each(["under-review", "approved", "default", "rejected"])(
+    "a matching account (%s) shows the warning, above the details, and blocks nothing",
+    async (status) => {
+      const screen = await render_page({ status }, { own_account: true });
+
+      await expect
+        .element(screen.getByRole("region", { name: TITLE }))
+        .toBeVisible();
+      await expect
+        .element(
+          screen.getByText(
+            "Payouts sent here may not reach your nonprofit. If you entered it by mistake, add your own bank account instead. Otherwise no action is needed."
+          )
+        )
+        .toBeVisible();
+      await expect.element(screen.getByText("Currency")).toBeVisible();
+    }
+  );
+
+  test("an account that doesn't match, or whose check could not run, shows none", async () => {
+    const screen = await render_page(
+      { status: "approved" },
+      { own_account: false }
+    );
+
+    await expect.element(screen.getByText("Currency")).toBeVisible();
+    expect(screen.getByRole("region", { name: TITLE }).query()).toBeNull();
   });
 });

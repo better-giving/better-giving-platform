@@ -215,30 +215,27 @@ const dedupe_keys = (kind: string) =>
 
 describe("approve", () => {
   describe("a bank that may be Better Giving's own", () => {
-    /** refused whole: no npo, no bank, the registration still in review */
-    const refused = async (res: Response, why: RegExp) => {
-      expect(res.status).toBe(409);
-      expect(await res.text()).toMatch(why);
+    /** approved all the same, the bank filed as the default */
+    const approved_with_bank = async (res: Response) => {
+      expect(res.status).toBe(302);
       const db = test_db.current!.db;
-      expect(await db.select().from(npos)).toEqual([]);
-      expect(await db.select().from(banking_apps)).toEqual([]);
-      expect((await reg_get(RID))?.status).toBe("02");
-      expect(enqueued).toEqual([]);
+      expect(await db.select().from(npos)).toHaveLength(1);
+      const banks = await db.select().from(banking_apps);
+      expect(banks).toHaveLength(1);
+      expect(banks[0]?.status).toBe("default");
+      expect((await reg_get(RID))?.status).toBe("03");
     };
 
-    test("one of our own accounts refuses the approval with 409", async () => {
+    test("one of our own accounts is approved, and the bank is filed as default", async () => {
       own.is_own_recipient.mockResolvedValueOnce(true);
 
-      await refused(await verdict("approved"), /belongs to Better Giving/);
-      expect(own.is_own_recipient).toHaveBeenCalledWith(
-        expect.objectContaining({ name: { fullName: "Test Bank" } })
-      );
+      await approved_with_bank(await verdict("approved"));
     });
 
-    test("a check that fails refuses the approval with 409", async () => {
+    test("a check that fails is approved too", async () => {
       own.is_own_recipient.mockRejectedValueOnce(new Error("wise 503"));
 
-      await refused(await verdict("approved"), /couldn't check this bank/);
+      await approved_with_bank(await verdict("approved"));
     });
   });
 

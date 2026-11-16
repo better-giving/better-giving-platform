@@ -402,7 +402,7 @@ describe("approve flow", () => {
 
   // runs before anything else in this file reads our own accounts: a good read
   // is held for an hour per module, so a later failure would never reach wise
-  it("shows the refusal in the dialog when our own accounts can't be checked", async () => {
+  it("approves when our own accounts can't be checked: warned about, never refused", async () => {
     const npo = await seed_npo();
     const bapp_id = await seed_bapp(npo.id);
     const row = await get_bapp(bapp_id);
@@ -420,13 +420,11 @@ describe("approve flow", () => {
       screen.getByRole("button", { name: /submit/i }).element() as HTMLElement
     ).click();
 
-    await expect
-      .element(screen.getByText(/couldn't check this bank account/i))
-      .toBeVisible();
+    await expect.element(screen.getByTestId("success")).toBeVisible();
     expect(
       screen.getByText("Unexpected Application Error!").query()
     ).toBeNull();
-    expect((await get_bapp(bapp_id)).status).toBe("under-review");
+    expect((await get_bapp(bapp_id)).status).toBe("approved");
   });
 
   it("approves bapp — status becomes approved when npo already has a default", async () => {
