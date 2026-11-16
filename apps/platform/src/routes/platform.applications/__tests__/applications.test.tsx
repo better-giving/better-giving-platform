@@ -238,12 +238,34 @@ describe("applications — view more", () => {
     await screen.getByRole("button", { name: /view more/i }).click();
 
     await expect.element(screen.getByText("Many Org 19")).toBeInTheDocument();
+    await expect.element(screen.getByText("Many Org 00")).toBeInTheDocument();
     const names = [
       ...screen.container.querySelectorAll("tbody tr td:first-child"),
     ]
       .map((td) => td.textContent)
       .filter(Boolean);
     expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("a filter change that serves the same first page still drops the loaded pages", async () => {
+    await seed_approved(20);
+    const screen = await render_applications("?status=03");
+    await screen.getByRole("button", { name: /view more/i }).click();
+    // newest first, ties by id: the last page holds the lowest ids
+    await expect.element(screen.getByText("Many Org 00")).toBeInTheDocument();
+
+    // every row matches "Many Org", so page 1 is identical to the one before
+    const search_input = screen.getByPlaceholder(/search applications/i);
+    await search_input.fill("Many Org");
+    await userEvent.keyboard("{Enter}");
+
+    await expect
+      .element(screen.getByText("Many Org 00"))
+      .not.toBeInTheDocument();
+    await expect.element(screen.getByText("Many Org 19")).toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("button", { name: /view more/i }))
+      .toBeVisible();
   });
 
   it("a filter change after View more leaves no row from the earlier filter", async () => {
@@ -260,7 +282,7 @@ describe("applications — view more", () => {
     });
     const screen = await render_applications("?status=03");
     await screen.getByRole("button", { name: /view more/i }).click();
-    await expect.element(screen.getByText("Many Org 19")).toBeInTheDocument();
+    await expect.element(screen.getByText("Many Org 00")).toBeInTheDocument();
 
     // a search that matches none of the loaded rows
     const search_input = screen.getByPlaceholder(/search applications/i);
