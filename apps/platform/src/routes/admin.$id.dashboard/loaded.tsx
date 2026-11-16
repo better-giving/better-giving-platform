@@ -36,10 +36,12 @@ export function Loaded({ classes = "", ...props }: Props) {
 
   return (
     <div className={classes}>
-      {/* one notice at a time: awaiting repair, then returned (with any
-          bounced beside it), then bounced */}
+      {/* one notice at a time: awaiting repair, then charged back, then
+          returned (with any bounced beside it), then bounced */}
       {props.awaiting_repair ? (
         <AwaitingNotice {...props.awaiting_repair} classes="mb-4" />
+      ) : props.charged_back ? (
+        <ChargedBackNotice {...props.charged_back} classes="mb-4" />
       ) : props.returned ? (
         <ReturnedNotice
           returned={props.returned}
@@ -47,7 +49,8 @@ export function Loaded({ classes = "", ...props }: Props) {
           classes="mb-4"
         />
       ) : (
-        props.bounced && (
+        props.bounced &&
+        props.bounce_hold && (
           <BouncedNotice bounced={props.bounced} classes="mb-4" />
         )
       )}
@@ -172,13 +175,14 @@ export function Loaded({ classes = "", ...props }: Props) {
           {/* no bank: what is held is news before any payout exists */}
           {(props.recent_payouts.items.length > 0 ||
             props.payout_to.kind !== "bank") &&
-            (props.payout_to.kind === "bank" &&
-            ((props.return_hold && !props.bounce_hold) ||
-              props.awaiting_repair ||
-              (props.bounce_hold && props.returned)) ? (
+            (props.payout_to.kind === "bank" && props.charged_back ? (
+              <ChargedBackHold />
+            ) : props.payout_to.kind === "bank" &&
+              ((props.return_hold && !props.bounce_hold) ||
+                (props.bounce_hold && props.returned)) ? (
               <ReturnHold />
             ) : props.payout_to.kind === "bank" && props.bounce_hold ? (
-              <BounceHold />
+              <BounceHold count={props.bounced?.count ?? 1} />
             ) : (
               <Payout
                 next_payout={props.next_payout}
@@ -292,13 +296,55 @@ export function AwaitingNotice({
   );
 }
 
+interface IBounceHold {
+  count: number;
+}
+
 /** a bounce is open: payouts wait on how it resolves, which needs nothing new approved yet */
-function BounceHold() {
+function BounceHold({ count }: IBounceHold) {
   return (
     <p className="text-sm">
-      Payouts are paused while this payout comes back to your balance. Donations
-      wait in your Better Giving balance. Nothing is lost.
+      {count === 1
+        ? "Payouts are paused while this payout comes back to your balance."
+        : "Payouts are paused while these payouts come back to your balance."}{" "}
+      Donations wait in your Better Giving balance. Nothing is lost.
     </p>
+  );
+}
+
+/** the transfer was reversed for good: the money is not accounted for, so no "nothing is lost" */
+function ChargedBackHold() {
+  return (
+    <p className="text-sm">
+      Payouts are on hold until you add a different{" "}
+      <Link to="../banking" className="link font-medium">
+        bank account
+      </Link>{" "}
+      and it's approved. Donations wait in your Better Giving balance.
+    </p>
+  );
+}
+
+interface IChargedBackNotice {
+  amount: number;
+  date: string;
+  classes?: string;
+}
+
+/** a transfer was reversed after it was sent: nothing is credited, and ops sorts it out by hand */
+function ChargedBackNotice({ amount, date, classes = "" }: IChargedBackNotice) {
+  return (
+    <WarningCallout
+      title="A payout was reversed"
+      classes={classes}
+      action={
+        <Link to="../banking" className="btn btn-primary btn-sm">
+          Add bank account
+        </Link>
+      }
+    >
+      {`${to_usd(amount, 2)} from ${format(date, "MMM d")} was reversed after it was sent, and it hasn't come back to your balance. We're sorting it out by hand. Payouts stay paused until you add a different bank account and it's approved.`}
+    </WarningCallout>
   );
 }
 

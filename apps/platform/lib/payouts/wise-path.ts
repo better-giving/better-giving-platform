@@ -21,6 +21,9 @@ export const LEGACY_SETTLED = "settled";
  * read for the window, or while a payout of it is open, see `settlements_to_poll` */
 export const CANCELLED = "cancelled";
 export const MONEY_BACK = "funds_refunded";
+/** wise's two states that bounce a funded transfer: it may still be delivered or refunded (`bounced_back`), or never will (`charged_back`) */
+export const BOUNCED_BACK = "bounced_back";
+export const CHARGED_BACK = "charged_back";
 /** stored states that mean the bank has the money */
 export const DELIVERED_STATES: readonly string[] = [DELIVERED, LEGACY_SETTLED];
 /** a delivered transfer is polled for this long after it is sent, in case it

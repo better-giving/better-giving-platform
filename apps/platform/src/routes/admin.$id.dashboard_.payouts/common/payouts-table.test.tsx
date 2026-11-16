@@ -157,3 +157,33 @@ describe("payouts table — sending and bounced", () => {
     expect(screen.getByRole("button").elements()).toHaveLength(2);
   });
 });
+
+describe("payouts table — reversed payout", () => {
+  afterEach(async () => {
+    await userEvent.keyboard("{Escape}");
+  });
+
+  test("a bounced payout whose transfer was charged back explains it was reversed, and a plain bounce keeps its own tip", async () => {
+    const screen = await render_table([
+      payout("c", { type: "bounced", charged_back: true }, 481.5),
+      payout("b", { type: "bounced" }, 90),
+    ]);
+    await screen
+      .getByRole("button", { name: "What this reversed payout means" })
+      .click();
+    await expect
+      .element(
+        screen.getByRole("tooltip", {
+          name: "This payout was reversed after it was sent, and it hasn't come back to your balance. We're sorting it out by hand, so you don't need to chase it.",
+        })
+      )
+      .toBeVisible();
+    await expect
+      .element(screen.getByRole("button", { name: "What Bounced means" }))
+      .toBeVisible();
+    // label, dot and amount are the same as a bounce: unstruck
+    expect(
+      screen.getByText("Bounced", { exact: true }).elements()
+    ).toHaveLength(2);
+  });
+});

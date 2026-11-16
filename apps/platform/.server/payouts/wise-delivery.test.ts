@@ -53,8 +53,8 @@ vi.mock("../pg/db", () => ({
 
 const { poll_wise_returns } = await import("./wise-return");
 const { settle_npo_payouts } = await import("./settle");
-const { npo_return_hold } = await import("./resend-returned");
-const { npo_settlements, processing_payouts } = await import(
+const { npo_return_hold, resend_returned } = await import("./resend-returned");
+const { npo_payouts, npo_settlements, processing_payouts } = await import(
   "../pg/queries/payout"
 );
 const { dists } = await import("../pg/schema/dist");
@@ -397,6 +397,131 @@ describe("a cancelled transfer on its way to a refund", () => {
   });
 });
 
+describe("the pause survives a donor refund", () => {
+  test.each(["bounced_back", "charged_back"])(
+    "a %s run whose only bounced payout is refunded keeps the npo held, and nothing is re-sent",
+    async (wise_state) => {
+      const npo = await seed_npo(500);
+      await seed_payout(npo.id, "p-1", 100);
+      const transfer = await funded(npo, ["p-1"]);
+      await poll_wise_returns(state(wise_state));
+      expect(await npo_return_hold(npo.id)).toMatchObject({
+        settlement_id: transfer,
+      });
+
+      // a donor refund finding the grant gone: the payout is `refunded_loss`
+      await db()
+        .update(payouts)
+        .set({ type: "refunded_loss" })
+        .where(eq(payouts.id, "p-1"));
+
+      expect(await npo_return_hold(npo.id)).toMatchObject({
+        settlement_id: transfer,
+        status: "bounced",
+        wise_state,
+      });
+      expect(await resend_returned(npo.id)).toEqual({
+        status: "held",
+        reason: expect.any(String),
+      });
+      expect(await types()).toEqual({ "p-1": "refunded_loss" });
+    }
+  );
+
+  test("a returned run with a refunded payout holds no one beyond today's returned rule", async () => {
+    const npo = await seed_npo(0);
+    await seed_payout(npo.id, "p-r", 100);
+    await db()
+      .insert(settlements)
+      .values({
+        id: "9005",
+        other_id: "ref-9005",
+        npo_id: npo.id,
+        date: days_ago(5),
+        amount: 100,
+        status: "returned",
+        recipient_id: "bank-x",
+      });
+    await db()
+      .update(payouts)
+      .set({ type: "refunded_loss", settled_id: "9005" })
+      .where(eq(payouts.id, "p-r"));
+    // the returned rule holds, as it did before: nothing is added or lifted
+    expect(await npo_return_hold(npo.id)).toMatchObject({
+      settlement_id: "9005",
+      status: "returned",
+    });
+    // an older awaiting-repair-free history: a manual cancel beside it is not the hold
+    await db()
+      .insert(settlements)
+      .values({
+        id: "9006",
+        other_id: "ref-9006",
+        npo_id: npo.id,
+        date: days_ago(2),
+        amount: 50,
+        status: "cancelled",
+      });
+    await seed_payout(npo.id, "p-c", 50);
+    await db()
+      .update(payouts)
+      .set({ type: "refunded_loss", settled_id: "9006" })
+      .where(eq(payouts.id, "p-c"));
+    expect(await npo_return_hold(npo.id)).toMatchObject({
+      settlement_id: "9005",
+    });
+  });
+
+  test("a manual cancel's refunded payouts hold no one", async () => {
+    const npo = await seed_npo(0);
+    await seed_payout(npo.id, "p-old", 100);
+    await db()
+      .insert(settlements)
+      .values({
+        id: "9004",
+        other_id: "ref-9004",
+        npo_id: npo.id,
+        date: days_ago(5),
+        amount: 100,
+        status: "cancelled",
+      });
+    await db()
+      .update(payouts)
+      .set({ type: "refunded_loss", settled_id: "9004" })
+      .where(eq(payouts.id, "p-old"));
+
+    expect(await npo_return_hold(npo.id)).toBeNull();
+  });
+});
+
+describe("the payouts list carries the charged-back flag", () => {
+  test("a bounced payout rides its transfer's stored state; a plain bounce has no flag", async () => {
+    const npo = await seed_npo(1000);
+    await seed_payout(npo.id, "p-c", 100);
+    await seed_payout(npo.id, "p-b", 100);
+    await funded(npo, ["p-c"]);
+    await funded(npo, ["p-b"]);
+    await poll_wise_returns(state("bounced_back"));
+    await db()
+      .update(settlements)
+      .set({ status: "charged_back" })
+      .where(
+        eq(
+          settlements.id,
+          (await db().select().from(payouts).where(eq(payouts.id, "p-c")))[0]!
+            .settled_id!
+        )
+      );
+
+    const { items } = await npo_payouts(npo.id, {});
+    const by_id = Object.fromEntries(items.map((i) => [i.id, i]));
+
+    expect(by_id["p-c"]).toMatchObject({ type: "bounced", charged_back: true });
+    expect(by_id["p-b"]).toMatchObject({ type: "bounced" });
+    expect(by_id["p-b"]).not.toHaveProperty("charged_back");
+  });
+});
+
 describe("a charged-back transfer", () => {
   test("is final: its payouts stay Bounced, nothing is credited, the npo stays held, and ops is told to resolve it by hand", async () => {
     const npo = await seed_npo(500);
@@ -421,7 +546,11 @@ describe("a charged-back transfer", () => {
     expect(alert.body).toMatch(/nothing was credited or re-sent/);
     expect(alert.body).toMatch(/resolve it by hand/);
     expect(alert.body).not.toMatch(/hold lifts when Wise delivers/);
+    expect(alert.body).toMatch(
+      /do not cancel, settle or return these payouts until the npo has a different bank account approved/
+    );
     expect(alert.body).toMatch(/do not move the payouts to returned/);
+    expect(alert.body).toMatch(/once the new account is approved/);
     expect(alert.body).not.toMatch(/go out again/);
   });
 });

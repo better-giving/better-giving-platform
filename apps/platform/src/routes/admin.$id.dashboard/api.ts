@@ -6,6 +6,7 @@ import { GRANTS_CRON, GRANTS_EXEC_DELAY_DAYS } from "@/constants/grants";
 import type { IComposition } from "@/nav/interfaces";
 import type { IPayout } from "@/payouts";
 import { payout_to, type TPayoutTo } from "@/payouts/payout-to";
+import { CHARGED_BACK } from "@/payouts/wise-path";
 import type { IPageKeyed } from "@/types/api";
 import { stripe as stripe_env } from "$/env";
 import { npo_return_hold } from "$/payouts/resend-returned";
@@ -43,6 +44,8 @@ export interface DashboardData {
   returned: IReturnedPayouts | null;
   /** payouts wise reports bounced and has not delivered or refunded; null when none */
   bounced: IReturnedPayouts | null;
+  /** the hold is a transfer charged back for good: the amount and date it went out; null for any other hold or none */
+  charged_back: { amount: number; date: string } | null;
   /** the hold is a bounced transfer (not a returned one) */
   bounce_hold: boolean;
   /** a transfer holds this npo's payouts (any hold; `bounce_hold` says it is a bounce) */
@@ -112,6 +115,10 @@ export const loader = async (x: Route.LoaderArgs) => {
     bounced,
     return_hold: hold !== null,
     bounce_hold: hold?.status === "bounced",
+    charged_back:
+      hold?.status === "bounced" && hold.wise_state === CHARGED_BACK
+        ? { amount: hold.amount, date: hold.date }
+        : null,
     awaiting_repair:
       hold?.status === "awaiting_repair"
         ? { amount: hold.amount, date: hold.date }

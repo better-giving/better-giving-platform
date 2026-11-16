@@ -182,6 +182,36 @@ describe("grants table — sending and bounced grants", () => {
     expect(screen.getByText("Sending").query()).toBeNull();
   });
 
+  test("a charged-back grant says it was reversed, struck and Not counted like a bounce", async () => {
+    const screen = await render(
+      <GrantsTable
+        items={[{ ...sent("g1", 481.5, "charged_back"), bounced: true }]}
+      />
+    );
+    await expect
+      .element(screen.getByText("Bounced", { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText("Not counted", { exact: true }))
+      .toBeVisible();
+    expect(struck(screen, "$481.50")).toBe("line-through");
+    await screen
+      .getByRole("button", { name: "What this reversed grant means" })
+      .click();
+    await expect
+      .element(
+        screen.getByRole("tooltip", {
+          name: "This grant was reversed after it was sent, so it isn't counted in your grant totals, and it hasn't come back to your balance. We're sorting it out by hand.",
+        })
+      )
+      .toBeVisible();
+    expect(
+      screen
+        .getByRole("button", { name: "What this bounced grant means" })
+        .query()
+    ).toBeNull();
+  });
+
   test("a late-delivered grant is a plain Settled-looking amount with nothing extra", async () => {
     const screen = await render(
       <GrantsTable items={[sent("g1", 481.5, "outgoing_payment_sent")]} />

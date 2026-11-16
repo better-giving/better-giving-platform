@@ -1,6 +1,7 @@
 import { report_error } from "#/errors/report";
 import { group_by } from "@/helpers/array";
 import type { IPayout, IPendingStatus } from "@/payouts";
+import { CHARGED_BACK } from "@/payouts/wise-path";
 import { stage } from "$/env";
 import { aws_monitor } from "$/kit/slack";
 import { owed_netting_on, undo_deductions } from "$/payouts/owed-run";
@@ -102,8 +103,8 @@ async function alert_held(el: Extract<GrantEligibility, { status: "held" }>) {
       title: `Grants held for npo:${npo.id}: ${npo.name}`,
       body: repair
         ? "its last transfer came back but which payouts it covered is unclear, so nothing more is sent until ops repairs the settlement and a new bank account is approved and made its default. if a new account lifts the hold first, the repair is still pending"
-        : bounced && hold.wise_state === "charged_back"
-          ? "its last transfer was charged back, so nothing more is sent until a new bank account is approved and made its default. nothing was credited and the payouts stay bounced: resolve them by hand (do not move them to returned, which would re-send them to that account)"
+        : bounced && hold.wise_state === CHARGED_BACK
+          ? "its last transfer was charged back, so nothing more is sent until a new bank account is approved and made its default. nothing was credited and the payouts stay bounced: resolve them by hand (do not cancel, settle or return them before a different account is approved: that ends the hold and re-sends them to that account)"
           : bounced
             ? "its last transfer bounced (Wise may still deliver it late or refund it), so nothing more is sent until a new bank account is approved and made its default, or Wise delivers it. if Wise refunds it, the payouts become returned and go out once a new account is approved"
             : "its last transfer came back, so nothing more is sent until a new bank account is approved and made its default; the returned payouts then go out with the next run",

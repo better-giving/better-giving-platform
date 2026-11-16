@@ -2,9 +2,13 @@ import { PayoutStatus } from "@better-giving/ui";
 import { Content, Tooltip } from "@better-giving/ui/tooltip";
 import { CircleAlertIcon } from "lucide-react";
 import type { IPayout } from "@/payouts";
-import { grant_state } from "@/payouts/wise-path";
+import { CHARGED_BACK, grant_state } from "@/payouts/wise-path";
 
 const TIPS = {
+  bounced_charged:
+    "This payout was reversed after it was sent, and it hasn't come back to your balance. We're sorting it out by hand, so you don't need to chase it.",
+  grant_bounced_charged:
+    "This grant was reversed after it was sent, so it isn't counted in your grant totals, and it hasn't come back to your balance. We're sorting it out by hand.",
   sending:
     "This payout is on its way to your bank. It counts as Settled once it has been sent. Nothing is needed from you.",
   bounced:
@@ -21,6 +25,8 @@ const TIPS = {
 } as const;
 
 const NAMES = {
+  bounced_charged: "What this reversed payout means",
+  grant_bounced_charged: "What this reversed grant means",
   sending: "What Sending means",
   bounced: "What Bounced means",
   grant_sending: "What this sending grant means",
@@ -58,7 +64,9 @@ export function PayoutStatusCell({ payout }: IPayoutStatusCell) {
       : payout.type === "returned" ||
           payout.type === "void" ||
           payout.type === "bounced"
-        ? payout.type
+        ? payout.type === "bounced" && payout.charged_back
+          ? "bounced_charged"
+          : payout.type
         : null;
   if (!kind) return <PayoutStatus type={payout.type} />;
   return (
@@ -108,14 +116,19 @@ export function SendingGrant({ amount }: IUncountedGrant) {
 }
 
 /** a grant whose transfer wise reports bounced: struck amount, status, and why on tap */
-export function BouncedGrant({ amount }: IUncountedGrant) {
+export function BouncedGrant({
+  amount,
+  charged_back = false,
+}: IUncountedGrant & { charged_back?: boolean }) {
   return (
     <div>
       <div className="flex items-baseline gap-3 flex-wrap">
         <span className="line-through text-gray-11">{amount}</span>
         <PayoutStatus type="bounced" />
         <span className="inline-flex self-center -ml-1.5">
-          <StatusTip kind="grant_bounced" />
+          <StatusTip
+            kind={charged_back ? "grant_bounced_charged" : "grant_bounced"}
+          />
         </span>
       </div>
       <p className="text-sm text-gray-11">Not counted</p>
@@ -138,7 +151,12 @@ export function GrantAmount({ grant, amount }: IGrantAmount) {
     case "sending":
       return <SendingGrant amount={amount} />;
     case "bounced":
-      return <BouncedGrant amount={amount} />;
+      return (
+        <BouncedGrant
+          amount={amount}
+          charged_back={grant.status === CHARGED_BACK}
+        />
+      );
     default:
       return amount;
   }

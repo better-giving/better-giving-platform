@@ -104,6 +104,7 @@ vi.mock("$/pg/db", () => ({
 
 const { index } = await import("./handler");
 const { NotFundedError } = await import("$/payouts/transfer");
+const { resend_returned } = await import("$/payouts/resend-returned");
 const { create_test_db } = await import("$/pg/test-utils/pglite");
 const { banking_apps } = await import("$/pg/schema/banking");
 const { donations } = await import("$/pg/schema/donation");
@@ -776,6 +777,32 @@ describe("grants cron execute", () => {
       }),
     ]);
   });
+
+  test.each(["bounced", "refunded_loss"] as const)(
+    "a charged-back run's %s payout is never re-sent, and nothing is paid to the old account, across runs and re-sends",
+    async (type) => {
+      const npo_id = await seed_npo({ cash: 300 });
+      await old_account();
+      await seed_returned(npo_id, "p-back", 100);
+      await db()
+        .update(settlements)
+        .set({ status: "charged_back", date: new Date().toISOString() });
+      await db().update(payouts).set({ type }).where(eq(payouts.id, "p-back"));
+      await seed_payout(npo_id, "p-new", 200);
+
+      await index();
+      await index();
+      const resent = await resend_returned(npo_id);
+
+      expect(wise_pay_mock).not.toHaveBeenCalled();
+      expect(resent).toMatchObject({ status: "held" });
+      expect(await payout_types()).toEqual({
+        "p-back": type,
+        "p-new": "pending",
+      });
+      expect(await npo_cash(npo_id)).toBe(300);
+    }
+  );
 
   test("a hold alert that fails to send is tried again on the next run", async () => {
     const npo_id = await seed_npo({ cash: 300 });

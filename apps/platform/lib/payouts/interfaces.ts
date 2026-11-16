@@ -47,6 +47,8 @@ export interface IReturnedStatus {
  */
 export interface IBouncedStatus {
   type: "bounced";
+  /** its transfer's stored state is `charged_back`: reversed for good, not on its way back */
+  charged_back?: boolean;
 }
 
 /** voided by ops: not a grant, not counted */

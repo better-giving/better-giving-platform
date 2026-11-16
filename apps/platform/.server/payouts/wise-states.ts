@@ -23,7 +23,9 @@ export const read_transfer = async (state_of: TransferState, id: string) => {
   return typeof t === "string" ? { status: t, recipient: undefined } : t;
 };
 
-export const CHARGED_BACK = "charged_back";
+export { CHARGED_BACK } from "@/payouts/wise-path";
+
+import { CHARGED_BACK } from "@/payouts/wise-path";
 /** stored states nothing polls again: ours once the money is back, and
  * `charged_back`, whose payouts stay bounced for ops to resolve by hand. not
  * `cancelled`: every polled transfer was funded, and a funded one passes

@@ -23,7 +23,13 @@ import {
   type PayoutStatus,
   UNSENT_TYPES,
 } from "@/payouts";
-import { CANCELLED, DELIVERED_STATES, ON_PATH } from "@/payouts/wise-path";
+import {
+  BOUNCED_BACK,
+  CANCELLED,
+  CHARGED_BACK,
+  DELIVERED_STATES,
+  ON_PATH,
+} from "@/payouts/wise-path";
 import { db } from "../db";
 import { payouts, settlements } from "../schema/payout";
 import type { DbOrTx, IPage } from "./helpers";
@@ -63,8 +69,9 @@ export async function npo_payouts(
   const { limit = 10, next, status, not_status } = opts;
 
   const rows = await db
-    .select()
+    .select({ payout: payouts, settlement_status: settlements.status })
     .from(payouts)
+    .leftJoin(settlements, eq(settlements.id, payouts.settled_id))
     .where(
       and(
         eq(payouts.npo_id, npo_id),
@@ -77,7 +84,9 @@ export async function npo_payouts(
     .limit(limit + 1);
 
   const has_more = rows.length > limit;
-  const items = rows.slice(0, limit).map(to_payout);
+  const items = rows
+    .slice(0, limit)
+    .map((r) => to_payout(r.payout, r.settlement_status));
   const last = items[items.length - 1];
   return {
     items,
@@ -95,7 +104,7 @@ export async function pending_payouts(): Promise<IPayout[]> {
     .from(payouts)
     .where(eq(payouts.type, "pending"))
     .orderBy(desc(payouts.date));
-  return rows.map(to_payout);
+  return rows.map((r) => to_payout(r));
 }
 
 /** claimed by a grants run that has not funded or released them yet: a funded
@@ -108,7 +117,7 @@ export async function processing_payouts(): Promise<
     .from(payouts)
     .where(and(eq(payouts.type, "processing"), isNull(payouts.settled_id)))
     .orderBy(asc(payouts.npo_id), asc(payouts.id));
-  return rows.map(to_payout) as IPayout<IProcessingStatus>[];
+  return rows.map((r) => to_payout(r)) as IPayout<IProcessingStatus>[];
 }
 
 /**
@@ -149,7 +158,7 @@ export async function pending_payouts_locked(
     .where(and(inArray(payouts.id, ids), eq(payouts.type, "pending")))
     .orderBy(asc(payouts.id))
     .for("update");
-  return rows.map(to_payout) as IPayout<IPendingStatus>[];
+  return rows.map((r) => to_payout(r)) as IPayout<IPendingStatus>[];
 }
 
 export async function payout_put(db: DbOrTx, data: IPayout) {
@@ -416,7 +425,7 @@ export async function returned_missing_recipient(): Promise<SettlementRow[]> {
         gt(settlements.amount, 0),
         or(
           inArray(settlements.status, ["returned", "awaiting_repair"]),
-          and(notInArray(settlements.status, [...ON_PATH]), bounced_payouts())
+          and(notInArray(settlements.status, [...ON_PATH]), holding_payouts())
         ),
         isNull(settlements.recipient_id)
       )
@@ -428,6 +437,16 @@ export async function returned_missing_recipient(): Promise<SettlementRow[]> {
  * ordinary path a hold */
 const bounced_payouts = () =>
   sql`exists (select 1 from ${payouts} where ${payouts.settled_id} = ${settlements.id} and ${payouts.type} = 'bounced')`;
+
+/**
+ * what keeps a state off the ordinary path a hold: a payout wise bounced, or
+ * one a donor refund then moved to `refunded_loss` while the transfer is still
+ * bounced or charged back (the next run would pay the same account). any other
+ * run's refunded payouts hold no one: a transfer ops cancelled by hand is
+ * history, and a returned or awaiting-repair run holds by its own rule
+ */
+const holding_payouts = () =>
+  sql`exists (select 1 from ${payouts} where ${payouts.settled_id} = ${settlements.id} and (${payouts.type} = 'bounced' or (${payouts.type} = 'refunded_loss' and ${settlements.status} in (${BOUNCED_BACK}, ${CHARGED_BACK}))))`;
 
 /** one of the settlement's payouts is waiting on wise: sent and not settled,
  * or bounced. a run stored before this was tracked has neither, so it is
@@ -508,7 +527,7 @@ export async function npo_last_return(
             notInArray(settlements.status, [...ON_PATH]),
             // a state off the ordinary path holds only for a run whose payouts
             // wise bounced: history stored before this (a manual cancel) did not
-            bounced_payouts()
+            holding_payouts()
           )
         )
       )

@@ -44,6 +44,17 @@ describe("dashboard payout history — grant rows", () => {
     ).toHaveLength(1);
   });
 
+  test("a charged-back grant picks the reversed tip", async () => {
+    const screen = await render(
+      <GrantsTable items={[grant("g1", "charged_back", true)]} />
+    );
+    await expect
+      .element(
+        screen.getByRole("button", { name: "What this reversed grant means" })
+      )
+      .toBeVisible();
+  });
+
   test("a sending grant says Not counted yet, and a delivered one has nothing extra", async () => {
     const sending = await render(
       <GrantsTable items={[grant("g1", "processing")]} />
