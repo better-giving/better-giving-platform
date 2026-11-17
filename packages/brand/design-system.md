@@ -281,8 +281,8 @@ roles, verbatim from
   fields, `FloatingInput` and the radio control's circle all draw it.
 - **Floating layer**: menu, popover, select list, hovercard, toast, the
   marketing header's mobile panel and any pinned bar that lifts: `--popover`
-  (step 1) at the card corner with `shadow-floating`, no edge. Radix overlays
-  carry a shadow; the layer is lighter than the card it opens over.
+  (step 1) at the card corner with `shadow-floating` and a 1px `--hairline`
+  edge (the registry's house rule since 2.4.0). Radix overlays carry a shadow; the layer is lighter than the card it opens over.
 - **Dialog**: Radix Themes' panel plus shadow: `--popover` and
   `shadow-floating`, behind the `--overlay` scrim. The fill is the call site's
   (`bg-popover` on every `Modal`/`RouteModal`); the shadow is in every
@@ -811,7 +811,7 @@ color, `--overlay`, is a color and stays in the palette.
 **Depth is scarce here on purpose: the app is flat in the flow.** A card has no
 shadow: Radix finds it by its step-2 fill and its step-6 edge (see "Resting
 surfaces"). Real depth is reserved for what genuinely sits over content: a
-floating layer and a dialog are `--popover` (step 1) with `shadow-floating`,
+floating layer and a dialog are `--popover` (step 1) with `shadow-floating` and a 1px `--hairline` edge,
 lighter than the card they open over and lifted off it.
 
 The set is closed and small. `--shadow-*` and `--inset-shadow-*` are reset to
@@ -820,7 +820,7 @@ The set is closed and small. `--shadow-*` and `--inset-shadow-*` are reset to
 | level | what sits here | shadow | stacking |
 | --- | --- | --- | --- |
 | `flush` | the document flow: a card, and inside it a well, a row, a form control. A card separates by its `--card` fill and `--hairline` edge, a well by its `--panel` fill, a control by its `--input` edge | none, and **no token**, see below | none |
-| `floating` | hovers over content, transient, no scrim: menu, dropdown, combobox and select popup, tooltip, hovercard, toast, and pinned page chrome once it is stuck. `bg-popover` + `rounded-card`, no edge | `shadow-floating` | `z-floating` for a popup; pinned chrome keeps `z-sticky` / `z-subbar` |
+| `floating` | hovers over content, transient, no scrim: menu, dropdown, combobox and select popup, tooltip, hovercard, toast, and pinned page chrome once it is stuck. `bg-popover` + `rounded-card` + a 1px `border-hairline` edge | `shadow-floating` | `z-floating` for a popup; pinned chrome keeps `z-sticky` / `z-subbar` |
 | `modal` | covers the page behind a scrim: dialog, drawer, route-modal. `bg-popover` + `rounded-card` (the drawer is square: it is pinned to the edge) | `shadow-floating`, from `modal_box`; see below | `z-scrim` on the backdrop, `z-modal` on the panel |
 | recessed track | a track a control sits *in*: slider track, progress bar, switch control | `inset-shadow-track` | none |
 | recessed fill | the fill that rides raised inside that track | `shadow-track-fill` | none |
@@ -1780,10 +1780,11 @@ What follows from it:
 **The popup content shell is named, on the component.** A tooltip or
 hovercard body (the panel-shaped surface that *does* converge) is
 `popup_shell` in `packages/ui/src/components/popup.ts`, and `Content` in
-`tooltip.tsx` and `hover-card.tsx` carries it: `bg-popover`, `shadow-floating`
+`tooltip.tsx` and `hover-card.tsx` carries it: `bg-popover`, `border-hairline`, `shadow-floating`
 + `z-floating` (the `floating` elevation row), `rounded-card`, and `p-4`. It
-has **no edge**: a floating layer is told from what it covers by its shadow,
-and its arrow tip is filled from `--popover` with no edge either. The select/combobox
+carries the 1px `--hairline` edge every floating surface has (the registry's
+house rule since 2.4.0, select popup, tooltip, dialog, menu, sheet, drawer and
+nav panel alike), and its arrow tip is filled from `--popover`. The select/combobox
 list (`popup_cls` in `select/classes.ts`) and the toast are the same box. A call
 site passes only
 what is its own: a width cap (`max-w-xs`, `w-80`), a type size, an alignment,

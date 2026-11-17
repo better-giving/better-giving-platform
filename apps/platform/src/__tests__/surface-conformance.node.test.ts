@@ -145,7 +145,7 @@ describe("a --primary fill declares its own ink", () => {
  * an in-flow container is `bg-card` (step 2) + `rounded-card` + a
  * `border-hairline` edge (step 6) and no shadow — `card` and `solo-card` carry
  * all three; a floating layer and a dialog are `bg-popover` (step 1) at the
- * card corner with `shadow-floating`; a well is `bg-panel` (step 3) at the
+ * card corner with `shadow-floating` and the registry's hairline edge; a well is `bg-panel` (step 3) at the
  * control corner, inside a card; a field is `bg-surface` with its `--input`
  * edge.
  *
@@ -207,7 +207,7 @@ describe("the surface model", () => {
       }))
     );
 
-  test("a floating layer is the popover fill with no edge", () => {
+  test("a floating layer is the popover fill at the card corner", () => {
     // a lone `shadow-floating` is a pinned header's IntersectionObserver
     // toggling the lift once it sticks; the element's own class string is
     // read where it is written. pinned chrome, and a panel dropped from it
@@ -219,14 +219,10 @@ describe("the surface model", () => {
       // dialog's fill is its call site's (modal-conformance holds the tiers
       // to no surface).
       if (t.includes("z-modal")) return [];
-      // popup_shell is the registry's: it draws the hairline edge itself
-      if (file === "packages/ui/src/components/popup.ts") return [];
       const pinned =
         t.includes("sticky") || t.includes("fixed") || t.includes("inset-x-0");
       const ok =
-        t.includes("bg-popover") &&
-        (pinned || t.includes("rounded-card")) &&
-        !t.some((c) => /^(border|outline)(-[\w-]+)?$/.test(c));
+        t.includes("bg-popover") && (pinned || t.includes("rounded-card"));
       return ok ? [] : [`${file}:${n}`];
     });
     expect(offenders).toEqual([]);
