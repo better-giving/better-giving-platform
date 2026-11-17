@@ -24,8 +24,19 @@ export const MONEY_BACK = "funds_refunded";
 /** wise's two states that bounce a funded transfer: it may still be delivered or refunded (`bounced_back`), or never will (`charged_back`) */
 export const BOUNCED_BACK = "bounced_back";
 export const CHARGED_BACK = "charged_back";
+/**
+ * the payout reached the npo by another route than a wise transfer: the
+ * settlement's `other_id` holds that payment's reference, not a transfer ref.
+ * delivered and final, and never read as a transfer: not polled at any age,
+ * not bounced, returned, held or taken back
+ */
+export const PAID = "paid";
 /** stored states that mean the bank has the money */
-export const DELIVERED_STATES: readonly string[] = [DELIVERED, LEGACY_SETTLED];
+export const DELIVERED_STATES: readonly string[] = [
+  DELIVERED,
+  LEGACY_SETTLED,
+  PAID,
+];
 /** a delivered transfer is polled for this long after it is sent, in case it
  * bounces; an open one (not delivered, not refunded) is polled whatever its age */
 export const WINDOW_DAYS = 90;
@@ -39,6 +50,7 @@ export const ON_PATH: readonly string[] = [
   ...ORDINARY,
   MONEY_BACK,
   LEGACY_SETTLED,
+  PAID,
 ];
 
 /**

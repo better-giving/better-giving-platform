@@ -28,6 +28,7 @@ import {
   CHARGED_BACK,
   DELIVERED_STATES,
   ON_PATH,
+  PAID,
 } from "@/payouts/wise-path";
 import { db } from "../db";
 import { payouts, settlements } from "../schema/payout";
@@ -479,6 +480,8 @@ export async function settlements_to_poll(
         isNotNull(settlements.other_id),
         gt(settlements.amount, 0),
         notInArray(settlements.status, [...final]),
+        // paid by another route: no wise transfer behind it, so never polled
+        ne(settlements.status, PAID),
         or(
           // open: on its way, bounced, awaiting repair, any age
           notInArray(settlements.status, [...DELIVERED_STATES, CANCELLED]),

@@ -87,6 +87,8 @@ describe("target_for", () => {
     ["charged_back", "bounced"],
     // stored before wise's own states were kept, and a manual cancel: history
     ["settled", null],
+    // paid by another route: delivered, never touched
+    ["paid", null],
     ["cancelled", null],
     ["something_new", "bounced"],
   ])("state %s", (state, to) => {
@@ -163,6 +165,7 @@ describe("run", () => {
     });
     await seed("t-legacy", "settled", { date: "2026-03-01T00:00:00.000Z" });
     await seed("t-cancel", "cancelled");
+    await seed("t-paid", "paid", { date: "2026-02-01T00:00:00.000Z" });
   };
 
   it("a dry run lists what it would change and writes nothing", async () => {
@@ -181,6 +184,7 @@ describe("run", () => {
       "p-t-old-bounce": "settled",
       "p-t-legacy": "settled",
       "p-t-cancel": "settled",
+      "p-t-paid": "settled",
     });
     expect(sum).toMatchObject({
       to_change: 4,
@@ -259,6 +263,7 @@ describe("run", () => {
       "p-t-old-bounce": "bounced",
       "p-t-legacy": "settled",
       "p-t-cancel": "settled",
+      "p-t-paid": "settled",
     });
 
     const second = await run({ commit: true }, { db: db() as never, log: () => {} });

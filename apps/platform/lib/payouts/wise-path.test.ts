@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { grant_state } from "./wise-path";
+import { DELIVERED_STATES, grant_state, ON_PATH, PAID } from "./wise-path";
 
 const g = (status: string, other_id: string | null = "ref") => ({
   status,
@@ -28,6 +28,15 @@ describe("grant_state", () => {
   test("a cancelled run is a bounce only when wise bounced a payout of it", () => {
     expect(grant_state({ ...g("cancelled"), bounced: true })).toBe("bounced");
     expect(grant_state(g("cancelled"))).toBe("settled");
+  });
+
+  test("a run paid by another route is settled, delivered and on the path", () => {
+    expect(PAID).toBe("paid");
+    expect(grant_state({ status: "paid", other_id: "mercury-1" })).toBe(
+      "settled"
+    );
+    expect(DELIVERED_STATES).toContain(PAID);
+    expect(ON_PATH).toContain(PAID);
   });
 
   test("a run with no transfer is settled", () => {
