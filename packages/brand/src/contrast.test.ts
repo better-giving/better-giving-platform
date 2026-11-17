@@ -440,7 +440,7 @@ const pairings: Pairing[] = [
     colors.secondary_active,
     52.5,
     min.content,
-    "registry 2.2 put the warning ink on step 11: a miss on the pressed secondary, recorded as measured"
+    "the warning ink is step 11: a miss on the pressed secondary, recorded as measured"
   ),
   p(
     "gray-12 on --warning-subtle",

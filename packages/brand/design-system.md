@@ -706,10 +706,10 @@ step the other status inks take, measured:
 | `--warning-subtle` (warning-3) | Lc 62.5 | |
 | `--secondary-active` (accent-5) | Lc 52.5 | cross-scale; under Lc 60, an accepted miss |
 
-Registry 2.2 put the ink on step 11: every surface but the pressed `accent-5` rung
+The ink is on step 11: every surface but the pressed `accent-5` rung
 clears Lc 60, and `contrast.test.ts` pins each measurement. `--warning-fg` is
 the label on the `--warning` fill, `--warning-subtle-fg` the warning ink on
-everything else; they are different steps now (`warning-12` and `warning-11`).
+everything else; they are different steps (`warning-12` and `warning-11`).
 
 **`Badge` carries it as the `warning` tone** (`packages/ui/src/components/badge.tsx`):
 `bg-warning-subtle text-warning-subtle-fg`, Lc 62.5, over the Lc 60 content floor. A warning chip reaches it through `Badge`, never by
@@ -780,10 +780,8 @@ of them at one value):
 | `accent-4` | `--secondary-hover` | that element hovered, and a tinted row resting transparent under the pointer or highlighted (`.selector-opt`, the select/combobox option, the marketing mobile nav, a dropzone) |
 | `accent-5` | `--secondary-active` | that element SELECTED or pressed: a checked option, a checked radio tile, the current sidebar row |
 
-**`accent-4` is claimed as of 2026-11-01.** It was left undeclared while every
-hover in the app went to step 3, the resting rung, on the ramp's
-transparent-element allowance; the PM's Radix alignment puts every hover on 4,
-so the token now has its consumers. The neutral twin is `gray-3 / 4 / 5`, spelled
+**`accent-4` is claimed.** Every hover sits on step 4 under the PM's Radix
+alignment, so the token has its consumers. The neutral twin is `gray-3 / 4 / 5`, spelled
 as steps.
 
 The band job constrains the lighter rung: a resting band carries de-emphasised
