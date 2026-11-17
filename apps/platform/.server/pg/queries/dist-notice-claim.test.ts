@@ -109,10 +109,16 @@ test("a holder that releases after a throw lets the redelivery claim", async () 
 test("a holder that outlived its lease cannot release the claim taken since", async () => {
   const late = await claim_stamp();
   await expire_claim();
-  // stamps are millisecond-truncated `now()`: two claims inside one
-  // millisecond would share a stamp, and `late` would release `current`
-  await new Promise((r) => setTimeout(r, 2));
-  const current = await claim_stamp();
+  // stamps are millisecond-truncated `now()`, so a claim inside the same
+  // millisecond as `late` would share its stamp and `late` would release it.
+  // a sleep only makes that unlikely; claim again until the clock has moved
+  let current = await claim_stamp();
+  while (current === late) {
+    await expire_claim();
+    await new Promise((r) => setTimeout(r, 2));
+    current = await claim_stamp();
+  }
+  expect(current).not.toBe(late);
   await release_dist_notice(DIST_ID, late);
   expect((await notice_of()).claimed).not.toBeNull();
   expect(await claim_dist_notice(DIST_ID)).toEqual({ status: "busy" });

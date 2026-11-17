@@ -704,6 +704,12 @@ const connector_ops = (): IOperation[] => [
     { refuses: [404] }
   ),
   keyed_read(
+    "connector.v1.memberships",
+    "/connector/v1/memberships",
+    "list_nonprofits",
+    "List the signed-in user's nonprofits"
+  ),
+  keyed_read(
     "connector.v1.donors",
     "/connector/v1/donors",
     "list_donors",
