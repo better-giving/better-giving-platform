@@ -1,9 +1,8 @@
 @import "tailwindcss";
 /* the faces ship with the design system (packages/ui/src/styles/fonts.css,
    copied from the registry's `fonts` item), but the style layer does not
-   import them: an app imports fonts.css itself, beside styles.css. the
-   registry stopped importing it in 2.0.0. without this line every page falls
-   back to a system font. the style layer is copied in from the design registry
+   import them: an app imports fonts.css itself, beside styles.css. without
+   this line every page falls back to a system font. the style layer is copied in from the design registry
    (packages/ui/bg-design.json): change it by a registry release, not here. */
 @import "@better-giving/ui/fonts.css";
 @import "@better-giving/ui/styles.css";

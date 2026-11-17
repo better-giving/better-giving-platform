@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 
 /**
- * the registry's style layer stopped importing `fonts.css` in 2.0.0: an app
- * imports it itself. missing, every page renders in a system font, no test
+ * the registry's style layer does not import `fonts.css`: an app imports
+ * it itself. missing, every page renders in a system font, no test
  * fails and the build is green, so this walks the `@import` graph from the
  * stylesheet platform ships and asks it for the faces.
  */

@@ -88,7 +88,7 @@ for (const name of decls.keys()) {
 describe("colors.ts matches colors.css", () => {
   // a second :root block, or a stray `}` ending one early, would drop tokens
   // from both sides of the comparison below without failing it. every
-  // declaration in the file must sit inside some block — and the light half
+  // declaration in the file must sit inside some block, and the light half
   // must have its share.
   it.each([COLORS, THEME])("reads every declaration of %s", (f) => {
     const whole = strip_comments(read_css(f));

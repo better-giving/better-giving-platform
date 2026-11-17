@@ -121,7 +121,7 @@ const pairings: Pairing[] = [
     card,
     21.8,
     min.spot,
-    "radix's interactive-border rung, kept by PM decision (2026-11-01): the field's label, placeholder and step-1 fill also identify it"
+    "radix's interactive-border rung, kept by PM decision: the field's label, placeholder and step-1 fill also identify it"
   ),
   p(
     "--input (gray-7) on --surface",
@@ -867,7 +867,7 @@ describe("the hero scrim composites to the recorded color", () => {
   });
 });
 
-// roles that stay on their radix step, by PM decision (2026-11-01): the
+// roles that stay on their radix step, by PM decision: the
 // measured Lc of each lives in the pairing ledger above, so a step move lands
 // there as a new figure; these pin the step itself.
 describe("the roles kept on their radix steps", () => {
