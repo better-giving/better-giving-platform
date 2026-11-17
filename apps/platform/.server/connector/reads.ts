@@ -276,7 +276,8 @@ export async function list_nonprofits(
     .from(user_npo_memberships)
     .innerJoin(npos, eq(npos.id, user_npo_memberships.npo_id))
     .where(eq(user_npo_memberships.user_id, live.allowed_by))
-    .orderBy(asc(npos.name), asc(npos.id));
+    // lower(): C / C.UTF-8 collation (pglite, neon) sorts every capital before "a"
+    .orderBy(asc(sql`lower(${npos.name})`), asc(npos.name), asc(npos.id));
 
   const items = rows.map((row) => ({
     id: String(row.id),

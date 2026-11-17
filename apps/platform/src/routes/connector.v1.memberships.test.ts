@@ -183,6 +183,55 @@ describe("GET /connector/v1/memberships", () => {
     expect(body.data[0]?.current).toBe(true);
   });
 
+  test("the rest sort by name ignoring case", async () => {
+    const mid = await npo("Mid Org");
+    const a = await connect("ada@test.com", mid);
+    for (const name of ["Zeta Fund", "charity: water", "Beta Org"]) {
+      await member(a.owner.id, (await npo(name)).id);
+    }
+
+    const body = (await (await list(`Bearer ${a.key}`)).json()) as {
+      data: { name: string }[];
+    };
+
+    expect(body.data.map((n) => n.name)).toEqual([
+      "Mid Org",
+      "Beta Org",
+      "charity: water",
+      "Zeta Fund",
+    ]);
+  });
+
+  test("same-name nonprofits sort by id", async () => {
+    const mid = await npo("Mid Org");
+    const a = await connect("ada@test.com", mid);
+    const first = await npo("Twin Org");
+    const second = await npo("Twin Org");
+    await member(a.owner.id, second.id);
+    await member(a.owner.id, first.id);
+
+    const body = (await (await list(`Bearer ${a.key}`)).json()) as {
+      data: { id: string }[];
+    };
+
+    expect(body.data.map((n) => n.id)).toEqual([
+      String(mid.id),
+      String(first.id),
+      String(second.id),
+    ]);
+  });
+
+  test("an empty logo is logo_url null", async () => {
+    const red = await npo("Red Bird", "");
+    const a = await connect("ada@test.com", red);
+
+    const body = (await (await list(`Bearer ${a.key}`)).json()) as {
+      data: { logo_url: string | null }[];
+    };
+
+    expect(body.data[0]?.logo_url).toBeNull();
+  });
+
   test("a membership the user lost is left out", async () => {
     const red = await npo("Red Bird");
     const gone = await npo("Gone Org");
