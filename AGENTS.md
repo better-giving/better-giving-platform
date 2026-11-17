@@ -1,6 +1,6 @@
 # Better Giving
 
-Public monorepo (`AngelProtocolFinance/better-giving`). Turborepo + pnpm. The root is a thin turbo delegator with no app code. **Each member's own `CLAUDE.md` is the authority on that member — read it before working there.**
+Public monorepo (`better-giving/better-giving-platform`). Turborepo + pnpm. The root is a thin turbo delegator with no app code. **Each member's own `CLAUDE.md` is the authority on that member — read it before working there.**
 
 ## Stack
 
