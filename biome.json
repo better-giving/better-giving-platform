@@ -18,6 +18,7 @@
       "!apps/platform/public/mockServiceWorker.js",
       "!apps/platform/src/types/sanity.types.ts",
       "!apps/platform/public/.well-known",
+      "!apps/platform/public/funding.json",
       "!apps/blog/.sanity",
       "!apps/blog/dist",
       "!apps/emails-preview/.react-email",

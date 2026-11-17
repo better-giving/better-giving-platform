@@ -71,7 +71,8 @@ function Content() {
 
       <p className="px-6 pb-4 text-center text-gray-11 mt-4">
         <span className="block">
-          You are about to {verdict} the Application for
+          You are about to {verdict === "approved" ? "approve" : "reject"} the
+          Application for
         </span>
         <span className="font-semibold block">{org_name}</span>
       </p>

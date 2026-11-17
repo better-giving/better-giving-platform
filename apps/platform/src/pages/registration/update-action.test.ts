@@ -41,6 +41,10 @@ import { type IUpdateActionOpts, update_action } from "./update-action";
 const RID = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const EMAIL = "jane@test.com";
 const SEEN_AT = "2026-09-01T00:00:00.000Z";
+/** the private store `.env.test`'s token names */
+const STORE = "https://testprivate.private.blob.vercel-storage.com";
+const OWN_DOC = `${STORE}/docs/u-1/statement-abc.pdf`;
+const OTHERS_DOC = `${STORE}/docs/u-2/passport-xyz.pdf`;
 
 beforeAll(async () => {
   test_db.current = await create_test_db();
@@ -185,7 +189,7 @@ describe("update_action — where a save lands", () => {
           body: JSON.stringify({
             update_type: "banking",
             o_bank_id: "999",
-            o_bank_statement: "https://example.com/new.pdf",
+            o_bank_statement: OWN_DOC,
           }),
         }),
         params: { reg_id: RID },
@@ -217,5 +221,83 @@ describe("update_action — where a save lands", () => {
     expect(res.headers.get("location")).toBe("../4");
     expect(res.headers.get("X-Remix-Replace")).toBe("true");
     expect((await reg_get(RID))?.o_bank_id).toBe("999");
+  });
+});
+
+describe("update_action — document urls", () => {
+  const seed_docs = () =>
+    test_db.current!.db.insert(registrations).values({
+      id: RID,
+      r_id: EMAIL,
+      status: "01",
+      o_bank_id: "111",
+      o_bank_statement: "https://example.com/old.pdf",
+      r_proof_of_identity: "https://example.com/id.pdf",
+    });
+
+  const save = (body: object) =>
+    settle(
+      update_action("4")({
+        request: new Request(`http://localhost/register/${RID}/4`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+        params: { reg_id: RID },
+        context: {} as any,
+      } as any)
+    );
+
+  test.each([
+    [
+      "the bank statement",
+      {
+        update_type: "banking",
+        o_bank_id: "999",
+        o_bank_statement: OTHERS_DOC,
+      },
+    ],
+    [
+      "a proof of identity",
+      { update_type: "fsa-doc", r_proof_of_identity: OTHERS_DOC },
+    ],
+  ])(
+    "refuses %s from another user's uploads, writing nothing",
+    async (_, body) => {
+      await seed_docs();
+
+      const res = await save(body);
+
+      expect(res.status).toBe(400);
+      const row = await reg_get(RID);
+      expect(row?.o_bank_id).toBe("111");
+      expect(row?.o_bank_statement).toBe("https://example.com/old.pdf");
+      expect(row?.r_proof_of_identity).toBe("https://example.com/id.pdf");
+    }
+  );
+
+  test("keeps a stored url posted back unchanged, from before documents went private", async () => {
+    await seed_docs();
+
+    const res = await save({
+      update_type: "banking",
+      o_bank_id: "999",
+      o_bank_statement: "https://example.com/old.pdf",
+    });
+
+    expect(res.status).toBe(302);
+    expect((await reg_get(RID))?.o_bank_id).toBe("999");
+  });
+
+  test("takes the writer's own upload", async () => {
+    await seed_docs();
+
+    const res = await save({
+      update_type: "fsa-doc",
+      r_proof_of_identity: OWN_DOC,
+    });
+
+    expect(res.status).toBe(302);
+    expect((await reg_get(RID))?.r_proof_of_identity).toBe(OWN_DOC);
   });
 });

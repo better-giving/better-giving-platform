@@ -6,14 +6,21 @@ import { GRANTS_CRON, GRANTS_EXEC_DELAY_DAYS } from "@/constants/grants";
 import type { IComposition } from "@/nav/interfaces";
 import type { IPayout } from "@/payouts";
 import { payout_to, type TPayoutTo } from "@/payouts/payout-to";
+import { CHARGED_BACK } from "@/payouts/wise-path";
 import type { IPageKeyed } from "@/types/api";
 import { stripe as stripe_env } from "$/env";
+import { npo_return_hold } from "$/payouts/resend-returned";
 import { npo_bapp_in_review, npo_default_bapp } from "$/pg/queries/banking";
 import { campaign_count, campaign_live_count } from "$/pg/queries/campaign";
 import { nav_ltd } from "$/pg/queries/nav";
 import { npo_get } from "$/pg/queries/npo";
-import type { SettlementRow } from "$/pg/queries/payout";
-import { npo_payouts, npo_settlements } from "$/pg/queries/payout";
+import type { GrantRow, IReturnedPayouts } from "$/pg/queries/payout";
+import {
+  npo_bounced_payouts,
+  npo_payouts,
+  npo_returned_payouts,
+  npo_settlements,
+} from "$/pg/queries/payout";
 import type { Route } from "./+types/route";
 
 export interface DashboardData {
@@ -23,7 +30,7 @@ export interface DashboardData {
   bal_cash: number;
   /** compute in server save client bundle */
   recent_payouts: IPageKeyed<IPayout>;
-  recent_settlements: IPageKeyed<SettlementRow>;
+  recent_settlements: IPageKeyed<GrantRow>;
   next_payout: string;
   pm?: IBapp;
   payout_to: TPayoutTo;
@@ -33,6 +40,19 @@ export interface DashboardData {
   total_inv_value: number;
   campaign_count: number;
   campaign_live: number;
+  /** payouts the bank sent back, waiting on new bank details; null when none */
+  returned: IReturnedPayouts | null;
+  /** payouts wise reports bounced and has not delivered or refunded; null when none */
+  bounced: IReturnedPayouts | null;
+  /** the hold is a transfer charged back for good: the amount and date it went out; null for any other hold or none */
+  charged_back: { amount: number; date: string } | null;
+  /** the hold is a bounced transfer (not a returned one) */
+  bounce_hold: boolean;
+  /** a transfer holds this npo's payouts (any hold; `bounce_hold` says it is a bounce) */
+  return_hold: boolean;
+  /** the hold is a transfer that came back with its payouts' ownership
+   * unclear: nothing credited yet; null for any other hold or none */
+  awaiting_repair: { amount: number; date: string } | null;
 }
 
 export const endowUpdateAction = endowUpdate({ redirect: "." });
@@ -59,6 +79,9 @@ export const loader = async (x: Route.LoaderArgs) => {
     in_review,
     count,
     live,
+    returned,
+    bounced,
+    hold,
   ] = await Promise.all([
     nav_ltd(),
     npo_get(id),
@@ -68,6 +91,9 @@ export const loader = async (x: Route.LoaderArgs) => {
     npo_bapp_in_review(id),
     campaign_count(id),
     campaign_live_count(id),
+    npo_returned_payouts(id),
+    npo_bounced_payouts(id),
+    npo_return_hold(id),
   ]);
 
   return {
@@ -85,5 +111,17 @@ export const loader = async (x: Route.LoaderArgs) => {
     total_inv_value: ltd.value,
     campaign_count: count,
     campaign_live: live,
+    returned,
+    bounced,
+    return_hold: hold !== null,
+    bounce_hold: hold?.status === "bounced",
+    charged_back:
+      hold?.status === "bounced" && hold.wise_state === CHARGED_BACK
+        ? { amount: hold.amount, date: hold.date }
+        : null,
+    awaiting_repair:
+      hold?.status === "awaiting_repair"
+        ? { amount: hold.amount, date: hold.date }
+        : null,
   } satisfies DashboardData;
 };

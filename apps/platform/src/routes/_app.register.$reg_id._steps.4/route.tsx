@@ -132,7 +132,7 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
   const bank = shows_saved ? (
     <SavedBank
       account_id={reg.o_bank_id ?? ""}
-      statement_href={reg.o_bank_statement ?? ""}
+      statement_ref={reg.o_bank_statement ?? ""}
       onChange={() => set_is_changing(true)}
       heading_ref={saved_heading}
     />

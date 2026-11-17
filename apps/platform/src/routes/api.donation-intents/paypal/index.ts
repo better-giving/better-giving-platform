@@ -7,10 +7,10 @@ import { rd2num } from "@/helpers/decimal";
 import { resp } from "@/helpers/https";
 import { db } from "$/pg/db";
 import { donation_put, donation_update } from "$/pg/queries/donation";
-import type { Provider } from "../types";
+import { type Provider, REFUSED_COPY } from "../types";
 import { paypal_charge } from "./charge";
 import { create_order } from "./create-order";
-import { create_subs } from "./create-subs";
+import { create_subs, subscription_quantity } from "./create-subs";
 
 export const paypal_intent: Provider = async ({
   to,
@@ -27,6 +27,16 @@ export const paypal_intent: Provider = async ({
     );
   }
   const charge = paypal_charge(intent.amount, scale);
+
+  // a total paypal can't take as a subscription quantity is refused before a
+  // row or a paypal object exists
+  if (
+    intent.frequency !== "one-time" &&
+    subscription_quantity(charge.total) === null
+  ) {
+    console.info(`[resp] 400 - paypal quantity: ${charge.total}`);
+    return resp.refuse(REFUSED_COPY);
+  }
 
   const upusd = await unit_per_usd(intent.currency);
   const base_usd = rd2num(charge.amount.base / upusd, 1);

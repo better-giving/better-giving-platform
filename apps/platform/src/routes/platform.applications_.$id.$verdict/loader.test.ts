@@ -11,7 +11,10 @@ vi.mock("$/pg/queries/registration", () => ({
 vi.mock("$/pg/db", () => ({ db: {} }));
 vi.mock("$/kit/wise", () => ({ wise }));
 vi.mock("$/kit/queue", () => ({ enqueue: vi.fn(), in_dedupe_window: vi.fn() }));
-vi.mock("#/errors/report", () => ({ report_degraded_null: () => null }));
+vi.mock("#/errors/report", () => ({
+  report_degraded: () => {},
+  report_degraded_null: () => null,
+}));
 vi.mock("./npo-new", () => ({ npo_new: vi.fn(), announce_approval: vi.fn() }));
 const routing = vi.hoisted(() => ({ on: true }));
 vi.mock("$/env", () => ({

@@ -182,6 +182,8 @@ describe("ImgEditor", () => {
         "https://cdn.example.com/cropped.png"
       )
     );
+    // a page image goes to the public image store, never as a document
+    expect(upload_mock).toHaveBeenCalledWith(expect.any(Blob), "image");
   });
 
   test("upload failure calls on_change('failure')", async () => {

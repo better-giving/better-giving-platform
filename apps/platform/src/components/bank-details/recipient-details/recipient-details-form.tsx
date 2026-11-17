@@ -19,13 +19,14 @@ import { Controller, get, useController, useForm } from "react-hook-form";
 import { safeParse } from "valibot";
 import { report_error } from "#/errors/report";
 import { error_prompt } from "#/helpers/error-prompt";
-import { uploadFile } from "#/helpers/upload-file";
+import { upload_document } from "#/helpers/upload-file";
 import type {
   CreateRecipientRequest,
   Group,
   V1RecipientAccount,
   ValidationContent,
 } from "#/types/bank-details";
+import { doc_href } from "@/docs";
 import type { IFormButtons, OnSubmit } from "../types";
 import { use_requirements } from "./use-requirements";
 
@@ -449,7 +450,8 @@ export function RecipientDetailsForm({
           value={bankStatement.value}
           onChange={bankStatement.onChange}
           error={errors.bankStatement?.message?.toString()}
-          upload={uploadFile}
+          upload={upload_document}
+          view_href={doc_href}
           report_error={report_error}
         />
       )}

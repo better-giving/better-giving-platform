@@ -4,6 +4,8 @@ import { user_by_referral_code } from "$/pg/queries/user";
 
 interface Referrer {
   pay_id?: number;
+  /** when a nonprofit referrer's payout account was approved or made default */
+  pay_since?: string;
   /** default $50 */
   pay_min: number;
   id: string;
@@ -20,13 +22,15 @@ export async function get_referrer(
     if (!item) return null;
 
     //get default payout method
-    const wise_id = await npo_default_bapp(item.id).then((x) => x?.id);
+    const bapp = await npo_default_bapp(item.id);
+    const wise_id = bapp?.id;
 
     return {
       id: referral_id,
       name: item.name,
       email: "n/a",
       pay_id: wise_id ? +wise_id : undefined,
+      pay_since: bapp ? (bapp.updated_at ?? bapp.date_created) : undefined,
       pay_min: 50,
     };
   }

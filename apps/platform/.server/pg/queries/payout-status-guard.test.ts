@@ -14,8 +14,10 @@ import { payouts, settlements } from "../schema/payout";
 import { create_test_db, type TestDb } from "../test-utils/pglite";
 import type { DbOrTx } from "./helpers";
 import {
+  npo_returned_payouts,
   payout_get,
-  payout_move_from_pending,
+  payout_mark_refunded_loss,
+  payout_move_from_unsent,
   pending_payouts_locked,
   processing_payouts,
 } from "./payout";
@@ -65,7 +67,7 @@ beforeEach(async () => {
 
 async function seed_payout(
   id: string,
-  type: "pending" | "processing" | "settled" | "refunded"
+  type: "pending" | "processing" | "settled" | "refunded" | "returned" | "void"
 ) {
   if (type === "settled") {
     await test_db.db.insert(settlements).values({
@@ -101,30 +103,59 @@ async function type_of(id: string) {
 
 const to_refunded = { type: "refunded" } as Partial<Omit<IPayout, "id">>;
 
-describe("payout_move_from_pending", () => {
-  test("moves a pending payout and reports the change", async () => {
-    await seed_payout("p1", "pending");
+describe("payout_move_from_unsent", () => {
+  test.each(["pending", "returned"] as const)(
+    "moves a %s payout and reports the change",
+    async (type) => {
+      await seed_payout("p1", type);
 
-    const changed = await payout_move_from_pending(
-      as_db(test_db.db),
-      "p1",
-      to_refunded
-    );
+      const changed = await payout_move_from_unsent(
+        as_db(test_db.db),
+        "p1",
+        to_refunded
+      );
 
-    expect(changed).toBe(true);
-    expect(await type_of("p1")).toBe("refunded");
-  });
+      expect(changed).toBe(true);
+      expect(await type_of("p1")).toBe("refunded");
+    }
+  );
 
-  test.each(["settled", "refunded"] as const)(
+  test.each(["settled", "refunded", "void"] as const)(
     "leaves a %s payout untouched and reports no change",
     async (type) => {
       await seed_payout("p1", type);
 
-      const changed = await payout_move_from_pending(as_db(test_db.db), "p1", {
+      const changed = await payout_move_from_unsent(as_db(test_db.db), "p1", {
         type: "cancelled",
       } as Partial<Omit<IPayout, "id">>);
 
       expect(changed).toBe(false);
+      expect(await type_of("p1")).toBe(type);
+    }
+  );
+});
+
+describe("payout_mark_refunded_loss", () => {
+  test.each(["processing", "settled"] as const)(
+    "marks a %s payout, its grant gone out",
+    async (type) => {
+      await seed_payout("p1", type);
+
+      expect(await payout_mark_refunded_loss(as_db(test_db.db), "p1")).toBe(
+        true
+      );
+      expect(await type_of("p1")).toBe("refunded_loss");
+    }
+  );
+
+  test.each(["pending", "returned", "void"] as const)(
+    "leaves a %s payout, its cash not paid out, and reports no change",
+    async (type) => {
+      await seed_payout("p1", type);
+
+      expect(await payout_mark_refunded_loss(as_db(test_db.db), "p1")).toBe(
+        false
+      );
       expect(await type_of("p1")).toBe(type);
     }
   );
@@ -188,6 +219,17 @@ describe("payout_get", () => {
 
     expect(po?.type).toBe("processing");
   });
+
+  test.each(["returned", "void"] as const)(
+    "reads a %s payout as %s, not pending",
+    async (type) => {
+      await seed_payout("p1", type);
+
+      const po = await payout_get("p1");
+
+      expect(po?.type).toBe(type);
+    }
+  );
 });
 
 describe("processing_payouts", () => {
@@ -203,5 +245,50 @@ describe("processing_payouts", () => {
       ["p-proc-a", "processing", npo_id, "2026-09-01T00:00:00.000Z"],
       ["p-proc-b", "processing", npo_id, "2026-09-01T00:00:00.000Z"],
     ]);
+  });
+});
+
+describe("npo_returned_payouts", () => {
+  test("null when the npo has no returned payout waiting for a new account", async () => {
+    await seed_payout("p-pending", "pending");
+    await seed_payout("p-settled", "settled");
+    await seed_payout("p-void", "void");
+
+    expect(await npo_returned_payouts(npo_id)).toBeNull();
+  });
+
+  test("counts and sums only the npo's returned payouts, dated by the latest", async () => {
+    await seed_payout("p-r1", "returned");
+    await seed_payout("p-r2", "returned");
+    await seed_payout("p-pending", "pending");
+    await test_db.db
+      .update(payouts)
+      .set({ amount: 25.5, date: "2026-10-02T00:00:00.000Z" })
+      .where(eq(payouts.id, "p-r2"));
+    const [other] = await test_db.db
+      .insert(npos)
+      .values({
+        registration_number: "EIN-OTHER",
+        name: "Other NPO",
+        endow_designation: "Charity",
+        overview_pt: "[]",
+        hq_country: "United States",
+      })
+      .returning();
+    await test_db.db.insert(payouts).values({
+      id: "p-other",
+      source_id: "dist-other",
+      npo_id: other!.id,
+      source: "donation",
+      date: "2026-11-01T00:00:00.000Z",
+      amount: 999,
+      type: "returned",
+    });
+
+    expect(await npo_returned_payouts(npo_id)).toEqual({
+      count: 2,
+      total: 125.5,
+      latest_date: "2026-10-02T00:00:00.000Z",
+    });
   });
 });

@@ -3,6 +3,7 @@ import { CircleAlert, SquareArrowOutUpRight } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { href, NavLink, Outlet, useFetcher } from "react-router";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
+import { doc_href } from "@/docs";
 import type { Route } from "./+types/route";
 
 export { ErrorBoundary } from "#/components/error";
@@ -43,8 +44,11 @@ export default function Page({ loaderData: d, params }: Route.ComponentProps) {
       </div>
 
       {is_rejected && (
-        <p className="text-sm text-destructive-subtle-fg my-2">
-          <CircleAlert className="relative inline bottom-px mr-1" />
+        <p className="flex items-start gap-1.5 text-sm text-destructive-subtle-fg my-2">
+          {/* a one-line box, so the icon sits on the reason's first line */}
+          <span className="inline-flex items-center h-[1lh] shrink-0">
+            <CircleAlert className="icon-sm" aria-hidden />
+          </span>
           <span>{d.ba.rejection_reason}</span>
         </p>
       )}
@@ -66,17 +70,19 @@ export default function Page({ loaderData: d, params }: Route.ComponentProps) {
             ))}
           </>
         )}
-        <Row label="Bank statement">
-          <ExtLink href={d.ba.bank_statement_url} className="link">
-            <span className="break-all">{d.ba.bank_statement_url}</span>
-            <SquareArrowOutUpRight className="inline relative bottom-px ml-2 icon-md" />
-          </ExtLink>
-        </Row>
+        {d.ba.bank_statement_url && (
+          <Row label="Bank statement">
+            <ExtLink href={doc_href(d.ba.bank_statement_url)} className="link">
+              <span className="break-all">{d.ba.bank_statement_url}</span>
+              <SquareArrowOutUpRight className="inline relative bottom-px ml-2 icon-md" />
+            </ExtLink>
+          </Row>
+        )}
       </dl>
       {d.wacc_unavailable && (
         <p className="text-sm text-gray-11 mt-2">
           Bank account details couldn't be loaded right now. This payout method
-          is unchanged — try again shortly.
+          is unchanged. Try again shortly.
         </p>
       )}
       <fetcher.Form method="POST" className="actions mt-4">

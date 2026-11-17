@@ -1,6 +1,22 @@
-import { and, asc, desc, eq, inArray, or, sql, sum } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  notInArray,
+  or,
+  sql,
+  sum,
+} from "drizzle-orm";
 import type { ICommission, IPayout, TStatus } from "@/referrals";
 import { db } from "../db";
+import { dists } from "../schema/dist";
 import { referrer_commissions, referrer_payouts } from "../schema/referrer";
 import {
   v_referrer_commissions_ltd,
@@ -23,7 +39,8 @@ export async function commissions_all_by_status(
   return rows as unknown as ICommission[];
 }
 
-/** earned and not yet paid: a commission in a transfer counts until it is */
+/** earned and not yet paid: a commission in a transfer counts until it is, and
+ * counts again once the transfer came back */
 export async function pending_earnings(referrer: string): Promise<number> {
   const [row] = await db
     .select({ total: sum(referrer_commissions.amount) })
@@ -34,7 +51,11 @@ export async function pending_earnings(referrer: string): Promise<number> {
           eq(referrer_commissions.referrer_user, referrer),
           eq(referrer_commissions.referrer_npo, referrer)
         ),
-        inArray(referrer_commissions.status, ["pending", "processing"])
+        inArray(referrer_commissions.status, [
+          "pending",
+          "processing",
+          "returned",
+        ])
       )
     );
   return Number(row?.total ?? 0);
@@ -101,16 +122,23 @@ export async function commission_put(db: DbOrTx, data: ICommission) {
 }
 
 // refunded_loss stays: the unfunded-payout reversal returns an unclaimed one to refunded
-const REFUNDABLE: TStatus[] = ["pending", "processing", "refunded_loss"];
+const REFUNDABLE: TStatus[] = [
+  "pending",
+  "processing",
+  "returned",
+  "refunded_loss",
+];
 
 /**
  * reverses a refunded donation's commission, read under its row lock: one a
  * Wise transfer has claimed may already be paying out, so it becomes
  * `refunded_loss` whatever `status` asked, and one that is already
  * `refunded_loss` with a ref stays so — that transfer may have paid it. one
- * with no ref took its loss from the npo's side and follows `status`. a `paid`
- * one (or any status outside `REFUNDABLE`) is left as it is: the referrer has
- * the money. returns the row as it was.
+ * with no ref took its loss from the npo's side and follows `status`. a
+ * `returned` one was never paid (its transfer came back), so it follows
+ * `status` and drops its ref, which would read as a transfer that paid it. a
+ * `paid` one is left as it is: the referrer has the money. returns the row as
+ * it was.
  */
 export async function commission_refund(
   tx: DbOrTx,
@@ -128,7 +156,10 @@ export async function commission_refund(
     (cur.status === "refunded_loss" && cur.ref !== null);
   await tx
     .update(referrer_commissions)
-    .set({ status: claimed ? "refunded_loss" : status })
+    .set({
+      status: claimed ? "refunded_loss" : status,
+      ...(cur.status === "returned" && { ref: null }),
+    })
     .where(
       and(
         eq(referrer_commissions.donation_id, donation_id),
@@ -233,6 +264,243 @@ export function commissions_release(db: DbOrTx, ref: string) {
 /** the transfer was funded: the ref's claimed commissions are paid, ref kept */
 export function commissions_mark_paid(db: DbOrTx, ref: string) {
   return claimed_move(db, ref, { status: "paid" });
+}
+
+// --- returned transfers ---
+
+export type ReferrerPayoutRow = typeof referrer_payouts.$inferSelect;
+
+/** the payout's row, locked until `tx` ends */
+export async function referrer_payout_locked(
+  tx: DbOrTx,
+  id: string
+): Promise<ReferrerPayoutRow | undefined> {
+  const [row] = await tx
+    .select()
+    .from(referrer_payouts)
+    .where(eq(referrer_payouts.id, id))
+    .for("update");
+  return row;
+}
+
+/** the payout's referrer, unlocked: undefined when there is no such payout */
+export async function referrer_payout_referrer(
+  tx: DbOrTx,
+  id: string
+): Promise<string | undefined> {
+  const [row] = await tx
+    .select({
+      user: referrer_payouts.referrer_user,
+      npo: referrer_payouts.referrer_npo,
+    })
+    .from(referrer_payouts)
+    .where(eq(referrer_payouts.id, id));
+  return row ? (row.user ?? row.npo ?? undefined) : undefined;
+}
+
+/** compare-and-set of the stored wise state; false when another writer moved
+ * it first */
+export async function referrer_payout_status_set(
+  db_: DbOrTx,
+  id: string,
+  from: string,
+  to: string
+): Promise<boolean> {
+  const rows = await db_
+    .update(referrer_payouts)
+    .set({ status: to })
+    .where(and(eq(referrer_payouts.id, id), eq(referrer_payouts.status, from)))
+    .returning({ id: referrer_payouts.id });
+  return rows.length > 0;
+}
+
+/** stores the wise recipient a transfer paid, where none is stored yet */
+export async function referrer_payout_recipient_fill(
+  db_: DbOrTx,
+  id: string,
+  recipient_id: string
+) {
+  await db_
+    .update(referrer_payouts)
+    .set({ recipient_id })
+    .where(
+      and(eq(referrer_payouts.id, id), isNull(referrer_payouts.recipient_id))
+    );
+}
+
+/** payouts with a real wise transfer behind them (not a failed attempt, not a
+ * run recovered as owed) dated since `since`, whose stored state is not one of
+ * `final` */
+export async function referrer_payouts_to_poll(
+  since: string,
+  final: readonly string[]
+): Promise<ReferrerPayoutRow[]> {
+  return db
+    .select()
+    .from(referrer_payouts)
+    .where(
+      and(
+        isNotNull(referrer_payouts.transfer_id),
+        isNull(referrer_payouts.error),
+        gt(referrer_payouts.amount, 0),
+        gte(referrer_payouts.date, since),
+        notInArray(referrer_payouts.status, [...final])
+      )
+    )
+    .orderBy(asc(referrer_payouts.date), asc(referrer_payouts.id));
+}
+
+/** returned payouts of a real transfer with no recipient stored, of any age:
+ * the hold refuses every account until it is known, so the poll window does
+ * not bound them. the poll reads it off the transfer */
+export async function referrer_returned_missing_recipient(): Promise<
+  ReferrerPayoutRow[]
+> {
+  return db
+    .select()
+    .from(referrer_payouts)
+    .where(
+      and(
+        isNotNull(referrer_payouts.transfer_id),
+        eq(referrer_payouts.status, "returned"),
+        isNull(referrer_payouts.recipient_id)
+      )
+    )
+    .orderBy(asc(referrer_payouts.date), asc(referrer_payouts.id));
+}
+
+/** the commissions a transfer's ref claimed, row-locked in id order */
+export async function commissions_of_ref_locked(
+  tx: DbOrTx,
+  ref: string
+): Promise<ICommission[]> {
+  const rows = await tx
+    .select()
+    .from(referrer_commissions)
+    .where(eq(referrer_commissions.ref, ref))
+    .orderBy(asc(referrer_commissions.donation_id))
+    .for("update");
+  return rows.map(to_commission);
+}
+
+/** the donation ids among `ids` whose dist was reversed (refunded or lost):
+ * a commission's `donation_id` is its dist's id */
+export async function commissions_reversed(
+  tx: DbOrTx,
+  ids: string[]
+): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await tx
+    .select({ id: dists.id })
+    .from(dists)
+    .where(and(inArray(dists.id, ids), ne(dists.status, "settled")));
+  return new Set(rows.map((r) => r.id));
+}
+
+/** the ref's commissions that are paid go `returned`, ref kept, those in
+ * `only` when it is given; returns those moved */
+export async function commissions_mark_returned(
+  tx: DbOrTx,
+  ref: string,
+  only?: string[]
+): Promise<ICommission[]> {
+  const rows = await tx
+    .update(referrer_commissions)
+    .set({ status: "returned" })
+    .where(
+      and(
+        eq(referrer_commissions.ref, ref),
+        eq(referrer_commissions.status, "paid"),
+        only ? inArray(referrer_commissions.donation_id, only) : undefined
+      )
+    )
+    .returning();
+  return rows
+    .map(to_commission)
+    .sort((a, b) => a.donation_id.localeCompare(b.donation_id));
+}
+
+/** paid commissions `ids` of the ref, whose gift was refunded after they were
+ * paid, go `refunded_loss`, ref kept: never payable again, as one refunded
+ * while its transfer was in flight; returns those moved */
+export async function commissions_mark_refunded_loss(
+  tx: DbOrTx,
+  ref: string,
+  ids: string[]
+): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const rows = await tx
+    .update(referrer_commissions)
+    .set({ status: "refunded_loss" })
+    .where(
+      and(
+        eq(referrer_commissions.ref, ref),
+        eq(referrer_commissions.status, "paid"),
+        inArray(referrer_commissions.donation_id, ids)
+      )
+    )
+    .returning({ id: referrer_commissions.donation_id });
+  return rows.map((r) => r.id).sort();
+}
+
+/** referrers holding returned commissions */
+export async function referrers_with_returned(): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({
+      user: referrer_commissions.referrer_user,
+      npo: referrer_commissions.referrer_npo,
+    })
+    .from(referrer_commissions)
+    .where(eq(referrer_commissions.status, "returned"));
+  return rows.flatMap((r) => r.user ?? r.npo ?? []);
+}
+
+/**
+ * the referrer's latest returned payout, the transfer whose account bounced:
+ * what `return_hold_cause` compares the account paid now with. the one read
+ * the commissions run (skip a held account) and the re-send both use
+ */
+export async function referrer_last_return(
+  referrer: string,
+  db_: DbOrTx = db
+): Promise<
+  Pick<ReferrerPayoutRow, "id" | "date" | "recipient_id"> | undefined
+> {
+  const [row] = await db_
+    .select({
+      id: referrer_payouts.id,
+      date: referrer_payouts.date,
+      recipient_id: referrer_payouts.recipient_id,
+    })
+    .from(referrer_payouts)
+    .where(
+      and(
+        or(
+          eq(referrer_payouts.referrer_user, referrer),
+          eq(referrer_payouts.referrer_npo, referrer)
+        ),
+        eq(referrer_payouts.status, "returned")
+      )
+    )
+    .orderBy(desc(referrer_payouts.date), desc(referrer_payouts.id))
+    .limit(1);
+  return row;
+}
+
+/** the referrer's returned commissions go back to pending, ref cleared, to be
+ * paid with the next run; returns their donation ids */
+export async function returned_commissions_resend(
+  tx: DbOrTx,
+  referrer: string
+): Promise<string[]> {
+  const rows = await tx
+    .update(referrer_commissions)
+    .set({ status: "pending", ref: null })
+    .where(
+      and(of_referrer(referrer), eq(referrer_commissions.status, "returned"))
+    )
+    .returning({ id: referrer_commissions.donation_id });
+  return rows.map((r) => r.id).sort();
 }
 
 export async function referrer_payout_put(db: DbOrTx, data: IPayout) {

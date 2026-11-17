@@ -46,11 +46,17 @@ const wise = vi.hoisted(() => ({
   v2_account: vi.fn(async () => ({ currency: "USD" })),
   quote: vi.fn(async (_: string, q: { sourceAmount: number }) => ({
     id: `q-${q.sourceAmount}`,
+    sourceAmount: q.sourceAmount,
+    sourceCurrency: "USD",
+    payOut: "BANK_TRANSFER",
   })),
-  transfer: vi.fn(async (_: { customerTransactionId: string }) => ({
-    id: 9001,
-    status: "incoming_payment_waiting",
-  })),
+  // none of ours: no recipient here is one of our own balances
+  transfer: vi.fn(
+    async (_: { customerTransactionId: string; quoteUuid: string }) => ({
+      id: 9001,
+      status: "incoming_payment_waiting",
+    })
+  ),
   fund_transfer: vi.fn(async () => ({ status: "COMPLETED" })),
 }));
 vi.mock("$/kit/wise", () => ({ wise }));
@@ -86,6 +92,7 @@ vi.mock("$/pg/db", () => ({
 
 const { index } = await import("./handler");
 const { NotFundedError } = await import("$/payouts/transfer");
+const { resend_returned } = await import("$/payouts/resend-returned");
 const { create_test_db } = await import("$/pg/test-utils/pglite");
 const { banking_apps } = await import("$/pg/schema/banking");
 const { donations } = await import("$/pg/schema/donation");
@@ -275,8 +282,8 @@ describe("grants cron execute", () => {
       })
     );
     expect(await payout_types()).toEqual({
-      "p-1": "settled",
-      "p-2": "settled",
+      "p-1": "processing",
+      "p-2": "processing",
     });
     const [stlmt] = await db().select().from(settlements);
     expect(stlmt).toMatchObject({ id: String(TRANSFER_ID), amount: 100 });
@@ -302,7 +309,7 @@ describe("grants cron execute", () => {
       expect.any(String)
     );
     expect(await payout_types()).toEqual({
-      "p-1": "settled",
+      "p-1": "processing",
       "p-2": "refunded",
     });
     const [stlmt] = await db().select().from(settlements);
@@ -364,7 +371,7 @@ describe("grants cron execute", () => {
       "stuck-1": "processing",
       "stuck-2": "processing",
       "stuck-3": "processing",
-      "p-1": "settled",
+      "p-1": "processing",
     });
   });
 
@@ -381,7 +388,7 @@ describe("grants cron execute", () => {
 
     expect(res.statusCode).toBe(200);
     expect(report_error_mock).toHaveBeenCalledWith(slack_down);
-    expect(await payout_types()).toMatchObject({ "p-1": "settled" });
+    expect(await payout_types()).toMatchObject({ "p-1": "processing" });
   });
 
   test("a snapshot under the npo's minimum claims nothing", async () => {
@@ -413,8 +420,8 @@ describe("grants cron execute", () => {
       expect.any(String)
     );
     expect(await payout_types()).toEqual({
-      "p-1": "settled",
-      "p-2": "settled",
+      "p-1": "processing",
+      "p-2": "processing",
     });
   });
 
@@ -566,8 +573,8 @@ describe("grants cron execute", () => {
         expect.any(String)
       );
       expect(await payout_types()).toEqual({
-        "p-1": "settled",
-        "p-2": "settled",
+        "p-1": "processing",
+        "p-2": "processing",
       });
       expect(await npo_cash(npo_id)).toBe(0);
     }
@@ -586,7 +593,7 @@ describe("grants cron execute", () => {
       100,
       expect.any(String)
     );
-    expect(await payout_types()).toEqual({ "p-1": "settled" });
+    expect(await payout_types()).toEqual({ "p-1": "processing" });
   });
 
   test("two approved banks and no default: no bank is guessed, the payout stays pending", async () => {
@@ -607,5 +614,292 @@ describe("grants cron execute", () => {
     expect(wise_pay_mock).not.toHaveBeenCalled();
     expect(await payout_types()).toEqual({ "p-1": "pending" });
     expect(await npo_cash(npo_id)).toBe(100);
+  });
+
+  /** a run whose transfer came back: its payout `returned`, its settlement too */
+  async function seed_returned(npo_id: number, id: string, amount: number) {
+    await db()
+      .insert(settlements)
+      .values({
+        id: `sttl-${id}`,
+        other_id: `ref-${id}`,
+        npo_id,
+        date: "2026-09-02T00:00:00.000Z",
+        amount,
+        sources: [`dist-${id}`],
+        status: "returned",
+        // the account that bounced: the hold lifts only for a different one
+        recipient_id: String(WISE_RECIPIENT),
+      });
+    await seed_payout(npo_id, id, amount);
+    await db()
+      .update(payouts)
+      .set({
+        type: "returned",
+        settled_id: `sttl-${id}`,
+        settled_date: "2026-09-02T00:00:00.000Z",
+      })
+      .where(eq(payouts.id, id));
+  }
+
+  const old_account = () =>
+    db()
+      .update(banking_apps)
+      .set({ updated_at: "2026-06-01T00:00:00.000Z" })
+      .where(eq(banking_apps.id, String(WISE_RECIPIENT)));
+
+  test.each([false, true])(
+    "an npo with a returned payout is sent nothing, and ops is told once (netting %s)",
+    async (nets) => {
+      deductions.on = nets;
+      const npo_id = await seed_npo({ cash: 300 });
+      await old_account();
+      await seed_returned(npo_id, "p-back", 100);
+      await seed_payout(npo_id, "p-new", 200);
+
+      await index();
+      await index();
+
+      expect(wise_pay_mock).not.toHaveBeenCalled();
+      expect(await payout_types()).toEqual({
+        "p-back": "returned",
+        "p-new": "pending",
+      });
+      expect(await npo_cash(npo_id)).toBe(300);
+      const held = send_alert.mock.calls
+        .map(([a]) => a)
+        .filter((a) => a.title.startsWith("Grants held"));
+      expect(held).toEqual([
+        expect.objectContaining({
+          type: "ERROR",
+          title: `Grants held for npo:${npo_id}: Grants Test NPO`,
+          fields: expect.arrayContaining([
+            { name: "returned", value: "1 payout(s), 100" },
+            { name: "pending", value: "200" },
+          ]),
+        }),
+      ]);
+      const [s] = await db().select().from(settlements);
+      expect(s?.hold_alerted_at).not.toBeNull();
+    }
+  );
+
+  test("an npo whose transfer is bounced is sent nothing, and ops is told it bounced", async () => {
+    const npo_id = await seed_npo({ cash: 300 });
+    await old_account();
+    await seed_returned(npo_id, "p-back", 100);
+    await db()
+      .update(settlements)
+      .set({ status: "bounced_back", date: new Date().toISOString() });
+    await db()
+      .update(payouts)
+      .set({ type: "bounced", settled_date: null })
+      .where(eq(payouts.id, "p-back"));
+    await seed_payout(npo_id, "p-new", 200);
+    // the account that bounced was approved before the transfer went out
+    await db()
+      .update(banking_apps)
+      .set({ updated_at: "2026-06-01T00:00:00.000Z" })
+      .where(eq(banking_apps.id, String(WISE_RECIPIENT)));
+
+    await index();
+
+    expect(wise_pay_mock).not.toHaveBeenCalled();
+    expect(await payout_types()).toEqual({
+      "p-back": "bounced",
+      "p-new": "pending",
+    });
+    const held = send_alert.mock.calls
+      .map(([a]) => a)
+      .filter((a) => a.title.startsWith("Grants held"));
+    expect(held).toEqual([
+      expect.objectContaining({
+        body: expect.stringContaining("bounced"),
+        fields: expect.arrayContaining([
+          {
+            name: "returned",
+            value: "bounced: not credited unless Wise refunds it",
+          },
+        ]),
+      }),
+    ]);
+  });
+
+  test("an npo whose transfer was charged back is sent nothing, and ops is told to resolve it by hand", async () => {
+    const npo_id = await seed_npo({ cash: 300 });
+    await old_account();
+    await seed_returned(npo_id, "p-back", 100);
+    await db()
+      .update(settlements)
+      .set({ status: "charged_back", date: new Date().toISOString() });
+    await db()
+      .update(payouts)
+      .set({ type: "bounced", settled_date: null })
+      .where(eq(payouts.id, "p-back"));
+    await seed_payout(npo_id, "p-new", 200);
+    // the account that bounced was approved before the transfer went out
+    await db()
+      .update(banking_apps)
+      .set({ updated_at: "2026-06-01T00:00:00.000Z" })
+      .where(eq(banking_apps.id, String(WISE_RECIPIENT)));
+
+    await index();
+
+    expect(wise_pay_mock).not.toHaveBeenCalled();
+    expect(await payout_types()).toEqual({
+      "p-back": "bounced",
+      "p-new": "pending",
+    });
+    const held = send_alert.mock.calls
+      .map(([a]) => a)
+      .filter((a) => a.title.startsWith("Grants held"));
+    expect(held).toEqual([
+      expect.objectContaining({
+        body: expect.stringMatching(
+          /charged back.*ends the hold, so the next run pays/
+        ),
+        fields: expect.arrayContaining([
+          {
+            name: "returned",
+            value: "bounced: not credited unless Wise refunds it",
+          },
+        ]),
+      }),
+    ]);
+  });
+
+  test.each(["bounced", "refunded_loss"] as const)(
+    "a charged-back run's %s payout is never re-sent, and nothing is paid to the old account, across runs and re-sends",
+    async (type) => {
+      const npo_id = await seed_npo({ cash: 300 });
+      await old_account();
+      await seed_returned(npo_id, "p-back", 100);
+      await db()
+        .update(settlements)
+        .set({ status: "charged_back", date: new Date().toISOString() });
+      await db().update(payouts).set({ type }).where(eq(payouts.id, "p-back"));
+      await seed_payout(npo_id, "p-new", 200);
+
+      await index();
+      await index();
+      const resent = await resend_returned(npo_id);
+
+      expect(wise_pay_mock).not.toHaveBeenCalled();
+      expect(resent).toMatchObject({ status: "held" });
+      expect(await payout_types()).toEqual({
+        "p-back": type,
+        "p-new": "pending",
+      });
+      expect(await npo_cash(npo_id)).toBe(300);
+    }
+  );
+
+  test("a hold alert that fails to send is tried again on the next run", async () => {
+    const npo_id = await seed_npo({ cash: 300 });
+    await old_account();
+    await seed_returned(npo_id, "p-back", 100);
+    await seed_payout(npo_id, "p-new", 200);
+    send_alert.mockRejectedValueOnce(new Error("slack down"));
+
+    await index();
+    const [s] = await db().select().from(settlements);
+    expect(s?.hold_alerted_at).toBeNull();
+    await index();
+
+    expect(
+      send_alert.mock.calls.filter(([a]) => a.title.startsWith("Grants held"))
+    ).toHaveLength(2);
+  });
+
+  test("an npo whose returned payouts were all refunded stays held: its account is still the one that bounced", async () => {
+    const npo_id = await seed_npo({ cash: 200 });
+    await old_account();
+    await seed_returned(npo_id, "p-back", 100);
+    await mark_refunded("p-back");
+    await seed_payout(npo_id, "p-new", 200);
+
+    await index();
+
+    expect(wise_pay_mock).not.toHaveBeenCalled();
+    expect(await payout_types()).toEqual({
+      "p-back": "refunded",
+      "p-new": "pending",
+    });
+    const held = send_alert.mock.calls
+      .map(([a]) => a)
+      .filter((a) => a.title.startsWith("Grants held"));
+    expect(held).toEqual([
+      expect.objectContaining({
+        fields: expect.arrayContaining([
+          { name: "returned", value: "none left" },
+          { name: "pending", value: "200" },
+        ]),
+      }),
+    ]);
+  });
+
+  test("an npo whose returned transfer awaits repair is held like a returned one, and ops is told once", async () => {
+    const npo_id = await seed_npo({ cash: 300 });
+    await old_account();
+    await db()
+      .insert(settlements)
+      .values({
+        id: "sttl-repair",
+        other_id: "ref-repair",
+        npo_id,
+        date: "2026-09-02T00:00:00.000Z",
+        amount: 100,
+        sources: ["dist-p-loss"],
+        status: "awaiting_repair",
+        recipient_id: String(WISE_RECIPIENT),
+      });
+    await seed_payout(npo_id, "p-new", 200);
+
+    await index();
+    await index();
+
+    expect(wise_pay_mock).not.toHaveBeenCalled();
+    expect(await payout_types()).toEqual({ "p-new": "pending" });
+    expect(await npo_cash(npo_id)).toBe(300);
+    const held = send_alert.mock.calls
+      .map(([a]) => a)
+      .filter((a) => a.title.startsWith("Grants held"));
+    expect(held).toEqual([
+      expect.objectContaining({
+        body: expect.stringContaining("which payouts it covered is unclear"),
+        fields: expect.arrayContaining([
+          { name: "returned", value: "awaiting repair: nothing credited yet" },
+          { name: "pending", value: "200" },
+        ]),
+      }),
+    ]);
+  });
+
+  test("a new account made default releases the hold: the next run pays the returned payouts with the new ones", async () => {
+    const { bapp_set_default } = await import("$/pg/queries/banking");
+    const { resend_returned } = await import("$/payouts/resend-returned");
+    const npo_id = await seed_npo({ cash: 300 });
+    await old_account();
+    await seed_returned(npo_id, "p-back", 100);
+    await seed_payout(npo_id, "p-new", 200);
+    await index();
+    expect(wise_pay_mock).not.toHaveBeenCalled();
+
+    await db()
+      .insert(banking_apps)
+      .values({ id: "778", npo_id, status: "approved" });
+    await bapp_set_default("778", npo_id);
+    await resend_returned(npo_id);
+    // the hold is under test, not the wise chain
+    wise_pay_mock.mockResolvedValue(TRANSFER_ID);
+    await index();
+
+    expect(wise_pay_mock).toHaveBeenCalledOnce();
+    expect(wise_pay_mock).toHaveBeenCalledWith(778, 300, expect.any(String));
+    expect(await payout_types()).toEqual({
+      "p-back": "processing",
+      "p-new": "processing",
+    });
+    expect(await npo_cash(npo_id)).toBe(0);
   });
 });

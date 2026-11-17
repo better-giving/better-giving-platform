@@ -29,7 +29,7 @@ export const Form: FC<Props> = ({ onReset, onSubmit, params }) => {
         : "",
       end_date: params.end_date ? toYYYMMDD(new Date(params.end_date)) : "",
       country: params.country ?? "",
-      status: params.status || "02",
+      status: params.status ?? "",
     },
   });
 

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://fundingjson.org/schema/v1.1.0.json",
+  "version": "v1.1.0",
+  "entity": {
+    "type": "organisation",
+    "role": "owner",
+    "name": "Better Giving, Inc.",
+    "email": "chauncey@better.giving",
+    "description": "Better Giving is a U.S. 501(c)(3) nonprofit (EIN 87-3758939) that builds free, open-source fundraising and financial infrastructure for nonprofits. Since 2021, nonprofits have raised more than $7 million through Better Giving, and more than 260 organisations in over 20 countries have joined. One donation form takes card, bank/ACH, PayPal and Venmo, Apple and Google Pay, stock, donor-advised fund, IRA and crypto gifts, and fiscal sponsorship lets groups without U.S. charity status receive tax-deductible U.S. gifts. Nonprofits pay no platform fee while an optional, never pre-selected donor contribution stays on the form. Our aim is financial sovereignty for nonprofits: each one should own its donor data, its payment relationships and its recurring donors, and be free to leave at any time. All of our code is public, so nonprofits, boards and auditors can verify how donations and fees are handled. Better Giving has endorsed the National Council of Nonprofits' Principles for Ethical Online Fundraising Platforms, and it has no investors and no revenue target.",
+    "webpageUrl": {
+      "url": "https://better.giving"
+    }
+  },
+  "projects": [
+    {
+      "guid": "better-giving-platform",
+      "name": "Better Giving platform",
+      "description": "The code behind better.giving, Better Giving's managed fundraising platform, published under GPL-3.0. It provides a brandable, embeddable donation form for card, bank/ACH, PayPal and Venmo, Apple and Google Pay, stock, donor-advised fund, IRA and crypto gifts, with recurring giving, automatic tax receipts, fiscal sponsorship, international payouts and free donor-data export by CSV and API. Under its Recurring-Donor Portability Guarantee, Better Giving moves a departing nonprofit's monthly donors to its new platform free of charge. Since May 2024 alone, the platform has delivered more than $730,000 to 90 nonprofits in 22 countries, 40 of them fiscally sponsored groups. Publishing the code lets anyone verify how donations and fees are handled instead of taking our word for it.",
+      "webpageUrl": {
+        "url": "https://better.giving/open-source"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/better-giving/better-giving-platform",
+        "wellKnown": "https://github.com/better-giving/better-giving-platform/blob/main/.well-known/funding-manifest-urls"
+      },
+      "licenses": ["spdx:GPL-3.0"],
+      "tags": ["nonprofit", "fundraising", "donations", "payments", "fiscal-sponsorship", "typescript"]
+    },
+    {
+      "guid": "better-giving-self-host",
+      "name": "Better Giving self-host",
+      "description": "An MIT-licensed donation platform that a nonprofit runs on its own server, with Docker Compose or on Fly.io, connected to its own Stripe, PayPal, Chariot (donor-advised funds) or NOWPayments (crypto) account. Gifts settle directly to the organisation, and its donors' recurring payment credentials stay in its own processor account, so no platform can hold its donors hostage or cut it off. It includes a donor page and embeddable form, a staff dashboard for campaigns, gifts and donors, email receipts, a ledger, webhooks, a public form API, a Zapier integration and a QuickBooks connection. It is in active development, with 30 alpha releases since September 2026 (latest v0.0.42-alpha).",
+      "webpageUrl": {
+        "url": "https://better.giving/open-source"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/better-giving/better-giving",
+        "wellKnown": "https://github.com/better-giving/better-giving/blob/main/.well-known/funding-manifest-urls"
+      },
+      "licenses": ["spdx:MIT"],
+      "tags": ["nonprofit", "fundraising", "self-hosted", "donations", "payments", "typescript"]
+    }
+  ],
+  "funding": {
+    "channels": [
+      {
+        "guid": "bank",
+        "type": "bank",
+        "description": "Bank transfer to Better Giving, Inc., a U.S. 501(c)(3). Details on request to chauncey@better.giving."
+      }
+    ],
+    "plans": [
+      {
+        "guid": "self-host-1-0",
+        "status": "active",
+        "name": "Self-host 1.0: secure, sovereign fundraising for nonprofits",
+        "description": "Takes the self-hosted edition from alpha to a stable 1.0 within 12 months: an independent security review of payment and donor-data handling, a published security policy with automated dependency and code scanning, tools to move recurring donors and their payment credentials between processors and off any platform, signed releases, and deployment guides for nonprofits and their volunteer IT helpers.",
+        "amount": 25000,
+        "currency": "USD",
+        "frequency": "yearly",
+        "channels": ["bank"]
+      },
+      {
+        "guid": "any-amount",
+        "status": "active",
+        "name": "General support",
+        "description": "Any amount toward maintaining Better Giving's open-source code.",
+        "amount": 0,
+        "currency": "USD",
+        "frequency": "one-time",
+        "channels": ["bank"]
+      }
+    ]
+  }
+}

@@ -1,11 +1,12 @@
 import { EmptyRow, LoadMoreRow } from "@better-giving/ui";
 import { format } from "date-fns";
+import { GrantAmount } from "#/components/returned-payout";
 import type { IPaginator } from "#/types/components";
 import { humanize } from "@/helpers/decimal";
 import type { IGrantRunDeductions } from "$/pg/queries/owed-history";
-import type { SettlementRow } from "$/pg/queries/payout";
+import type { GrantRow } from "$/pg/queries/payout";
 
-export interface IGrantLine extends SettlementRow {
+export interface IGrantLine extends GrantRow {
   /** set when the grant recovered anything owed */
   run?: IGrantRunDeductions;
 }
@@ -37,7 +38,7 @@ export function GrantsTable({
             items.map((payout, idx) => (
               <tr key={idx}>
                 <td>
-                  ${humanize(payout.amount)}{" "}
+                  <GrantAmount grant={payout} amount={usd(payout.amount)} />
                   {payout.run && payout.run.deductions.length > 0 && (
                     <ul className="text-sm text-gray-11">
                       <li>Gross {usd(payout.run.gross)}</li>

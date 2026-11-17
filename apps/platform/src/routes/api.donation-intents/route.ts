@@ -17,7 +17,7 @@ import { crypto_intent } from "./crypto";
 import { paypal_intent } from "./paypal";
 import { capture_order } from "./paypal/capture-order";
 import { stripe_intent } from "./stripe";
-import type { Ctx, Provider } from "./types";
+import { type Ctx, type Provider, REFUSED_COPY } from "./types";
 
 const providers = {
   card: stripe_intent,
@@ -63,9 +63,7 @@ const json_with_cookie_fn =
 // refusal header `resp.refuse` sets. the detail stays in the log
 const refused = (detail: string) => {
   console.info(`[resp] 400 - ${detail}`);
-  return resp.refuse(
-    "We couldn't process this donation. Please refresh the page and try again."
-  );
+  return resp.refuse(REFUSED_COPY);
 };
 
 const refused_issue = ([i]: [BaseIssue<unknown>, ...BaseIssue<unknown>[]]) =>
@@ -103,6 +101,11 @@ export const action: ActionFunction = async ({ request }) => {
     campaign_id: requested_campaign,
     ...rest
   } = parsed.output;
+
+  // the chariot row is stored at upusd 1, which is only true of usd
+  if (via === "chariot" && rest.currency !== "USD") {
+    return refused(`chariot is usd-only, got ${rest.currency}`);
+  }
 
   const to = await to_fn(to_id, { open_at: new Date() });
   if (!to) {
