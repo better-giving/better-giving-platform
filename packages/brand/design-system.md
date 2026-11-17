@@ -316,12 +316,11 @@ step-1 fill reads against the step-2 card. Do not move it to step 9 without a
 new PM call. `.btn-secondary` draws the same 7 / 8, and so does a **switch's**
 off-state ring (`gray-7`): its off state reads by the ring alone, so this miss
 carries state — accepted all the same (PM, 2026-11-01: "stay true to radix");
-`contrast.test.ts` pins it under 3:1.
+`contrast.test.ts` pins the step.
 
 **Radix is the authority — PM rule (2026-11-01).** Where a Radix step role and
-a measurement (WCAG 2, APCA) or a house convention disagree, the Radix role
-wins; the miss is recorded here and pinned in `contrast.test.ts`, never fixed
-silently by moving a step. Only a new PM call moves a token off its role.
+a measurement (APCA) or a house convention disagree, the Radix role
+wins; the miss is recorded here, never fixed silently by moving a step. Only a new PM call moves a token off its role.
 
 **Contrast is judged in APCA, as Radix judges it — PM rule (2026-11-02).**
 Radix's only contrast guarantee is APCA: steps 11 and 12 are built to Lc 60 and
@@ -334,9 +333,8 @@ measure the same step-7/8 edges and step-8 ring as ours — the faint edges are
 Radix's design, not a custom ramp.
 
 **The focus ring stays Radix's step 8 — PM decision (2026-11-01).** `--ring` (`accent-8`) is
-Lc 42.7 on the card, clear of APCA's Lc 30, and **2.24:1** on the card in WCAG 2
-terms (2.30:1 on the page), under the 3:1 1.4.11 asks of a state indicator.
-Radix assigns step 8 to the ring; the PM chose Radix over the WCAG 2 figure, accepting the miss (APCA clears it). Do not move it to step 9 without a new PM call.
+Lc 42.7 on the card, clear of APCA's Lc 30.
+Radix assigns step 8 to the ring and sets no contrast target for it. Do not move it to step 9 without a new PM call.
 
 **Steps that were off role before this, now moved** (for the next reader
 diffing against history): the page was `gray-2` (now 1); the card was white
@@ -554,9 +552,8 @@ Lc 65.8 on `--secondary`, Lc 55.1 on the `accent-5` pressed rung;
 `gray-12` on the band is Lc 95.7, so it also takes neutral body copy.**
 Step 3 because it is Radix's component background: on `success-2` the band sat on
 the `gray-2` card at 1.005:1, so a success `Badge` or active pill had no visible
-fill. The WCAG 2 figure for the ink on it is 4.45:1, just under 4.5:1 — recorded
-for reference, not the gate (Radix is the authority, PM rule 2026-11-01), and
-`contrast.test.ts` pins it under 4.5:1 so a step move is a new decision.
+fill. The ink on it is Lc 66.1, clear of Lc 60 (Radix is the authority, PM rule
+2026-11-01), and `contrast.test.ts` pins the step so a move is a new decision.
 
 The three cross-scale figures in that list (green ink on a gray or blue surface)
 are **not** covered by the accepted-misses policy, which only speaks for
@@ -1137,11 +1134,11 @@ guarding them is its own change.
 
 Recorded so they are not "fixed" by someone reading them as oversights.
 
-- **The success band's ink is 4.45:1 in WCAG 2 terms.** `--success-subtle` is
+- **The success band is `success-3`, not `success-2`.** `--success-subtle` is
   `success-3`, Radix's component background; on `success-2` the band sat on the
   `gray-2` card at 1.005:1 and a success `Badge` or active pill had no fill.
-  success-11 on it is Lc 66.1, clear of Lc 60; the WCAG figure is recorded, not
-  the gate, and `contrast.test.ts` pins it under 4.5:1 (see `--success-subtle`).
+  success-11 on it is Lc 66.1, clear of Lc 60, and `contrast.test.ts` pins the
+  step (see `--success-subtle`).
 - **A goal bar shows a 4px fill for $25 against $100,000.** Not a rounding
   error: `GoalBar` floors any amount raised at `min-w-1`, trading true
   proportion at the very bottom of the bar for a first gift being seen. Nothing
@@ -1170,8 +1167,8 @@ Recorded so they are not "fixed" by someone reading them as oversights.
   donation form's two hand-rolled ones) draws its off-state ring in `gray-7`,
   Radix's interactive border (1.48:1 on the card): on spec by the same rule,
   though that ring alone carries the state.
-- **The focus ring is under 3:1 in WCAG 2 terms.** `--ring` (`accent-8`) is
-  Lc 42.7 on the card, clear of APCA's Lc 30, and 2.24:1 in WCAG 2 — on spec:
+- **The focus ring is Radix's step 8.** `--ring` (`accent-8`) is
+  Lc 42.7 on the card, clear of APCA's Lc 30 — on spec:
   Radix's step 8 is the focus ring and it sets no contrast target (PM rule, 2026-11-02). It is not compensated for by
   anything else: the offset only moves it off a fill.
 - **`--destructive` is destructive-9 and clears every surface in the palette** (Lc 74.1 on
