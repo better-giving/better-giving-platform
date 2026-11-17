@@ -19,7 +19,7 @@ export function WarningCallout({
   return (
     <section
       aria-labelledby={title_id}
-      className={`${classes} flex items-start gap-3 bg-warning-subtle border border-amber-6 rounded-card p-4 text-warning-subtle-fg ${action ? "max-md:grid max-md:grid-cols-[auto_1fr]" : ""}`}
+      className={`${classes} flex items-start gap-3 bg-warning-subtle border border-warning-6 rounded-card p-4 text-warning-subtle-fg ${action ? "max-md:grid max-md:grid-cols-[auto_1fr]" : ""}`}
     >
       {/* 2px down: centres the 20px icon on the title's 24px first line */}
       <TriangleAlertIcon
