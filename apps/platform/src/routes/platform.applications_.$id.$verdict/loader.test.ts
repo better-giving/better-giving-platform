@@ -15,9 +15,6 @@ vi.mock("#/errors/report", () => ({
   report_degraded: () => {},
   report_degraded_null: () => null,
 }));
-vi.mock("$/payouts/own-accounts", () => ({
-  is_own_recipient: vi.fn(async () => false),
-}));
 vi.mock("./npo-new", () => ({ npo_new: vi.fn(), announce_approval: vi.fn() }));
 const routing = vi.hoisted(() => ({ on: true }));
 vi.mock("$/env", () => ({

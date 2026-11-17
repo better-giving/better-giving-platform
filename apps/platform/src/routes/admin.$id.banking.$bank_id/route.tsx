@@ -2,7 +2,6 @@ import { Badge, Breadcrumb, ExtLink } from "@better-giving/ui";
 import { CircleAlert, SquareArrowOutUpRight } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { href, NavLink, Outlet, useFetcher } from "react-router";
-import { WarningCallout } from "#/components/warning-callout";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
 import { doc_href } from "@/docs";
 import type { Route } from "./+types/route";
@@ -52,17 +51,6 @@ export default function Page({ loaderData: d, params }: Route.ComponentProps) {
           </span>
           <span>{d.ba.rejection_reason}</span>
         </p>
-      )}
-
-      {d.own_account && (
-        <WarningCallout
-          title="This matches a Better Giving bank account"
-          classes="mb-2"
-        >
-          Payouts sent here may not reach your nonprofit. If you entered it by
-          mistake, add your own bank account instead. Otherwise no action is
-          needed.
-        </WarningCallout>
       )}
 
       <dl className="grid sm:grid-cols-[auto_auto_1fr] bg-card rounded-card border border-hairline mt-2">

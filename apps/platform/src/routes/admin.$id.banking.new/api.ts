@@ -2,15 +2,12 @@ import type { ActionFunction } from "react-router";
 import * as v from "valibot";
 import { admin_ctx, user_ctx } from "#/.server/auth";
 import { redirectWithSuccess } from "#/.server/toast";
-import { report_degraded_null } from "#/errors/report";
 import { routes } from "#/pages/admin/routes";
 import { new_bank as schema } from "@/banking/schema";
 import { resp } from "@/helpers/https";
 import { msg } from "@/queue";
 import { FOREIGN_DOC, may_store_doc } from "$/doc-access";
 import { enqueue } from "$/kit/queue";
-import { wise } from "$/kit/wise";
-import { is_own_recipient } from "$/payouts/own-accounts";
 import { db } from "$/pg/db";
 import { bapp_get, bapp_put, npo_bapp_count } from "$/pg/queries/banking";
 
@@ -31,17 +28,6 @@ export const action: ActionFunction = async (args) => {
   if (!may_store_doc(args.context.get(user_ctx).id, statement, undefined)) {
     return resp.fail(400, FOREIGN_DOC);
   }
-
-  // read from wise, never the body
-  const wacc = await wise
-    .v2_account(+x.wiseRecipientID)
-    .catch(report_degraded_null);
-  // an account that matches one of ours is filed all the same: the page the
-  // member lands on says so, and nothing is rejected over it. a check that
-  // could not run says nothing to the member; staff see it at approval
-  const own = wacc
-    ? await is_own_recipient(wacc).catch(report_degraded_null)
-    : null;
 
   const count = await npo_bapp_count(npo_id);
   const filed =
@@ -79,9 +65,7 @@ export const action: ActionFunction = async (args) => {
   await enqueue(msg("banking-new", { npo_id }));
 
   return redirectWithSuccess(
-    own === true
-      ? `../${routes.banking}/${x.wiseRecipientID}`
-      : `../${routes.banking}`,
+    `../${routes.banking}`,
     "Banking application submitted"
   );
 };

@@ -9,17 +9,12 @@ const q = vi.hoisted(() => ({
   npo_default_bapp: vi.fn(),
 }));
 const wise = vi.hoisted(() => ({ v2_account: vi.fn() }));
-const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
 const hold = vi.hoisted(() => ({ npo_return_hold: vi.fn() }));
 const queue = vi.hoisted(() => ({ enqueue: vi.fn() }));
 
 vi.mock("$/pg/queries/banking", () => q);
 vi.mock("$/pg/queries/npo", () => ({ npos_batch_get: async () => [] }));
 vi.mock("$/kit/wise", () => ({ wise }));
-vi.mock("$/payouts/own-accounts", async (io) => ({
-  ...(await io<typeof import("$/payouts/own-accounts")>()),
-  ...own,
-}));
 vi.mock("$/payouts/resend-returned", () => hold);
 vi.mock("$/kit/queue", () => queue);
 vi.mock("#/.server/toast", () => ({ redirectWithSuccess: vi.fn() }));
@@ -65,7 +60,6 @@ beforeEach(() => {
   for (const f of Object.values(q)) f.mockReset();
   wise.v2_account.mockReset();
   wise.v2_account.mockResolvedValue({ id: BAPP_ID, currency: "USD" });
-  own.is_own_recipient.mockReset().mockResolvedValue(false);
   hold.npo_return_hold.mockReset().mockResolvedValue(null);
   queue.enqueue.mockReset();
 });
@@ -141,41 +135,6 @@ describe("the approve submit, posted around the page", () => {
     await submit("rejected");
 
     expect(q.bapp_update_status).toHaveBeenCalled();
-  });
-
-  it.each([
-    [
-      "is one of Better Giving's own",
-      () => own.is_own_recipient.mockResolvedValue(true),
-    ],
-    [
-      "can't be checked against ours",
-      () =>
-        own.is_own_recipient.mockRejectedValue(
-          new Error("account-details 503")
-        ),
-    ],
-  ])(
-    "approves an account that %s: it is warned about, never refused",
-    async (_name, arrange) => {
-      q.bapp_get.mockResolvedValue(bapp("under-review"));
-      q.bapp_approve.mockResolvedValue({ status: "under-review" });
-      arrange();
-
-      await submit("approved");
-
-      expect(q.bapp_approve).toHaveBeenCalledWith(String(BAPP_ID), 7, {
-        as_default: false,
-      });
-      expect(queue.enqueue).toHaveBeenCalled();
-    }
-  );
-
-  it("opens the approve prompt for an account that is one of our own", async () => {
-    q.bapp_get.mockResolvedValue(bapp("under-review"));
-    own.is_own_recipient.mockResolvedValue(true);
-
-    expect(await redirected_to()).toBeNull();
   });
 });
 

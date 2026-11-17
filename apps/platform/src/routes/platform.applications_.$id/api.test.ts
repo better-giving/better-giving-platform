@@ -2,11 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const reg_get = vi.hoisted(() => vi.fn());
 const wise = vi.hoisted(() => ({ v2_account: vi.fn() }));
-const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
 
 vi.mock("$/pg/queries/registration", () => ({ reg_get }));
 vi.mock("$/kit/wise", () => ({ wise }));
-vi.mock("$/payouts/own-accounts", () => own);
 vi.mock("#/errors/report", () => ({
   report_degraded: () => {},
   report_degraded_null: () => null,
@@ -25,54 +23,30 @@ beforeEach(() => {
     o_bank_statement: "https://example.com/s.pdf",
   });
   wise.v2_account.mockReset().mockResolvedValue({ currency: "USD" });
-  own.is_own_recipient.mockReset().mockResolvedValue(false);
 });
 
-describe("registration review: own-account flag", () => {
-  it.each([
-    [
-      "a confirmed match",
-      () => own.is_own_recipient.mockResolvedValue(true),
-      true,
-      false,
-    ],
-    [
-      "no match",
-      () => own.is_own_recipient.mockResolvedValue(false),
-      false,
-      false,
-    ],
-    [
-      "a check that could not run",
-      () => own.is_own_recipient.mockRejectedValue(new Error("503")),
-      false,
-      true,
-    ],
-  ])("is %s", async (_name, arrange, own_account, own_account_unknown) => {
-    arrange();
-
+describe("registration review", () => {
+  it("reads the bank on file from wise", async () => {
     const d = await review_get(REG_ID);
 
-    expect(d.own_account).toBe(own_account);
-    expect(d.own_account_unknown).toBe(own_account_unknown);
+    expect(wise.v2_account).toHaveBeenCalledWith(40000001);
+    expect(d.wacc_unavailable).toBe(false);
   });
 
-  it("is false when the registration has no bank (Stripe only), and asks nothing", async () => {
+  it("asks wise nothing when the registration has no bank (Stripe only)", async () => {
     reg_get.mockResolvedValue({ id: REG_ID, status: "02", o_bank_id: "" });
 
     const d = await review_get(REG_ID);
-    expect(d.own_account).toBe(false);
-    expect(d.own_account_unknown).toBe(false);
-    expect(own.is_own_recipient).not.toHaveBeenCalled();
+
+    expect(wise.v2_account).not.toHaveBeenCalled();
+    expect(d.wacc_unavailable).toBe(false);
   });
 
-  it("is false when wise can't return the account", async () => {
+  it("is unavailable when wise can't return the account", async () => {
     wise.v2_account.mockRejectedValue(new Error("wise down"));
 
     const d = await review_get(REG_ID);
 
     expect(d.wacc_unavailable).toBe(true);
-    expect(d.own_account).toBe(false);
-    expect(d.own_account_unknown).toBe(false);
   });
 });

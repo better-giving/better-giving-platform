@@ -44,7 +44,6 @@ const wise = vi.hoisted(() => {
       payOut: "BANK_TRANSFER",
     })),
     // none of ours: no recipient here is one of our own balances
-    account_details: vi.fn(async () => []),
     transfer: vi.fn(
       async (t: {
         customerTransactionId: string;
@@ -283,38 +282,6 @@ describe("commissions cron", () => {
 
     expect(quoted()).toEqual([60]);
     expect(await statuses()).toEqual({ "d-1": "paid" });
-  });
-
-  test("a payout to one of our own wise accounts is paid as normal, and ops is warned", async () => {
-    await seed("d-1", 60);
-    wise.v2_account.mockResolvedValueOnce({
-      currency: "USD",
-      ownedByCustomer: true,
-      name: { fullName: "Better Giving Inc" },
-    } as never);
-    const at_warning: Record<string, string>[] = [];
-    send_alert.mockImplementation(async (a: { title: string }) => {
-      if (a.title.startsWith("payout to one of"))
-        at_warning.push(await statuses());
-    });
-
-    await index();
-
-    // recorded first: the commission is already paid when the alert goes out
-    expect(at_warning).toEqual([{ "d-1": "paid" }]);
-
-    expect(wise.transfer).toHaveBeenCalledOnce();
-    expect(wise.fund_transfer).toHaveBeenCalledOnce();
-    expect(await statuses()).toEqual({ "d-1": "paid" });
-    const warned = send_alert.mock.calls
-      .map(([a]) => a)
-      .filter(
-        (a) => a.title === "payout to one of Better Giving's own Wise accounts"
-      );
-    expect(warned).toHaveLength(1);
-    expect(warned[0]!.fields).toEqual(
-      expect.arrayContaining([{ name: "recipient", value: "42" }])
-    );
   });
 
   test("a retry over a grown set after an unknown funding outcome pays only the new commission", async () => {

@@ -68,7 +68,7 @@ vi.mock("remix-client-cache", () => ({
 }));
 
 vi.mock("$/kit/wise", () => ({
-  wise: { v2_account: vi.fn(), account_details: vi.fn() },
+  wise: { v2_account: vi.fn() },
 }));
 
 vi.mock("#/.server/toast", async () => {
@@ -128,7 +128,6 @@ beforeEach(async () => {
   // action re-checks the account before writing, so it needs one too.
   vi.mocked(wise.v2_account).mockResolvedValue(WISE_FIXTURE as never);
   // none of the balances we hold shares the fixture's account number
-  vi.mocked(wise.account_details).mockResolvedValue([]);
 });
 
 // --- helpers ---
@@ -198,8 +197,6 @@ const WISE_FIXTURE = {
   currency: "USD",
   country: "US",
   name: { fullName: "Jane Doe" },
-  own_account: false,
-  own_account_unknown: false,
   type: "checking",
   legalEntityType: "PERSON" as const,
   longAccountSummary: "USD account ending in 1234",
