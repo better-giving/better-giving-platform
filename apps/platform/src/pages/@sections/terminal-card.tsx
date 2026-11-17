@@ -1,3 +1,5 @@
+import { Fragment } from "react";
+
 interface ITerminalCard {
   label: string;
   classes?: string;
@@ -11,7 +13,12 @@ export function TerminalCard({ label, classes = "", children }: ITerminalCard) {
   return (
     <figure className={`${classes} card grid gap-2 min-w-0`}>
       <figcaption className="font-mono text-sm text-gray-11">
-        {label}
+        {label.split(" / ").map((part, i) => (
+          <Fragment key={part}>
+            {i > 0 && " / "}
+            <span className="whitespace-nowrap">{part}</span>
+          </Fragment>
+        ))}
       </figcaption>
       {/* pre-wrap, not a sideways scroll: the lines are prose-length and a
           scroller at 390 hides the end of every one */}
