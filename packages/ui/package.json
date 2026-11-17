@@ -17,6 +17,7 @@
     "./tooltip": "./src/components/tooltip.tsx",
     "./hover-card": "./src/components/hover-card.tsx",
     "./styles.css": "./src/styles/index.css",
+    "./fonts.css": "./src/styles/fonts.css",
     "./fonts/*": "./src/styles/fonts/*",
     "./colors.css": "./src/styles/colors.css",
     "./themes/default.css": "./src/styles/themes/default.css"
