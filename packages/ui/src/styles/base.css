@@ -12,6 +12,31 @@
     outline-color: var(--ring);
   }
 
+  /* the page: long words wrap instead of widening a box; the last line of a
+     paragraph is never a lone word. no scrollbar-gutter: a stable gutter
+     shortens the viewport by the scrollbar's width for fixed layers, so a
+     sheet or scrim would stop short of the window's edge on a classic
+     scrollbar. */
+  :root {
+    overflow-wrap: break-word;
+    text-wrap: pretty;
+  }
+
+  /* a heading breaks evenly across its lines */
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  /* no double-tap zoom wait on a control */
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+
   h1,
   h2,
   h3,

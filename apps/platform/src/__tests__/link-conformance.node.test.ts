@@ -162,7 +162,13 @@ describe("the link recipe", () => {
     // the same split the type roles keep by holding no colour. a display or a
     // font-weight baked in here is a decision every one of the 139 call sites
     // would then have to cancel.
-    const decls = [...recipe.matchAll(/([a-z-]+):\s*([^;]+);/g)].map(
+    // the hover rung sits in the registry's fine-pointer media query, so a
+    // touch tap does not leave a stuck hover; the wrapper is unwrapped here and
+    // asserted on its own below.
+    const flat = recipe
+      .replace("@media (hover: hover) and (pointer: fine) {", "")
+      .replace("&:hover {", "");
+    const decls = [...flat.matchAll(/([a-z-]+):\s*([^;]+);/g)].map(
       (m) => `${m[1]}: ${m[2]}`
     );
     expect(decls).toEqual([
@@ -175,6 +181,12 @@ describe("the link recipe", () => {
     // link on a pointer press that no control in components.css rings.
     expect(recipe).toContain("&:focus-visible {");
     expect(recipe).not.toMatch(/&:focus\s*\{/);
+  });
+
+  test("the hover rung fires on a fine pointer only", () => {
+    expect(recipe).toMatch(
+      /@media \(hover: hover\) and \(pointer: fine\) \{\s*&:hover \{\s*color: var\(--link-hover\);/
+    );
   });
 
   test("both rungs are the ramp's own tokens", () => {

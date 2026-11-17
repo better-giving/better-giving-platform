@@ -123,6 +123,17 @@
   --animate-spinner: spin 0.8s linear infinite;
 }
 
+/* hover: only where the pointer can hover and is fine: a phone that also
+   reports a mouse, or a stylus, keeps no hover fill stuck after a tap (the
+   stock variant gates on (hover: hover) alone). */
+@custom-variant hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
+
 /* the dark: variant follows the same switch the themes do: the .dark class on an
    ancestor, not the system setting. a .light area inside a dark page is light
    again, so it is excluded, and everything under it: a .dark area nested inside
@@ -504,22 +515,36 @@
      the sweep rather than the compiler is what keeps a literal out of a call
      site.
 
-     easing is a real namespace, and tailwind's three curves are exactly the
-     three roles this system has, so the set is inherited unchanged rather
-     than redeclared:
-       ease-out     something entering        (--animate-*-in below)
-       ease-in      something leaving         (--animate-*-out below)
-       ease-in-out  a control moving between two resting states — a hover
-                    colour, a toggle thumb, a chevron flipping
-     the third is the default, so a call site writes no easing for it at all —
-     which is what keeps an explicit ease-out or ease-in meaning enter or exit
-     and nothing else. */
+     easing is a real namespace, and the system has two roles in it, each
+     redeclared below with good-css's curve over tailwind's weaker default,
+     plus linear for a bar that is only measuring:
+       ease-out     entering and leaving (a sheet, a drawer, a menu, a dialog,
+                    a scrim) and feedback (a hover fade, a press fill, a press
+                    scale). the default, so a call site writes no easing for it
+                    at all
+       ease-in-out  something moving on screen between two resting places: a
+                    toggle thumb, a chevron turning
+       linear       a progress or route bar growing
+     tailwind's ease-in is left as it ships and unused: good-css has no
+     ease-in on UI, so a leaving thing eases like an entering one. */
+  --ease-out: cubic-bezier(
+    0.23,
+    1,
+    0.32,
+    1
+  ); /* something entering or leaving */
+  --ease-in-out: cubic-bezier(
+    0.77,
+    0,
+    0.175,
+    1
+  ); /* a control moving between two resting states */
   --duration-fast: 150ms; /* a control acknowledging you, and a popup */
   --duration-base: 200ms; /* an element entering or leaving the page */
   --duration-slow: 300ms; /* something changing size in the flow */
 
   --default-transition-duration: var(--duration-fast);
-  --default-transition-timing-function: var(--ease-in-out);
+  --default-transition-timing-function: var(--ease-out);
 
   /*
    * ark overlay/accordion animations.
@@ -530,11 +555,16 @@
    * with `overflow-hidden` on item-content (--height is set during transitions).
    */
   --animate-overlay-in: overlay-in var(--duration-base) var(--ease-out);
-  --animate-overlay-out: overlay-out var(--duration-base) var(--ease-in);
+  --animate-overlay-out: overlay-out var(--duration-base) var(--ease-out);
   --animate-popup-in: popup-in var(--duration-fast) var(--ease-out);
-  --animate-popup-out: popup-out var(--duration-fast) var(--ease-in);
+  --animate-popup-out: popup-out var(--duration-fast) var(--ease-out);
   --animate-accordion-down: accordion-down var(--duration-slow) var(--ease-out);
   --animate-accordion-up: accordion-up var(--duration-slow) var(--ease-out);
+  /* a sheet slides in from the inline end and back out. --sheet-from is
+     where it starts and ends: 100% (its own width) by default, -100% under
+     rtl, where the end is on the left. */
+  --animate-sheet-in: sheet-in var(--duration-base) var(--ease-out);
+  --animate-sheet-out: sheet-out var(--duration-base) var(--ease-out);
   /* ark marquee: vars (--marquee-duration/delay/loop-count) provided by machine */
   --animate-marquee-y: marqueeY var(--marquee-duration) linear
     var(--marquee-delay) var(--marquee-loop-count);
@@ -577,20 +607,30 @@
       scale: 0.95;
     }
   }
+  @keyframes sheet-in {
+    from {
+      translate: var(--sheet-from, 100%) 0;
+    }
+  }
+  @keyframes sheet-out {
+    to {
+      translate: var(--sheet-from, 100%) 0;
+    }
+  }
   @keyframes accordion-down {
     from {
-      height: 0;
+      block-size: 0;
     }
     to {
-      height: var(--height);
+      block-size: var(--height);
     }
   }
   @keyframes accordion-up {
     from {
-      height: var(--height);
+      block-size: var(--height);
     }
     to {
-      height: 0;
+      block-size: 0;
     }
   }
   @keyframes marqueeY {

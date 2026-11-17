@@ -5,11 +5,13 @@ import {
   Fragment,
   isValidElement,
   type ReactNode,
+  useCallback,
   useEffect,
   useId,
   useRef,
   useState,
 } from "react";
+import { use_theme_host } from "../helpers/theme-host";
 import { popup_anim, popup_shell } from "./popup";
 
 // no-op: the arrow is rendered by `Tooltip` itself
@@ -46,7 +48,7 @@ const wrap_trigger = [
   "outline-0 focus-visible:*:outline-2 focus-visible:*:outline-ring focus-visible:*:outline-offset-2",
   "not-has-[>.absolute]:relative not-has-[>.absolute]:after:absolute",
   "after:top-1/2 after:left-1/2 after:-translate-x-1/2 after:-translate-y-1/2",
-  "after:size-6 after:min-w-full after:min-h-full",
+  "after:size-6 after:min-inline-full after:min-block-full",
 ].join(" ");
 
 const BLOCK = new Set(["p", "div", "li", "br", "ul", "ol"]);
@@ -83,6 +85,24 @@ export function Tooltip(props: Props) {
   const name_id = useId();
   const desc_id = useId();
   const wrap_ref = useRef<HTMLButtonElement>(null);
+  const theme = use_theme_host(open);
+  const show = (next: boolean) => {
+    if (next) theme.place();
+    set_open(next);
+  };
+  const anchor_ref = useCallback(
+    (el: HTMLElement | null) => {
+      theme.anchor.current = el;
+    },
+    [theme.anchor]
+  );
+  const wrap_anchor_ref = useCallback(
+    (el: HTMLButtonElement | null) => {
+      wrap_ref.current = el;
+      theme.anchor.current = el;
+    },
+    [theme.anchor]
+  );
   const as_child =
     props.trigger === "child" ||
     (props.trigger === undefined &&
@@ -108,6 +128,12 @@ export function Tooltip(props: Props) {
     }
   }, []);
 
+  // a part that makes the child its own trigger (a menu's, a dialog's close)
+  // gives it that part's id, which the child's props carry over zag's; zag
+  // finds the anchor by id, so it is told that one or places the tip at 0,0
+  const child_id = as_child
+    ? (props.children.props as { id?: unknown }).id
+    : undefined;
   const own_text = as_child ? "" : squash(text_of(props.children));
   const tip_text = squash(
     text_of(
@@ -119,25 +145,27 @@ export function Tooltip(props: Props) {
 
   return (
     <ArkTooltip.Root
+      {...(typeof child_id === "string" && { ids: { trigger: child_id } })}
       open={open}
-      onOpenChange={(e) => set_open(e.open)}
+      onOpenChange={(e) => show(e.open)}
       openDelay={50}
       closeOnClick={false}
       // unmount positioner (and arrow) once content's exit animation ends,
       // otherwise the arrow lingers after content hides.
       lazyMount
       unmountOnExit
-      positioning={{ gutter: 4 }}
+      // fixed: a theme scope may clip with overflow, where body never did
+      positioning={{ gutter: 4, strategy: "fixed" }}
     >
       {as_child ? (
-        <ArkTooltip.Trigger onClick={() => set_open(true)} asChild>
+        <ArkTooltip.Trigger ref={anchor_ref} onClick={() => show(true)} asChild>
           {props.children}
         </ArkTooltip.Trigger>
       ) : (
         <ArkTooltip.Trigger
-          ref={wrap_ref}
+          ref={wrap_anchor_ref}
           type="button"
-          onClick={() => set_open(true)}
+          onClick={() => show(true)}
           className={wrap_trigger}
           // a hidden label, not aria-label: an ancestor named through its own
           // aria-labelledby (a radio's label) skips a nested labelledby, so the
@@ -162,10 +190,15 @@ export function Tooltip(props: Props) {
           {tip_text}
         </span>
       )}
-      <Portal>
-        <ArkTooltip.Positioner className="[--arrow-size:10px] [--arrow-background:var(--popover)]">
+      {/* in the trigger's theme scope, so a themed area's tip keeps its look */}
+      <Portal container={theme.host}>
+        {/* zag copies the positioner's z-index from its first child, which
+            is the arrow (auto), so the layer is set here: it beats zag's
+            inline z-index, and a tip in a dialog or drawer clears it */}
+        <ArkTooltip.Positioner className="z-floating! [--arrow-size:10px] [--arrow-background:var(--popover)]">
           <ArkTooltip.Arrow>
-            <ArkTooltip.ArrowTip />
+            {/* zag turns the tip so its top and start sides face out */}
+            <ArkTooltip.ArrowTip className="border-bs border-s border-hairline" />
           </ArkTooltip.Arrow>
           {props.tip}
         </ArkTooltip.Positioner>

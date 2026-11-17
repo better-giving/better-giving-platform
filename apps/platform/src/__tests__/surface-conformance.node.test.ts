@@ -219,6 +219,8 @@ describe("the surface model", () => {
       // dialog's fill is its call site's (modal-conformance holds the tiers
       // to no surface).
       if (t.includes("z-modal")) return [];
+      // popup_shell is the registry's: it draws the hairline edge itself
+      if (file === "packages/ui/src/components/popup.ts") return [];
       const pinned =
         t.includes("sticky") || t.includes("fixed") || t.includes("inset-x-0");
       const ok =
