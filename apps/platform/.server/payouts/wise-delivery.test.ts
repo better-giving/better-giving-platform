@@ -829,7 +829,7 @@ describe("a payout paid by another route is settled, and never read as a wise tr
       .where(eq(payouts.id, "p-ret"));
     await seed_paid(npo.id, "9104", 10);
 
-    // the returned run holds as it always did; the later paid run is not what holds
+    // the returned run holds; the later paid run is not what holds
     expect(await npo_return_hold(npo.id)).toMatchObject({
       settlement_id: "9103",
       status: "returned",

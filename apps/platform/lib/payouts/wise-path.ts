@@ -27,8 +27,7 @@ export const CHARGED_BACK = "charged_back";
 /**
  * the payout reached the npo by another route than a wise transfer: the
  * settlement's `other_id` holds that payment's reference, not a transfer ref.
- * delivered and final, and never read as a transfer: not polled at any age,
- * not bounced, returned, held or taken back
+ * delivered and final, and never read as a transfer
  */
 export const PAID = "paid";
 /** stored states that mean the bank has the money */
