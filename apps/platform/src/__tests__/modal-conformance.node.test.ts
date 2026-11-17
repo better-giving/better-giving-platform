@@ -34,7 +34,7 @@ const line_of = (text: string, i: number) =>
 
 describe("modal size set", () => {
   test("`fixed-center` is spelled only where it is defined and spent", () => {
-    // the registry's tiers centre with inset/auto-margin now, so only the
+    // the registry's tiers centre with inset/auto-margin, so only the
     // utility's definition is left.
     const owners = ["packages/ui/src/styles/utilities.css"];
     // the one centered box that is not a modal *content* box: an

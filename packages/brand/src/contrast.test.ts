@@ -154,7 +154,7 @@ const pairings: Pairing[] = [
     min.spot,
     "the hovered field edge inside a well, kept by PM decision (2026-11-01); transient"
   ),
-  // the steps that would clear a higher bar, recorded beside the field edge's and
+  // the steps a higher bar would take, recorded beside the field edge's and
   // held to nothing: no edge spends them (fields and switches are radix gray-7).
   p("gray-9 on --card", colors.gray_9, card, 56.3, null),
   p("gray-9 on --surface", colors.gray_9, colors.surface, 58.3, null),

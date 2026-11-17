@@ -332,7 +332,7 @@ with the inputs above reproduces all 60 steps exactly, and stock slate and blue
 measure the same step-7/8 edges and step-8 ring as ours — the faint edges are
 Radix's design, not a custom ramp.
 
-**The focus ring stays Radix's step 8 — PM decision (2026-11-01).** `--ring` (`accent-8`) is
+**The focus ring stays Radix's step 8 (PM decision, 2026-11-01).** `--ring` (`accent-8`) is
 Lc 42.7 on the card, clear of APCA's Lc 30.
 Radix assigns step 8 to the ring and sets no contrast target for it. Do not move it to step 9 without a new PM call.
 
@@ -706,8 +706,7 @@ step the other status inks take, measured:
 | `--warning-subtle` (warning-3) | Lc 62.5 | |
 | `--secondary-active` (accent-5) | Lc 52.5 | cross-scale; under Lc 60, an accepted miss |
 
-Until registry 2.2 the ink sat on `warning-12`. 2.2 put it on step 11, so the figures above are lower than the ones
-this file recorded before: every surface but the pressed `accent-5` rung still
+Registry 2.2 put the ink on step 11: every surface but the pressed `accent-5` rung
 clears Lc 60, and `contrast.test.ts` pins each measurement. `--warning-fg` is
 the label on the `--warning` fill, `--warning-subtle-fg` the warning ink on
 everything else; they are different steps now (`warning-12` and `warning-11`).
@@ -1168,7 +1167,7 @@ Recorded so they are not "fixed" by someone reading them as oversights.
   Radix's interactive border (1.48:1 on the card): on spec by the same rule,
   though that ring alone carries the state.
 - **The focus ring is Radix's step 8.** `--ring` (`accent-8`) is
-  Lc 42.7 on the card, clear of APCA's Lc 30 — on spec:
+  Lc 42.7 on the card, clear of APCA's Lc 30, so on spec:
   Radix's step 8 is the focus ring and it sets no contrast target (PM rule, 2026-11-02). It is not compensated for by
   anything else: the offset only moves it off a fill.
 - **`--destructive` is destructive-9 and clears every surface in the palette** (Lc 74.1 on
