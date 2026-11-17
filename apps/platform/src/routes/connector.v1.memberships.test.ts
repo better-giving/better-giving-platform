@@ -66,7 +66,7 @@ const npo = async (name: string, logo: string | null = null) =>
 const member = (user_id: string, npo_id: number) =>
   db().insert(user_npo_memberships).values({ user_id, npo_id });
 
-/** a user with a live key on `current`, plus memberships in `others` */
+/** a user who is a member of `current`, with a live key on it */
 const connect = async (email: string, current: { id: number }) => {
   const owner = (await seed_user(db(), email, "Ada", "Lovelace"))!;
   await member(owner.id, current.id);
