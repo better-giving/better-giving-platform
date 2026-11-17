@@ -129,6 +129,7 @@ describe("served connector routes without a key", () => {
     ["PATCH", "/connector/v1/forms/some-id"],
     ["GET", "/connector/v1/results"],
     ["GET", "/connector/v1/donations"],
+    ["GET", "/connector/v1/memberships"],
     ["GET", "/connector/v1/donors"],
     ["GET", "/connector/v1/donors/some-id"],
     ["GET", "/connector/v1/recurring"],

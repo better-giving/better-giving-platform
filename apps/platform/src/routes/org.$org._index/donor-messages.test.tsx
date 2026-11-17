@@ -127,14 +127,11 @@ describe("donor messages paging", () => {
     expect(report_error).toHaveBeenCalledWith(new Error("500"), {
       npo_id: 7,
     });
-    // a press while the failing page is still out is dropped, so press until
-    // one lands after it settles
-    await expect
-      .poll(async () => {
-        await screen.getByRole("button", { name: "More" }).click();
-        return asked.length;
-      })
-      .toBe(2);
+    // the hook clears its in-flight flag in the same step that reports, so
+    // one press now is not dropped; a press while the page is out would be
+    await screen.getByRole("button", { name: "More" }).click();
+    await expect.poll(() => asked.length).toBe(2);
+    expect(asked).toHaveLength(2);
     expect(asked.map((q) => q.get("next"))).toEqual(["c2", "c2"]);
   });
 });

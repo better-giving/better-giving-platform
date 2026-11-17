@@ -6,6 +6,7 @@ export const CONNECTOR_ACTIONS = [
   "hello",
   "exchange",
   "disconnect",
+  "list_nonprofits",
   "list_campaigns",
   "get_campaign",
   "create_campaign",

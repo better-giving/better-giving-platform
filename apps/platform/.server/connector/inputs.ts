@@ -6,6 +6,7 @@ type Action = (typeof CONNECTOR_ACTIONS)[number];
 /** the query parameters each read accepts; any other is refused as invalid.
  * `/openapi.json` documents these sets. */
 export const QUERY_PARAMS = {
+  list_nonprofits: [],
   list_campaigns: ["status", "cursor", "limit"],
   get_campaign: [],
   get_donation_page: [],
