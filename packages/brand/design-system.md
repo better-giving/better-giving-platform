@@ -283,9 +283,9 @@ roles, verbatim from
   marketing header's mobile panel and any pinned bar that lifts: `--popover`
   (step 1) at the card corner with `shadow-floating` and a 1px `--hairline`
   edge (the registry's house rule since 2.4.0). Radix overlays carry a shadow; the layer is lighter than the card it opens over.
-- **Dialog**: Radix Themes' panel plus shadow: `--popover` and
-  `shadow-floating`, behind the `--overlay` scrim. The fill is the call site's
-  (`bg-popover` on every `Modal`/`RouteModal`); the shadow is in every
+- **Dialog**: Radix Themes' panel plus shadow: `--popover` with
+  `shadow-floating` and a 1px `--hairline` edge, behind the `--overlay` scrim. The fill is the call site's
+  (`bg-popover` on every `Modal`/`RouteModal`); the shadow and the edge are in every
   `modal_box` tier. A dialog is a surface: a table inside it drops its shell,
   as inside a card.
 
