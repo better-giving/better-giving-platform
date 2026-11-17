@@ -23,7 +23,7 @@ export const read_transfer = async (state_of: TransferState, id: string) => {
   return typeof t === "string" ? { status: t, recipient: undefined } : t;
 };
 
-export { CHARGED_BACK } from "@/payouts/wise-path";
+export { CHARGED_BACK, PAID } from "@/payouts/wise-path";
 
 import { CHARGED_BACK } from "@/payouts/wise-path";
 /** stored states nothing polls again: ours once the money is back, and

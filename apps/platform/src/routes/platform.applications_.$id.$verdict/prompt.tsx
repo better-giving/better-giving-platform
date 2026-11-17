@@ -5,36 +5,7 @@ import { useForm } from "react-hook-form";
 import { Link, useFetcher, useParams, useRouteLoaderData } from "react-router";
 import { nonEmpty, object, pipe, string, trim } from "valibot";
 import { RouteModal } from "#/components/route-modal";
-import { WarningCallout } from "#/components/warning-callout";
 import type { LoaderData } from "#/routes/platform.applications_.$id/api";
-
-interface IOwnAccountWarning {
-  own_account: boolean;
-  own_account_unknown: boolean;
-}
-
-/** the bank on file matches one of ours, or the check could not run: said, and
- * never a block */
-function OwnAccountWarning({
-  own_account,
-  own_account_unknown,
-}: IOwnAccountWarning) {
-  if (!own_account && !own_account_unknown) return null;
-  return (
-    <WarningCallout
-      classes="mx-6 mb-4 text-left"
-      title={
-        own_account
-          ? "This bank account matches one of Better Giving's own accounts"
-          : "We couldn't check this bank account against Better Giving's own accounts"
-      }
-    >
-      {own_account
-        ? "Payouts to it may not reach the nonprofit. You can still approve."
-        : "It may be one of ours. You can still approve."}
-    </WarningCallout>
-  );
-}
 
 function Content() {
   const { verdict } = useParams();
@@ -113,13 +84,6 @@ function Content() {
             : "This registration has a Stripe account and no bank account. Donations Stripe can't receive will wait in the nonprofit's balance until it adds a bank account. This is irreversible."}
         </div>
       ) : null}
-
-      {verdict === "approved" && review?.reg.o_bank_id && (
-        <OwnAccountWarning
-          own_account={review.own_account}
-          own_account_unknown={review.own_account_unknown}
-        />
-      )}
 
       <div className="px-6 pb-4 text-center text-gray-11 font-bold">
         Please ensure you have confirmed all submitted details and supporting

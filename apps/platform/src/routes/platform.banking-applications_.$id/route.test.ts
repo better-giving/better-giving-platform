@@ -3,7 +3,6 @@ import { doc_args } from "#/__tests__/fixtures/route-args";
 
 const npos_batch_get = vi.hoisted(() => vi.fn());
 const wise = vi.hoisted(() => ({ v2_account: vi.fn() }));
-const own = vi.hoisted(() => ({ is_own_recipient: vi.fn() }));
 
 vi.mock("$/pg/queries/banking", () => ({
   bapp_get: async () => ({
@@ -16,10 +15,6 @@ vi.mock("$/pg/queries/banking", () => ({
 }));
 vi.mock("$/pg/queries/npo", () => ({ npos_batch_get }));
 vi.mock("$/kit/wise", () => ({ wise }));
-vi.mock("$/payouts/own-accounts", async (io) => ({
-  ...(await io<typeof import("$/payouts/own-accounts")>()),
-  ...own,
-}));
 vi.mock("$/kit/queue", () => ({ enqueue: vi.fn() }));
 vi.mock("#/.server/toast", () => ({ redirectWithSuccess: vi.fn() }));
 vi.mock("#/errors/report", () => ({
@@ -38,41 +33,14 @@ const call = () =>
 beforeEach(() => {
   npos_batch_get.mockReset().mockResolvedValue([]);
   wise.v2_account.mockReset().mockResolvedValue({ id: 40001, currency: "USD" });
-  own.is_own_recipient.mockReset().mockResolvedValue(false);
 });
 
 describe("banking application detail loader", () => {
-  it("flags an account that is one of Better Giving's own", async () => {
-    own.is_own_recipient.mockResolvedValue(true);
-
-    const d = await call();
-    expect(d.own_account).toBe(true);
-    expect(d.own_account_unknown).toBe(false);
-  });
-
-  it("reads an account it can't check against ours as unknown, not as a match", async () => {
-    own.is_own_recipient.mockRejectedValue(new Error("account-details 503"));
-
-    const d = await call();
-    expect(d.own_account).toBe(false);
-    expect(d.own_account_unknown).toBe(true);
-  });
-
-  it("flags an account that isn't one of ours as false", async () => {
-    own.is_own_recipient.mockResolvedValue(false);
-
-    const d = await call();
-    expect(d.own_account).toBe(false);
-    expect(d.own_account_unknown).toBe(false);
-  });
-
-  it("an account wise could not return is neither a match nor unknown", async () => {
+  it("reads an account wise could not return as unavailable", async () => {
     wise.v2_account.mockRejectedValue(new Error("wise down"));
 
     const d = await call();
     expect(d.wacc_unavailable).toBe(true);
-    expect(d.own_account).toBe(false);
-    expect(d.own_account_unknown).toBe(false);
   });
 
   it("names the application's nonprofit, and leaves the name out when its row is gone", async () => {

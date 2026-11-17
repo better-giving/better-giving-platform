@@ -74,7 +74,6 @@ vi.mock("$/kit/wise", () => ({
       ],
     })),
     // none of the balances we hold shares the account number above
-    account_details: vi.fn(async () => []),
   },
 }));
 

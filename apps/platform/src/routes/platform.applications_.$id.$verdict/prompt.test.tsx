@@ -5,11 +5,7 @@ import Prompt from "./prompt";
 
 const render_prompt = (
   verdict: string,
-  review: {
-    o_bank_id?: string;
-    own_account: boolean;
-    own_account_unknown?: boolean;
-  }
+  review: { o_bank_id?: string } = {}
 ) => {
   const Stub = createRoutesStub([
     {
@@ -17,8 +13,6 @@ const render_prompt = (
       path: "/platform/applications/:id",
       loader: () => ({
         reg: { o_name: "Acme Relief", o_bank_id: review.o_bank_id ?? "" },
-        own_account: review.own_account,
-        own_account_unknown: review.own_account_unknown ?? false,
       }),
       Component: Outlet,
       HydrateFallback: () => null,
@@ -30,13 +24,9 @@ const render_prompt = (
   );
 };
 
-const MATCH = "This bank account matches one of Better Giving's own accounts";
-const UNKNOWN =
-  "We couldn't check this bank account against Better Giving's own accounts";
-
-describe("registration approve prompt: own-account warning", () => {
+describe("registration approve prompt", () => {
   test("reads 'about to approve', not 'about to approved'", async () => {
-    const screen = await render_prompt("approved", { own_account: false });
+    const screen = await render_prompt("approved");
 
     await expect
       .element(
@@ -47,10 +37,7 @@ describe("registration approve prompt: own-account warning", () => {
   });
 
   test("a rejection reads 'about to reject'", async () => {
-    const screen = await render_prompt("rejected", {
-      own_account: true,
-      o_bank_id: "1",
-    });
+    const screen = await render_prompt("rejected", { o_bank_id: "1" });
 
     await expect
       .element(
@@ -59,67 +46,11 @@ describe("registration approve prompt: own-account warning", () => {
       .toBeVisible();
   });
 
-  test("a bank that matches one of ours is warned about, between the payout sentence and the confirm line", async () => {
-    const screen = await render_prompt("approved", {
-      o_bank_id: "40000001",
-      own_account: true,
-    });
-
-    await expect
-      .element(screen.getByRole("region", { name: MATCH }))
-      .toBeVisible();
-    await expect
-      .element(
-        screen.getByText(
-          "Payouts to it may not reach the nonprofit. You can still approve."
-        )
-      )
-      .toBeVisible();
-    await expect
-      .element(screen.getByRole("button", { name: "Submit" }))
-      .toBeEnabled();
-  });
-
-  test("a check that could not run is said to staff", async () => {
-    const screen = await render_prompt("approved", {
-      o_bank_id: "40000001",
-      own_account: false,
-      own_account_unknown: true,
-    });
-
-    await expect
-      .element(screen.getByRole("region", { name: UNKNOWN }))
-      .toBeVisible();
-    await expect
-      .element(
-        screen.getByText("It may be one of ours. You can still approve.")
-      )
-      .toBeVisible();
-  });
-
-  test.each([
-    ["no match", { o_bank_id: "40000001", own_account: false }],
-    ["no bank on file (Stripe only)", { own_account: true }],
-  ])("shows no warning for %s", async (_name, review) => {
-    const screen = await render_prompt("approved", review);
-
-    await expect
-      .element(
-        screen.getByText("Please ensure you have confirmed", { exact: false })
-      )
-      .toBeVisible();
-    expect(screen.getByRole("region").query()).toBeNull();
-  });
-
-  test("a rejection carries no warning", async () => {
-    const screen = await render_prompt("rejected", {
-      o_bank_id: "40000001",
-      own_account: true,
-    });
+  test("a rejection asks for a reason", async () => {
+    const screen = await render_prompt("rejected", { o_bank_id: "40000001" });
 
     await expect
       .element(screen.getByText("Reason for rejection:"))
       .toBeVisible();
-    expect(screen.getByRole("region").query()).toBeNull();
   });
 });

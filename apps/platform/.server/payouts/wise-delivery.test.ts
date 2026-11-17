@@ -51,9 +51,9 @@ vi.mock("../pg/db", () => ({
   ),
 }));
 
-const { poll_wise_returns } = await import("./wise-return");
+const { poll_wise_returns, return_settlement } = await import("./wise-return");
 const { settle_npo_payouts } = await import("./settle");
-const { ON_PATH } = await import("@/payouts/wise-path");
+const { grant_state, ON_PATH } = await import("@/payouts/wise-path");
 const { npo_return_hold, resend_returned } = await import("./resend-returned");
 const {
   npo_bounced_payouts,
@@ -733,5 +733,132 @@ describe("a bounced transfer is Bounced and holds the npo", () => {
     expect(send_alert.mock.calls[0]![0].title).toBe(
       `Wise transfer bounced_back: npo:${npo.id}`
     );
+  });
+});
+
+describe("a payout paid by another route is settled, and never read as a wise transfer", () => {
+  const seed_paid = async (
+    npo_id: number,
+    id: string,
+    age_days: number,
+    payout_type: "settled" | "refunded_loss" | "bounced" = "settled"
+  ) => {
+    await seed_payout(npo_id, `p-${id}`, 481.5);
+    await db()
+      .insert(settlements)
+      .values({
+        id,
+        other_id: `mercury-${id}`,
+        npo_id,
+        date: days_ago(age_days),
+        amount: 481.5,
+        status: "paid",
+      });
+    await db()
+      .update(payouts)
+      .set({
+        type: payout_type,
+        settled_id: id,
+        settled_date: days_ago(age_days),
+      })
+      .where(eq(payouts.id, `p-${id}`));
+  };
+
+  test.each([5, 120, 400])(
+    "a paid settlement %s days old is never polled",
+    async (age) => {
+      const npo = await seed_npo(0);
+      await seed_paid(npo.id, "9100", age);
+      const lookup = vi.fn(state("bounced_back"));
+
+      await poll_wise_returns(lookup);
+
+      expect(lookup).not.toHaveBeenCalled();
+      expect((await status_of("9100"))?.status).toBe("paid");
+      expect(await types()).toEqual({ "p-9100": "settled" });
+      expect(await npo_return_hold(npo.id)).toBeNull();
+    }
+  );
+
+  test("its payouts and grant read settled on the lists, with no flag", async () => {
+    const npo = await seed_npo(0);
+    await seed_paid(npo.id, "9101", 5);
+
+    const { items } = await npo_payouts(npo.id, {});
+    const grants = await npo_settlements(npo.id, {});
+
+    expect(items).toEqual([
+      expect.objectContaining({ id: "p-9101", type: "settled" }),
+    ]);
+    expect(items[0]).not.toHaveProperty("charged_back");
+    expect(grants.items[0]).toMatchObject({
+      id: "9101",
+      status: "paid",
+      bounced: false,
+    });
+    expect(grant_state(grants.items[0]!)).toBe("settled");
+  });
+
+  test.each(["settled", "refunded_loss", "bounced"] as const)(
+    "a paid run with a %s payout never holds the npo",
+    async (payout_type) => {
+      const npo = await seed_npo(0);
+      await seed_paid(npo.id, "9102", 5, payout_type);
+
+      expect(await npo_return_hold(npo.id)).toBeNull();
+    }
+  );
+
+  test("a run with only paid and returned history leaves a new default bank unheld, and holds nobody before it", async () => {
+    const npo = await seed_npo(0);
+    await seed_payout(npo.id, "p-ret", 100);
+    await db()
+      .insert(settlements)
+      .values({
+        id: "9103",
+        other_id: "ref-9103",
+        npo_id: npo.id,
+        date: days_ago(40),
+        amount: 100,
+        status: "returned",
+        recipient_id: "old-bank",
+      });
+    await db()
+      .update(payouts)
+      .set({ type: "returned", settled_id: "9103" })
+      .where(eq(payouts.id, "p-ret"));
+    await seed_paid(npo.id, "9104", 10);
+
+    // the returned run holds; the later paid run is not what holds
+    expect(await npo_return_hold(npo.id)).toMatchObject({
+      settlement_id: "9103",
+      status: "returned",
+    });
+
+    // a different bank approved after the returned transfer lifts it
+    await db()
+      .insert(banking_apps)
+      .values({
+        id: "bank-new",
+        npo_id: npo.id,
+        status: "default",
+        date_created: days_ago(5),
+        updated_at: days_ago(5),
+      });
+    expect(await npo_return_hold(npo.id)).toBeNull();
+  });
+
+  test("taking a paid settlement back is a no-op: nothing moves, nothing is credited", async () => {
+    const npo = await seed_npo(500);
+    await seed_paid(npo.id, "9105", 5);
+
+    const res = await return_settlement("9105", "some-recipient");
+
+    expect(res.status).toBe("paid_elsewhere");
+    expect(await types()).toEqual({ "p-9105": "settled" });
+    expect(await npo_cash(npo.id)).toBe(500);
+    expect((await status_of("9105"))?.status).toBe("paid");
+    // and it does not even store a recipient on it
+    expect((await status_of("9105"))?.recipient).toBeNull();
   });
 });

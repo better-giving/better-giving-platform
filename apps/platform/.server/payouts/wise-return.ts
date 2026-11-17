@@ -76,6 +76,7 @@ import {
   FINAL,
   MONEY_BACK,
   ORDINARY,
+  PAID,
   RETURNED,
   RETURNING,
   read_transfer,
@@ -87,6 +88,8 @@ export { AWAITING_REPAIR, alert, RETURNED, type TransferState };
 
 export type ReturnResult =
   | { status: "not_found" }
+  /** paid by another route: there is no wise transfer to take back */
+  | { status: "paid_elsewhere" }
   /** an earlier detection already took it back */
   | { status: "already_returned" }
   /** marked returned with nothing credited: no payout of it was left to take back */
@@ -131,6 +134,8 @@ export async function return_settlement(
       if (npo_id !== null) await lock_run(tx, `grant_run:npo:${npo_id}`);
       const s = await settlement_locked(tx, id);
       if (!s) return { res: { status: "not_found" } };
+      // not a wise transfer: nothing to take back, no recipient to store
+      if (s.status === PAID) return { res: { status: "paid_elsewhere" } };
       if (recipient) await settlement_recipient_fill(tx, id, recipient);
       if (s.status === RETURNED) return { res: { status: "already_returned" } };
       return take_back(tx, s);

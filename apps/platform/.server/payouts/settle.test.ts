@@ -88,7 +88,6 @@ vi.mock("../pg/db", () => ({
 
 const { settle_npo_payouts } = await import("./settle");
 const { NotFundedError } = await import("./transfer");
-const { attach_warning } = await import("./pay-warning");
 const { processing_payouts } = await import("../pg/queries/payout");
 const { dists_for_refund } = await import("../pg/queries/dist");
 const { process_refund } = await import("../refund/process");
@@ -279,95 +278,6 @@ const npo_cash = async (id: number) =>
     ?.cash;
 
 describe("settle_npo_payouts", () => {
-  describe("a warning from the payment is sent after the settlement is recorded", () => {
-    const warning = {
-      title: "payout to one of Better Giving's own Wise accounts",
-      body: "the payout went ahead",
-      fields: [{ name: "recipient", value: RECIPIENT }],
-    };
-
-    test("the settlement and cash write exist before any alert is sent", async () => {
-      const npo = await seed_npo({ cash: 500 });
-      await seed_payout(npo.id, "p-1", 100);
-      const at_alert: { settlements: number; cash: number | undefined }[] = [];
-      send_alert.mockImplementation(async () => {
-        at_alert.push({
-          settlements: (await db().select().from(settlements)).length,
-          cash: await npo_cash(npo.id),
-        });
-      });
-      const pay = vi.fn<Pay>(async () => ({ id: TRANSFER_ID, warning }));
-
-      const res = await settle_npo_payouts(npo, ["p-1"], {
-        ref_key: RECIPIENT,
-        pay,
-      });
-
-      expect(res).toMatchObject({ status: "settled" });
-      expect(at_alert).toEqual([{ settlements: 1, cash: 400 }]);
-      expect(send_alert.mock.calls[0]![0]).toMatchObject({
-        title: warning.title,
-      });
-    });
-
-    test("a Slack that rejects changes nothing recorded", async () => {
-      const npo = await seed_npo({ cash: 500 });
-      await seed_payout(npo.id, "p-1", 100);
-      send_alert.mockRejectedValue(new Error("slack down"));
-      const pay = vi.fn<Pay>(async () => ({ id: TRANSFER_ID, warning }));
-
-      const res = await settle_npo_payouts(npo, ["p-1"], {
-        ref_key: RECIPIENT,
-        pay,
-      });
-
-      expect(res).toMatchObject({ status: "settled", transfer_id: "9001" });
-      expect(await payout_types()).toEqual({ "p-1": "processing" });
-      expect(await db().select().from(settlements)).toHaveLength(1);
-      expect(await npo_cash(npo.id)).toBe(400);
-    });
-
-    test("a funding throw keeps the claim as today, and a Slack that also fails changes nothing", async () => {
-      const npo = await seed_npo({ cash: 500 });
-      await seed_payout(npo.id, "p-1", 100);
-      send_alert.mockRejectedValue(new Error("slack down"));
-      const funding_error = new Error("fetch timed out");
-      const pay = vi.fn<Pay>(async () => {
-        attach_warning(funding_error, warning);
-        throw funding_error;
-      });
-
-      const res = await settle_npo_payouts(npo, ["p-1"], {
-        ref_key: RECIPIENT,
-        pay,
-      });
-
-      expect(res).toMatchObject({ status: "fund_unknown" });
-      expect(await payout_types()).toEqual({ "p-1": "processing" });
-      expect(await db().select().from(settlements)).toEqual([]);
-      expect(await npo_cash(npo.id)).toBe(500);
-      // both alerts were tried: the unknown-funding one first, then the warning
-      expect(send_alert.mock.calls.map(([a]) => a.title)).toEqual([
-        `funding status unknown for npo:${npo.id}`,
-        warning.title,
-      ]);
-    });
-
-    test("no warning goes out when nothing was funded", async () => {
-      const npo = await seed_npo({ cash: 500 });
-      await seed_payout(npo.id, "p-1", 100);
-      const pay = vi.fn<Pay>(async () => {
-        throw new NotFundedError(new Error("wise 503"));
-      });
-
-      await settle_npo_payouts(npo, ["p-1"], { ref_key: RECIPIENT, pay });
-
-      expect(
-        send_alert.mock.calls.filter(([a]) => a.title === warning.title)
-      ).toEqual([]);
-    });
-  });
-
   test("claims, pays the pending total, then settles every payout", async () => {
     const npo = await seed_npo({ cash: 500 });
     await seed_payout(npo.id, "p-1", 60);

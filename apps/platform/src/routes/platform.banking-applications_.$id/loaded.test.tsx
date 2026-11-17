@@ -21,8 +21,6 @@ const data = (o: Partial<LoaderData>): LoaderData => ({
   wacc_unavailable: false,
   npo_name: "Riverbend Youth Coding Collective",
   name: { fullName: "Harbor Light Food Pantry Inc." },
-  own_account: false,
-  own_account_unknown: false,
   ...o,
 });
 
@@ -33,12 +31,8 @@ const render_page = (d: LoaderData) => {
   return render(<Stub initialEntries={["/"]} />);
 };
 
-const OWN_TITLE = "This matches one of Better Giving's own bank accounts";
-const UNKNOWN_TITLE =
-  "We couldn't check this account against Better Giving's own accounts";
-
-describe("banking application review — Better Giving's own account", () => {
-  test("a regular account has no callout and shows its recipient name", async () => {
+describe("banking application review", () => {
+  test("shows the recipient name, with no callout, and Approve enabled", async () => {
     const screen = await render_page(data({}));
     await expect
       .element(screen.getByText("Recipient name", { exact: true }))
@@ -47,69 +41,6 @@ describe("banking application review — Better Giving's own account", () => {
     await expect
       .element(screen.getByRole("link", { name: "Approve" }))
       .toHaveAttribute("aria-disabled", "false");
-  });
-
-  test("a match is warned about before a verdict, and Approve stays enabled", async () => {
-    const screen = await render_page(data({ own_account: true }));
-    await expect
-      .element(screen.getByRole("region", { name: OWN_TITLE }))
-      .toBeVisible();
-    await expect
-      .element(
-        screen.getByText(
-          "Payouts to it may not reach the nonprofit. You can still approve it."
-        )
-      )
-      .toBeVisible();
-    await expect
-      .element(screen.getByRole("link", { name: "Approve" }))
-      .toHaveAttribute("aria-disabled", "false");
-  });
-
-  test("a decided application on a match still warns, without the approval sentence", async () => {
-    const d = data({ own_account: true });
-    for (const status of ["approved", "rejected"] as const) {
-      const screen = await render_page({ ...d, ba: { ...d.ba, status } });
-      await expect
-        .element(screen.getByRole("region", { name: OWN_TITLE }))
-        .toBeVisible();
-      await expect
-        .element(
-          screen.getByText("Payouts to it may not reach the nonprofit.", {
-            exact: true,
-          })
-        )
-        .toBeVisible();
-      expect(screen.getByText(/You can still approve it/).query()).toBeNull();
-      await screen.unmount();
-    }
-  });
-
-  test("a check that could not run says so before a verdict, and Approve stays enabled", async () => {
-    const screen = await render_page(data({ own_account_unknown: true }));
-    await expect
-      .element(screen.getByRole("region", { name: UNKNOWN_TITLE }))
-      .toBeVisible();
-    await expect
-      .element(
-        screen.getByText(
-          "It may be one of ours. Reload to try again, or approve it if you've confirmed it's the nonprofit's own account."
-        )
-      )
-      .toBeVisible();
-    await expect
-      .element(screen.getByRole("link", { name: "Approve" }))
-      .toHaveAttribute("aria-disabled", "false");
-  });
-
-  test("a check that could not run says nothing after a verdict", async () => {
-    const d = data({ own_account_unknown: true });
-    const screen = await render_page({
-      ...d,
-      ba: { ...d.ba, status: "approved" },
-    });
-    await expect.element(screen.getByText("Recipient name")).toBeVisible();
-    expect(screen.getByRole("region").query()).toBeNull();
   });
 
   test("no wise rows while wise is unreachable", async () => {
