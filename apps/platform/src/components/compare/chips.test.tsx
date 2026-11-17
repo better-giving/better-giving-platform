@@ -57,6 +57,15 @@ afterEach(async () => {
 });
 
 describe("Chips below sm", () => {
+  test("the row scrolls with no scrollbar drawn, and keeps its fade and snap", async () => {
+    const { row } = await render_at("givebutter");
+    expect(row.scrollWidth).toBeGreaterThan(row.clientWidth);
+    expect(row.classList).toContain("scrollbar-none");
+    expect(getComputedStyle(row).scrollbarWidth).toBe("none");
+    expect(row.classList).toContain("scroll-fade-x");
+    expect(row.classList).toContain("snap-x");
+  });
+
   test("a swipe to the end of the row stays there", async () => {
     const { row } = await render_at("givebutter");
     const end = row.scrollWidth - row.clientWidth;

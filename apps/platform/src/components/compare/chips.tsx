@@ -32,7 +32,7 @@ export function Chips({ chips, current }: IChips) {
       </h2>
       <ul
         ref={row}
-        className="relative flex gap-2 overflow-x-auto scroll-fade-x snap-x snap-proximity max-sm:-mx-5 max-sm:px-5 sm:flex-wrap sm:overflow-visible"
+        className="relative flex gap-2 overflow-x-auto scrollbar-none scroll-fade-x snap-x snap-proximity max-sm:-mx-5 max-sm:px-5 sm:flex-wrap sm:overflow-visible"
       >
         {chips.map((c) => {
           const is_current = c.slug === current;
