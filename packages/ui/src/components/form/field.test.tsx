@@ -4,6 +4,16 @@ import { render } from "vitest-browser-react";
 import { Button } from "../button";
 import { Field } from "./field";
 
+// the field mints its help-text ids with useId, so a test names each by its
+// role (the suffix the field gives it), in the order the control reads them
+const roles = (input: Element) =>
+  (input.getAttribute("aria-describedby") ?? "")
+    .split(" ")
+    .filter(Boolean)
+    .map((id) => id.match(/(sub|error|hint)$/)?.[1] ?? id);
+const by_role = (role: "sub" | "error" | "hint") =>
+  document.querySelector(`[id$="${role}"]`) as HTMLElement;
+
 describe("Field: autofill", () => {
   it("defaults to off — the visitor's saved values must not prefill somebody else's data", async () => {
     const screen = await render(
@@ -202,9 +212,7 @@ describe("Field: help text announcement", () => {
     );
     const input = screen.getByLabelText("Work email").element();
 
-    expect(input.getAttribute("aria-describedby")).toBe(
-      "__sub_email __error_email"
-    );
+    expect(roles(input)).toEqual(["sub", "error"]);
   });
 
   it("lists every id in reading order, whatever shape the sub note is", async () => {
@@ -223,9 +231,7 @@ describe("Field: help text announcement", () => {
     );
     const input = screen.getByLabelText("Custom URL").element();
 
-    expect(input.getAttribute("aria-describedby")).toBe(
-      "__sub_slug __tooltip_slug outside_note __error_slug"
-    );
+    expect(roles(input)).toEqual(["sub", "error", "hint", "outside_note"]);
   });
 
   it("describes nothing when there is no help text and no error", async () => {
@@ -246,7 +252,7 @@ describe("Field: help text announcement", () => {
     const input = screen.getByLabelText("Work email").element();
 
     expect(input.hasAttribute("sub")).toBe(false);
-    expect(input.getAttribute("aria-describedby")).toBe("__sub_email");
+    expect(roles(input)).toEqual(["sub"]);
   });
 
   it("treats a whitespace-only sub as absent: no note, nothing described", async () => {
@@ -256,7 +262,7 @@ describe("Field: help text announcement", () => {
     const input = screen.getByLabelText("Address").element();
 
     expect(input.getAttribute("aria-describedby")).toBe(null);
-    expect(document.getElementById("__sub_street")).toBe(null);
+    expect(by_role("sub")).toBe(null);
   });
 });
 
@@ -304,10 +310,8 @@ describe("Field: action", () => {
     const a = control.getBoundingClientRect();
     const b = button.getBoundingClientRect();
 
-    for (const id of ["__tooltip_slug", "__error_slug"]) {
-      const r = (
-        document.getElementById(id) as HTMLElement
-      ).getBoundingClientRect();
+    for (const role of ["hint", "error"] as const) {
+      const r = by_role(role).getBoundingClientRect();
       // under the control, in its column: below its box, wholly left of the
       // action (a message spanning the row would run past the button's left edge)
       expect(r.top).toBeGreaterThanOrEqual(a.bottom);
@@ -333,9 +337,7 @@ describe("Field: action", () => {
       .getByRole("button", { name: "Check" })
       .element()
       .getBoundingClientRect();
-    const r = (
-      document.getElementById("__error_slug") as HTMLElement
-    ).getBoundingClientRect();
+    const r = by_role("error").getBoundingClientRect();
 
     expect(r.top).toBeGreaterThanOrEqual(a.bottom);
     expect(r.right).toBeLessThanOrEqual(b.left);
@@ -360,17 +362,12 @@ describe("Field: action", () => {
     const input = screen.getByLabelText("Custom URL").element();
     const ids = (input.getAttribute("aria-describedby") ?? "").split(" ");
 
-    expect(ids).toEqual([
-      "__sub_slug",
-      "__tooltip_slug",
-      "outside_note",
-      "__error_slug",
-    ]);
+    expect(roles(input)).toEqual(["sub", "error", "hint", "outside_note"]);
     for (const id of ids) expect(document.getElementById(id)).not.toBe(null);
     await expect
       .element(input)
       .toHaveAccessibleDescription(
-        "Your page address. Lowercase only. Only numbers and letters are permitted. (Already taken)"
+        "Your page address. Already taken Lowercase only. Only numbers and letters are permitted."
       );
   });
 
@@ -381,7 +378,7 @@ describe("Field: action", () => {
     const input = screen.getByLabelText("Custom URL").element();
 
     expect(screen.getByRole("button").query()).toBeNull();
-    expect(input.getAttribute("aria-describedby")).toBe("__error_slug");
+    expect(roles(input)).toEqual(["error"]);
   });
 });
 
@@ -408,9 +405,7 @@ describe("Field: action row width", () => {
       .getByRole("button", { name: "Check" })
       .element()
       .getBoundingClientRect(),
-    error: (
-      document.getElementById("__error_slug") as HTMLElement
-    ).getBoundingClientRect(),
+    error: by_role("error").getBoundingClientRect(),
   });
 
   it("sits beside the control at 384px, the narrowest row that does", async () => {
