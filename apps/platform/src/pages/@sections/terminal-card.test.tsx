@@ -29,6 +29,9 @@ describe("terminal card label", () => {
     );
     // one line tall: the name did not wrap inside itself
     expect(name?.getBoundingClientRect().height).toBeLessThanOrEqual(line + 1);
+    expect(caption?.textContent).toBe("better-giving / better-giving-platform");
+    // the slash stays on the first line
+    expect(caption?.firstElementChild?.textContent).toBe("better-giving /");
     // and the label did wrap, onto two lines, at the slash
     expect(caption?.getBoundingClientRect().height).toBeGreaterThan(line * 1.5);
   });
