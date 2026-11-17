@@ -1167,7 +1167,7 @@ Recorded so they are not "fixed" by someone reading them as oversights.
   Radix's interactive border (1.48:1 on the card): on spec by the same rule,
   though that ring alone carries the state.
 - **The focus ring is Radix's step 8.** `--ring` (`accent-8`) is
-  Lc 42.7 on the card, clear of APCA's Lc 30, so on spec:
+  Lc 42.7 on the card, clear of APCA's Lc 30. On spec:
   Radix's step 8 is the focus ring and it sets no contrast target (PM rule, 2026-11-02). It is not compensated for by
   anything else: the offset only moves it off a fill.
 - **`--destructive` is destructive-9 and clears every surface in the palette** (Lc 74.1 on
