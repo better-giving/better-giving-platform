@@ -27,7 +27,7 @@ describe("compare index", () => {
     await expect
       .element(screen.getByRole("heading", { level: 1 }))
       .toHaveTextContent(
-        "Better Giving compared with 18 fundraising platforms"
+        `Better Giving compared with ${compare_pages.length} fundraising platforms`
       );
     const h2s = [...screen.container.querySelectorAll("h2")].map(
       (h) => h.textContent
@@ -41,7 +41,7 @@ describe("compare index", () => {
     ]);
   });
 
-  test("eighteen cards link to the eighteen comparisons and carry no description", async () => {
+  test("every comparison gets one card and carry no description", async () => {
     const screen = await render_index();
     const cards = [
       ...screen.container.querySelectorAll("a[href^='/compare/']"),

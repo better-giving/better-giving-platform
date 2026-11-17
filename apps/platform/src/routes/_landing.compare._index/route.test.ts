@@ -18,5 +18,11 @@ describe("compare index meta", () => {
     expect(ds.find((x) => x.property === "og:url")?.content).toBe(
       `${base_url}/compare`
     );
+    expect(ds.find((x) => x.property === "og:title")?.content).toBe(
+      d.index.seo_title
+    );
+    expect(ds.find((x) => x.property === "og:description")?.content).toBe(
+      d.index.meta_description
+    );
   });
 });

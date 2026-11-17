@@ -1,14 +1,19 @@
 import { createRoutesStub } from "react-router";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
 import { page as browser } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { compare_chips, compare_page } from "#/content/compare/data";
+import { reset_viewport } from "#/__tests__/fixtures/viewport";
+import {
+  compare_chips,
+  compare_page,
+  compare_pages,
+} from "#/content/compare/data";
 import Page, { meta } from "./route";
 
 const GB = compare_page("givebutter")!;
 
-function render_slug(slug = "givebutter") {
-  const page = compare_page(slug)!;
+function render_slug(slug = "givebutter", override?: Partial<typeof GB>) {
+  const page = { ...compare_page(slug)!, ...override };
   const Stub = createRoutesStub([
     {
       path: "/compare/:slug",
@@ -23,6 +28,8 @@ function render_slug(slug = "givebutter") {
 }
 
 describe("compare page", () => {
+  afterEach(reset_viewport);
+
   test("the feature table shows every core row, then the More on divider, then the rest", async () => {
     const screen = await render_slug();
     await expect
@@ -68,7 +75,7 @@ describe("compare page", () => {
       screen.container.querySelectorAll(
         "nav[aria-labelledby='all-comparisons'] a"
       )
-    ).toHaveLength(18);
+    ).toHaveLength(compare_pages.length);
   });
 
   test("the visible FAQ questions are the json-ld questions", async () => {
@@ -121,5 +128,16 @@ describe("compare page", () => {
     await expect
       .element(screen.getByRole("heading", { name: GB.h2.cta }))
       .toBeInTheDocument();
+  });
+
+  test("the call to action button reads the page's own label", async () => {
+    // every page's label equals CtaBand's default, so a distinct one is
+    // needed to tell a wired prop from a dropped one
+    const screen = await render_slug("givebutter", {
+      cta: { label: "Switch from Givebutter", href: GB.cta.href },
+    });
+    await expect
+      .element(screen.getByRole("link", { name: "Switch from Givebutter" }))
+      .toHaveAttribute("href", "/register");
   });
 });

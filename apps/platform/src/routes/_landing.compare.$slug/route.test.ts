@@ -25,8 +25,8 @@ describe("compare slug loader", () => {
     expect((thrown as Response).status).toBe(404);
   });
 
-  test("every page answers its own slug and lists all eighteen chips", () => {
-    expect(compare_pages).toHaveLength(18);
+  test("every page answers its own slug and lists every page as a chip", () => {
+    expect(compare_pages.length).toBeGreaterThan(0);
     for (const p of compare_pages) {
       const d = run_loader(p.slug);
       expect(d.page.slug).toBe(p.slug);
@@ -86,9 +86,13 @@ describe("compare data the pages lean on", () => {
     }
   });
 
-  test("twelve core rows lead every page", () => {
-    for (const p of compare_pages)
-      expect(p.rows.filter((r) => r.core)).toHaveLength(12);
+  test("twelve core rows lead every page, before any other row", () => {
+    for (const p of compare_pages) {
+      const flags = p.rows.map((r) => r.core);
+      expect(flags.filter(Boolean), p.slug).toHaveLength(12);
+      expect(flags.indexOf(false), p.slug).toBeGreaterThanOrEqual(12);
+      expect(flags.slice(0, 12), p.slug).not.toContain(false);
+    }
   });
 
   test("who_each_suits is one claim per platform on every page", () => {

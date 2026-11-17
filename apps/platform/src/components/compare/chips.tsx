@@ -17,11 +17,13 @@ export function Chips({ chips, current }: IChips) {
 
   useEffect(() => {
     const el = row.current;
-    const mark = el?.querySelector("[aria-current=page]")?.closest("li");
-    if (!el || !mark) return;
+    // keyed on `current`: a chip link keeps this route mounted, so each page
+    // it lands on recentres the row
+    const mark = el?.children[chips.findIndex((c) => c.slug === current)];
+    if (!el || !(mark instanceof HTMLElement)) return;
     // moves the row alone: scrollIntoView would move the page too
     el.scrollLeft = mark.offsetLeft - (el.clientWidth - mark.clientWidth) / 2;
-  }, []);
+  }, [chips, current]);
 
   return (
     <nav aria-labelledby="all-comparisons" className="page pt-10">
@@ -30,15 +32,12 @@ export function Chips({ chips, current }: IChips) {
       </h2>
       <ul
         ref={row}
-        className="relative flex gap-2 overflow-x-auto scroll-fade-x snap-x snap-mandatory max-sm:-mx-5 max-sm:px-5 sm:flex-wrap sm:overflow-visible"
+        className="relative flex gap-2 overflow-x-auto scroll-fade-x snap-x snap-proximity max-sm:-mx-5 max-sm:px-5 sm:flex-wrap sm:overflow-visible"
       >
         {chips.map((c) => {
           const is_current = c.slug === current;
           return (
-            <li
-              key={c.slug}
-              className={is_current ? "snap-center" : "snap-none"}
-            >
+            <li key={c.slug} className="snap-center">
               <Link
                 to={href("/compare/:slug", { slug: c.slug })}
                 aria-current={is_current ? "page" : undefined}

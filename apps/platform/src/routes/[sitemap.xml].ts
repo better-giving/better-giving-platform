@@ -1,7 +1,7 @@
 import type { LoaderFunction } from "react-router";
 import { post_path } from "#/api/get/posts";
 import { sanity } from "#/api/sanity";
-import { compare_pages } from "#/content/compare/data";
+import { compare_generated, compare_pages } from "#/content/compare/data";
 
 interface SitemapUrl {
   url: string;
@@ -30,7 +30,6 @@ const staticUrls: SitemapUrl[] = [
   { url: "/fiscal-sponsorship", changeFrequency: "weekly", priority: 0.8 },
   { url: "/open-source", changeFrequency: "weekly", priority: 0.7 },
   { url: "/pricing", changeFrequency: "weekly", priority: 0.7 },
-  { url: "/compare", changeFrequency: "monthly", priority: 0.7 },
   { url: "/donor", changeFrequency: "weekly", priority: 0.8 },
   { url: "/donation-calculator", changeFrequency: "monthly", priority: 0.7 },
   { url: "/giving-tuesday", changeFrequency: "monthly", priority: 0.6 },
@@ -77,15 +76,22 @@ export const loader: LoaderFunction = async ({ url }) => {
     )
     .join("\n");
 
-  // each comparison states the date its sources were last checked, which is
-  // the honest lastmod; slugs are a fixed kebab-case set, so no encoding needed
-  const compare_entries = compare_pages
+  // the honest lastmod is a comparison's last_verified and the index's
+  // generated date; data.ts rejects a non-kebab slug, so no encoding needed
+  const compare_entries = [
+    { path: "/compare", lastmod: compare_generated, priority: 0.7 },
+    ...compare_pages.map((p) => ({
+      path: `/compare/${p.slug}`,
+      lastmod: p.last_verified,
+      priority: 0.6,
+    })),
+  ]
     .map(
-      (p) => `  <url>
-    <loc>${base_url}/compare/${p.slug}</loc>
-    <lastmod>${p.last_verified}</lastmod>
+      (e) => `  <url>
+    <loc>${base_url}${e.path}</loc>
+    <lastmod>${e.lastmod}</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+    <priority>${e.priority}</priority>
   </url>`
     )
     .join("\n");

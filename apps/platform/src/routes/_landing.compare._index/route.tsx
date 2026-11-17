@@ -47,7 +47,8 @@ export default function Page({
         <div className="page grid gap-5 justify-items-start">
           <p className="eyebrow text-primary">Comparisons</p>
           <h1 className="hero-heading max-w-4xl">
-            Better Giving compared with 18 fundraising platforms
+            Better Giving compared with {index.cards.length} fundraising
+            platforms
           </h1>
           <p className="text-lg/relaxed text-gray-11 max-w-3xl text-pretty">
             Each page sets Better Giving beside one platform or payment option,

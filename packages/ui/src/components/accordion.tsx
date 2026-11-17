@@ -18,8 +18,9 @@ interface Props {
   /** wraps each trigger in a heading of this level, so the rows sit in the
    * page outline; leave it off when a heading above the list already names it */
   heading_level?: 2 | 3 | 4 | 5 | 6;
-  /** the `value`s of the rows open on first render; none by default. Read once,
-   * so a caller that changes it later remounts the list. */
+  /** the `value` of the row open on first render, in Ark's one-item array;
+   * none by default. One row opens at a time, so name one.
+   * Read once, so a caller that changes it later remounts the list. */
   default_value?: string[];
   /** outer placement only — width, margin */
   className?: string;
