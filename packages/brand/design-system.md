@@ -574,7 +574,7 @@ and "green ink for bands" split to keep straight.
 
 Three sites, all carrying real text (counted, will drift):
 
-- `packages/ui/src/components/badge.tsx`: the `success` variant: the resources
+- `packages/ui/src/components/badge.tsx`, the `success` variant: the resources
   "guides" badge and the funds' `completed` status reach it through `Badge`
 - `routes/admin.$id.forms/table.tsx:146`: active/inactive pill
 - `routes/dashboard.forms/table.tsx:145`: active/inactive pill
