@@ -38,6 +38,17 @@ describe("footer donate link", () => {
   });
 });
 
+describe("footer compare link", () => {
+  test("full variant links the platform comparisons", async () => {
+    const Stub = stb("full");
+    const screen = await render(<Stub />);
+
+    const link = screen.getByRole("link", { name: /^compare platforms$/i });
+    await expect.element(link).toBeVisible();
+    await expect.element(link).toHaveAttribute("href", "/compare");
+  });
+});
+
 describe("footer legal links", () => {
   test.each(["full", "minimal"] as const)(
     "%s variant links donor terms and nonprofit terms",

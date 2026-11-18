@@ -31,6 +31,7 @@ const platform = [
   { label: "Fiscal sponsorship", to: href("/fiscal-sponsorship") },
   { label: "Open source", to: href("/open-source") },
   { label: "Pricing", to: href("/pricing") },
+  { label: "Compare platforms", to: href("/compare") },
   { label: "Marketplace", to: href("/marketplace") },
   { label: "Campaigns", to: href("/campaigns") },
   { label: "Referral program", to: href("/referral-program") },
