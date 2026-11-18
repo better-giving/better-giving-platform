@@ -179,7 +179,7 @@ Three pairings land under their threshold and are **accepted**, not defects:
 | pairing | measured | threshold | |
 | --- | --- | --- | --- |
 | `--destructive-subtle-fg` on `--destructive-subtle-active` (destructive-11 on destructive-5) | **Lc 51.7** | Lc 60 | the pressed rung of a subtle error control; transient |
-| `--warning-fg` on `--warning` (warning-12 on warning-9) | **Lc 52.1** | Lc 60 | the filled warning button's label and the checklist badge; white would be weaker still at Lc 46.4 |
+| `--warning-fg` on `--warning` (warning-12 on warning-9) | **Lc 52.1** | Lc 60 | the filled warning button's label and the `on_photo` warning `Badge`; white would be weaker still at Lc 46.4 |
 | `--warning` as a meaningful icon on `gray-1` / white | **Lc 39.9 / 41.8** | Lc 45 | a fill, not an icon ink: a meaningful amber glyph takes `--warning-subtle-fg` (Lc 69.3 / 71.2) |
 
 **Borders and rings have no contrast target — PM rule (2026-11-02): follow
@@ -465,7 +465,7 @@ call-site edit to notice. Use an authored pair wherever one exists.
 | pair | what it is |
 | --- | --- |
 | `--destructive-subtle` / `--destructive-subtle-fg` | error panel, banner, or row that carries error copy, not a filled control |
-| `--warning-subtle` / `--warning-subtle-fg` | warning band, same shape; `Badge`'s `warning` tone |
+| `--warning-subtle` / `--warning-subtle-fg` | warning band, same shape; `Badge`'s `warning` variant |
 | `--success-subtle` / `--success-subtle-fg` | success band, same shape: confirmation panel, `completed`/`active` status pill, badge |
 | `--destructive-subtle-active` | **fill only.** The pressed rung of a control whose hover is `--destructive-subtle`; its ink stays `--destructive-subtle-fg` |
 
@@ -574,7 +574,7 @@ and "green ink for bands" split to keep straight.
 
 Three sites, all carrying real text (counted, will drift):
 
-- `packages/ui/src/components/badge.tsx`: the `success` tone — the resources
+- `packages/ui/src/components/badge.tsx`, the `success` variant: the resources
   "guides" badge and the funds' `completed` status reach it through `Badge`
 - `routes/admin.$id.forms/table.tsx:146`: active/inactive pill
 - `routes/dashboard.forms/table.tsx:145`: active/inactive pill
@@ -712,11 +712,11 @@ clears Lc 60, and `contrast.test.ts` pins each measurement. `--warning-fg` is
 the label on the `--warning` fill, `--warning-subtle-fg` the warning ink on
 everything else; they are different steps (`warning-12` and `warning-11`).
 
-**`Badge` carries it as the `warning` tone** (`packages/ui/src/components/badge.tsx`):
+**`Badge` carries it as the `warning` variant** (`packages/ui/src/components/badge.tsx`):
 `bg-warning-subtle text-warning-subtle-fg`, Lc 62.5, over the Lc 60 content floor. A warning chip reaches it through `Badge`, never by
 spelling the pair. The two warning surfaces that are *not* this stay as they are:
-the checklist's filled chip (`--warning-fg` on `--warning`, the accepted Lc 52.1
-miss above) and the dot-plus-ink status lines (`stripe-connect/status.tsx`,
+the `Badge` `on_photo` warning look (`--warning-fg` on `--warning`, the accepted
+Lc 52.1 miss above) and the dot-plus-ink status lines (`stripe-connect/status.tsx`,
 payouts, applications), which draw no chip at all.
 
 ### `--primary-deep`: the dark brand ground, and the scrim
@@ -929,7 +929,7 @@ rather than by a hand-picked number.
 
 | step | value | what sits here |
 | --- | --- | --- |
-| `z-subbar` | 20 | a bar pinned *beneath* a pinned header: the checklist's progress bar at `top-16` |
+| `z-subbar` | 20 | a bar pinned *beneath* a pinned header: the registry `Checklist`'s score card, under the header height the page sets in `--ds-header-h` |
 | `z-sticky` | 30 | page chrome that pins: the app and marketing headers (the announcement bar above them scrolls away) |
 | `z-scrim` | 40 | the `--overlay` a modal lays over the page |
 | `z-modal` | 50 | dialog, drawer, route-modal: above its own scrim |
@@ -937,8 +937,9 @@ rather than by a hand-picked number.
 | `z-top` | 100 | the one step above everything: the route-load progress bar |
 
 **Pinned chrome takes two rungs, not one.** A page can pin a header *and* a bar
-beneath it: `_landing.ethical-fundraising-platform-checklist/checklist.tsx`
-sticks a progress bar at `top-16`, under the 4rem marketing header. On one
+beneath it: the registry `Checklist` (`packages/ui/src/components/checklist.tsx`)
+sticks its score card at `inset-block-start: var(--ds-header-h, ...)` on `z-subbar`;
+the ethics checklist page sets `--ds-header-h: 4rem` so it sits under the 4rem marketing header. On one
 shared step the pair resolves by document order, so the sub-bar wins wherever it
 comes later in the tree and slides over the header it is meant to sit under. The
 rule that fixes it: **a pinned header is always above a bar pinned beneath it.**

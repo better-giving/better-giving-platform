@@ -1,9 +1,4 @@
-import {
-  Badge,
-  type BadgeTone,
-  ImagePlaceholder,
-  Target,
-} from "@better-giving/ui";
+import { Badge, ImagePlaceholder, Target } from "@better-giving/ui";
 import { to_usd } from "@better-giving/ui/helpers";
 import { type ReactNode, useId } from "react";
 import { MAX_EXPIRATION_ISO } from "@/campaign/schema";
@@ -13,10 +8,13 @@ export type TRowStatus =
   | (typeof STATUS_WORD)[keyof typeof STATUS_WORD]
   | "Profile";
 
-const STATUS_TONE: Record<TRowStatus, BadgeTone> = {
+const STATUS_VARIANT: Record<
+  TRowStatus,
+  "success" | "neutral" | "outline" | "destructive" | "primary"
+> = {
   Live: "success",
   Draft: "neutral",
-  Ended: "secondary",
+  Ended: "outline",
   Closed: "destructive",
   Profile: "primary",
 };
@@ -29,7 +27,7 @@ interface IStatusBadge {
 
 export function StatusBadge({ status, className }: IStatusBadge) {
   return (
-    <Badge tone={STATUS_TONE[status]} className={className}>
+    <Badge variant={STATUS_VARIANT[status]} classes={className}>
       {status}
     </Badge>
   );

@@ -4,7 +4,7 @@ import { app_name, base_url } from "#/constants/env";
 import { metas } from "#/helpers/seo";
 import { CtaBand } from "#/pages/@sections/cta-band";
 import type { Route } from "./+types/route";
-import { Checklist } from "./checklist";
+import { EthicsChecklist } from "./ethics-checklist";
 
 export const headers: Route.HeadersFunction = () => ({
   "cache-control": "public, s-maxage=60, stale-while-revalidate=300",
@@ -50,7 +50,10 @@ export default function Page() {
       </header>
 
       <div className="px-6 py-10 md:py-12 print:px-0 print:py-4">
-        <Checklist classes="mx-auto max-w-3xl" />
+        {/* the score card pins under the 64px public header */}
+        <div className="mx-auto max-w-3xl [--ds-header-h:4rem]">
+          <EthicsChecklist />
+        </div>
 
         <footer className="card mx-auto mt-6 max-w-3xl break-inside-avoid text-sm/relaxed text-gray-11">
           <p>

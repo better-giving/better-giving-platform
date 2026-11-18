@@ -151,10 +151,10 @@ describe("org hero", () => {
       "www.riverside.org",
       "EIN 12-3456789",
     ]);
-    expect(items[0].firstElementChild).toHaveAttribute(
-      "data-tone",
-      "secondary"
-    );
+    // the quiet look: the gray step-3 fill, whatever ground it sits on
+    expect(
+      getComputedStyle(items[0].firstElementChild as Element).backgroundColor
+    ).not.toBe("rgba(0, 0, 0, 0)");
     for (const li of items.slice(1)) {
       expect(li.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
     }

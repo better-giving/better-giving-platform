@@ -133,6 +133,10 @@ const unreachable: Record<string, string[]> = {
   "apps/platform/src/components/donation/common/method-benefits.tsx": [
     "LightbulbIcon",
   ],
+  // registry-owned (packages/ui/bg-design.json, item `checklist`): the
+  // verdict band's glyph is a 20px box set by the registry's own markup, which
+  // this repo may not edit
+  "packages/ui/src/components/checklist.tsx": ["Icon"],
 };
 
 /** every `class`/`className`/`classes` value in a file, plus every `@apply`,

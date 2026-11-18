@@ -120,9 +120,18 @@ const RULES: IRule[] = [
   },
 ];
 
-const findings = class_tokens.flatMap(({ file, n, t }) =>
-  RULES.filter((r) => r.off(t)).map((r) => `${file}:${n} ${t} — ${r.name}`)
-);
+/** registry-owned spellings this repo may not edit (packages/ui/bg-design.json):
+ *  the badge's `on_photo` neutral is ink `gray-1` on the solid `gray-12` fill
+ *  beside it, a pair the registry's APCA ledger records. */
+const registry_pairs = new Set([
+  "packages/ui/src/components/badge.tsx text-gray-1",
+]);
+
+const findings = class_tokens
+  .filter(({ file, t }) => !registry_pairs.has(`${file} ${t}`))
+  .flatMap(({ file, n, t }) =>
+    RULES.filter((r) => r.off(t)).map((r) => `${file}:${n} ${t}: ${r.name}`)
+  );
 
 describe("each ramp step does its radix job", () => {
   test("the rules read the spellings they are written for", () => {
