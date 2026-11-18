@@ -35,6 +35,7 @@ export const CHROME_BY_SEGMENT: Record<string, Chrome> = {
 
   // marketing — informational / landing
   "about-us": "marketing",
+  compare: "marketing",
   blog: "marketing",
   product: "marketing",
   donor: "marketing",

@@ -44,6 +44,24 @@ describe("Accordion", () => {
     }
   );
 
+  test("default_value: the named row starts open and the rest stay closed", async () => {
+    const screen = await render(
+      <Accordion items={items} default_value={["fees"]} />
+    );
+    await expect
+      .element(
+        screen.getByRole("button", {
+          name: "How much does Better Giving charge?",
+        })
+      )
+      .toHaveAttribute("aria-expanded", "true");
+    await expect
+      .element(
+        screen.getByRole("button", { name: "Can I receive a tax receipt?" })
+      )
+      .toHaveAttribute("aria-expanded", "false");
+  });
+
   test("heading_level: each trigger sits in a heading named by its row", async () => {
     const screen = await render(<Accordion items={items} heading_level={3} />);
     const heading = screen.getByRole("heading", {
