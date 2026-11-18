@@ -145,8 +145,8 @@ describe("a --primary fill declares its own ink", () => {
  * an in-flow container is `bg-card` (step 2) + `rounded-card` + a
  * `border-hairline` edge (step 6) and no shadow — `card` and `solo-card` carry
  * all three; a floating layer and a dialog are `bg-popover` (step 1) at the
- * card corner with `shadow-floating` and the registry's hairline edge; a well is `bg-panel` (step 3) at the
- * control corner, inside a card; a field is `bg-surface` with its `--input`
+ * card corner with `shadow-floating` and the registry's hairline edge; a
+ * well is `bg-panel` (step 3) at the control corner, inside a card; a field is `bg-surface` with its `--input`
  * edge.
  *
  * these read every string literal, not only `className=` values: the

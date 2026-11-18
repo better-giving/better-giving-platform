@@ -282,7 +282,8 @@ roles, verbatim from
 - **Floating layer**: menu, popover, select list, hovercard, toast, the
   marketing header's mobile panel and any pinned bar that lifts: `--popover`
   (step 1) at the card corner with `shadow-floating` and a 1px `--hairline`
-  edge (the registry's house rule since 2.4.0). Radix overlays carry a shadow; the layer is lighter than the card it opens over.
+  edge (the registry's house rule). Radix overlays carry a shadow; the layer
+  is lighter than the card it opens over.
 - **Dialog**: Radix Themes' panel plus shadow: `--popover` with
   `shadow-floating` and a 1px `--hairline` edge, behind the `--overlay` scrim. The fill is the call site's
   (`bg-popover` on every `Modal`/`RouteModal`); the shadow and the edge are in every
@@ -1780,7 +1781,7 @@ hovercard body (the panel-shaped surface that *does* converge) is
 `tooltip.tsx` and `hover-card.tsx` carries it: `bg-popover`, `border-hairline`, `shadow-floating`
 + `z-floating` (the `floating` elevation row), `rounded-card`, and `p-4`. It
 carries the 1px `--hairline` edge every floating surface has (the registry's
-house rule since 2.4.0, select popup, tooltip, dialog, menu, sheet, drawer and
+house rule: select popup, tooltip, dialog, menu, sheet, drawer and
 nav panel alike), and its arrow tip is filled from `--popover`. The select/combobox
 list (`popup_cls` in `select/classes.ts`) and the toast are the same box. A call
 site passes only
