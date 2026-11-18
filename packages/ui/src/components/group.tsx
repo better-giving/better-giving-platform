@@ -1,9 +1,10 @@
 import { type PropsWithChildren, useId } from "react";
 
 /** a titled section of a form — the fields that belong together, on their own
- *  card unless it is the only group on its page or section. `title` is what makes it one: a named `<section>` is a region a screen
- *  reader can jump to, an unnamed one is a `<div>` with extra letters, so the
- *  name is wired rather than left to the heading sitting nearby. */
+ *  card unless it is the only group on its page or section. `title` is what
+ *  makes it one: a named `<section>` is a region a screen reader can jump to,
+ *  an unnamed one is a `<div>` with extra letters, so the name is wired rather
+ *  than left to the heading sitting nearby. */
 export function Group({
   classes = "",
   card = true,
