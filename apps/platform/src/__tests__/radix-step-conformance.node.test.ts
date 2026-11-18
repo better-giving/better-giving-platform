@@ -130,7 +130,7 @@ const registry_pairs = new Set([
 const findings = class_tokens
   .filter(({ file, t }) => !registry_pairs.has(`${file} ${t}`))
   .flatMap(({ file, n, t }) =>
-    RULES.filter((r) => r.off(t)).map((r) => `${file}:${n} ${t} — ${r.name}`)
+    RULES.filter((r) => r.off(t)).map((r) => `${file}:${n} ${t}: ${r.name}`)
   );
 
 describe("each ramp step does its radix job", () => {

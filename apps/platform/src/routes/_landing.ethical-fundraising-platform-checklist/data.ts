@@ -1,5 +1,5 @@
 export interface IItem {
-  /* persisted in localStorage under the page's `storage_key` — renaming an id silently drops a
+  /* persisted in localStorage under the page's `storage_key`; renaming an id silently drops a
      visitor's tick. bump the key's version suffix instead. */
   id: string;
   text: string;

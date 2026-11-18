@@ -46,6 +46,41 @@ describe("EthicsChecklist", () => {
       .toBeVisible();
   });
 
+  test("the last unticked flashpoint reads as 1 flashpoint unchecked", async () => {
+    const flags = items.filter((i) => i.flag).map((i) => i.id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(flags.slice(1)));
+
+    const screen = await render(<EthicsChecklist />);
+
+    await expect
+      .element(screen.getByText("1 flashpoint unchecked"))
+      .toBeVisible();
+  });
+
+  test("every flashpoint ticked with items left is its own verdict", async () => {
+    const flags = items.filter((i) => i.flag).map((i) => i.id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(flags));
+
+    const screen = await render(<EthicsChecklist />);
+
+    await expect
+      .element(screen.getByText("No red flags, with a few items left"))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText("All flashpoints clear"))
+      .toBeVisible();
+  });
+
+  test("only a full sheet meets every principle", async () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items.map((i) => i.id)));
+
+    const screen = await render(<EthicsChecklist />);
+
+    await expect
+      .element(screen.getByText("Meets every principle"))
+      .toBeVisible();
+  });
+
   test("a tick is written to the store", async () => {
     const screen = await render(<EthicsChecklist />);
 

@@ -8,7 +8,7 @@ export type TRowStatus =
   | (typeof STATUS_WORD)[keyof typeof STATUS_WORD]
   | "Profile";
 
-const STATUS_TONE: Record<
+const STATUS_VARIANT: Record<
   TRowStatus,
   "success" | "neutral" | "outline" | "destructive" | "primary"
 > = {
@@ -27,7 +27,7 @@ interface IStatusBadge {
 
 export function StatusBadge({ status, className }: IStatusBadge) {
   return (
-    <Badge variant={STATUS_TONE[status]} classes={className}>
+    <Badge variant={STATUS_VARIANT[status]} classes={className}>
       {status}
     </Badge>
   );
