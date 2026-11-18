@@ -41,7 +41,6 @@ function Page({ loaderData: data }: Route.ComponentProps) {
             method: "PATCH",
           });
         })}
-        className="card"
       >
         <Label htmlFor="user-avatar" className="mb-2">
           Avatar

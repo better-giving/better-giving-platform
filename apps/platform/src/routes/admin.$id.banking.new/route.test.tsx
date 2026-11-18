@@ -96,4 +96,27 @@ describe("admin: new payout method", () => {
       .element(screen.getByText(/received "not-a-url"/i))
       .toBeInTheDocument();
   }, 30_000);
+
+  it("draws its one group as a plain section, not a card", async () => {
+    const Stub = createRoutesStub([
+      {
+        path: "/admin/:id/banking/new",
+        Component: AdminBanking,
+        HydrateFallback: () => null,
+      },
+    ]);
+    const screen = await render(
+      <Stub initialEntries={["/admin/1/banking/new"]} />
+    );
+
+    const region = screen
+      .getByRole("region", { name: "Bank account details" })
+      .element();
+    expect(region.className).not.toMatch(/\bcard\b/);
+    await expect
+      .element(
+        screen.getByRole("heading", { name: "Bank account details", level: 2 })
+      )
+      .toBeVisible();
+  });
 });
