@@ -43,10 +43,10 @@ export function OrgMeta({ npo, credential, classes = "" }: IOrgMeta) {
     >
       {npo.endow_designation !== "Other" && (
         <li className="flex">
-          {/* secondary on every ground, the deep fill included: an opaque
+          {/* quiet on every ground, the deep fill included: an opaque
               surface + ink pair, legible whatever is under it */}
-          <Badge tone="secondary">
-            <Heart aria-hidden className="icon-xs mr-1" />
+          <Badge variant="quiet">
+            <Heart aria-hidden className="icon-xs" />
             {npo.endow_designation}
           </Badge>
         </li>

@@ -1,8 +1,15 @@
 {
   "schemaVersion": 1,
   "dir": "src",
-  "registryVersion": "3.0.0",
+  "registryVersion": "4.1.0",
   "items": {
+    "badge": {
+      "version": "1.2.1",
+      "files": {
+        "components/badge.tsx": "5c4f40bbfb56d1899ec3039de713583a68d018a2af76e94c1e8284376d762526",
+        "components/badge.usage.md": "b0d9096aa36585306890b886458986b454f995ac114d7d0913caee85845eddea"
+      }
+    },
     "button": {
       "version": "1.4.0",
       "files": {
@@ -11,15 +18,29 @@
         "components/load-text.tsx": "4d6788e40c932612c321c138f6344c6d44bf89ec0cc63b4eae65c026199b9f49"
       }
     },
-    "dialog": {
-      "version": "1.3.0",
+    "card": {
+      "version": "1.1.2",
       "files": {
-        "components/dialog.usage.md": "32e7ab49457728011c2a50d7ff67e5ea3d31468a2972c8053880a9671e1faa18",
+        "components/card.tsx": "43a14193f91c027ca7439b4f0605a98b9284c2cde0d1b84610356f3ea70aec48",
+        "components/card.usage.md": "59420f6b36c8ddc4156c8d0d520d8e6847e2631af27db96f123eb8ff075710ac"
+      }
+    },
+    "checklist": {
+      "version": "1.0.0",
+      "files": {
+        "components/checklist.tsx": "fad31dfe805ffa9a7ddfb7e9ed19321a3c79b1f3167935e288dad9d4009d31e8",
+        "components/checklist.usage.md": "8f82136b8a81e76b3687aef5a29bbc9f2ad228c67b3aad8adb30cfe141ae81d0"
+      }
+    },
+    "dialog": {
+      "version": "1.3.1",
+      "files": {
+        "components/dialog.usage.md": "d9074b0b1bba1521873df6d2ff425590b6cd66f7dfd62ebe3192ae40c2989817",
         "components/modal.tsx": "988b89ee87c6c7b21f2cef4c0cb32c384df5a46339c979fb86ed4159c931ce1e",
         "components/stripe-challenge.ts": "f12cba57903f587cd18efe896023ea5706d749cac45f78f1f69183964fe3439f",
         "helpers/dialog-name.ts": "472363b572bc28d66efbea740a9e4f609a2a67f0c2a39156296b902f8481f051",
         "helpers/ejected-focus.ts": "1f38ad0c0988da6b5c412ae9b41c76b518f5adbfdff8550e6dd4407d50eef609",
-        "helpers/modal-box.ts": "773e6c3d746bfc8fb65a8c77862df722e9e5d9b77dcbfb0e007ea2bc2b2ad7a2"
+        "helpers/modal-box.ts": "957b1908414c2047f31489aa192c78daa039784cff3a8cfc5b2455eba06226cc"
       }
     },
     "fonts": {

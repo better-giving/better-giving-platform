@@ -40,7 +40,7 @@ export function SavedBank({
           >
             Bank payout
           </h3>
-          <Badge tone="success">Saved</Badge>
+          <Badge variant="success">Saved</Badge>
         </div>
         <button
           type="button"

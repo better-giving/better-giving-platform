@@ -744,9 +744,15 @@ describe("campaign pages", () => {
       screen.getByRole("link", { name: "Winter", exact: true }).query()
     ).toBeNull();
     // the same pill the list rows wear
-    await expect
-      .element(screen.getByText("Live", { exact: true }))
-      .toHaveAttribute("data-tone", "success");
+    const live = screen.getByText("Live", { exact: true });
+    await expect.element(live).toBeVisible();
+    const probe = document.createElement("span");
+    probe.style.backgroundColor = "var(--success-subtle)";
+    document.body.append(probe);
+    expect(getComputedStyle(live.element()).backgroundColor).toBe(
+      getComputedStyle(probe).backgroundColor
+    );
+    probe.remove();
     const crumb = screen.getByRole("link", { name: "Campaigns" });
     expect((crumb.element() as HTMLElement).className).not.toContain(
       "pointer-events-none"
