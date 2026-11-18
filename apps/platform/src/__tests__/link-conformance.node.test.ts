@@ -162,12 +162,18 @@ describe("the link recipe", () => {
     // the same split the type roles keep by holding no colour. a display or a
     // font-weight baked in here is a decision every one of the 139 call sites
     // would then have to cancel.
-    const decls = [...recipe.matchAll(/([a-z-]+):\s*([^;]+);/g)].map(
+    // the hover rung sits in the registry's fine-pointer media query, so a
+    // touch tap does not leave a stuck hover; the wrapper is unwrapped here and
+    // asserted on its own below.
+    const flat = recipe
+      .replace("@media (hover: hover) and (pointer: fine) {", "")
+      .replace("&:hover {", "");
+    const decls = [...flat.matchAll(/([a-z-]+):\s*([^;]+);/g)].map(
       (m) => `${m[1]}: ${m[2]}`
     );
     expect(decls).toEqual([
-      "color: var(--primary)",
-      "color: var(--primary-hover)",
+      "color: var(--link)",
+      "color: var(--link-hover)",
       "outline: 2px solid var(--ring)",
       "outline-offset: 2px",
     ]);
@@ -177,11 +183,49 @@ describe("the link recipe", () => {
     expect(recipe).not.toMatch(/&:focus\s*\{/);
   });
 
+  test("the hover rung fires on a fine pointer only", () => {
+    expect(recipe).toMatch(
+      /@media \(hover: hover\) and \(pointer: fine\) \{\s*&:hover \{\s*color: var\(--link-hover\);/
+    );
+  });
+
   test("both rungs are the ramp's own tokens", () => {
-    // step 9 at rest, step 10 hovered — the state ladder's filled row. a
-    // color-mix or an alpha of --primary here would be a value nobody
-    // generated and nobody re-measures when the ramp moves.
+    // --link and --link-hover are step aliases the theme generator picks per
+    // appearance (accent 11/12, rest and hover, in light and in dark). a
+    // color-mix or an alpha here would be a value nobody generated and nobody
+    // re-measures when the ramp moves.
     expect(recipe).not.toMatch(/color-mix|oklch\(|#[0-9a-f]{3}/i);
+  });
+
+  test("the theme sets --link on accent-11 and --link-hover on accent-12, in light and in dark", () => {
+    // the recipe reads var(--link): an undefined one paints nothing and
+    // inherits, with no error anywhere. the rungs are radix's text steps, 11
+    // at rest and 12 hovered, in both appearances. literals here, since
+    // reading them back out of the theme would only compare it to itself.
+    const theme =
+      sources.find(
+        (x) => x.file === "packages/ui/src/styles/themes/default.css"
+      )?.text ?? "";
+    const appearance = (scheme: "light" | "dark") => {
+      const at = theme.indexOf(`color-scheme: ${scheme};`);
+      const next = theme.indexOf("color-scheme:", at + 1);
+      return at < 0 ? "" : theme.slice(at, next < 0 ? undefined : next);
+    };
+    const rung = (block: string, name: string) =>
+      [...block.matchAll(new RegExp(`^\\s*--${name}:\\s*([^;]+);`, "gm"))].map(
+        (m) => m[1]
+      );
+    for (const scheme of ["light", "dark"] as const) {
+      const block = appearance(scheme);
+      expect({ scheme, link: rung(block, "link") }).toEqual({
+        scheme,
+        link: ["var(--accent-11)"],
+      });
+      expect({ scheme, hover: rung(block, "link-hover") }).toEqual({
+        scheme,
+        hover: ["var(--accent-12)"],
+      });
+    }
   });
 });
 

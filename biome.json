@@ -11,6 +11,7 @@
       "**",
       "!**/package.json",
       "!**/*.svg",
+      "!packages/ui/src/styles/themes",
       "!apps/platform/public/scripts/**/*",
       "!apps/platform/src/scripts/**/*.json",
       "!apps/platform/.server/pg/migrations",

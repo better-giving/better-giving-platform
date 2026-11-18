@@ -23,7 +23,7 @@ interface Props {
 const tones: Record<BadgeTone, string> = {
   neutral: "bg-gray-3 text-gray-11",
   secondary: "bg-secondary text-gray-12",
-  primary: "bg-secondary text-blue-11",
+  primary: "bg-secondary text-accent-11",
   success: "bg-success-subtle text-success-subtle-fg",
   warning: "bg-warning-subtle text-warning-subtle-fg",
   destructive: "bg-destructive-subtle text-destructive-subtle-fg",

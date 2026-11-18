@@ -1593,12 +1593,16 @@ describe("E2E: start screen", () => {
       .toBeVisible();
     // the number's message is the number field's own error node, not a
     // second copy hanging off the country
-    await vi.waitFor(() =>
-      expect(
-        screen.container.querySelector("#__error_o_registration_number")
-          ?.textContent
-      ).toBe("Enter your registration number.")
-    );
+    await vi.waitFor(() => {
+      // the field mints the error node's id, so it is found from the control
+      const input = screen.container.querySelector(
+        '[name="o_registration_number"]'
+      );
+      const id = input?.getAttribute("aria-errormessage");
+      expect(id && document.getElementById(id)?.textContent).toBe(
+        "Enter your registration number."
+      );
+    });
     expect(await all_regs()).toHaveLength(0);
   }, 20_000);
 

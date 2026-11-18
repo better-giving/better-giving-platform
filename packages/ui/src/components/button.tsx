@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import type {
   ComponentProps,
   KeyboardEvent,
@@ -11,8 +12,10 @@ type Variant =
   | "primary"
   | "secondary"
   | "ghost"
+  | "soft"
   | "outline"
   | "destructive"
+  | "destructive-outline"
   | "success"
   | "warning";
 
@@ -24,8 +27,10 @@ const variant_class: Record<Variant, string> = {
   primary: "btn-primary",
   secondary: "btn-secondary",
   ghost: "btn-ghost",
+  soft: "btn-soft",
   outline: "btn-outline",
   destructive: "btn-destructive",
+  "destructive-outline": "btn-destructive-outline",
   success: "btn-success",
   warning: "btn-warning",
 };
@@ -45,21 +50,33 @@ interface IShared {
   /** @default "md" */
   size?: Size;
   /** in-flight: the label renders through `LoadText`, the control takes the
-   *  `pending` fill and stops responding. */
+   *  `pending` fill and stops responding. the button form stays focusable
+   *  (`aria-disabled` + `aria-busy`), so focus is still on it when done lands. */
   is_loading?: boolean;
   loading_text?: string;
   /** on the link forms this becomes `aria-disabled` plus an interception — a
    *  `disabled` attribute on an anchor does nothing and leaves it clickable. */
   disabled?: boolean;
-  /** appended last. padding belongs to the tier and width to the caller, so no
-   *  `px-*` and no `w-*` from here. */
+  /** the work succeeded: writes `data-done` and puts a check before the label,
+   *  which the caller swaps for its done label ("Saved"). on the button form
+   *  no activation lands while it shows, by pointer or keyboard. hold it with
+   *  `useDone` and announce the outcome in a `role="status"` region. */
+  is_done?: boolean;
+  /** fills the container's inline size, content centred, on any variant and
+   *  tier: the sheet or card footer's one action, a phone's stacked actions. */
+  full_width?: boolean;
+  /** appended last. padding belongs to the tier and width to the caller
+   *  (`full_width`), so no `px-*` and no `w-*` from here. */
   classes?: string;
   children?: ReactNode;
 }
 
 /** `btn-icon` removes the only text node, so the icon-only shape is
- *  unconstructible without an accessible name. */
-type IconName = { icon: true; "aria-label": string } | { icon?: false };
+ *  unconstructible without an accessible name. a square has its tier's width,
+ *  so it never fills its container. */
+type IconName =
+  | { icon: true; "aria-label": string; full_width?: never }
+  | { icon?: false };
 
 type Anchor = Omit<ComponentProps<"a">, "className" | "children" | "href">;
 
@@ -85,19 +102,25 @@ export function Button(props: IButton) {
     size_class[props.size ?? "md"],
     variant_class[props.variant],
     props.icon ? "btn-icon" : "",
+    // a square that slipped past the types keeps its square: icon wins
+    props.full_width && !props.icon ? "inline-full" : "",
     props.is_loading ? "pending" : "",
     props.classes ?? "",
   ]
     .filter(Boolean)
     .join(" ");
 
+  /** the link forms' blocked state; the button form splits it below */
   const inert = !!props.disabled || !!props.is_loading;
 
   const label = (
     <LoadText is_loading={props.is_loading} text={props.loading_text}>
+      {props.is_done ? <Check aria-hidden="true" /> : null}
       {props.children}
     </LoadText>
   );
+  const done =
+    props.is_done === undefined ? {} : { "data-done": String(props.is_done) };
 
   if (props.to !== undefined) {
     const {
@@ -106,14 +129,21 @@ export function Button(props: IButton) {
       icon,
       is_loading,
       loading_text,
+      is_done,
       disabled,
+      full_width,
       classes: _classes,
       children,
       to,
       nav,
       ...rest
     } = props;
-    const shared = { ...rest, ...blocked(inert), className: classes };
+    const shared = {
+      ...rest,
+      ...done,
+      ...blocked(inert),
+      className: classes,
+    };
     return nav ? (
       <NavLink to={to} {...shared}>
         {label}
@@ -132,14 +162,22 @@ export function Button(props: IButton) {
       icon,
       is_loading,
       loading_text,
+      is_done,
       disabled,
+      full_width,
       classes: _classes,
       children,
       href,
       ...rest
     } = props;
     return (
-      <a href={href} {...rest} {...blocked(inert)} className={classes}>
+      <a
+        href={href}
+        {...rest}
+        {...done}
+        {...blocked(inert)}
+        className={classes}
+      >
         {label}
       </a>
     );
@@ -151,18 +189,41 @@ export function Button(props: IButton) {
     icon,
     is_loading,
     loading_text,
+    is_done,
     disabled,
+    full_width,
     classes: _classes,
     children,
     type = "button",
     ...rest
   } = props;
+  // aria-disabled keeps the button focusable and hoverable, so a tooltip can
+  // say why it is off; the click (and with it a submit) is stopped here. done
+  // is off to the pointer in css, but Enter and Space still click the focused
+  // button, so that click is stopped here too. in flight takes aria-disabled
+  // rather than `disabled`: native disabled blurs a focused button to <body>
+  // before the done state it is waiting for can land
+  const off =
+    rest["aria-disabled"] === true || rest["aria-disabled"] === "true";
   return (
-    <button {...rest} type={type} disabled={inert} className={classes}>
+    <button
+      {...rest}
+      {...done}
+      {...(is_loading && { "aria-disabled": true, "aria-busy": true })}
+      {...((off || is_loading || is_done) && { onClick: stop })}
+      type={type}
+      disabled={!!disabled}
+      className={classes}
+    >
       {label}
     </button>
   );
 }
+
+const stop = (e: MouseEvent | KeyboardEvent) => {
+  e.preventDefault();
+  e.stopPropagation();
+};
 
 /** an anchor has no `disabled` attribute — the state has to be announced and
  *  then enforced by hand, or it renders as a still-navigable link. keydown as
@@ -170,10 +231,6 @@ export function Button(props: IButton) {
  *  bound further up before the synthesized click ever fires. */
 function blocked(inert: boolean) {
   if (!inert) return {};
-  const stop = (e: MouseEvent | KeyboardEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
   return {
     "aria-disabled": true,
     onClick: stop,

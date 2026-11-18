@@ -1,5 +1,7 @@
 @import "tailwindcss";
-/* the faces ship with the design system — packages/ui/src/styles/fonts.css */
+/* the faces ship with the design system, but its style layer does not import
+   them: an app imports fonts.css itself, beside styles.css */
+@import "@better-giving/ui/fonts.css";
 @import "@better-giving/ui/styles.css";
 
 /* the fictional nonprofit's palette, for /demo-nonprofit only.

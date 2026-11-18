@@ -18,7 +18,7 @@ import { sources_of } from "./conformance/walk";
  * | 11 / 12 | low- / high-contrast text |
  *
  * the semantic names sit on those steps already (`bg-card` 2, `bg-panel` 3,
- * `border-hairline` 6, `bg-secondary-hover` blue-4 …), so what drifts is a
+ * `border-hairline` 6, `bg-secondary-hover` accent-4 …), so what drifts is a
  * step spelled at a call site — `text-gray-9`, `border-gray-3`,
  * `hover:bg-gray-3` — which compiles, paints, reads fine in review and is the
  * wrong rung for what the element is. the colour reset can't catch it: every
@@ -75,7 +75,7 @@ const class_tokens = sources
     )
   );
 
-const SCALE = "(?:gray|blue|red|green|amber)";
+const SCALE = "(?:gray|accent|success|warning|destructive)";
 
 interface IRule {
   name: string;
@@ -131,8 +131,8 @@ describe("each ramp step does its radix job", () => {
       ["text-gray-12", false],
       ["text-gray-10", true],
       ["placeholder:text-gray-9", true],
-      ["text-blue-11", false],
-      ["text-blue-9", true],
+      ["text-accent-11", false],
+      ["text-accent-9", true],
       ["border-gray-6", false],
       ["border-b-gray-3", true],
       ["divide-gray-3", true],
@@ -153,7 +153,7 @@ describe("each ramp step does its radix job", () => {
       ["hover:bg-band", true],
       ["hover:bg-band/50", true],
       ["hover:bg-destructive-subtle", true],
-      ["hover:bg-red-4", false],
+      ["hover:bg-destructive-4", false],
       ["active:bg-destructive-subtle-active", false],
       ["lg:bg-surface", false],
       ["hover:bg-gray-4", false],

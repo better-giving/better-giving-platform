@@ -34,12 +34,9 @@ const line_of = (text: string, i: number) =>
 
 describe("modal size set", () => {
   test("`fixed-center` is spelled only where it is defined and spent", () => {
-    const owners = [
-      // spends it — one full literal string per tier
-      "packages/ui/src/helpers/modal-box.ts",
-      // defines it
-      "packages/ui/src/styles/utilities.css",
-    ];
+    // the registry's tiers centre with inset/auto-margin, so only the
+    // utility's definition is left.
+    const owners = ["packages/ui/src/styles/utilities.css"];
     // the one centered box that is not a modal *content* box: an
     // aspect-ratio-driven media viewport whose height is already bounded by
     // its own 80vh crop surface. it has no width cap to collapse onto, and any
@@ -51,7 +48,7 @@ describe("modal size set", () => {
 
   test("every tier bounds its own height", () => {
     const unbounded = Object.entries(modal_box)
-      .filter(([, cls]) => !cls.includes("max-h-[90dvh]"))
+      .filter(([, cls]) => !cls.includes("90dvh"))
       .map(([tier]) => tier);
     expect(unbounded).toEqual([]);
   });
@@ -65,9 +62,11 @@ describe("modal size set", () => {
 
   test("no tier carries a surface — geometry only", () => {
     // a surface baked into the base would beat or lose to the call site's own
-    // by stylesheet source order, not by class-string order.
+    // by stylesheet source order, not by class-string order. the registry's
+    // tiers carry the hairline edge themselves, so only a fill or an ink is
+    // the call site's.
     const surfaced = Object.entries(modal_box)
-      .filter(([, cls]) => /(^|\s)(bg-|text-|border(\s|$))/.test(cls))
+      .filter(([, cls]) => /(^|\s)(bg-|text-)/.test(cls))
       .map(([tier]) => tier);
     expect(surfaced).toEqual([]);
   });

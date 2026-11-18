@@ -19,17 +19,17 @@ export function Input(props: Props) {
     <div className={style.container}>
       <div className="relative">
         {props.icon && (
-          <props.icon className="icon-xl text-gray-11 absolute top-1/2 -translate-y-1/2 left-4" />
+          <props.icon className="icon-xl text-gray-11 absolute top-1/2 -translate-y-1/2 start-4" />
         )}
         <input
           {...rest}
           ref={ref}
           type="text"
-          className={`field-input h-full ${props.icon ? "pl-12" : ""} ${style.input}`}
+          className={`field-input block-full ${props.icon ? "ps-12" : ""} ${style.input}`}
           aria-invalid={!!error}
         />
       </div>
-      {error && <p className="field-err mt-1 empty:hidden">{error}</p>}
+      {error && <p className="field-err mbs-1 empty:hidden">{error}</p>}
     </div>
   );
 }
