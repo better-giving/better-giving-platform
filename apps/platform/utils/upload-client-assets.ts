@@ -252,11 +252,12 @@ async function probe_sentinel(r2: R2, base: string, delay_ms: number) {
 // PUT (from all of them when none were), entry.client first. names are
 // content-hashed, so a name this build introduces was never requested before
 // and no cache holds a stale 404 for it.
+//
 // module scripts and fonts are cors requests, and r2 sends no
 // access-control-allow-origin until the bucket has a CORS policy, so a missing
 // header is a dead site. the policy must answer exactly "*", not echo an
-// origin: the fonts are also fetched
-// from inside Stripe's iframe and previews get a new host per deployment.
+// origin: the fonts are also fetched from inside Stripe's iframe, and previews
+// get a new host per deployment.
 async function probe_asset(
   r2: R2,
   base: string,
