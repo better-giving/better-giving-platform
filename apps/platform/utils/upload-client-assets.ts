@@ -13,8 +13,7 @@ import { AwsClient } from "aws4fetch";
 // cloudflare's cache) and needs all four ASSETS_S3_* vars. the base is what the
 // html points at, so the upload can never target a store the html doesn't read
 // — preview/staging may carry the ASSETS_S3_* vars while their base is still
-// blob, and those vars are then ignored. the cutover is the ASSET_BASE_URL
-// flip, undone by the same.
+// blob, and those vars are then ignored.
 //
 // only build/client/assets/** is uploaded: every file there is content-hashed
 // and immutable, so the upload is append-only and safe to skip when the name is
