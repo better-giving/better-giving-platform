@@ -66,6 +66,16 @@ describe("r2", () => {
     );
   });
 
+  test("a failed PUT throws", async () => {
+    await writeFile(path.join(dir, "a-1.js"), "x");
+    fetch_mock.mockImplementation(async (req) =>
+      res(req.method === "HEAD" ? 404 : 403)
+    );
+    await expect(upload_client_assets(BASE, { dir, env: ENV })).rejects.toThrow(
+      /PUT assets\/a-1\.js answered 403/
+    );
+  });
+
   test("a HEAD error other than 404 throws", async () => {
     await writeFile(path.join(dir, "a-1.js"), "x");
     fetch_mock.mockResolvedValue(res(403));

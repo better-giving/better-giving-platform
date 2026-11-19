@@ -26,8 +26,8 @@ export default defineConfig((config) => {
   // from depending on the guard. dev and build still hard-fail on a missing
   // key, which is the guard's whole point.
   const env = check_env(config.mode, !is_test && !is_typegen);
-  // vite base for content-hashed client assets: "/" locally, blob origin on
-  // deployed stages (skew protection). MUST end in "/" — vite concatenates
+  // vite base for content-hashed client assets: "/" locally, the durable
+  // asset origin (r2 or blob) on deployed stages (skew protection). MUST end in "/" — vite concatenates
   // `base + filename` for ssr-manifest module urls. the fallback covers the
   // runs that stood the guard down — neither typegen nor vitest resolves an
   // asset url, so neither needs a real base.
