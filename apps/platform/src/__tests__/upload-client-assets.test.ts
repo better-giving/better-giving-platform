@@ -115,6 +115,22 @@ describe("r2", () => {
       expect(urls).toEqual([`${BASE}assets/entry.client-9f.js`]);
     });
 
+    test("probes a file this run uploaded, not one already present", async () => {
+      await writeFile(path.join(dir, "entry.client-9f.js"), "old");
+      await writeFile(path.join(dir, "route-7c.js"), "new");
+      const urls: string[] = [];
+      fetch_mock.mockImplementation(async (req) => {
+        if (typeof req === "string") {
+          urls.push(req);
+          return served("new", "text/javascript");
+        }
+        const present = req.url.includes("entry.client-");
+        return res(req.method === "HEAD" ? (present ? 200 : 404) : 200);
+      });
+      await upload_client_assets(BASE, { ...opts, dir });
+      expect(urls).toEqual([`${BASE}assets/route-7c.js`]);
+    });
+
     test("throws after 5 tries on 404, naming base, status and bucket", async () => {
       await writeFile(path.join(dir, "a-1.js"), "x");
       serve({ get: () => res(404) });

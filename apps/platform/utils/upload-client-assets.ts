@@ -129,6 +129,7 @@ export async function upload_client_assets(
   // fail on an unmapped extension before anything is uploaded
   if (r2) for (const rel of rel_paths) content_type(rel);
 
+  const fresh: string[] = [];
   let uploaded = 0;
   let skipped = 0;
   for (let i = 0; i < rel_paths.length; i += CONCURRENCY) {
@@ -138,8 +139,10 @@ export async function upload_client_assets(
         const did_upload = r2
           ? await put_r2(r2, pathname, path.join(dir, rel), rel)
           : await put_blob(asset_base_url, pathname, path.join(dir, rel));
-        if (did_upload) uploaded++;
-        else skipped++;
+        if (did_upload) {
+          uploaded++;
+          fresh.push(rel);
+        } else skipped++;
       })
     );
   }
@@ -148,7 +151,7 @@ export async function upload_client_assets(
       asset_base_url,
       r2.bucket,
       dir,
-      probe_rel(rel_paths),
+      probe_rel(fresh.length ? fresh : rel_paths),
       opts.probe_delay_ms ?? PROBE_DELAY_MS
     );
   }
@@ -166,10 +169,12 @@ const probe_rel = (rel_paths: string[]) =>
 // typo) uploads fine and ships html whose every asset 404s. fetch one file back
 // through the public base — status, content type and bytes — and throw so the
 // previous deployment stays live. plain unsigned fetch: this is the url a
-// browser uses. the file was just uploaded or confirmed present by HEAD, and
-// names are content-hashed, so a name this build introduces was never requested
-// before and no cache can hold a stale 404 for it. retries cover a fresh custom
-// domain that lags.
+// browser uses. the file is one this run just PUT when any was (entry.client
+// first — its name moves rarely, so it is a weak probe only when nothing else
+// is new): a preview build pointed at the prod base would otherwise pass on an
+// old prod file the base already serves. names are content-hashed, so a name
+// this build introduces was never requested before and no cache can hold a
+// stale 404 for it. retries cover a fresh custom domain that lags.
 async function probe_base(
   base: string,
   bucket: string,
