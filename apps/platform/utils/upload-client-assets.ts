@@ -47,8 +47,7 @@ const S3_KEYS = [
 
 // r2 stores whatever Content-Type the PUT carries, and browsers refuse module
 // scripts served as octet-stream, so an extension missing here throws rather
-// than ship with a guess. covers every extension vite emits into
-// build/client/assets today.
+// than ship with a guess.
 const CONTENT_TYPES: Record<string, string> = {
   ".js": "text/javascript",
   ".mjs": "text/javascript",
