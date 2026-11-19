@@ -9,6 +9,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { userEvent } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import { clear_qstash_events, get_qstash_events } from "#/setup-tests-browser";
 import { user } from "$/pg/schema/auth";
@@ -453,6 +454,25 @@ describe("back to the list", () => {
     (
       screen.getByRole("link", { name: "Cancel" }).element() as HTMLElement
     ).click();
+    await screen.getByRole("link", { name: "Back" }).click();
+
+    await expect
+      .element(screen.getByTestId("list-search"))
+      .toHaveTextContent(VIEW);
+  });
+
+  it("keeps them when Escape closes the verdict dialog", async () => {
+    const id = await seed_reg(ALL_FIELDS);
+    const screen = await render_review_from_list(id);
+
+    await screen.getByRole("link", { name: /reject/i }).click();
+    await expect
+      .element(screen.getByText(/changing application status/i))
+      .toBeVisible();
+    await userEvent.keyboard("{Escape}");
+    await expect
+      .element(screen.getByText(/changing application status/i))
+      .not.toBeInTheDocument();
     await screen.getByRole("link", { name: "Back" }).click();
 
     await expect

@@ -144,8 +144,13 @@ function Content() {
 }
 
 export default function Prompt() {
+  const { search } = useLocation();
   return (
-    <RouteModal classes="grid content-start justify-items-center bg-popover">
+    // Escape and an outside click close through this, so it keeps the view too
+    <RouteModal
+      to={`..${search}`}
+      classes="grid content-start justify-items-center bg-popover"
+    >
       <Content />
     </RouteModal>
   );
