@@ -64,6 +64,7 @@
     "@vercel/blob": "2.9.0",
     "@vercel/react-router": "1.3.7",
     "ai": "6.0.176",
+    "aws4fetch": "1.0.20",
     "better-auth": "1.6.22",
     "blog-types": "workspace:*",
     "cron-parser": "5.5.0",

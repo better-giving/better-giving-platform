@@ -1,41 +1,122 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { BlobNotFoundError, head, put } from "@vercel/blob";
+import { AwsClient } from "aws4fetch";
 
 // asset_base_url is expected to end in "/" (vite base convention).
 
-// mirror content-hashed client assets to vercel blob so html cached from a
-// rotated-out deployment can still load its assets from a deploy-independent
-// origin (see vite.config.ts `base` + entry.server.tsx `durable_assets`).
+// mirror content-hashed client assets to the deploy-independent store behind
+// ASSET_BASE_URL so html cached from a rotated-out deployment can still load
+// its assets (see vite.config.ts `base` + entry.server.tsx `durable_assets`).
+// the store is cloudflare r2 (S3 api, behind cloudflare's cache) when the four
+// ASSETS_S3_* vars are set, and vercel blob when none are. a partial set
+// throws. the env alone picks the backend, so the cutover can land before or
+// after the ASSET_BASE_URL flip and be undone by env alone.
 //
 // only build/client/assets/** is uploaded: every file there is content-hashed
 // and immutable, so the upload is append-only and safe to skip when the name is
 // already present (identical name implies identical bytes). public files
 // (favicon, /icons/*) are referenced via literal origin paths, never get the
-// blob base, and stay on the deployment — so they're intentionally excluded.
+// asset base, and stay on the deployment — so they're intentionally excluded.
 //
 // .map sourcemaps are skipped: the build, when it emits them at all, emits
 // them `"hidden"` (vite.config.ts), so no `sourceMappingURL` is written and a
 // browser never fetches them — only sentry consumes them, and sentryOnBuildEnd
 // already uploads them out-of-band. they're as numerous as the js chunks and
-// larger, and churn on every content-hash change, so mirroring them to blob
-// is pure waste — the bulk of the per-deploy re-upload volume.
+// larger, and churn on every content-hash change, so mirroring them is pure
+// waste — the bulk of the per-deploy re-upload volume.
 //
-// reads BLOB_READ_WRITE_TOKEN from env (via @vercel/blob). caller passes the
-// asset base url; it must point at the same blob store BLOB_READ_WRITE_TOKEN
-// writes to, or the baked asset urls won't resolve.
-const ASSETS_DIR = path.resolve("build/client/assets");
+// blob path: reads BLOB_READ_WRITE_TOKEN from env (via @vercel/blob); the
+// asset base url must point at the same blob store that token writes to.
+// r2 path: the base url must be the custom domain in front of ASSETS_S3_BUCKET.
 const CONCURRENCY = 12;
 const IMMUTABLE_MAX_AGE = 31_536_000; // 1y — hashed assets never change
+const CACHE_CONTROL = `public, max-age=${IMMUTABLE_MAX_AGE}, immutable`;
 
-export async function upload_client_assets(asset_base_url: string) {
-  const entries = await readdir(ASSETS_DIR, {
+const S3_KEYS = [
+  "ASSETS_S3_ENDPOINT",
+  "ASSETS_S3_BUCKET",
+  "ASSETS_S3_ACCESS_KEY_ID",
+  "ASSETS_S3_SECRET_ACCESS_KEY",
+] as const;
+
+// r2 stores whatever Content-Type the PUT carries, and browsers refuse module
+// scripts served as octet-stream, so an extension missing here throws rather
+// than ship with a guess. covers every extension vite emits into
+// build/client/assets today.
+const CONTENT_TYPES: Record<string, string> = {
+  ".js": "text/javascript",
+  ".mjs": "text/javascript",
+  ".css": "text/css",
+  ".woff2": "font/woff2",
+  ".woff": "font/woff",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".avif": "image/avif",
+  ".gif": "image/gif",
+  ".ico": "image/x-icon",
+  ".json": "application/json",
+  ".wasm": "application/wasm",
+  ".txt": "text/plain",
+};
+
+export function content_type(rel: string): string {
+  const ext = path.extname(rel).toLowerCase();
+  const type = CONTENT_TYPES[ext];
+  if (!type) {
+    throw new Error(
+      `[upload-client-assets] no Content-Type for "${rel}" — add "${ext}" to CONTENT_TYPES`
+    );
+  }
+  return type;
+}
+
+type Env = Record<string, string | undefined>;
+
+type R2 = { client: AwsClient; endpoint: string; bucket: string };
+
+function r2_from_env(env: Env): R2 | null {
+  const set = S3_KEYS.filter((k) => env[k]);
+  if (set.length === 0) return null;
+  if (set.length < S3_KEYS.length) {
+    const missing = S3_KEYS.filter((k) => !env[k]);
+    throw new Error(
+      `[upload-client-assets] partial R2 config — missing ${missing.join(", ")}. set all four ASSETS_S3_* vars for R2, or none for vercel blob`
+    );
+  }
+  return {
+    client: new AwsClient({
+      accessKeyId: env.ASSETS_S3_ACCESS_KEY_ID as string,
+      secretAccessKey: env.ASSETS_S3_SECRET_ACCESS_KEY as string,
+      service: "s3",
+      region: "auto",
+      // aws4fetch's default is 10 retries with doubling backoff (~50s); a
+      // build is better off failing sooner.
+      retries: 3,
+    }),
+    endpoint: (env.ASSETS_S3_ENDPOINT as string).replace(/\/+$/, ""),
+    bucket: env.ASSETS_S3_BUCKET as string,
+  };
+}
+
+export async function upload_client_assets(
+  asset_base_url: string,
+  opts: { dir?: string; env?: Env } = {}
+) {
+  const dir = opts.dir ?? path.resolve("build/client/assets");
+  const r2 = r2_from_env(opts.env ?? process.env);
+  const entries = await readdir(dir, {
     recursive: true,
     withFileTypes: true,
   });
   const rel_paths = entries
     .filter((e) => e.isFile() && !e.name.endsWith(".map"))
-    .map((e) => path.relative(ASSETS_DIR, path.join(e.parentPath, e.name)));
+    .map((e) => path.relative(dir, path.join(e.parentPath, e.name)));
+  // fail on an unmapped extension before anything is uploaded
+  if (r2) for (const rel of rel_paths) content_type(rel);
 
   let uploaded = 0;
   let skipped = 0;
@@ -43,26 +124,53 @@ export async function upload_client_assets(asset_base_url: string) {
     await Promise.all(
       rel_paths.slice(i, i + CONCURRENCY).map(async (rel) => {
         const pathname = `assets/${rel.split(path.sep).join("/")}`;
-        const url = `${asset_base_url}${pathname}`;
-        if (await blob_exists(url)) {
-          skipped++;
-          return;
-        }
-        await put(pathname, await readFile(path.join(ASSETS_DIR, rel)), {
-          access: "public",
-          addRandomSuffix: false,
-          // concurrent deploys may upload the same new (hashed) file; bytes are
-          // identical so overwrite is harmless and avoids a race failure.
-          allowOverwrite: true,
-          cacheControlMaxAge: IMMUTABLE_MAX_AGE,
-        });
-        uploaded++;
+        const did_upload = r2
+          ? await put_r2(r2, pathname, path.join(dir, rel), rel)
+          : await put_blob(asset_base_url, pathname, path.join(dir, rel));
+        if (did_upload) uploaded++;
+        else skipped++;
       })
     );
   }
   console.log(
-    `[upload-client-assets] ${uploaded} uploaded, ${skipped} already present`
+    `[upload-client-assets] ${r2 ? "r2" : "blob"}: ${uploaded} uploaded, ${skipped} already present`
   );
+}
+
+async function put_blob(base: string, pathname: string, file: string) {
+  if (await blob_exists(`${base}${pathname}`)) return false;
+  await put(pathname, await readFile(file), {
+    access: "public",
+    addRandomSuffix: false,
+    // concurrent deploys may upload the same new (hashed) file; bytes are
+    // identical so overwrite is harmless and avoids a race failure.
+    allowOverwrite: true,
+    cacheControlMaxAge: IMMUTABLE_MAX_AGE,
+  });
+  return true;
+}
+
+async function put_r2(r2: R2, key: string, file: string, rel: string) {
+  const url = `${r2.endpoint}/${r2.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
+  const probe = await r2.client.fetch(url, { method: "HEAD" });
+  if (probe.ok) return false;
+  if (probe.status !== 404) {
+    throw new Error(
+      `[upload-client-assets] HEAD ${key} answered ${probe.status}`
+    );
+  }
+  const res = await r2.client.fetch(url, {
+    method: "PUT",
+    body: await readFile(file),
+    headers: {
+      "Content-Type": content_type(rel),
+      "Cache-Control": CACHE_CONTROL,
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`[upload-client-assets] PUT ${key} answered ${res.status}`);
+  }
+  return true;
 }
 
 async function blob_exists(url: string): Promise<boolean> {

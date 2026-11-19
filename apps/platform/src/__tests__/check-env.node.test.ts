@@ -373,6 +373,10 @@ describe("missing_keys", () => {
       "SLACK_BOT_TOKEN",
       "SMTP_PASSWORD",
       "HUBSPOT_ACCESS_TOKEN",
+      "ASSETS_S3_ENDPOINT",
+      "ASSETS_S3_BUCKET",
+      "ASSETS_S3_ACCESS_KEY_ID",
+      "ASSETS_S3_SECRET_ACCESS_KEY",
     ]);
   });
 
