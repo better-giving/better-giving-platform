@@ -248,10 +248,10 @@ async function probe_sentinel(r2: R2, base: string, delay_ms: number) {
 }
 
 // then one real asset, through the public base, for what the sentinel can't
-// show: content type, bytes and CORS. the file is one this run just PUT when
-// any was (entry.client otherwise). names are content-hashed, so a name this
-// build introduces was never requested before and no cache holds a stale 404
-// for it.
+// show: content type, bytes and CORS. the file comes from those this run just
+// PUT (from all of them when none were), entry.client first. names are
+// content-hashed, so a name this build introduces was never requested before
+// and no cache holds a stale 404 for it.
 // module scripts and fonts are cors requests, and r2 sends no
 // access-control-allow-origin until the bucket has a CORS policy, so a missing
 // header is a dead site. the policy must allow "*": the fonts are also fetched
