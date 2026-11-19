@@ -4,17 +4,22 @@ import type { PropsWithChildren } from "react";
 import { preconnect } from "react-dom";
 import { Links, Meta, Scripts, ScrollRestoration } from "react-router";
 import { NavProgress } from "#/components/nav-progress";
+import { asset_origin } from "@/asset-origin";
 import { useConsent } from "./use-consent";
 
 export function Layout({ children }: PropsWithChildren<{ classes?: string }>) {
   // resource hints — emitted in <head> during SSR
-  // the blob origin serves images (no-cors) and, when ASSET_BASE_URL points at
-  // it, the module scripts and fonts (cors) — a connection opened without
-  // `crossorigin` is not reused by a cors request, so each mode gets its own
+  // the blob origin serves images (no-cors); the asset origin (vite base, baked
+  // at build) serves the module scripts and fonts (cors). a connection opened
+  // without `crossorigin` is not reused by a cors request, so each mode gets
+  // its own. the asset origin also serves the stylesheet and images as plain
+  // requests, so it gets both. a "/" base is same-origin and needs no hint.
   preconnect("https://cnfc6hjkztdschkg.public.blob.vercel-storage.com");
-  preconnect("https://cnfc6hjkztdschkg.public.blob.vercel-storage.com", {
-    crossOrigin: "anonymous",
-  });
+  const assets = asset_origin(import.meta.env.BASE_URL);
+  if (assets) {
+    preconnect(assets);
+    preconnect(assets, { crossOrigin: "anonymous" });
+  }
 
   useConsent();
 

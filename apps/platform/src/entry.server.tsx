@@ -59,7 +59,7 @@ export const streamTimeout = 5_000;
 
 // skew protection has two layers:
 //   1. content-hashed client assets are served from a deploy-independent
-//      origin (vercel blob — see vite.config.ts `base` +
+//      origin (cloudflare r2, or vercel blob — see vite.config.ts `base` +
 //      utils/upload-client-assets.ts), so cached html from a rotated-out
 //      deployment never 404s on its js/css/images.
 //   2. no .data pinning — loader/action contracts are kept additive-only so

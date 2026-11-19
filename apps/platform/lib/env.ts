@@ -56,9 +56,17 @@ export const SERVER_KEYS = [
   "QSTASH_CURRENT_SIGNING_KEY",
   "QSTASH_NEXT_SIGNING_KEY",
   "BLOB_READ_WRITE_TOKEN",
-  // vite base for content-hashed client assets: "/" locally, blob origin on
-  // deployed stages (skew protection — see vite.config.ts).
+  // vite base for content-hashed client assets: "/" locally, the durable
+  // asset origin (r2 or blob) on deployed stages (skew protection — see
+  // vite.config.ts).
   "ASSET_BASE_URL",
+  // r2 upload target for those assets (utils/upload-client-assets.ts): used
+  // when ASSET_BASE_URL is not a vercel blob host, ignored when it is.
+  // build-time only.
+  "ASSETS_S3_ENDPOINT",
+  "ASSETS_S3_BUCKET",
+  "ASSETS_S3_ACCESS_KEY_ID",
+  "ASSETS_S3_SECRET_ACCESS_KEY",
   "DATABASE_URL",
   "DATABASE_URL_UNPOOLED",
   "CRYPTO_DEPOSIT_ADDR_ETH",
@@ -119,6 +127,11 @@ export const OPTIONAL_KEYS = [
   "SLACK_BOT_TOKEN",
   "SMTP_PASSWORD",
   "HUBSPOT_ACCESS_TOKEN",
+  // r2 asset upload: the uploader requires all four when the base is not blob
+  "ASSETS_S3_ENDPOINT",
+  "ASSETS_S3_BUCKET",
+  "ASSETS_S3_ACCESS_KEY_ID",
+  "ASSETS_S3_SECRET_ACCESS_KEY",
 ] as const satisfies readonly ServerKey[];
 
 // optional keys check_env still requires when STAGE is production
