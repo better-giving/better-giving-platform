@@ -43,8 +43,10 @@ export const EXCLUDED: Record<string, string> = {
   "api.cron.nav-update": "cron",
   "api.cron.owed-notices": "cron",
   "api.cron.savings-snapshot": "cron",
+  "api.cron.wise-returns": "cron",
   "api.crypto-intents.$id": "checkout",
   "api.donation-intents": "checkout",
+  "api.docs": "internal",
   "api.donation-notifications": "internal",
   "api.file-upload": "internal",
   "api.me": "session",
@@ -700,6 +702,12 @@ const connector_ops = (): IOperation[] => [
     "list_donations",
     "List donations",
     { refuses: [404] }
+  ),
+  keyed_read(
+    "connector.v1.memberships",
+    "/connector/v1/memberships",
+    "list_nonprofits",
+    "List the signed-in user's nonprofits"
   ),
   keyed_read(
     "connector.v1.donors",

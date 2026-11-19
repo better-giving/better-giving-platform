@@ -23,7 +23,14 @@ export const referrer_commissions = pgTable(
       .references(() => npos.id),
     amount: numeric_as_number("amount", { precision: 38, scale: 18 }).notNull(),
     status: text("status")
-      .$type<"pending" | "processing" | "paid" | "refunded" | "refunded_loss">()
+      .$type<
+        | "pending"
+        | "processing"
+        | "paid"
+        | "returned"
+        | "refunded"
+        | "refunded_loss"
+      >()
       .notNull(),
     /** wise customerTransactionId of the transfer that claimed it */
     ref: text("ref"),
@@ -35,7 +42,7 @@ export const referrer_commissions = pgTable(
     ),
     check(
       "status_check",
-      sql`${t.status} IN ('pending','processing','paid','refunded','refunded_loss')`
+      sql`${t.status} IN ('pending','processing','paid','returned','refunded','refunded_loss')`
     ),
     index("referrer_commissions_donation_id_idx").on(t.donation_id),
     index("referrer_commissions_status_idx").on(t.status),
@@ -60,6 +67,12 @@ export const referrer_payouts = pgTable(
     amount: numeric_as_number("amount", { precision: 38, scale: 18 }).notNull(),
     error: text("error"),
     transfer_id: bigint("transfer_id", { mode: "number" }),
+    /** the transfer's wise state, stored by the returns poll (`returned` once
+     * its money came back); empty until polled, and on rows with no transfer */
+    status: text("status").notNull().default(""),
+    /** the wise recipient the transfer paid, to tell a new payout account from
+     * the one that bounced; null on a run from before it was stored */
+    recipient_id: text("recipient_id"),
   },
   (t) => [
     check(

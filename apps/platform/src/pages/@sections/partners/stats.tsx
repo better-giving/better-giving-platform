@@ -62,7 +62,7 @@ export function Stats({ classes = "" }) {
         viewport={{ once: true, margin: "-100px" }}
         transition={{ type: "spring" }}
       >
-        <CountUp end={6} suffix=" Million+" />
+        <CountUp end={7} suffix=" Million+" />
         <p className="max-w-md text-center mt-2 text-lg">
           Raised across crypto, stock, DAF, and card donations for nonprofit
           members.

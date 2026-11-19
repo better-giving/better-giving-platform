@@ -11,7 +11,11 @@ export interface ISettledStatus {
 export interface IPendingStatus {
   type: "pending";
 }
-/** claimed by the grants cron: its wise transfer is in flight or unreconciled */
+/**
+ * claimed by the grants cron and not yet delivered: its wise transfer is
+ * unfunded or unreconciled (no `settled_id`), or funded and on its way
+ * (`settled_id` names the transfer) until wise reports it sent
+ */
 export interface IProcessingStatus {
   type: "processing";
   /** the claim's wise `customerTransactionId`; `""` on a claim made before it was stored */
@@ -31,6 +35,27 @@ export interface ICancelledStatus {
   type: "cancelled";
 }
 
+/** the bank sent the wise transfer back: the money is in the npo's balance, and goes out again once a newer approved account is the one the grants run pays (`npo_return_hold`) */
+export interface IReturnedStatus {
+  type: "returned";
+}
+
+/**
+ * wise reports its transfer off the ordinary path (`bounced_back` and the
+ * like): not delivered, so not settled. the money may still be delivered late
+ * (back to `settled`) or refunded (`returned`)
+ */
+export interface IBouncedStatus {
+  type: "bounced";
+  /** its transfer's stored state is `charged_back`: reversed for good, not on its way back */
+  charged_back?: boolean;
+}
+
+/** voided by ops: not a grant, not counted */
+export interface IVoidStatus {
+  type: "void";
+}
+
 export type PayoutStatus =
   | IErrorStatus
   | ISettledStatus
@@ -38,7 +63,20 @@ export type PayoutStatus =
   | IProcessingStatus
   | IRefundedStatus
   | IRefundedLossStatus
-  | ICancelledStatus;
+  | ICancelledStatus
+  | IReturnedStatus
+  | IBouncedStatus
+  | IVoidStatus;
+
+/** the types whose money is in the npo's cash, not sent: a refund cancels the
+ * payout and takes its cash back */
+export const UNSENT_TYPES = [
+  "pending",
+  "returned",
+] as const satisfies readonly PayoutStatus["type"][];
+
+export const is_unsent = (type: string | null | undefined): boolean =>
+  UNSENT_TYPES.some((t) => t === type);
 
 /**
  * donation - a payout from a donation

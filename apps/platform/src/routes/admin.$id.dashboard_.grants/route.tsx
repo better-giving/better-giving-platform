@@ -10,7 +10,7 @@ import {
   grant_run_deductions,
   npo_owed_history,
 } from "$/pg/queries/owed-history";
-import { npo_settlements, type SettlementRow } from "$/pg/queries/payout";
+import { type GrantRow, npo_settlements } from "$/pg/queries/payout";
 import type { Route } from "./+types/route";
 import { GrantsTable, type IGrantLine } from "./common/grants-table";
 
@@ -35,7 +35,7 @@ export const clientLoader = createClientLoaderCache<Route.ClientLoaderArgs>();
 /** a grant that recovered anything owed carries its gross, deductions and net */
 function with_deductions(
   npo_id: number,
-  grants: SettlementRow[]
+  grants: GrantRow[]
 ): Promise<IGrantLine[]> {
   return Promise.all(
     grants.map(async (g) => {

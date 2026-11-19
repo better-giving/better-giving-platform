@@ -22,6 +22,7 @@ import { forms } from "../pg/schema/form";
 import { funds } from "../pg/schema/fund";
 import { npo_media, npos } from "../pg/schema/npo";
 import { subscriptions } from "../pg/schema/subscription";
+import { user_npo_memberships } from "../pg/schema/user";
 import { block_catalog } from "./catalog";
 import { encode_list_cursor, type ListCursor } from "./cursor";
 import {
@@ -249,6 +250,45 @@ export async function list_campaigns(
     data: listed.data.map(summary_of),
     next_cursor: listed.next_cursor,
   });
+}
+
+/** Every member is a full admin today; a role column would change only this. */
+function member_role() {
+  return { role: "admin", can_manage: true } as const;
+}
+
+/**
+ * The nonprofits the connection's user belongs to, the connection's own
+ * first and the rest by name. One page, so `next_cursor` is always null.
+ */
+export async function list_nonprofits(
+  db: DbOrTx,
+  live: { npo_id: number; allowed_by: string },
+  url: URL
+): Promise<Response> {
+  const issues: FieldError[] = [];
+  stray_params(url, QUERY_PARAMS.list_nonprofits, issues);
+  const refused = refuse(issues);
+  if (refused) return refused;
+
+  const rows = await db
+    .select({ id: npos.id, name: npos.name, logo: npos.logo })
+    .from(user_npo_memberships)
+    .innerJoin(npos, eq(npos.id, user_npo_memberships.npo_id))
+    .where(eq(user_npo_memberships.user_id, live.allowed_by))
+    // lower(): C / C.UTF-8 collation (pglite, neon) sorts every capital before "a"
+    .orderBy(asc(sql`lower(${npos.name})`), asc(npos.name), asc(npos.id));
+
+  const items = rows.map((row) => ({
+    id: String(row.id),
+    name: row.name,
+    ...member_role(),
+    current: row.id === live.npo_id,
+    logo_url: row.logo || null,
+  }));
+  const current = items.filter((item) => item.current);
+  const rest = items.filter((item) => !item.current);
+  return json({ data: [...current, ...rest], next_cursor: null });
 }
 
 export async function read_campaign_detail(

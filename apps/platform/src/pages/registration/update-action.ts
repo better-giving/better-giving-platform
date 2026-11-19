@@ -13,6 +13,7 @@ import {
   reg_id,
   reg_update as reg_update_schema,
 } from "@/reg/schema";
+import { FOREIGN_DOC, may_store_doc, REG_DOC_FIELDS } from "$/doc-access";
 import { stripe as stripe_env } from "$/env";
 import { enqueue } from "$/kit/queue";
 import { db } from "$/pg/db";
@@ -68,6 +69,11 @@ export const update_action =
 
     const { update_type, ...fields } = upd8;
     const attrs: TRegAttrs = { ...fields, status: "01" as const };
+    const foreign = REG_DOC_FIELDS.some((k) => {
+      const next = attrs[k];
+      return next != null && !may_store_doc(user.id, next, reg[k]);
+    });
+    if (foreign) return resp.fail(400, FOREIGN_DOC);
 
     //resets
     const prog = new Progress(reg, stripe_env.connect_routing);

@@ -1,4 +1,5 @@
 import { Search } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { useSearchParams } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { metas } from "#/helpers/seo";
@@ -6,7 +7,6 @@ import { use_table } from "#/hooks/use-table";
 import type { IReg } from "@/reg";
 import type { Route } from "./+types/route";
 import { Filter } from "./filter";
-import type { statuses } from "./filter/constants";
 import { Table } from "./table";
 
 export { loader } from "./api";
@@ -16,26 +16,36 @@ export { ErrorBoundary } from "#/components/error";
 export const meta: Route.MetaFunction = () =>
   metas({ title: "NPO applications" });
 
-const empty_msgs: Record<keyof typeof statuses, string> = {
-  "": "No applications",
-  "01": "No incomplete applications",
-  "02": "No applications under review",
-  "03": "No approved applications",
-  "04": "No rejected applications",
-};
-
 export default CacheRoute(Applications);
 function Applications({ loaderData: page1 }: Route.ComponentProps) {
   const [params, setParams] = useSearchParams();
-  const status_key = (
-    params.has("status") ? params.get("status")! : "02"
-  ) as keyof typeof statuses;
+  const query_ref = useRef<HTMLInputElement>(null);
+  const query = params.get("query") ?? "";
+  // the box is uncontrolled, so it follows a query changed elsewhere (Reset
+  // filters, back/forward) without being remounted, which would drop its focus
+  useEffect(() => {
+    if (query_ref.current && query_ref.current.value !== query) {
+      query_ref.current.value = query;
+    }
+  }, [query]);
+  // any filter or search narrows the list, so an empty one is "found", not "yet"
+  const any_filter = [
+    "status",
+    "country",
+    "start_date",
+    "end_date",
+    "query",
+  ].some((k) => !!params.get(k));
 
   const { node, loading } = use_table<IReg>({
+    // a filter or sort change drops every loaded page, and so does a cached
+    // page 1 swapped for a fresh one under the same URL: hence the params plus
+    // what page 1 is
+    filter_key: `${params.toString()}|${page1.next ?? ""}|${page1.items[0]?.id ?? ""}`,
     table: ({ items, ...props }) => (
       <Table
         items={items}
-        empty_msg={empty_msgs[status_key] ?? empty_msgs[""]}
+        empty_msg={any_filter ? "No applications found" : "No applications yet"}
         connect_routing={page1.connect_routing}
         {...props}
       />
@@ -69,6 +79,7 @@ function Applications({ loaderData: page1 }: Route.ComponentProps) {
         >
           <Search className="absolute top-1/2 -translate-y-1/2 left-3 icon-xl" />
           <input
+            ref={query_ref}
             disabled={loading}
             name="query"
             defaultValue={params.get("query") ?? ""}

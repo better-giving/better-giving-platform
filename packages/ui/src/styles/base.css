@@ -6,10 +6,35 @@
   ::file-selector-button {
     /* the token, not the step: `surface-primary` rebinds --border so a hairline
        inside a brand fill is drawn against that fill, and --ring so the focus
-       ring is. reading gray-6/blue-8 here would leave both rebinds with no
+       ring is. reading gray-6/accent-8 here would leave both rebinds with no
        consumer. */
     border-color: var(--border);
     outline-color: var(--ring);
+  }
+
+  /* the page: long words wrap instead of widening a box; the last line of a
+     paragraph is never a lone word. no scrollbar-gutter: a stable gutter
+     shortens the viewport by the scrollbar's width for fixed layers, so a
+     sheet or scrim would stop short of the window's edge on a classic
+     scrollbar. */
+  :root {
+    overflow-wrap: break-word;
+    text-wrap: pretty;
+  }
+
+  /* a heading breaks evenly across its lines */
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  /* no double-tap zoom wait on a control */
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
   }
 
   h1,
@@ -20,6 +45,15 @@
   h6 {
     font-family: var(--font-display);
     font-weight: 700;
+  }
+
+  /* preflight's --default-mono-font-family resolves once at :root, so a
+     data-font region's own --font-mono would never reach these. */
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-mono);
   }
 
   body {

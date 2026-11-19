@@ -25,17 +25,31 @@ const deductions = vi.hoisted(() => ({ on: false }));
  * so a reused ref answers with the original transfer, funded or not
  */
 const wise = vi.hoisted(() => {
-  const by_ref = new Map<string, { id: number; status: string }>();
-  const by_id = new Map<number, { id: number; status: string }>();
+  const by_ref = new Map<
+    string,
+    { id: number; status: string; sourceValue?: number }
+  >();
+  const by_id = new Map<
+    number,
+    { id: number; status: string; sourceValue?: number }
+  >();
   return {
     by_ref,
     by_id,
     v2_account: vi.fn(async () => ({ currency: "USD" })),
     quote: vi.fn(async (_: string, q: { sourceAmount: number }) => ({
       id: `q-${q.sourceAmount}`,
+      sourceAmount: q.sourceAmount,
+      sourceCurrency: "USD",
+      payOut: "BANK_TRANSFER",
     })),
+    // none of ours: no recipient here is one of our own balances
     transfer: vi.fn(
-      async (t: { customerTransactionId: string; targetAccount: string }) => {
+      async (t: {
+        customerTransactionId: string;
+        targetAccount: string;
+        quoteUuid: string;
+      }) => {
         const seen = by_ref.get(t.customerTransactionId);
         if (seen) return { ...seen };
         const created = {
@@ -241,6 +255,33 @@ describe("commissions cron", () => {
       transfer_id: 9000,
       error: null,
     });
+  });
+
+  test("returned commissions wait while the referrer's payout account is the one that bounced, and go out in the same run once it is a different one", async () => {
+    await seed("d-1", 60);
+    await db()
+      .update(referrer_commissions)
+      .set({ status: "returned", ref: "r-0" });
+    await db().insert(referrer_payouts).values({
+      id: "r-0",
+      referrer_npo: REFERRER,
+      date: "2026-09-02T00:00:00.000Z",
+      amount: 60,
+      transfer_id: 1,
+      status: "returned",
+      recipient_id: "42",
+    });
+
+    await index();
+
+    expect(wise.transfer).not.toHaveBeenCalled();
+    expect(await statuses()).toEqual({ "d-1": "returned" });
+
+    referrer.pay_id = 43;
+    await index();
+
+    expect(quoted()).toEqual([60]);
+    expect(await statuses()).toEqual({ "d-1": "paid" });
   });
 
   test("a retry over a grown set after an unknown funding outcome pays only the new commission", async () => {

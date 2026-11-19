@@ -1,6 +1,7 @@
 import type { LoaderFunction } from "react-router";
 import { post_path } from "#/api/get/posts";
 import { sanity } from "#/api/sanity";
+import { compare_generated, compare_pages } from "#/content/compare/data";
 
 interface SitemapUrl {
   url: string;
@@ -75,6 +76,26 @@ export const loader: LoaderFunction = async ({ url }) => {
     )
     .join("\n");
 
+  // the honest lastmod is a comparison's last_verified and the index's
+  // generated date; data.ts rejects a non-kebab slug, so no encoding needed
+  const compare_entries = [
+    { path: "/compare", lastmod: compare_generated, priority: 0.7 },
+    ...compare_pages.map((p) => ({
+      path: `/compare/${p.slug}`,
+      lastmod: p.last_verified,
+      priority: 0.6,
+    })),
+  ]
+    .map(
+      (e) => `  <url>
+    <loc>${base_url}${e.path}</loc>
+    <lastmod>${e.lastmod}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>${e.priority}</priority>
+  </url>`
+    )
+    .join("\n");
+
   // post_path's encoded segment leaves no `&`/`<`/`>` to break the xml
   const postEntries = posts
     .flatMap((p) => {
@@ -94,7 +115,7 @@ export const loader: LoaderFunction = async ({ url }) => {
 
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${[staticEntries, postEntries].filter(Boolean).join("\n")}
+${[staticEntries, compare_entries, postEntries].filter(Boolean).join("\n")}
 </urlset>`;
 
   return new Response(sitemap.trim(), {

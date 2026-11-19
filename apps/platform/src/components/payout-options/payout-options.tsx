@@ -125,7 +125,7 @@ export function Cell({ cell }: ICellView) {
   if (!cell.held) return <span className="text-gray-11">{cell.text}</span>;
   return (
     <span className="inline-flex items-start gap-2">
-      <Badge tone="warning" className="shrink-0">
+      <Badge variant="warning" classes="shrink-0">
         Held
       </Badge>
       <span className="text-gray-11">{cell.text}</span>

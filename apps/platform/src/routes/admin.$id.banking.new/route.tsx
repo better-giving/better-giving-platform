@@ -55,7 +55,7 @@ export default function Banking() {
   return (
     <div className="px-4 py-4 md:px-10 md:py-8">
       <Breadcrumb
-        classes="mb-4"
+        classes="mb-6"
         items={[
           {
             label: "Banking",
@@ -65,7 +65,9 @@ export default function Banking() {
         ]}
       />
       <Group
-        classes="max-w-[1112px]"
+        card={false}
+        heading_level={2}
+        classes="max-w-2xl"
         title="Bank account details"
         description="The following information will be used to register your bank account that will be used to withdraw your funds."
       >

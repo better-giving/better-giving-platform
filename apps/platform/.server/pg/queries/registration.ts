@@ -24,7 +24,7 @@ import {
 import { db } from "../db";
 import { registrations } from "../schema/registration";
 import type { DbOrTx, IPage } from "./helpers";
-import { decode_date_cursor, encode_date_cursor } from "./helpers";
+import { decode_cursor, decode_date_cursor, encode_cursor } from "./helpers";
 
 export async function reg_get(id: string): Promise<IReg | undefined> {
   const [row] = await db
@@ -208,10 +208,94 @@ export async function reg_stripe_deauthorize(
   return { status: "stale", reg_id: row.id };
 }
 
-/** paginated registrations with status/date/country filters */
+const PAGE = 15;
+const STATUSES: TStatus[] = ["01", "02", "03", "04"];
+/** what the database writes for a timestamptz: a cursor for another sort is not one */
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+/** a string postgres accepts as a parameter, which a NUL is not */
+const sound = (x: unknown): x is string =>
+  typeof x === "string" && !x.includes("\u0000");
+/** a timestamp the database would read */
+const is_timestamp = (x: string) =>
+  ISO_TIMESTAMP.test(x) && !Number.isNaN(Date.parse(x));
+
+/** a keyset cursor: the last row's sort value and id, and the sort it was
+ * made under, utf-8 safe */
+function encode_regs_cursor(
+  sort_key: string,
+  sort_dir: string,
+  value: string | null,
+  id: string,
+  /** the status inferred from a legacy cursor, carried to the pages after it */
+  inferred_status?: TStatus
+) {
+  return encode_cursor({
+    k: sort_key,
+    d: sort_dir,
+    v: value,
+    i: id,
+    ...(inferred_status && { s: inferred_status }),
+  });
+}
+
+type RegsCursor =
+  | {
+      kind: "keyset";
+      value: string | null;
+      id: string;
+      /** a status a legacy cursor implied, for a request that names none */
+      status?: TStatus;
+    }
+  /** a bare date from before keyset paging */
+  | { kind: "date"; date: string };
+
+/** what `next` holds, or undefined for anything unreadable or made under
+ * another sort: such a cursor starts the list over rather than failing it */
+function decode_regs_cursor(
+  next: string,
+  sort_key: string,
+  sort_dir: string
+): RegsCursor | undefined {
+  try {
+    const x = decode_cursor(next);
+    if (x && typeof x === "object" && "i" in x) {
+      if (
+        x.k === sort_key &&
+        x.d === sort_dir &&
+        sound(x.i) &&
+        (x.v === null || sound(x.v)) &&
+        // a timestamp must read as one, or the comparison fails in postgres
+        (sort_key !== "updated_at" ||
+          x.v === null ||
+          is_timestamp(x.v as string))
+      ) {
+        return {
+          kind: "keyset",
+          value: x.v as string | null,
+          id: x.i,
+          ...(typeof x.s === "string" &&
+            STATUSES.includes(x.s as TStatus) && { status: x.s as TStatus }),
+        };
+      }
+      return undefined;
+    }
+  } catch {}
+  try {
+    const date = decode_date_cursor(next);
+    if (date && is_timestamp(date)) return { kind: "date", date };
+  } catch {}
+  return undefined;
+}
+
+/**
+ * paginated registrations with status/date/country filters. no status is
+ * every status, newest first. paged by a keyset on (sort column, id), the id
+ * breaking ties and nulls last, so a "view more" under any sort continues
+ * where the page before it stopped
+ */
 export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
   const {
-    status = "02",
+    status: asked_status,
     start_date,
     end_date,
     country,
@@ -221,8 +305,6 @@ export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
     sort_dir = "desc",
   } = opts || {};
 
-  const cursor = decode_date_cursor(next);
-
   const sort_col_map = {
     o_name: registrations.o_name,
     updated_at: registrations.updated_at,
@@ -230,7 +312,39 @@ export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
     status: registrations.status,
   } as const;
   const col = sort_col_map[sort_key];
-  const order = sort_dir === "asc" ? asc(col) : desc(col);
+  const desc_ = sort_dir !== "asc";
+  const dir = desc_ ? desc : asc;
+
+  const cursor = next
+    ? decode_regs_cursor(next, sort_key, desc_ ? "desc" : "asc")
+    : undefined;
+  // a tab from before this default changed pages with a bare date and no
+  // status, which then meant under review. that status rides in the cursors
+  // after it, and a status the request names always wins
+  const inferred =
+    asked_status !== undefined
+      ? undefined
+      : cursor?.kind === "date"
+        ? "02"
+        : cursor?.kind === "keyset"
+          ? cursor.status
+          : undefined;
+  const status = asked_status ?? inferred;
+  let after: SQL | undefined;
+  if (cursor?.kind === "keyset") {
+    const { value, id } = cursor;
+    // a timestamp column compares as one, whatever the cursor's text
+    const v =
+      sort_key === "updated_at" ? sql`${value}::timestamptz` : sql`${value}`;
+    const past = desc_ ? sql`<` : sql`>`;
+    after =
+      value === null
+        ? // nulls sort last: only nulls with a later id remain
+          sql`(${col} is null and ${registrations.id} ${past} ${id})`
+        : sql`(${col} ${past} ${v} or (${col} = ${v} and ${registrations.id} ${past} ${id}) or ${col} is null)`;
+  } else if (cursor?.kind === "date") {
+    after = sql`${registrations.updated_at} < ${cursor.date}`;
+  }
 
   const rows = await db
     .select()
@@ -251,20 +365,31 @@ export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
               sql`${registrations.id} ILIKE ${`%${query}%`}`
             )
           : undefined,
-        cursor ? sql`${registrations.updated_at} < ${cursor}` : undefined
+        after
       )
     )
-    .orderBy(order)
-    .limit(16);
+    .orderBy(
+      sql`${col} ${desc_ ? sql`desc` : sql`asc`} nulls last`,
+      dir(registrations.id)
+    )
+    .limit(PAGE + 1);
 
-  const has_more = rows.length > 15;
-  const items = rows.slice(0, 15);
+  const has_more = rows.length > PAGE;
+  const items = rows.slice(0, PAGE);
+  const last = items[items.length - 1];
   return {
     // IReg is composed of many sub-interfaces with field shape mismatches
     items: items as unknown as IReg[],
-    next: has_more
-      ? encode_date_cursor(items[items.length - 1]?.updated_at ?? undefined)
-      : undefined,
+    next:
+      has_more && last
+        ? encode_regs_cursor(
+            sort_key,
+            desc_ ? "desc" : "asc",
+            (last[sort_key] as string | null | undefined) ?? null,
+            last.id,
+            inferred
+          )
+        : undefined,
   };
 }
 

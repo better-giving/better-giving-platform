@@ -1,10 +1,10 @@
 export interface IItem {
-  /* persisted in localStorage under STORE_KEY — renaming an id silently drops a
+  /* persisted in localStorage under the page's `storage_key`; renaming an id silently drops a
      visitor's tick. bump the key's version suffix instead. */
   id: string;
   text: string;
-  /** named in a 2025-26 enforcement action, not merely a principle on paper */
-  flashpoint?: boolean;
+  /** a flag: named in a 2025-26 enforcement action, not merely a principle on paper (the page words it "flashpoint") */
+  flag?: boolean;
   /** which action, and what it cost — only where the case is specific */
   note?: string;
 }
@@ -25,13 +25,13 @@ export const sections: ISection[] = [
       {
         id: "consent-solicit",
         text: "The platform gets written consent from an authorized representative before soliciting or collecting donations in our name.",
-        flashpoint: true,
+        flag: true,
         note: "This is the exact failure at the center of Alaska's six lawsuits and the 21-state GoFundMe letter.",
       },
       {
         id: "consent-branding",
         text: "It gets written consent before using our logo, branding, images, or messaging, including in ads and promotions.",
-        flashpoint: true,
+        flag: true,
       },
       {
         id: "consent-provided-assets",
@@ -40,7 +40,7 @@ export const sections: ISection[] = [
       {
         id: "consent-removal",
         text: "We can find and remove our organization for free, without registering or agreeing to any terms and conditions first.",
-        flashpoint: true,
+        flag: true,
       },
     ],
   },
@@ -64,13 +64,13 @@ export const sections: ISection[] = [
       {
         id: "transparency-fees",
         text: "All fees, charges, and “tips” are disclosed at the donation point, in a font at least as large as the rest of the page, so donors see the net amount we receive.",
-        flashpoint: true,
+        flag: true,
         note: "A default “tip” routed to the platform was one of the four harms cited in the multi-state GoFundMe letter.",
       },
       {
         id: "transparency-tip-destination",
         text: "It's clear whether a tip goes to the platform or to us, processing-fee coverage is separated from tips, and tips are never the pre-selected default.",
-        flashpoint: true,
+        flag: true,
       },
       {
         id: "transparency-business-model",
@@ -79,7 +79,7 @@ export const sections: ISection[] = [
       {
         id: "transparency-daf",
         text: "It discloses whether it's for-profit or nonprofit, and whether donations pass through a donor-advised fund (DAF), including DAF fees, timing, and any power to redirect gifts.",
-        flashpoint: true,
+        flag: true,
         note: "Undisclosed DAF structure was a specific harm regulators flagged against GoFundMe.",
       },
       {
@@ -96,7 +96,7 @@ export const sections: ISection[] = [
       {
         id: "partnership-campaign-notice",
         text: "We're told within 7 days of any new campaign raising funds in our name.",
-        flashpoint: true,
+        flag: true,
       },
       {
         id: "partnership-links-out",
@@ -105,13 +105,13 @@ export const sections: ISection[] = [
       {
         id: "partnership-remittance",
         text: "Donations are transferred within 30 days, and within 5 business days if any donor is in California.",
-        flashpoint: true,
+        flag: true,
         note: "Withholding roughly $500,000 past this window is what drew California's cease-and-desist against Flipcause.",
       },
       {
         id: "partnership-paid-search",
         text: "It does not buy paid search on our name without our consent.",
-        flashpoint: true,
+        flag: true,
         note: "GoFundMe was accused of using search placement to rank its pages above nonprofits' own sites.",
       },
       {
@@ -152,7 +152,7 @@ export const sections: ISection[] = [
       {
         id: "accountability-registration",
         text: "It's registered and in good standing everywhere required, such as California (AB 488) and Hawaii.",
-        flashpoint: true,
+        flag: true,
         note: "Operating unregistered was a core finding in California's action against Flipcause.",
       },
       {
@@ -174,7 +174,3 @@ export const sections: ISection[] = [
     ],
   },
 ];
-
-export const items = sections.flatMap((s) => s.items);
-export const total = items.length;
-export const flag_total = items.filter((i) => i.flashpoint).length;

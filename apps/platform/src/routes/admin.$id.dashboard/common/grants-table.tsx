@@ -1,10 +1,11 @@
 import { EmptyRow, LoadMoreRow } from "@better-giving/ui";
 import { format } from "date-fns";
+import { GrantAmount } from "#/components/returned-payout";
 import type { IPaginator } from "#/types/components";
 import { humanize } from "@/helpers/decimal";
-import type { SettlementRow } from "$/pg/queries/payout";
+import type { GrantRow } from "$/pg/queries/payout";
 
-export interface Props extends IPaginator<SettlementRow> {}
+export interface Props extends IPaginator<GrantRow> {}
 
 export function GrantsTable({
   items,
@@ -28,7 +29,12 @@ export function GrantsTable({
           )}
           {items.map((payout, idx) => (
             <tr key={idx}>
-              <td>${humanize(payout.amount)} </td>
+              <td>
+                <GrantAmount
+                  grant={payout}
+                  amount={`$${humanize(payout.amount)}`}
+                />
+              </td>
               <td>{format(payout.date, "PP")}</td>
             </tr>
           ))}

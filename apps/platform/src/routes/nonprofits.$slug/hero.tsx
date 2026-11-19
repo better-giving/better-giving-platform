@@ -32,7 +32,7 @@ export function Hero({ classes = "", ...props }: Props) {
           </Link>
           <Link
             to={BOOK_A_DEMO}
-            className="capitalize text-center btn xl:btn-lg btn-secondary font-bold border-2"
+            className="capitalize text-center btn xl:btn-lg btn-secondary font-bold"
           >
             See how it works (&nbsp;Book&nbsp;a&nbsp;call&nbsp;)
           </Link>

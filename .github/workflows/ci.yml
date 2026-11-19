@@ -139,12 +139,16 @@ jobs:
       TURBO_TEAM: ""
       # sha-256 of the cli the registry serves. bumping the cli means
       # updating this hash.
-      BG_DESIGN_CLI_SHA256: fc690bf4b1cce6bfd0048c437e2025361d5eebd2944e3564595c412aed036374
+      BG_DESIGN_CLI_SHA256: aa48aca1b938652f751224d90f027cccf587542c69439833a7c82082f22fdc80 # bg-design-cli-pin
     steps:
+      # keep GITHUB_TOKEN out of .git/config for the same reason as the
+      # turbo token above.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version-file: .nvmrc
       - name: bg-design diff --check
         working-directory: packages/ui
         run: |
@@ -152,7 +156,7 @@ jobs:
           cli="$RUNNER_TEMP/bg-design.mjs"
           curl --fail --silent --show-error --location \
             --retry 3 --retry-all-errors --retry-delay 5 --connect-timeout 20 \
-            "$REGISTRY/cli.mjs" --output "$cli"
+            "$REGISTRY/cli/1.0.0/cli.mjs" --output "$cli" # bg-design-cli-pin
           echo "$BG_DESIGN_CLI_SHA256  $cli" | sha256sum --check --strict
           node "$cli" diff --check --registry "$REGISTRY" --lock bg-design.json
 

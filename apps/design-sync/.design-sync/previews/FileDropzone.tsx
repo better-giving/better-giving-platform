@@ -16,6 +16,7 @@ const statement_spec: FileSpec = {
 // generic "dropzone" only reads unambiguously when a form holds one.
 const upload = async (f: File) => `https://cdn.better.giving/uploads/${f.name}`;
 const report_error = (err: unknown) => console.error(err);
+const view_href = (ref: string) => `/api/docs?ref=${encodeURIComponent(ref)}`;
 
 export const Empty = () => (
   <FileDropzone
@@ -45,6 +46,7 @@ export const Uploaded = () => (
     onChange={() => {}}
     specs={id_spec}
     upload={upload}
+    view_href={view_href}
     report_error={report_error}
   />
 );

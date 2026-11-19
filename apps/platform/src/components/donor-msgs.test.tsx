@@ -234,8 +234,8 @@ describe("donor messages", () => {
       heading.element().compareDocumentPosition(card) &
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    expect(card?.classList.contains("bg-green-3")).toBe(true);
-    expect(card?.classList.contains("border-green-6")).toBe(true);
+    expect(card?.classList.contains("bg-success-3")).toBe(true);
+    expect(card?.classList.contains("border-success-6")).toBe(true);
     expect(card?.textContent).toBe("You$25Just now");
     await vi.waitFor(() => {
       expect(document.querySelector("[data-feed-pending]")).toBeNull();

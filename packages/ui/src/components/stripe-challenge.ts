@@ -29,8 +29,8 @@ function event_target_node(event: Event): Node | null {
 }
 
 /**
- * while a donate dialog is open, a 3ds / financial-connections frame stripe
- * appends to `document.body` stays a body child. the donate box is translated,
+ * while a dialog is open, a 3ds / financial-connections frame stripe
+ * appends to `document.body` stays a body child. the dialog box is translated,
  * and that transform is the containing block for `position: fixed`, so moving
  * the frame into the dialog clips a viewport-sized overlay to the box.
  *

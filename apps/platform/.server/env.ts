@@ -63,6 +63,12 @@ export const blob = {
   read_write_token: process.env.BLOB_READ_WRITE_TOKEN,
 } as const;
 
+// the private store holds uploaded documents; a store is private or public
+// for its whole life, so it is a second store with its own token
+export const blob_private = {
+  read_write_token: process.env.BLOB_PRIVATE_READ_WRITE_TOKEN,
+} as const;
+
 // optional: a chain without its key fails only its own webhook, which 500s
 export const alchemy_signing_key = {
   "eth-mainnet": process.env.ALCHEMY_SIGNING_KEY_ETH_MAINNET,

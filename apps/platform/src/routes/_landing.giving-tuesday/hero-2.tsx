@@ -30,7 +30,7 @@ export function Hero2({ classes = "" }) {
           </Link>
           <Link
             to={BOOK_A_DEMO}
-            className="btn xl:btn-lg btn-secondary font-bold border-2"
+            className="btn xl:btn-lg btn-secondary font-bold"
           >
             Learn how it works
           </Link>

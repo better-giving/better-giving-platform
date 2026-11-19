@@ -22,7 +22,7 @@ export async function wise_pay(
   to: number,
   amount: number,
   ref: string
-): Promise<number> {
+): Promise<number | string> {
   const transfer = await create_transfer(to, amount, ref).catch((err) => {
     throw new NotFundedError(err);
   });
@@ -46,7 +46,6 @@ export async function wise_pay(
       `transfer ${transfer.id} (customerTransactionId ${ref}) is ${transfer.status}`
     );
   }
-
   const funding = await wise.fund_transfer(transfer.id, +wise_env.profile_id, {
     type: "BALANCE",
   });
@@ -57,19 +56,26 @@ export async function wise_pay(
   return transfer.id;
 }
 
-async function create_transfer(to: number, amount: number, ref: string) {
-  const recipient = await wise.v2_account(to);
+type Transfer = Awaited<ReturnType<typeof wise.transfer>>;
 
+/** the transfer, created and not yet funded */
+async function create_transfer(
+  to: number,
+  amount: number,
+  ref: string
+): Promise<Transfer> {
+  const recipient = await wise.v2_account(to);
   const quote = await wise.quote(wise_env.profile_id, {
     sourceCurrency: "USD",
     targetCurrency: recipient.currency,
     sourceAmount: amount,
     targetAmount: null,
     payOut: null,
-    preferredPayIn: null,
+    // priced for the balance we fund it from: without it wise quotes a
+    // bank-transfer pay-in fee, and the balance then debits another total
+    preferredPayIn: "BALANCE",
     targetAccount: to.toString(),
   });
-
   const transfer = await wise.transfer({
     targetAccount: to.toString(),
     quoteUuid: quote.id,

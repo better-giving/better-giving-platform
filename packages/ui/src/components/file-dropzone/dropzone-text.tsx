@@ -2,7 +2,7 @@ import { ArrowUpFromLine, LoaderCircle } from "lucide-react";
 import type { FileOutput } from "./types";
 
 interface Props {
-  value?: FileOutput | File;
+  value: FileOutput | undefined;
   /** shown in the size-rejection text so the limit is stated where it is broken */
   mbLimit: number;
 }
@@ -56,8 +56,6 @@ export function DropzoneText({ value, mbLimit }: Props) {
   }
 
   return (
-    <p className="text-sm text-center px-4 break-all">
-      {value instanceof File ? value.name : file_name(value)}
-    </p>
+    <p className="text-sm text-center px-4 break-all">{file_name(value)}</p>
   );
 }

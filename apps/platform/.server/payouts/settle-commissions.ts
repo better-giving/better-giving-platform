@@ -11,6 +11,7 @@ import {
   commissions_claim,
   commissions_mark_paid,
   commissions_release,
+  referrer_last_return,
   referrer_payout_put,
 } from "../pg/queries/referrer";
 import {
@@ -22,6 +23,7 @@ import {
 import { owe_takes_of_dists } from "../refund/takes";
 import { net_owed } from "./net-owed";
 import { deduct, lock_run, owed_netting_on, undo_deductions } from "./owed-run";
+import { return_hold_cause } from "./return-hold";
 import type { Pay } from "./settle";
 import {
   NotFundedError,
@@ -39,6 +41,8 @@ export interface ISettleReferrer {
 export interface IReferrerRecipient {
   /** wise recipient account id */
   pay_id: number;
+  /** when that account was approved or made default, for a nonprofit referrer */
+  since?: string;
   pay: Pay;
 }
 
@@ -52,14 +56,16 @@ export type CommissionSettleResult =
   | { status: "paid"; ref: string; total: number; transfer_id: string }
   /** every commission went to what the referrer owes: paid with no transfer */
   | { status: "recovered"; ref: string; total: number }
-  | { status: "no_recipient"; total: number };
+  | { status: "no_recipient"; total: number }
+  /** the payout account is one a returned transfer bounced from: nothing is claimed */
+  | { status: "held" };
 
 /** thrown from inside the claim, so its tx rolls back and nothing is claimed */
 class NotClaimed extends Error {
   constructor(
     readonly result: Extract<
       CommissionSettleResult,
-      { status: "under_minimum" | "no_recipient" }
+      { status: "under_minimum" | "no_recipient" | "held" }
     >
   ) {
     super(result.status);
@@ -95,10 +101,11 @@ export async function settle_referrer_commissions(
   }
 
   const { ref, commissions, gross } = claimed;
-  const { total, pay } = claimed.send;
+  const { total, to: recipient } = claimed.send;
   const ids = commissions.map((c) => c.donation_id);
   const fields = [
     { name: "referrer", value: referrer.id },
+    { name: "recipient", value: String(recipient.pay_id) },
     { name: "amount", value: total.toString() },
     { name: "donation_ids", value: ids.join(", ") },
   ];
@@ -106,7 +113,8 @@ export async function settle_referrer_commissions(
 
   let transfer_id: string;
   try {
-    transfer_id = String(await pay(ref, total));
+    const result = await recipient.pay(ref, total);
+    transfer_id = String(result);
   } catch (err) {
     await error_row(referrer.id, total);
     if (err instanceof NotFundedError) {
@@ -208,6 +216,7 @@ export async function settle_referrer_commissions(
         amount: total,
         date: new Date().toISOString(),
         transfer_id: +transfer_id,
+        recipient_id: String(recipient.pay_id),
         ...party,
       };
       await referrer_payout_put(tx, payout);
@@ -253,10 +262,22 @@ async function claim(
   nets: boolean
 ) {
   return db.transaction(async (tx) => {
-    if (nets) await lock_referrer_run(tx, referrer.id);
+    // the lock `return_commission_payout` and the re-send take, held before the
+    // hold is read, deductions or not: a return committing between that read and
+    // the claim would otherwise have its account paid
+    await lock_referrer_run(tx, referrer.id);
+    // a bounced account is not paid again: what is pending waits, as a held
+    // npo's grants do, until the referrer names a different one
+    if (to) {
+      const last = await referrer_last_return(referrer.id, tx);
+      const cause =
+        last &&
+        return_hold_cause(last, { id: String(to.pay_id), since: to.since });
+      if (cause) throw new NotClaimed({ status: "held" });
+    }
     let gross = 0;
     /** set when the claim sends a transfer: the net and who it goes to */
-    let send: { total: number; pay: Pay } | undefined;
+    let send: { total: number; to: IReferrerRecipient } | undefined;
     const claimed = await commissions_claim(
       tx,
       referrer.id,
@@ -279,7 +300,7 @@ async function claim(
         } else {
           const key = `referrer-commission:${to.pay_id}`;
           ref = transfer_ref(key, plan.net, ids);
-          send = { total: plan.net, pay: to.pay };
+          send = { total: plan.net, to };
         }
         await deduct(sp, party, "commission_run", plan, ref);
         return ref;

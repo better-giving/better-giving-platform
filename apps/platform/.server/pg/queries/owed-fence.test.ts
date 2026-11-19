@@ -4,15 +4,22 @@ import { type Source, sources_of } from "#/__tests__/conformance/walk";
 // the owed ledger is written only through queries/owed.ts's verbs, each by its
 // owner. matched as words, not import statements, so a namespace import
 // (`o.credit_owed`), an alias, the schema barrel and raw sql are all seen.
-// test files and the shared test fixtures seed rows and are not the app
+// test files and the shared test fixtures seed rows and are not the app, so
+// the sweep leaves them out.
 const platform = "apps/platform";
 const in_refund_core = (file: string) =>
   file.startsWith(`${platform}/.server/refund/`);
 const in_owed_admin = (file: string) =>
   file.startsWith(`${platform}/src/routes/platform.owed/`);
-const PAYOUT_RUNS = ["settle.ts", "settle-commissions.ts", "owed-run.ts"].map(
-  (f) => `${platform}/.server/payouts/${f}`
-);
+// wise-return.ts and wise-return-commission.ts undo a run whose transfer the
+// bank sent back, as settle.ts releases one that went unfunded
+const PAYOUT_RUNS = [
+  "settle.ts",
+  "settle-commissions.ts",
+  "owed-run.ts",
+  "wise-return.ts",
+  "wise-return-commission.ts",
+].map((f) => `${platform}/.server/payouts/${f}`);
 const in_payout_run = (file: string) => PAYOUT_RUNS.includes(file);
 const OWNER: Record<string, (file: string) => boolean> = {
   record_owed: in_refund_core,

@@ -1,9 +1,11 @@
 @import "tailwindcss";
-/* the faces ship with the design system — packages/ui/src/styles/fonts.css
-   declares them beside the --font-* tokens that name them. an app does not
-   load a face of its own. the style layer is copied in from the design
-   registry (packages/ui/bg-design.json): change it by a registry release, not
-   here. */
+/* the faces ship with the design system (packages/ui/src/styles/fonts.css,
+   copied from the registry's `fonts` item), but the style layer does not
+   import them: an app imports fonts.css itself, beside styles.css. without
+   this line every page falls back to a system font. the style layer is
+   copied in from the design registry (packages/ui/bg-design.json): change it
+   by a registry release, not here. */
+@import "@better-giving/ui/fonts.css";
 @import "@better-giving/ui/styles.css";
 
 @plugin "@tailwindcss/typography";
@@ -38,18 +40,13 @@
   --color-sky: #edf2fe;
 }
 
-/* REGISTRY GAP (for the design-system PM): the registry's `.table`
-   (packages/ui/src/styles/components.css) sets `"tnum", "zero"`, which slashes
-   every zero. the Payouts page keeps the tabular figures and drops the slash on
-   all its money tables, so $500.00 and 2026 read as plain digits and no table
-   shows the other kind. this override goes when the registry's `.table` does. */
-.table.plain-zero-table {
-  font-feature-settings: "tnum";
-}
-
-/* donation form: override ring so all focus outlines follow the theme */
+/* donation form: override ring so all focus outlines follow the theme.
+   --form-ring too: it resolves --ring on :root (packages/ui variables.css), so
+   btn-form-primary never sees the --ring set here, and this element has no
+   data-theme to re-resolve it. */
 #donation-container {
   --ring: var(--form-primary);
+  --form-ring: var(--form-primary);
 }
 
 /* the ground: the page fill, painted once here for every screen and never per

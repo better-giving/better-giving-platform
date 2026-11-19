@@ -296,6 +296,29 @@ describe("calc_donation_settle - rebill", () => {
     settlement: sttl({ id: "sttl-old", date: "2025-12-01T00:00:00.000Z" }),
   };
 
+  test("an NZD renewal carries the order's currency, rate and amount, not usd at 1", () => {
+    const nzd: IDonationSettled = {
+      ...prior_settled,
+      currency: "NZD",
+      upusd: 1.78,
+      amount: { base: 10.68, tip: 0, fee_allowance: 0 },
+    };
+    const r = calc_donation_settle({
+      kind: "rebill",
+      order_id: "don-1",
+      prior: nzd,
+      settlement: sttl({ id: "sttl-new" }),
+      subs_id: "sub_old",
+      new_id: "new-uuid",
+    });
+    if (r.op !== "put") throw new Error("expected put");
+    expect(r.row).toMatchObject({
+      currency: "NZD",
+      upusd: 1.78,
+      amount: { base: 10.68, tip: 0, fee_allowance: 0 },
+    });
+  });
+
   test("returns put op with new row", () => {
     const r = calc_donation_settle({
       kind: "rebill",

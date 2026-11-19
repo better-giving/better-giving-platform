@@ -1,0 +1,3 @@
+SET LOCAL lock_timeout = '2s';--> statement-breakpoint
+CREATE OR REPLACE VIEW "public"."v_contributions" AS (SELECT dists.to_id as npo_id, COALESCE(SUM(dists.amount_usd), 0) as total, COUNT(*) as count FROM dists INNER JOIN donations ON donations.id = dists.donation_id WHERE dists.status = 'settled' AND donations.status = 'settled' GROUP BY dists.to_id);--> statement-breakpoint
+CREATE OR REPLACE VIEW "public"."v_donation_total_usd" AS (SELECT dists.fund_id, COALESCE(SUM(dists.net), 0) as total FROM dists INNER JOIN donations ON donations.id = dists.donation_id WHERE dists.fund_id IS NOT NULL AND dists.status = 'settled' AND donations.status = 'settled' GROUP BY dists.fund_id);

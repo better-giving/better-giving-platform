@@ -7,6 +7,7 @@ import { owed_netting_on, undo_deductions } from "$/payouts/owed-run";
 import { settle_referrer_commissions } from "$/payouts/settle-commissions";
 import { payout_total } from "$/payouts/transfer";
 import { wise_pay } from "$/payouts/wise-pay";
+import { resend_all_returned_commissions } from "$/payouts/wise-return-commission";
 import { commissions_all_by_status } from "$/pg/queries/referrer";
 import {
   CREDIT_BY_HAND,
@@ -20,6 +21,11 @@ const lambda = `commissions-processor:${stage}`;
 export async function index() {
   try {
     await alert_unsettled_claims();
+    // before the pending read: a referrer on a new payout account is paid now
+    await resend_all_returned_commissions(async (id) => {
+      const r = await get_referrer(id);
+      return r?.pay_id ? { pay_id: r.pay_id, since: r.pay_since } : undefined;
+    });
     const items = await commissions_all_by_status("pending");
 
     if (items.length === 0) {
@@ -124,6 +130,7 @@ async function process_item(ref_id: string, items: ICommission[]) {
       pay_id
         ? {
             pay_id,
+            since: ref.pay_since,
             pay: (wise_ref, total) => wise_pay(pay_id, total, wise_ref),
           }
         : null

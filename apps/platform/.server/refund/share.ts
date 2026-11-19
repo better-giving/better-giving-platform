@@ -1,4 +1,5 @@
 import { and, asc, eq, type SQL, sql } from "drizzle-orm";
+import { is_unsent } from "@/payouts";
 import type { DbOrTx } from "../pg/queries/helpers";
 import {
   credit_owed,
@@ -151,10 +152,19 @@ export const taken_from_npo = (plan: RefundPlan): number =>
     0
   );
 
-/** whether the dist's grant has gone out: a payout of its cash share no
- * longer pending, as the refund plan judges it a loss */
+/** whether the dist's grant has gone out: a payout of its cash share neither
+ * unsent (`is_unsent`) nor void, as the refund plan judges it a loss */
 export const grant_went_out = (d: LockedDist) =>
-  d.cash_pct > 0 && d.payout_type !== null && d.payout_type !== "pending";
+  d.cash_pct > 0 &&
+  d.payout_type !== null &&
+  !is_unsent(d.payout_type) &&
+  d.payout_type !== "void";
+
+/** the part of the dist its npo can owe for, fees included: all of it, less
+ * a void payout's cash share, which left the npo and was never a grant, so
+ * the platform takes its loss */
+export const owable_part = (d: LockedDist) =>
+  d.payout_type === "void" ? 1 - d.cash_pct / 100 : 1;
 
 export type OwedShare = Pick<
   IOwedRecord,
@@ -200,13 +210,17 @@ export function owed_shares(
     );
   };
   for (const [i, x] of ds.entries()) {
-    if (o.owes(x)) {
+    const part = owable_part(x);
+    if (o.owes(x) && part > 0) {
       const f = o.f_of?.(x) ?? past_cut(x.refunds_cut_share, o.f);
       add(`npo:${x.to_id}`, {
         party: { npo_id: x.to_id },
-        received_usd: scaled(x.net, share_of_net(x.refunds_cut_share, f)),
-        fee_processing_usd: scaled(fee_processing_usd(x), f),
-        fee_dispute_usd: fee_shares[i]!,
+        received_usd: scaled(
+          x.net,
+          share_of_net(x.refunds_cut_share, f) * part
+        ),
+        fee_processing_usd: scaled(fee_processing_usd(x), f * part),
+        fee_dispute_usd: scaled(fee_shares[i]!, part),
       });
     }
     const c = x.commission;

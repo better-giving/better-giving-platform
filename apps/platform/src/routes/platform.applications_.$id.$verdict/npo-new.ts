@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import Stripe from "stripe";
 import { report_error } from "#/errors/report";
 import { referral_id } from "#/helpers/referral";
-import type { IBapp } from "@/banking";
 import { resp } from "@/helpers/https";
 import { msg } from "@/queue";
 import type { Progress, TStatus } from "@/reg";
@@ -114,7 +113,6 @@ export const npo_new = async (r: NonNullable<Progress["banking"]>) => {
           wacc: await wise.v2_account(+r.o_bank_id),
         }
       : null;
-
   const new_endow: NpoInsert = {
     ...ecfr,
     social_media_urls: {},
@@ -165,7 +163,7 @@ export const npo_new = async (r: NonNullable<Progress["banking"]>) => {
 
     if (bank) {
       const now = new Date().toISOString();
-      const bank_new: IBapp = {
+      const bank_new: Parameters<typeof bapp_put>[1] = {
         id: bank.id,
         npo_id: id,
         bank_statement_url: bank.statement,
