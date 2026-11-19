@@ -201,18 +201,18 @@ const probe_error = (r2: R2, base: string, url: string, why: string) =>
     `[upload-client-assets] ASSET_BASE_URL ${base} does not serve what was uploaded to R2 bucket "${r2.bucket}": ${url} gave ${why} after ${PROBE_TRIES} tries`
   );
 
-// the upload goes to the S3 endpoint and the html reads ASSET_BASE_URL; nothing
-// ties the two together, so a wrong bucket (preview keys with the prod base, a
-// typo) uploads fine and ships html whose every asset 404s. a real asset can't
-// prove they are the same store: on a retry, or a rebuild of a commit, every
-// HEAD succeeds in the wrong bucket and the only candidate left is a file the
-// base already serves from the right one. so each run PUTs a unique sentinel
-// through the signed client and reads it back through the public base, then
-// deletes it. it lives under assets/_probe/, which no html references and no
-// hashed asset name can collide with (vite emits files flat or in chunk dirs,
-// never `_probe`, and the name carries a timestamp and random suffix). a fresh
-// name is never cached, so retries only wait out a custom domain that lags.
-// plain unsigned fetch: this is the url a browser uses.
+// the upload goes to the S3 endpoint and the html reads ASSET_BASE_URL;
+// nothing ties the two together, so a wrong bucket (preview keys with the prod
+// base, a typo) uploads fine and ships html whose every asset 404s. a real
+// asset can't prove they are the same store: on a retry or a rebuild every
+// HEAD succeeds in the wrong bucket, and the only file left to probe is one
+// the base already serves from the right one. so each run PUTs a unique
+// sentinel through the signed client, reads it back through the public base,
+// then deletes it. it lives under assets/_probe/, which no html references and
+// no hashed name can collide with (vite never emits `_probe`, and the name
+// carries a timestamp and random suffix). a fresh name is never cached, so
+// retries only wait out a custom domain that lags. the read is a plain
+// unsigned fetch: it is the url a browser uses.
 async function probe_sentinel(r2: R2, base: string, delay_ms: number) {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const key = `assets/_probe/${id}.txt`;
