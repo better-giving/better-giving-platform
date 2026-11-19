@@ -50,8 +50,10 @@ export default function Page() {
       </header>
 
       <div className="px-6 py-10 md:py-12 print:px-0 print:py-4">
-        {/* the score card pins under the 64px public header */}
-        <div className="mx-auto max-w-3xl [--ds-header-h:4rem]">
+        {/* the score card pins under the 64px public header. linked rows add that
+            header to their own scroll margin, so the layout's html scroll-pt-16
+            is zeroed here or a jump would count the header twice */}
+        <div className="mx-auto max-w-3xl [--ds-header-h:4rem] [html:has(&)]:scroll-pt-0!">
           <EthicsChecklist />
         </div>
 

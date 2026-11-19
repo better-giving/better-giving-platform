@@ -33,6 +33,11 @@ const words: Partial<ChecklistWords> = {
 
 export function EthicsChecklist() {
   return (
-    <Checklist sections={sections} storage_key={STORAGE_KEY} words={words} />
+    <Checklist
+      sections={sections}
+      storage_key={STORAGE_KEY}
+      words={words}
+      link_ids
+    />
   );
 }
