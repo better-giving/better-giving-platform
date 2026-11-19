@@ -25,6 +25,8 @@ export function Testimonials({ classes = "" }: ITestimonials) {
               <img
                 src={fora}
                 alt=""
+                loading="lazy"
+                decoding="async"
                 className="flex-none h-11 w-auto object-contain"
                 aria-hidden
               />
@@ -46,6 +48,8 @@ export function Testimonials({ classes = "" }: ITestimonials) {
               <img
                 src={casd}
                 alt=""
+                loading="lazy"
+                decoding="async"
                 className="flex-none h-11 w-auto object-contain"
                 aria-hidden
               />
@@ -60,6 +64,8 @@ export function Testimonials({ classes = "" }: ITestimonials) {
               src={laira_sitting}
               width={92}
               alt="Laira sitting"
+              loading="lazy"
+              decoding="async"
               className="absolute bottom-full right-6 translate-y-2 max-md:hidden"
             />
           </div>

@@ -29,6 +29,8 @@ export function CtaBand({
         src={laira_cheering}
         width={140}
         alt="Laira celebrating"
+        loading="lazy"
+        decoding="async"
         className="mx-auto mb-4"
       />
       <h2 className="section-heading max-w-2xl mx-auto">{title}</h2>

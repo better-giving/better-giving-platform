@@ -1,8 +1,9 @@
 import { useEffect } from "react";
-import * as cc from "vanilla-cookieconsent";
+import type * as CC from "vanilla-cookieconsent";
 import ccbase from "vanilla-cookieconsent/dist/cookieconsent.css?url";
 import { stage } from "./constants/env";
 import cc_css from "./cookie-consent.css?url";
+import { when_idle } from "./when-idle";
 
 declare global {
   interface Window {
@@ -30,7 +31,7 @@ const gas = {
   ad_personalization: "ad_personalization",
 } as const;
 
-const categories: { [name: string]: cc.Category } = {
+const categories: { [name: string]: CC.Category } = {
   [cat.necessary]: {
     enabled: true,
     readOnly: true,
@@ -80,7 +81,7 @@ const categories: { [name: string]: cc.Category } = {
   [cat.tracking]: {},
 };
 
-const sections: cc.Section[] = [
+const sections: CC.Section[] = [
   {
     title: "Cookie usage",
     description:
@@ -160,7 +161,7 @@ const sections: cc.Section[] = [
   },
 ];
 
-const consent: cc.ConsentModalOptions = {
+const consent: CC.ConsentModalOptions = {
   title: "Cookie Preferences",
   description:
     "We use cookies to enhance your browsing experience, serve personalized content, and analyze our traffic. Please select your preferences below.",
@@ -169,7 +170,7 @@ const consent: cc.ConsentModalOptions = {
   showPreferencesBtn: "Manage preferences",
 };
 
-const preference: cc.PreferencesModalOptions = {
+const preference: CC.PreferencesModalOptions = {
   title: "Manage Cookie Preferences",
   acceptAllBtn: "Accept all",
   acceptNecessaryBtn: "Reject all",
@@ -178,12 +179,15 @@ const preference: cc.PreferencesModalOptions = {
   sections: sections,
 };
 
-const load = (url: string) => {
-  const script = document.createElement("script");
-  script.src = url;
-  script.async = true;
-  document.head.appendChild(script);
-};
+// each script gets its own idle slot after `load`, so the vendors' parse and
+// first run never land in the same task as hydration or each other
+const load = (url: string) =>
+  when_idle(() => {
+    const script = document.createElement("script");
+    script.src = url;
+    script.async = true;
+    document.head.appendChild(script);
+  });
 
 export const useConsent = () => {
   useEffect(() => {
@@ -197,6 +201,9 @@ export const useConsent = () => {
     // initialize dataLayer
     window.dataLayer = window.dataLayer || [];
 
+    // the library is its own chunk, fetched when the banner is due rather than
+    // with the first view's scripts; onConsentChange only runs after it is set
+    let cc: typeof CC;
     const onConsentChange = () => {
       // push consent update to dataLayer for GTM
       window.dataLayer.push({
@@ -244,7 +251,8 @@ export const useConsent = () => {
       document.head.appendChild(link);
     }
 
-    const init = () => {
+    const init = async () => {
+      cc = await import("vanilla-cookieconsent");
       cc.run({
         categories,
         language: {
@@ -262,10 +270,6 @@ export const useConsent = () => {
       });
     };
 
-    if ("requestIdleCallback" in window) {
-      requestIdleCallback(init);
-    } else {
-      setTimeout(init, 0);
-    }
+    when_idle(init);
   }, []);
 };

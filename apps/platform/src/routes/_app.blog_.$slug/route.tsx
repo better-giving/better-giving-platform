@@ -89,7 +89,7 @@ export { ErrorBoundary } from "#/components/error";
 const ptComponents: PortableTextComponents = {
   types: {
     image: ({ value }) => {
-      const src = urlFor(value)?.width(900).url();
+      const src = urlFor(value)?.width(900).auto("format").url();
       return src ? (
         <figure className="my-6">
           <img src={src} alt={value.alt ?? ""} className="rounded" />
@@ -134,7 +134,11 @@ function format_post_date(iso: string) {
 }
 
 export default function Post({ loaderData: post }: Route.ComponentProps) {
-  const heroUrl = urlFor(post.image)?.width(900).height(500).url();
+  const heroUrl = urlFor(post.image)
+    ?.width(900)
+    .height(500)
+    .auto("format")
+    .url();
   return (
     <div className={container_style}>
       <Link
@@ -148,6 +152,7 @@ export default function Post({ loaderData: post }: Route.ComponentProps) {
         <img
           src={heroUrl}
           alt={post.image?.alt ?? ""}
+          fetchPriority="high"
           className="relative w-full aspect-9/5 object-cover object-top mt-4 rounded"
         />
       ) : (
