@@ -27,10 +27,10 @@ export default defineConfig((config) => {
   // key, which is the guard's whole point.
   const env = check_env(config.mode, !is_test && !is_typegen);
   // vite base for content-hashed client assets: "/" locally, the durable
-  // asset origin (r2 or blob) on deployed stages (skew protection). MUST end in "/" — vite concatenates
-  // `base + filename` for ssr-manifest module urls. the fallback covers the
-  // runs that stood the guard down — neither typegen nor vitest resolves an
-  // asset url, so neither needs a real base.
+  // asset origin (r2 or blob) on deployed stages (skew protection). MUST end
+  // in "/" — vite concatenates `base + filename` for ssr-manifest module urls.
+  // the fallback covers the runs that stood the guard down — neither typegen
+  // nor vitest resolves an asset url, so neither needs a real base.
   const asset_base = env.ASSET_BASE_URL ?? "/";
   const rr7 = !is_test && reactRouter();
   // the predicate is shared with react-router.config.ts's buildEnd gate, which

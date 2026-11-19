@@ -57,7 +57,8 @@ export const SERVER_KEYS = [
   "QSTASH_NEXT_SIGNING_KEY",
   "BLOB_READ_WRITE_TOKEN",
   // vite base for content-hashed client assets: "/" locally, the durable
-  // asset origin (r2 or blob) on deployed stages (skew protection — see vite.config.ts).
+  // asset origin (r2 or blob) on deployed stages (skew protection — see
+  // vite.config.ts).
   "ASSET_BASE_URL",
   // r2 upload target for those assets (utils/upload-client-assets.ts): used
   // when ASSET_BASE_URL is not a vercel blob host, ignored when it is.
