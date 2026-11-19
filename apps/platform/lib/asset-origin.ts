@@ -2,7 +2,9 @@
  * preconnect; null when the base is same-origin ("/") so nothing is emitted. */
 export function asset_origin(base: string): string | null {
   try {
-    return new URL(base).origin;
+    const { origin } = new URL(base);
+    // opaque schemes (data:, blob:) serialise as "null"
+    return origin === "null" ? null : origin;
   } catch {
     return null;
   }

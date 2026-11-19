@@ -33,6 +33,8 @@ beforeEach(async () => {
 afterEach(async () => {
   vi.unstubAllGlobals();
   fetch_mock.mockReset();
+  vi.mocked(head).mockReset();
+  vi.mocked(put).mockReset();
   await rm(dir, { recursive: true, force: true });
 });
 
@@ -79,6 +81,11 @@ describe("r2", () => {
     expect(req_at(0).url).toBe(
       "https://acct.r2.cloudflarestorage.com/bg-platform-assets/assets/a-1.js"
     );
+    const puts = fetch_mock.mock.calls.filter(
+      ([r]) =>
+        typeof r !== "string" && r.method === "PUT" && !r.url.includes("_probe")
+    );
+    expect(puts).toHaveLength(0);
   });
 
   test("a missing object is PUT with type and cache headers; maps are skipped", async () => {
@@ -196,6 +203,85 @@ describe("r2", () => {
       await expect(
         upload_client_assets(BASE, { ...opts, dir })
       ).rejects.toThrow(/access-control-allow-origin missing.*"\*"/);
+    });
+
+    test("sends better.giving as Origin when BASE_URL is absent", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      const seen: (string | null)[] = [];
+      let stored = "";
+      fetch_mock.mockImplementation(async (req, init) => {
+        if (typeof req !== "string") {
+          if (req.method === "PUT") stored = await req.text();
+          return res(req.method === "HEAD" ? 200 : 204);
+        }
+        if (req.includes("/_probe/")) return new Response(stored);
+        seen.push(new Headers(init?.headers).get("origin"));
+        return served("x", "text/javascript");
+      });
+      await upload_client_assets(BASE, { ...opts, dir });
+      expect(seen).toEqual(["https://better.giving"]);
+    });
+
+    test("recovers when the base serves on a later try", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      let tries = 0;
+      serve({
+        get: () => (++tries < 3 ? res(404) : served("x", "text/javascript")),
+      });
+      await upload_client_assets(BASE, { ...opts, dir });
+      expect(tries).toBe(3);
+    });
+
+    test("throws when the sentinel PUT fails", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      fetch_mock.mockImplementation(async (req) =>
+        typeof req === "string" || req.method === "HEAD" ? res(200) : res(403)
+      );
+      await expect(
+        upload_client_assets(BASE, { ...opts, dir })
+      ).rejects.toThrow(/PUT assets\/_probe\/.* answered 403/);
+    });
+
+    test("throws on a sentinel body mismatch", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      fetch_mock.mockImplementation(async (req) => {
+        if (typeof req !== "string") {
+          return res(req.method === "HEAD" ? 200 : 204);
+        }
+        return new Response("someone else's");
+      });
+      await expect(
+        upload_client_assets(BASE, { ...opts, dir })
+      ).rejects.toThrow(/a different body/);
+    });
+
+    test("throws when access-control-allow-origin names another origin", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      serve({
+        get: () => served("x", "text/javascript", "https://other.example"),
+      });
+      await expect(
+        upload_client_assets(BASE, { ...opts, dir })
+      ).rejects.toThrow(/"https:\/\/other\.example" for Origin/);
+    });
+
+    test("a DELETE that throws only logs", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      let stored = "";
+      fetch_mock.mockImplementation(async (req) => {
+        if (typeof req === "string") {
+          return req.includes("/_probe/")
+            ? new Response(stored)
+            : served("x", "text/javascript");
+        }
+        if (req.method === "DELETE") throw new Error("socket closed");
+        if (req.method === "PUT") stored = await req.text();
+        return res(req.method === "HEAD" ? 200 : 200);
+      });
+      await upload_client_assets(BASE, { ...opts, dir });
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("DELETE assets/_probe/")
+      );
     });
 
     test("sends the app origin from BASE_URL, else better.giving", async () => {

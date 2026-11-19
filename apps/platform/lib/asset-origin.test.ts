@@ -7,6 +7,10 @@ test("a real origin base yields its origin", () => {
   );
 });
 
+test("an opaque-origin base yields nothing", () => {
+  expect(asset_origin("data:text/plain,x")).toBeNull();
+});
+
 test("a same-origin base yields nothing", () => {
   expect(asset_origin("/")).toBeNull();
 });
