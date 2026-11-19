@@ -11,6 +11,7 @@ import {
 } from "vitest";
 import { userEvent } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
+import { layer_ready } from "#/__tests__/fixtures/layer-ready";
 import { clear_qstash_events, get_qstash_events } from "#/setup-tests-browser";
 import { user } from "$/pg/schema/auth";
 import { banking_apps } from "$/pg/schema/banking";
@@ -469,6 +470,8 @@ describe("back to the list", () => {
     await expect
       .element(screen.getByText(/changing application status/i))
       .toBeVisible();
+    // zag listens for Escape a frame after the dialog opens
+    await layer_ready();
     await userEvent.keyboard("{Escape}");
     await expect
       .element(screen.getByText(/changing application status/i))
