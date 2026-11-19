@@ -146,12 +146,15 @@ export async function upload_client_assets(
     );
   }
   if (r2) {
-    await probe_base(
+    const delay = opts.probe_delay_ms ?? PROBE_DELAY_MS;
+    await probe_sentinel(r2, asset_base_url, delay);
+    await probe_asset(
+      r2,
       asset_base_url,
-      r2.bucket,
       dir,
       probe_rel(fresh.length ? fresh : rel_paths),
-      opts.probe_delay_ms ?? PROBE_DELAY_MS
+      app_origin(env),
+      delay
     );
   }
   console.log(
@@ -163,50 +166,128 @@ const probe_rel = (rel_paths: string[]) =>
   rel_paths.find((r) => /^entry\.client-.*\.js$/.test(path.basename(r))) ??
   rel_paths[0];
 
+// the origin a browser sends for the app's own pages; BASE_URL is the app url.
+const app_origin = (env: Env) => {
+  try {
+    return new URL(env.BASE_URL ?? "").origin;
+  } catch {
+    return "https://better.giving";
+  }
+};
+
+const object_url = (r2: R2, key: string) =>
+  `${r2.endpoint}/${r2.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
+
+// run `check` up to PROBE_TRIES times; it returns null on success or why not.
+async function with_retries(
+  check: () => Promise<string | null>,
+  delay_ms: number
+): Promise<string | null> {
+  let why: string | null = "";
+  for (let i = 1; i <= PROBE_TRIES; i++) {
+    try {
+      why = await check();
+    } catch (err) {
+      why = `fetch failed: ${err instanceof Error ? err.message : err}`;
+    }
+    if (why === null) return null;
+    if (i < PROBE_TRIES) await new Promise((r) => setTimeout(r, delay_ms));
+  }
+  return why;
+}
+
+const probe_error = (r2: R2, base: string, url: string, why: string) =>
+  new Error(
+    `[upload-client-assets] ASSET_BASE_URL ${base} does not serve what was uploaded to R2 bucket "${r2.bucket}": ${url} gave ${why} after ${PROBE_TRIES} tries`
+  );
+
 // the upload goes to the S3 endpoint and the html reads ASSET_BASE_URL; nothing
 // ties the two together, so a wrong bucket (preview keys with the prod base, a
-// typo) uploads fine and ships html whose every asset 404s. fetch one file back
-// through the public base — status, content type and bytes — and throw so the
-// previous deployment stays live. plain unsigned fetch: this is the url a
-// browser uses. the file is one this run just PUT when any was (entry.client
-// first — its name moves rarely, so it is a weak probe only when nothing else
-// is new): a preview build pointed at the prod base would otherwise pass on an
-// old prod file the base already serves. names are content-hashed, so a name
-// this build introduces was never requested before and no cache can hold a
-// stale 404 for it. retries cover a fresh custom domain that lags.
-async function probe_base(
+// typo) uploads fine and ships html whose every asset 404s. a real asset can't
+// prove they are the same store: on a retry, or a rebuild of a commit, every
+// HEAD succeeds in the wrong bucket and the only candidate left is a file the
+// base already serves from the right one. so each run PUTs a unique sentinel
+// through the signed client and reads it back through the public base, then
+// deletes it. it lives under assets/_probe/, which no html references and no
+// hashed asset name can collide with (vite emits files flat or in chunk dirs,
+// never `_probe`, and the name carries a timestamp and random suffix). a fresh
+// name is never cached, so retries only wait out a custom domain that lags.
+// plain unsigned fetch: this is the url a browser uses.
+async function probe_sentinel(r2: R2, base: string, delay_ms: number) {
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const key = `assets/_probe/${id}.txt`;
+  const put_res = await r2.client.fetch(object_url(r2, key), {
+    method: "PUT",
+    body: id,
+    headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" },
+  });
+  if (!put_res.ok) {
+    throw new Error(
+      `[upload-client-assets] PUT ${key} answered ${put_res.status}`
+    );
+  }
+  const url = `${base}${key}`;
+  const why = await with_retries(async () => {
+    const res = await fetch(url);
+    if (res.status !== 200) return `status ${res.status}`;
+    return (await res.text()) === id ? null : "a different body";
+  }, delay_ms);
+  try {
+    const del = await r2.client.fetch(object_url(r2, key), {
+      method: "DELETE",
+    });
+    if (!del.ok) {
+      console.log(
+        `[upload-client-assets] DELETE ${key} answered ${del.status}`
+      );
+    }
+  } catch (err) {
+    console.log(`[upload-client-assets] DELETE ${key} failed: ${err}`);
+  }
+  if (why !== null) throw probe_error(r2, base, url, why);
+}
+
+// then one real asset, through the public base, for what the sentinel can't
+// show: content type, bytes and CORS. the file is one this run just PUT when
+// any was (entry.client otherwise). names are content-hashed, so a name this
+// build introduces was never requested before and no cache holds a stale 404
+// for it.
+// module scripts and fonts are cors requests, and r2 sends no
+// access-control-allow-origin until the bucket has a CORS policy, so a missing
+// header is a dead site. the policy must allow "*": the fonts are also fetched
+// from inside Stripe's iframe and previews get a new host per deployment.
+async function probe_asset(
+  r2: R2,
   base: string,
-  bucket: string,
   dir: string,
   rel: string | undefined,
+  origin: string,
   delay_ms: number
 ) {
   if (!rel) return;
   const url = `${base}assets/${rel.split(path.sep).join("/")}`;
   const want_type = content_type(rel);
   const want = await readFile(path.join(dir, rel));
-  let why = "";
-  for (let i = 1; i <= PROBE_TRIES; i++) {
-    try {
-      const res = await fetch(url);
-      const got_type = (res.headers.get("content-type") ?? "")
-        .split(";")[0]
-        .trim()
-        .toLowerCase();
-      if (res.status !== 200) why = `status ${res.status}`;
-      else if (got_type !== want_type) {
-        why = `content-type "${got_type}", expected "${want_type}"`;
-      } else if (Buffer.compare(Buffer.from(await res.arrayBuffer()), want)) {
-        why = "bytes differ from the uploaded file";
-      } else return;
-    } catch (err) {
-      why = `fetch failed: ${err instanceof Error ? err.message : err}`;
+  const why = await with_retries(async () => {
+    const res = await fetch(url, { headers: { Origin: origin } });
+    const got_type = (res.headers.get("content-type") ?? "")
+      .split(";")[0]
+      .trim()
+      .toLowerCase();
+    const acao = res.headers.get("access-control-allow-origin");
+    if (res.status !== 200) return `status ${res.status}`;
+    if (got_type !== want_type) {
+      return `content-type "${got_type}", expected "${want_type}"`;
     }
-    if (i < PROBE_TRIES) await new Promise((r) => setTimeout(r, delay_ms));
-  }
-  throw new Error(
-    `[upload-client-assets] ASSET_BASE_URL ${base} does not serve what was uploaded to R2 bucket "${bucket}": ${url} gave ${why} after ${PROBE_TRIES} tries`
-  );
+    if (acao !== "*" && acao !== origin) {
+      return `access-control-allow-origin ${acao ? `"${acao}"` : "missing"} for Origin ${origin}; the bucket CORS policy must allow "*"`;
+    }
+    if (Buffer.compare(Buffer.from(await res.arrayBuffer()), want)) {
+      return "bytes differ from the uploaded file";
+    }
+    return null;
+  }, delay_ms);
+  if (why !== null) throw probe_error(r2, base, url, why);
 }
 
 async function put_blob(base: string, pathname: string, file: string) {
@@ -223,7 +304,7 @@ async function put_blob(base: string, pathname: string, file: string) {
 }
 
 async function put_r2(r2: R2, key: string, file: string, rel: string) {
-  const url = `${r2.endpoint}/${r2.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
+  const url = object_url(r2, key);
   const probe = await r2.client.fetch(url, { method: "HEAD" });
   if (probe.ok) return false;
   if (probe.status !== 404) {

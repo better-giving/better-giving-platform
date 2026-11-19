@@ -21,7 +21,8 @@ const BASE = "https://assets.better.giving/";
 const BLOB_BASE = "https://abc123.public.blob.vercel-storage.com/";
 
 let dir: string;
-const fetch_mock = vi.fn<(req: Request | string) => Promise<Response>>();
+const fetch_mock =
+  vi.fn<(req: Request | string, init?: RequestInit) => Promise<Response>>();
 
 beforeEach(async () => {
   dir = await mkdtemp(path.join(tmpdir(), "assets-"));
@@ -37,18 +38,34 @@ afterEach(async () => {
 
 const res = (status: number) => new Response(null, { status });
 const req_at = (i: number) => fetch_mock.mock.calls[i][0] as Request;
-const served = (body: string, type: string) =>
-  new Response(body, { status: 200, headers: { "content-type": type } });
+const served = (body: string, type: string, cors: string | null = "*") =>
+  new Response(body, {
+    status: 200,
+    headers: {
+      "content-type": type,
+      ...(cors ? { "access-control-allow-origin": cors } : {}),
+    },
+  });
 
-// signed s3 calls arrive as Requests; the probe is a plain string url
+// signed s3 calls arrive as Requests; the probes are plain string urls. the
+// sentinel is echoed back from whatever the PUT stored unless `sentinel` says
+// the public base serves some other store (404).
 function serve(o: {
   head?: number;
   put?: number;
+  del?: number;
+  sentinel?: "echo" | "404";
   get: (url: string) => Response;
 }) {
+  let stored = "";
   fetch_mock.mockImplementation(async (req) => {
-    if (typeof req === "string") return o.get(req);
+    if (typeof req === "string") {
+      if (!req.includes("/_probe/")) return o.get(req);
+      return o.sentinel === "404" ? res(404) : new Response(stored);
+    }
     if (req.method === "HEAD") return res(o.head ?? 200);
+    if (req.method === "DELETE") return res(o.del ?? 204);
+    if (req.url.includes("/_probe/")) stored = await req.text();
     return res(o.put ?? 200);
   });
 }
@@ -58,7 +75,6 @@ describe("r2", () => {
     await writeFile(path.join(dir, "a-1.js"), "x");
     serve({ get: () => served("x", "text/javascript") });
     await upload_client_assets(BASE, { dir, env: ENV, probe_delay_ms: 0 });
-    expect(fetch_mock).toHaveBeenCalledTimes(2);
     expect(req_at(0).method).toBe("HEAD");
     expect(req_at(0).url).toBe(
       "https://acct.r2.cloudflarestorage.com/bg-platform-assets/assets/a-1.js"
@@ -73,7 +89,7 @@ describe("r2", () => {
     const methods = fetch_mock.mock.calls.map(([r]) =>
       typeof r === "string" ? "GET" : r.method
     );
-    expect(methods).toEqual(["HEAD", "PUT", "GET"]);
+    expect(methods).toEqual(["HEAD", "PUT", "PUT", "GET", "DELETE", "GET"]);
     const put_req = req_at(1);
     expect(put_req.url).toContain("/assets/sub/a-1.css");
     expect(put_req.headers.get("content-type")).toBe("text/css");
@@ -119,16 +135,88 @@ describe("r2", () => {
       await writeFile(path.join(dir, "entry.client-9f.js"), "old");
       await writeFile(path.join(dir, "route-7c.js"), "new");
       const urls: string[] = [];
+      let stored = "";
       fetch_mock.mockImplementation(async (req) => {
         if (typeof req === "string") {
+          if (req.includes("/_probe/")) return new Response(stored);
           urls.push(req);
           return served("new", "text/javascript");
+        }
+        if (req.method === "PUT" && req.url.includes("/_probe/")) {
+          stored = await req.text();
         }
         const present = req.url.includes("entry.client-");
         return res(req.method === "HEAD" ? (present ? 200 : 404) : 200);
       });
       await upload_client_assets(BASE, { ...opts, dir });
       expect(urls).toEqual([`${BASE}assets/route-7c.js`]);
+    });
+
+    test("a retry with every file present in the wrong bucket fails on the sentinel", async () => {
+      await writeFile(path.join(dir, "entry.client-9f.js"), "boot");
+      serve({
+        head: 200,
+        sentinel: "404",
+        get: () => served("boot", "text/javascript"),
+      });
+      await expect(
+        upload_client_assets(BASE, { ...opts, dir })
+      ).rejects.toThrow(/_probe\/.*status 404.*5 tries/);
+      expect(req_at(fetch_mock.mock.calls.length - 1).method).toBe("DELETE");
+    });
+
+    test("the sentinel passes and is deleted", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      serve({ get: () => served("x", "text/javascript") });
+      await upload_client_assets(BASE, { ...opts, dir });
+      const calls = fetch_mock.mock.calls.map(([r]) =>
+        typeof r === "string" ? `GET ${r}` : `${r.method} ${r.url}`
+      );
+      expect(calls.filter((c) => c.includes("/_probe/"))).toEqual([
+        expect.stringMatching(/^PUT .*\/assets\/_probe\/.*\.txt$/),
+        expect.stringMatching(
+          /^GET https:\/\/assets\.better\.giving\/assets\/_probe\//
+        ),
+        expect.stringMatching(/^DELETE .*\/assets\/_probe\//),
+      ]);
+    });
+
+    test("a failed DELETE only logs", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      serve({ del: 403, get: () => served("x", "text/javascript") });
+      await upload_client_assets(BASE, { ...opts, dir });
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("DELETE assets/_probe/")
+      );
+    });
+
+    test("throws without access-control-allow-origin", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      serve({ get: () => served("x", "text/javascript", null) });
+      await expect(
+        upload_client_assets(BASE, { ...opts, dir })
+      ).rejects.toThrow(/access-control-allow-origin missing.*"\*"/);
+    });
+
+    test("sends the app origin from BASE_URL, else better.giving", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      const seen: (string | null)[] = [];
+      let stored = "";
+      fetch_mock.mockImplementation(async (req, init) => {
+        if (typeof req !== "string") {
+          if (req.method === "PUT") stored = await req.text();
+          return res(req.method === "HEAD" ? 200 : 204);
+        }
+        if (req.includes("/_probe/")) return new Response(stored);
+        seen.push(new Headers(init?.headers).get("origin"));
+        return served("x", "text/javascript", "https://app.example");
+      });
+      await upload_client_assets(BASE, {
+        ...opts,
+        dir,
+        env: { ...ENV, BASE_URL: "https://app.example/path" },
+      });
+      expect(seen).toEqual(["https://app.example"]);
     });
 
     test("throws after 5 tries on 404, naming base, status and bucket", async () => {
@@ -140,7 +228,9 @@ describe("r2", () => {
         /https:\/\/assets\.better\.giving\/.*"bg-platform-assets".*status 404.*5 tries/
       );
       expect(
-        fetch_mock.mock.calls.filter(([r]) => typeof r === "string")
+        fetch_mock.mock.calls.filter(
+          ([r]) => typeof r === "string" && r.includes("/assets/a-1.js")
+        )
       ).toHaveLength(5);
     });
 
