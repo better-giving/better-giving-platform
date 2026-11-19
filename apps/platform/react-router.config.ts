@@ -32,8 +32,8 @@ export default {
       await sentryOnBuildEnd(args);
     }
     // when assets are served from a durable origin (vite base is not "/"; see
-    // vite.config.ts), mirror the content-hashed client assets to r2 (when
-    // ASSETS_S3_* is set) or vercel blob, so
+    // vite.config.ts), mirror the content-hashed client assets to r2 (or
+    // to vercel blob when the base is a blob host), so
     // cached html never 404s on a rotated-out deployment's assets. throws on
     // error so a deploy never ships html pointing at un-uploaded assets.
     const base = args.viteConfig.base;

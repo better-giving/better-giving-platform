@@ -53,7 +53,7 @@ Ships as **`@better-giving/ui`** (`packages/ui/`) — the components, the style 
 
 ## Skew Protection
 
-- assets durable via cloudflare r2 when `ASSETS_S3_*` is set, vercel blob otherwise (vite `base` + `utils/upload-client-assets.ts`); no `.data` pinning (no `__vdpl` cookie, no header/query patch)
+- assets durable via cloudflare r2 (vercel blob when `ASSET_BASE_URL` is a blob host) (vite `base` + `utils/upload-client-assets.ts`); no `.data` pinning (no `__vdpl` cookie, no header/query patch)
 - keep loader/action contracts **additive-only** so old js hitting newer deploys is safe — never rename/remove response fields, request params, or routes; add new fields with safe defaults
 - removed routes need server-side redirects to avoid old `<Link to>` 404s
 - **migrations are expand/contract** — the rule, the guard and where each environment migrates are root `AGENTS.md` → Architecture and Deploy. Two things that file leaves out: the advisory lock lives on the `DATABASE_URL_UNPOOLED` session (`migrate-lock.ts`), so a lost session takes the lock and the open migration with it; and `migration-guard.test.ts` gates the production migrate through CI's `test` job, while for preview/staging it runs in parallel with the build and only reports.

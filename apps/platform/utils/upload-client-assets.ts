@@ -8,10 +8,13 @@ import { AwsClient } from "aws4fetch";
 // mirror content-hashed client assets to the deploy-independent store behind
 // ASSET_BASE_URL so html cached from a rotated-out deployment can still load
 // its assets (see vite.config.ts `base` + entry.server.tsx `durable_assets`).
-// the store is cloudflare r2 (S3 api, behind cloudflare's cache) when the four
-// ASSETS_S3_* vars are set, and vercel blob when none are. a partial set
-// throws. the env alone picks the backend, so the cutover can land before or
-// after the ASSET_BASE_URL flip and be undone by env alone.
+// the base url picks the store: a vercel blob host (*.blob.vercel-storage.com)
+// uploads to blob, any other base uploads to cloudflare r2 (S3 api, behind
+// cloudflare's cache) and needs all four ASSETS_S3_* vars. the base is what the
+// html points at, so the upload can never target a store the html doesn't read
+// — preview/staging may carry the ASSETS_S3_* vars while their base is still
+// blob, and those vars are then ignored. the cutover is the ASSET_BASE_URL
+// flip, undone by the same.
 //
 // only build/client/assets/** is uploaded: every file there is content-hashed
 // and immutable, so the upload is append-only and safe to skip when the name is
@@ -29,6 +32,7 @@ import { AwsClient } from "aws4fetch";
 // blob path: reads BLOB_READ_WRITE_TOKEN from env (via @vercel/blob); the
 // asset base url must point at the same blob store that token writes to.
 // r2 path: the base url must be the custom domain in front of ASSETS_S3_BUCKET.
+const BLOB_HOST = ".blob.vercel-storage.com";
 const CONCURRENCY = 12;
 const IMMUTABLE_MAX_AGE = 31_536_000; // 1y — hashed assets never change
 const CACHE_CONTROL = `public, max-age=${IMMUTABLE_MAX_AGE}, immutable`;
@@ -78,13 +82,11 @@ type Env = Record<string, string | undefined>;
 
 type R2 = { client: AwsClient; endpoint: string; bucket: string };
 
-function r2_from_env(env: Env): R2 | null {
-  const set = S3_KEYS.filter((k) => env[k]);
-  if (set.length === 0) return null;
-  if (set.length < S3_KEYS.length) {
-    const missing = S3_KEYS.filter((k) => !env[k]);
+function r2_from_env(env: Env): R2 {
+  const missing = S3_KEYS.filter((k) => !env[k]);
+  if (missing.length > 0) {
     throw new Error(
-      `[upload-client-assets] partial R2 config — missing ${missing.join(", ")}. set all four ASSETS_S3_* vars for R2, or none for vercel blob`
+      `[upload-client-assets] ASSET_BASE_URL is not a vercel blob host, so assets upload to R2 — missing ${missing.join(", ")}`
     );
   }
   return {
@@ -107,7 +109,14 @@ export async function upload_client_assets(
   opts: { dir?: string; env?: Env } = {}
 ) {
   const dir = opts.dir ?? path.resolve("build/client/assets");
-  const r2 = r2_from_env(opts.env ?? process.env);
+  const env = opts.env ?? process.env;
+  const is_blob = new URL(asset_base_url).hostname.endsWith(BLOB_HOST);
+  if (is_blob && S3_KEYS.some((k) => env[k])) {
+    console.log(
+      "[upload-client-assets] ASSET_BASE_URL is a vercel blob host; ASSETS_S3_* ignored"
+    );
+  }
+  const r2 = is_blob ? null : r2_from_env(env);
   const entries = await readdir(dir, {
     recursive: true,
     withFileTypes: true,

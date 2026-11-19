@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { head, put } from "@vercel/blob";
+import { BlobNotFoundError, head, put } from "@vercel/blob";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { upload_client_assets } from "../../utils/upload-client-assets";
 
@@ -18,6 +18,7 @@ const ENV = {
   ASSETS_S3_SECRET_ACCESS_KEY: "secret",
 };
 const BASE = "https://assets.better.giving/";
+const BLOB_BASE = "https://abc123.public.blob.vercel-storage.com/";
 
 let dir: string;
 const fetch_mock = vi.fn<(req: Request) => Promise<Response>>();
@@ -83,7 +84,7 @@ describe("r2", () => {
 });
 
 describe("backend choice", () => {
-  test("a partial env throws naming the missing vars", async () => {
+  test("an r2 base with a partial env throws naming the missing vars", async () => {
     const {
       ASSETS_S3_BUCKET: _b,
       ASSETS_S3_SECRET_ACCESS_KEY: _s,
@@ -94,14 +95,29 @@ describe("backend choice", () => {
     ).rejects.toThrow(/ASSETS_S3_BUCKET, ASSETS_S3_SECRET_ACCESS_KEY/);
   });
 
-  test("with no S3 env the blob path is used", async () => {
-    await writeFile(path.join(dir, "a-1.xyz"), "x");
-    vi.mocked(head).mockRejectedValue(
-      new (await import("@vercel/blob")).BlobNotFoundError()
+  test("an r2 base with no S3 env throws", async () => {
+    await expect(upload_client_assets(BASE, { dir, env: {} })).rejects.toThrow(
+      /missing ASSETS_S3_ENDPOINT/
     );
-    await upload_client_assets(BASE, { dir, env: {} });
-    expect(head).toHaveBeenCalledWith(`${BASE}assets/a-1.xyz`);
+  });
+
+  test("a blob base with no S3 env uses blob", async () => {
+    await writeFile(path.join(dir, "a-1.xyz"), "x");
+    vi.mocked(head).mockRejectedValue(new BlobNotFoundError());
+    await upload_client_assets(BLOB_BASE, { dir, env: {} });
+    expect(head).toHaveBeenCalledWith(`${BLOB_BASE}assets/a-1.xyz`);
     expect(put).toHaveBeenCalledTimes(1);
     expect(fetch_mock).not.toHaveBeenCalled();
+  });
+
+  test("a blob base with the full S3 env still uses blob and says so", async () => {
+    await writeFile(path.join(dir, "a-1.js"), "x");
+    vi.mocked(head).mockResolvedValue({} as never);
+    await upload_client_assets(BLOB_BASE, { dir, env: ENV });
+    expect(head).toHaveBeenCalledTimes(1);
+    expect(fetch_mock).not.toHaveBeenCalled();
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringContaining("ASSETS_S3_* ignored")
+    );
   });
 });

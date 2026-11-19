@@ -23,12 +23,12 @@ export const PUBLIC_IMAGE_TYPES: UploadTypes = Object.fromEntries(
   Object.entries(upload_limits.types).filter(([t]) => t.startsWith("image/"))
 );
 
-/** where user uploads live. Builds that run without `ASSETS_S3_*` mirror
- * content-hashed client assets into the same blob store under `assets/`
- * (`utils/upload-client-assets.ts`; r2 otherwise), and html cached from
- * those deploys still points at them, so an upload that could pick its own pathname
- * could replace a live js chunk. One prefix, applied here, keeps the two sets
- * from ever addressing the same object. */
+/** where user uploads live. While ASSET_BASE_URL is a blob host the build
+ * mirrors content-hashed client assets into the same blob store under
+ * `assets/` (`utils/upload-client-assets.ts`; r2 otherwise), and html cached
+ * from those deploys still points at them, so an upload that could pick its
+ * own pathname could replace a live js chunk. One prefix, applied here, keeps
+ * the two sets from ever addressing the same object. */
 const PREFIX = "u/";
 
 /** the caller names the file, so treat it as a name and not a path: no
