@@ -45,26 +45,19 @@ export const Box = () => (
       heading_level={2}
       items={[
         {
-          value: "compare",
+          value: "receipts",
           trigger: (
             <span className="grid gap-1">
-              <span className="text-lg font-semibold">
-                Compare your options
-              </span>
+              <span className="text-lg font-semibold">Tax receipts</span>
               <span className="text-sm font-normal text-gray-11">
-                Right now: Bank. See how Bank and Stripe differ.
+                When and how you get one.
               </span>
             </span>
           ),
           content: (
             <div className="grid gap-4 border-t border-hairline pt-4 text-sm">
               <p className="text-gray-11">
-                You need one to get paid. Having both is possible.
-              </p>
-              <p className="text-gray-11">
-                <span className="font-semibold text-gray-12">Have both?</span>{" "}
-                Once Stripe says your account is ready, Stripe donations go to
-                Stripe. Everything else goes to your bank.
+                We will email you a tax receipt immediately after your donation.
               </p>
             </div>
           ),

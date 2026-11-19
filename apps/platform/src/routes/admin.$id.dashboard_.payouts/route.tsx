@@ -3,7 +3,11 @@ import { useId } from "react";
 import { href, useSearchParams } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { admin_ctx } from "#/.server/auth";
-import { PayoutsHeldCard, type THeldRails } from "#/components/payout-options";
+import {
+  BANK_PAYOUT_LEAD,
+  PayoutsHeldCard,
+  type THeldRails,
+} from "#/components/payout-options";
 import { use_table } from "#/hooks/use-table";
 import { admin_page_meta } from "#/routes/admin.$id/page-meta";
 import { search } from "@/helpers/https";
@@ -116,8 +120,8 @@ function Page({ loaderData: page1, params }: Route.ComponentProps) {
   const { sent, held, has_bank, bank_pending } = page1;
   const payouts_heading_id = useId();
   // the bank table's empty row is this page's only content off Connect, and
-  // where card gifts land once they stop routing. beside a live stripe list it
-  // would still say nothing was paid after a transfer
+  // where card, bank and wallet donations land once they stop routing. beside a
+  // live stripe list it would still say nothing was paid after a transfer
   const show_bank =
     (!sent?.on_stripe && !holds_money(held)) || page1.items.length > 0;
 
@@ -161,10 +165,12 @@ function Page({ loaderData: page1, params }: Route.ComponentProps) {
             <h2 id={payouts_heading_id} className="font-bold text-lg">
               Payouts
             </h2>
-            <p className="text-sm text-gray-11 max-w-3xl">
-              Sent to your bank every 3 days once your balance reaches your
-              payout minimum.
-            </p>
+            {/* without a bank, WhereMoneyShows above says new donations wait */}
+            {has_bank && (
+              <p className="text-sm text-gray-11 max-w-3xl">
+                {BANK_PAYOUT_LEAD}
+              </p>
+            )}
           </div>
           {node}
         </section>

@@ -18,11 +18,9 @@ import type {
 } from "@/stripe-connect/return";
 import { StripeConnectStatus, type TConnectStatus } from "./status";
 
-export type TConnectNoticeReason = TConnectErrorReason;
-
-export interface IConnectNotice {
+interface IConnectNotice {
   result: TConnectResult;
-  reason?: TConnectNoticeReason;
+  reason?: TConnectErrorReason;
 }
 
 export interface IStripeConnectCard {
@@ -39,25 +37,29 @@ export interface IStripeConnectCard {
   /** the Payouts page, linked from the ready state beside a bank */
   payouts_href?: string;
   /** a bank payout is on file: what isn't Stripe's pays out there. without
-   *  one it waits in the balance, and so do Stripe donations until Stripe
-   *  says the account is ready */
+   *  one it waits in the balance, and so do card, bank and wallet donations
+   *  until Stripe says the account is ready */
   has_bank: boolean;
   /** a bank account is filed and under review. read only while `has_bank`
    *  is false */
   bank_pending?: boolean;
-  /** the add-bank page, through the router: linked from the not-available
-   *  state while no bank is on file or under review */
-  add_bank_href?: string;
-  /** status, band and control only, where an option card above already
-   *  says what Stripe does: registration step 4 */
+  /** registration step 4: the Stripe option card above already says where
+   *  card, bank and wallet donations go before and once the account is
+   *  ready, so the body keeps only what that row can't say, and none where
+   *  a band speaks */
   brief?: boolean;
+  /** the held-money card shows above, carrying its own Connect Stripe while
+   *  no account is linked, so the page keeps one. the page shows it only
+   *  without a bank payout on file; given one anyway, a disconnected body
+   *  keeps both its paragraphs */
+  holds_money?: boolean;
   /** 3 under a page's own h2, as on registration step 4 */
   heading_level?: 2 | 3;
   /** outer placement only — margin, grid placement */
   classes?: string;
 }
 
-const reason_messages: Record<TConnectNoticeReason, string> = {
+const reason_messages: Record<TConnectErrorReason, string> = {
   already_linked:
     "That Stripe account is already linked to another nonprofit. Connect a different one.",
   replace_unconfirmed:
@@ -78,47 +80,74 @@ function notice_message({ result, reason }: IConnectNotice) {
 const with_replace = (href: string) =>
   `${href}${href.includes("?") ? "&" : "?"}replace=1`;
 
-const READY_STRIPE_ONLY =
-  "Stripe donations go straight to your Stripe account, after fees. What Stripe pays on to your own bank is in your Stripe dashboard.";
+/** the first mention in a state's body; later sentences say "they" or "them"
+ *  unless another plural sits nearer */
+const FIRST =
+  "card, bank and wallet donations (like Apple Pay, Google Pay and Link)";
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
-const bodies = (status: TConnectStatus, has_bank: boolean): string[] => {
+const SENT_AS_TRANSFER =
+  "go straight to your Stripe account as each donation's own transfer, after fees. They skip your Grant, Savings and Investments split.";
+const PAYS_ON =
+  "What Stripe pays on to the bank on your Stripe account is in your Stripe dashboard.";
+const DISCONNECTED =
+  "Better Giving was disconnected from your Stripe account in your Stripe dashboard.";
+const KEPT_ON_STRIPE =
+  "Donations already sent to your Stripe account stay there.";
+const FINISH_SETUP =
+  "Stripe needs a few more details before it can receive donations. Finish setup on Stripe, in your Stripe dashboard.";
+
+const bodies = (
+  status: TConnectStatus,
+  has_bank: boolean,
+  holds_money: boolean
+): string[] => {
   switch (status) {
     case "not_connected":
       return [
-        `Connect Stripe to get Stripe donations straight to your Stripe account, after fees, once Stripe says your account is ready.${has_bank ? " Everything else keeps paying out to your bank." : ""}`,
+        `Once Stripe says your account is ready, ${FIRST} ${SENT_AS_TRANSFER} Until then, ${has_bank ? "they go to your bank" : "they're held in your Better Giving balance"}.`,
       ];
     case "disconnected":
-      // with no bank they are held, which the held card says while any are
-      return has_bank
-        ? [
-            "Better Giving was disconnected from your Stripe account in your Stripe dashboard. Stripe donations now go to your bank payout.",
-            "Connect Stripe again to get them straight to your Stripe account, after fees, once Stripe says your account is ready. Donations already sent to your Stripe account stay there.",
-          ]
+      if (has_bank)
+        return [
+          `${DISCONNECTED} ${cap(FIRST)} now go to your bank.`,
+          `Connect Stripe again to get them straight to your Stripe account, after fees, once Stripe says your account is ready. ${KEPT_ON_STRIPE}`,
+        ];
+      // the held card above already says Stripe is disconnected and carries
+      // Connect Stripe, so only what it never says is left
+      return holds_money
+        ? [KEPT_ON_STRIPE]
         : [
-            "Better Giving was disconnected from your Stripe account in your Stripe dashboard. Connect Stripe again to get Stripe donations straight to your Stripe account, after fees, once Stripe says your account is ready.",
+            `${DISCONNECTED} Connect Stripe again to get ${FIRST} straight to your Stripe account, after fees, once Stripe says your account is ready. ${KEPT_ON_STRIPE}`,
           ];
     case "incomplete":
       // without a bank, the standing band says it
       return has_bank
         ? [
-            "Stripe needs a few more details before it can receive donations. Finish setup on Stripe, in your Stripe dashboard.",
-            "Until you do and Stripe says your account is ready, Stripe donations go to your bank payout, so nothing is lost.",
+            FINISH_SETUP,
+            `Until you do and Stripe says your account is ready, ${FIRST} go to your bank, so nothing is lost. Then each one goes straight to your Stripe account, after fees, and skips your Grant, Savings and Investments split.`,
           ]
         : [];
     case "pending":
       return has_bank
         ? [
-            "Stripe is reviewing your account. Until it's ready, Stripe donations go to your bank payout.",
+            `Stripe is reviewing your account. Until it's ready, ${FIRST} go to your bank.`,
           ]
         : [];
     case "ready":
-      return has_bank
-        ? [
-            "Stripe donations (cards, digital wallets and bank debits) go straight to your Stripe account, after fees. What Stripe pays on to your own bank is in your Stripe dashboard.",
-            "Everything else pays out to your bank. If you disconnect Better Giving in your Stripe dashboard, Stripe donations go back to your bank.",
-          ]
-        : [READY_STRIPE_ONLY];
+      return [
+        `${cap(FIRST)} ${SENT_AS_TRANSFER} ${PAYS_ON}${has_bank ? " If you disconnect Better Giving in your Stripe dashboard, card, bank and wallet donations go to your bank again." : ""}`,
+      ];
   }
+};
+
+/** step 4's body: the Stripe option row above says where card, bank and
+ *  wallet donations go until and once the account is ready, and the status
+ *  line names the status, so only what neither says is left */
+const brief_bodies = (status: TConnectStatus, has_bank: boolean): string[] => {
+  if (status === "disconnected") return [`${DISCONNECTED} ${KEPT_ON_STRIPE}`];
+  if (status === "incomplete" && has_bank) return [FINISH_SETUP];
+  return [];
 };
 
 type TBandTone = "success" | "warning" | "error";
@@ -133,18 +162,16 @@ const standing_band = (
   status: TConnectStatus,
   has_bank: boolean
 ): IBand | null => {
-  if (status === "ready")
-    return { tone: "success", text: "Your Stripe account is connected." };
   if (has_bank) return null;
   if (status === "incomplete")
     return {
       tone: "warning",
-      text: "Your Stripe account is connected, but Stripe hasn't finished setting it up. Finish on Stripe. Until it's ready, your Stripe donations are held too.",
+      text: "Your Stripe account is connected, but Stripe hasn't finished setting it up. Finish on Stripe. Until it's ready, your card, bank and wallet donations are held too.",
     };
   if (status === "pending")
     return {
       tone: "warning",
-      text: "Stripe is reviewing your account. Until it's ready, your Stripe donations are held too.",
+      text: "Stripe is reviewing your account. Until it's ready, your card, bank and wallet donations are held too.",
     };
   return null;
 };
@@ -158,15 +185,15 @@ const notice_tones: Record<IConnectNotice["result"], TBandTone> = {
 const ineligible_reasons = (i: TConnectIneligibility) =>
   i.reason === "fiscal_sponsored"
     ? "Stripe isn't available to fiscally sponsored nonprofits, so there's nothing to connect."
-    : `Stripe isn't available for nonprofits headquartered in ${i.hq_country}. We can send Stripe donations to nonprofits headquartered in ${TRANSFER_COUNTRIES_COPY}.`;
+    : `Stripe isn't available for nonprofits headquartered in ${i.hq_country}. We can send card, bank and wallet donations to a Stripe account for nonprofits headquartered in ${TRANSFER_COUNTRIES_COPY}.`;
 
 /** the not-available state: the bank is the only way to get paid */
 const bank_only_line = (has_bank: boolean, bank_pending: boolean) =>
   has_bank
-    ? "All your donations, Stripe donations included, pay out to your bank. You don't need to do anything."
+    ? "All your donations, including card, bank and wallet donations, pay out to your bank. You don't need to do anything."
     : bank_pending
-      ? "Your bank account is under review. Until it's approved, all your donations, Stripe donations included, are held in your Better Giving balance. Nothing is lost."
-      : "Until you add a bank account, all your donations, Stripe donations included, are held in your Better Giving balance. Nothing is lost.";
+      ? "Your bank account is under review. Until it's approved, all your donations, including card, bank and wallet donations, are held in your Better Giving balance. Nothing is lost."
+      : "Until you add a bank account, all your donations, including card, bank and wallet donations, are held in your Better Giving balance. Nothing is lost.";
 
 /** Stripe beside bank details — registration step 4 and the banking page. */
 export function StripeConnectCard({
@@ -177,8 +204,8 @@ export function StripeConnectCard({
   payouts_href,
   has_bank,
   bank_pending = false,
-  add_bank_href,
   brief = false,
+  holds_money = false,
   heading_level = 2,
   classes = "",
 }: IStripeConnectCard) {
@@ -196,13 +223,6 @@ export function StripeConnectCard({
         <Body>
           <p>{ineligible_reasons(ineligible)}</p>
           <p>{bank_only_line(has_bank, bank_pending)}</p>
-          {!has_bank && !bank_pending && add_bank_href && (
-            <p>
-              <Link to={add_bank_href} className="link">
-                Add a bank account
-              </Link>
-            </p>
-          )}
         </Body>
       </CardShell>
     );
@@ -214,8 +234,13 @@ export function StripeConnectCard({
     notice && !(notice.result === "connected" && standing)
       ? { tone: notice_tones[notice.result], text: notice_message(notice) }
       : standing;
-  const body = brief && band ? [] : bodies(status, has_bank);
+  const body = !brief
+    ? bodies(status, has_bank, holds_money)
+    : band
+      ? []
+      : brief_bodies(status, has_bank);
   const payouts_link = status === "ready" && has_bank && payouts_href;
+  const connects = status === "not_connected" || status === "disconnected";
 
   return (
     <CardShell
@@ -248,11 +273,13 @@ export function StripeConnectCard({
         </Body>
       )}
 
-      {status === "not_connected" || status === "disconnected" ? (
+      {connects ? (
         // a revoked account has nothing left to replace, so nothing to confirm
-        <a href={start_href} className="btn btn-secondary justify-self-start">
-          Connect Stripe
-        </a>
+        !holds_money && (
+          <a href={start_href} className="btn btn-secondary justify-self-start">
+            Connect Stripe
+          </a>
+        )
       ) : (
         <button
           type="button"

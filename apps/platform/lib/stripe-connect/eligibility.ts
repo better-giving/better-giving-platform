@@ -150,7 +150,7 @@ export const connect_ineligibility = (npo: {
   return null;
 };
 
-/** whether a card donation to `npo` routes to its connected account
+/** whether a card, bank or wallet donation to `npo` routes to its connected account
  * @param routing_on - the `STRIPE_CONNECT_ROUTING` switch */
 export const is_routable = (npo: IRoutingNpo, routing_on: boolean) =>
   routing_on && connect_ineligibility(npo) === null && is_ready(npo);

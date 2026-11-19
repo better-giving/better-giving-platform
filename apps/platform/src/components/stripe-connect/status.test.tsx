@@ -6,7 +6,7 @@ const labels: [TConnectStatus, string][] = [
   ["not_connected", "Not connected"],
   ["incomplete", "Finish setup on Stripe"],
   ["pending", "Pending review"],
-  ["ready", "Ready to receive Stripe donations"],
+  ["ready", "Ready to receive card, bank and wallet donations"],
   ["disconnected", "Disconnected"],
 ];
 
