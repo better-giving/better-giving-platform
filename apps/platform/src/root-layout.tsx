@@ -10,7 +10,7 @@ export function Layout({ children }: PropsWithChildren<{ classes?: string }>) {
   // resource hints — emitted in <head> during SSR
   // the blob origin serves images (no-cors) and, when ASSET_BASE_URL points at
   // it, the module scripts and fonts (cors) — a connection opened without
-  // `crossorigin` is not reused by a cors request, so each mode gets its own.
+  // `crossorigin` is not reused by a cors request, so each mode gets its own
   preconnect("https://cnfc6hjkztdschkg.public.blob.vercel-storage.com");
   preconnect("https://cnfc6hjkztdschkg.public.blob.vercel-storage.com", {
     crossOrigin: "anonymous",
