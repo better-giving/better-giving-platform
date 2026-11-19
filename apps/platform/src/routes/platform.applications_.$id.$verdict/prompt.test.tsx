@@ -46,6 +46,15 @@ describe("registration approve prompt", () => {
       .toBeVisible();
   });
 
+  test("the status badge calls the starting status Under review", async () => {
+    const screen = await render_prompt("approved");
+
+    await expect
+      .element(screen.getByText("Under review", { exact: true }))
+      .toBeVisible();
+    expect(screen.getByText("Pending", { exact: true }).query()).toBeNull();
+  });
+
   test("a rejection asks for a reason", async () => {
     const screen = await render_prompt("rejected", { o_bank_id: "40000001" });
 

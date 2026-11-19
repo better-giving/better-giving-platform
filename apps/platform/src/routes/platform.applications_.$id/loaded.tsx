@@ -1,7 +1,8 @@
 import { Actions, Badge, ExtLink } from "@better-giving/ui";
 import { SquareArrowOutUpRight } from "lucide-react";
 import type { PropsWithChildren } from "react";
-import { href, NavLink, Outlet } from "react-router";
+import { href, NavLink, Outlet, useLocation } from "react-router";
+import { list_url } from "#/routes/platform.applications/list-url";
 import type { V2RecipientAccount } from "#/types/bank-details";
 import { doc_href } from "@/docs";
 import type { IReg } from "@/reg";
@@ -17,6 +18,7 @@ export default function Loaded(
     approvable: boolean;
   }
 ) {
+  const { search } = useLocation();
   const prev_verdict =
     props.status === "03"
       ? "approved"
@@ -149,15 +151,12 @@ export default function Loaded(
         </Container>
       )}
       <Actions>
-        <NavLink
-          to={href("/platform/applications")}
-          className="min-w-24 btn btn-secondary"
-        >
+        <NavLink to={list_url(search)} className="min-w-24 btn btn-secondary">
           Back
         </NavLink>
         <NavLink
           aria-disabled={!!prev_verdict}
-          to="rejected"
+          to={{ pathname: "rejected", search }}
           className="min-w-24 btn btn-destructive"
           preventScrollReset
         >
@@ -168,7 +167,7 @@ export default function Loaded(
           // disables it; so does having neither a bank nor stripe, or
           // stripe alone while routing is off
           aria-disabled={!props.approvable}
-          to="approved"
+          to={{ pathname: "approved", search }}
           className="min-w-24 btn btn-success"
           preventScrollReset
         >

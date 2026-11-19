@@ -1,6 +1,5 @@
 import {
   and,
-  asc,
   desc,
   eq,
   gte,
@@ -313,7 +312,6 @@ export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
   } as const;
   const col = sort_col_map[sort_key];
   const desc_ = sort_dir !== "asc";
-  const dir = desc_ ? desc : asc;
 
   const cursor = next
     ? decode_regs_cursor(next, sort_key, desc_ ? "desc" : "asc")
@@ -370,7 +368,11 @@ export async function regs(opts?: IRegsSearchObj): Promise<IPage<IReg>> {
     )
     .orderBy(
       sql`${col} ${desc_ ? sql`desc` : sql`asc`} nulls last`,
-      dir(registrations.id)
+      // spelled out so the default order is the index's exactly: a bare desc
+      // would put nulls first, which the index doesn't hold. ids are never null
+      desc_
+        ? sql`${registrations.id} desc nulls last`
+        : sql`${registrations.id} asc nulls first`
     )
     .limit(PAGE + 1);
 

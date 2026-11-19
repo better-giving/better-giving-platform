@@ -9,7 +9,9 @@ import {
   it,
   vi,
 } from "vitest";
+import { userEvent } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
+import { layer_ready } from "#/__tests__/fixtures/layer-ready";
 import { clear_qstash_events, get_qstash_events } from "#/setup-tests-browser";
 import { user } from "$/pg/schema/auth";
 import { banking_apps } from "$/pg/schema/banking";
@@ -104,7 +106,7 @@ vi.mock("#/.server/toast", () => ({
   dataWithSuccess: vi.fn((_data: unknown, msg: string) => ({ toast: msg })),
 }));
 
-import type { LoaderFunction } from "react-router";
+import { type LoaderFunction, useLocation } from "react-router";
 import { get_session } from "#/.server/auth";
 import { ErrorModal } from "#/components/error";
 import { step_loader } from "#/pages/registration/data/step-loader";
@@ -115,6 +117,7 @@ import RegSuccess from "#/routes/_app.register.success/route";
 import Prompt, {
   action,
 } from "#/routes/platform.applications_.$id.$verdict/route";
+import SuccessPrompt from "#/routes/platform.applications_.$id.success/route";
 import type { V2RecipientAccount } from "#/types/bank-details";
 import { wise } from "$/kit/wise";
 import { reg_get, reg_put } from "$/pg/queries/registration";
@@ -388,6 +391,120 @@ describe("rejection", () => {
     await expect
       .element(screen.getByText(/submitted for review/i))
       .toBeInTheDocument();
+  });
+});
+
+const VIEW = "?status=02&query=Test&sort_key=o_name&sort_dir=asc";
+
+// the list stub prints the query string it was sent back to
+async function render_review_from_list(id: string, sub = "") {
+  const Stub = createRoutesStub([
+    {
+      path: "/platform/applications",
+      Component: () => <p data-testid="list-search">{useLocation().search}</p>,
+      HydrateFallback: () => null,
+    },
+    {
+      id: "routes/platform.applications_.$id",
+      path: "/platform/applications/:id",
+      Component: Page,
+      HydrateFallback: () => null,
+      loader: test_loader,
+      children: [
+        { path: ":verdict", Component: Prompt, action: action as any },
+        { path: "success", Component: SuccessPrompt },
+      ],
+    },
+  ]);
+  return await render(
+    <Stub initialEntries={[`/platform/applications/${id}${sub}${VIEW}`]} />
+  );
+}
+
+describe("back to the list", () => {
+  it("Back carries the list's filters, search and sort", async () => {
+    const id = await seed_reg(ALL_FIELDS);
+    const screen = await render_review_from_list(id);
+
+    await screen.getByRole("link", { name: "Back" }).click();
+
+    await expect
+      .element(screen.getByTestId("list-search"))
+      .toHaveTextContent(VIEW);
+  });
+
+  it("the breadcrumb carries them too", async () => {
+    const id = await seed_reg(ALL_FIELDS);
+    const screen = await render_review_from_list(id);
+
+    await screen.getByRole("link", { name: "NPO applications" }).click();
+
+    await expect
+      .element(screen.getByTestId("list-search"))
+      .toHaveTextContent(VIEW);
+  });
+
+  it("keeps them through the verdict dialog and its Cancel", async () => {
+    const id = await seed_reg(ALL_FIELDS);
+    const screen = await render_review_from_list(id);
+
+    await screen.getByRole("link", { name: /reject/i }).click();
+    await expect
+      .element(screen.getByText(/changing application status/i))
+      .toBeVisible();
+    (
+      screen.getByRole("link", { name: "Cancel" }).element() as HTMLElement
+    ).click();
+    await screen.getByRole("link", { name: "Back" }).click();
+
+    await expect
+      .element(screen.getByTestId("list-search"))
+      .toHaveTextContent(VIEW);
+  });
+
+  it("keeps them when Escape closes the verdict dialog", async () => {
+    const id = await seed_reg(ALL_FIELDS);
+    const screen = await render_review_from_list(id);
+
+    await screen.getByRole("link", { name: /reject/i }).click();
+    await expect
+      .element(screen.getByText(/changing application status/i))
+      .toBeVisible();
+    // zag listens for Escape a frame after the dialog opens
+    await layer_ready();
+    await userEvent.keyboard("{Escape}");
+    await expect
+      .element(screen.getByText(/changing application status/i))
+      .not.toBeInTheDocument();
+    await screen.getByRole("link", { name: "Back" }).click();
+
+    await expect
+      .element(screen.getByTestId("list-search"))
+      .toHaveTextContent(VIEW);
+  });
+
+  it("keeps them after a verdict, through the success prompt", async () => {
+    const id = await seed_reg(ALL_FIELDS);
+    const screen = await render_review_from_list(id);
+
+    await screen.getByRole("link", { name: /reject/i }).click();
+    await screen
+      .getByLabelText(/reason for rejection/i)
+      .fill("docs incomplete");
+    (
+      screen.getByRole("button", { name: /submit/i }).element() as HTMLElement
+    ).click();
+    await expect
+      .element(screen.getByText(/review submitted/i))
+      .toBeInTheDocument();
+    (
+      screen.getByRole("button", { name: "Close" }).element() as HTMLElement
+    ).click();
+    await screen.getByRole("link", { name: "Back" }).click();
+
+    await expect
+      .element(screen.getByTestId("list-search"))
+      .toHaveTextContent(VIEW);
   });
 });
 

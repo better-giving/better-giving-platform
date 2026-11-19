@@ -82,6 +82,12 @@ export const registrations = pgTable(
     check("status_check", sql`${t.status} IN ('01','02','03','04')`),
     index("registrations_r_id_status_idx").on(t.r_id, t.status, t.updated_at),
     index("registrations_status_updated_idx").on(t.status, t.updated_at),
+    // the staff applications list's default order, every status: newest
+    // first, a tie broken by the higher id (`regs` in queries/registration.ts)
+    index("registrations_updated_at_id_idx").on(
+      t.updated_at.desc(),
+      t.id.desc()
+    ),
     // every agreement download resolves an eid through this
     index("registrations_o_fsa_doc_eid_idx").on(t.o_fsa_doc_eid),
     // pg_trgm fuzzy search index on org name + id

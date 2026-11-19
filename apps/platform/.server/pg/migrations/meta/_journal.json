@@ -575,6 +575,13 @@
       "when": 1794789188077,
       "tag": "0081_payouts_bounced",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1795071206222,
+      "tag": "0082_registrations_updated_at_id_idx",
+      "breakpoints": true
     }
   ]
 }
