@@ -449,7 +449,7 @@ export interface IUserDonation {
   status: string;
   /** the status every dist of this donation shares; null when it has no dist
    * or its dists differ. a cancelled duplicate is a `cancelled` status with a
-   * `refunded` dist_status — the pair `INpoDonation` carries per dist */
+   * `refunded` dist_status: the pair `INpoDonation` carries per dist */
   dist_status: DistRow["status"] | null;
   created_at: string;
   amount_base: number;

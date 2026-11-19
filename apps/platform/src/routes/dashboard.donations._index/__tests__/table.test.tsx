@@ -110,7 +110,7 @@ describe("my donations — a refunded gift's amount", () => {
   });
 });
 
-describe("my donations — a cancelled duplicate", () => {
+describe("my donations: a cancelled duplicate", () => {
   test("strikes its amount and tells the donor no refund was made", async () => {
     const screen = await render_table([
       row({ status: "cancelled", dist_status: "refunded" }),
@@ -130,7 +130,7 @@ describe("my donations — a cancelled duplicate", () => {
     await expect.element(tip).toHaveAccessibleDescription(/No refund was made/);
   });
 
-  // a canceled DAF grant or a checkout a campaign's close shut has no dist;
+  // a cancelled DAF grant or a checkout a campaign's close shut has no dist;
   // a refunded_loss dist did refund
   test.each([null, "refunded_loss"] as const)(
     "a cancelled donation with dist %s reads plain Cancelled: no note, no strike",
