@@ -14,6 +14,8 @@ export type TAccount =
   | "donation"
   | "interest"
   | "dividend"
+  /** a record-only correction to a balance, with no money movement and written by ops */
+  | "adjustment"
   | "refund";
 /**
  * pending - can be cancelled

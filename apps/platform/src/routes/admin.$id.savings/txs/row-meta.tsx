@@ -52,6 +52,18 @@ export const row_meta = (data: IBalanceTx): IRowMeta => {
       description: <Description text="Grant" id={data.id} />,
     };
   }
+  // record-only correction, sign decides the arrow
+  if (data.account_other === "adjustment") {
+    return {
+      icon:
+        data.bal_end - data.bal_begin > 0 ? (
+          <ArrowRight className="text-success icon-md" />
+        ) : (
+          <ArrowLeft className="text-destructive icon-md" />
+        ),
+      description: <Description text="Balance adjustment" id={data.id} />,
+    };
+  }
   //investments
   const flow = data.bal_end - data.bal_begin > 0 ? "in" : "out";
   return {
