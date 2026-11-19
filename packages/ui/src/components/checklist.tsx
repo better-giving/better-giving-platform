@@ -6,7 +6,14 @@ import {
   RotateCcw,
   TriangleAlert,
 } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { Card, CardBody, CardHeader } from "./card";
@@ -169,6 +176,17 @@ const tones: Record<Tone, { icon: LucideIcon; vars: string }> = {
   },
 };
 
+// a linked row or section scrolls to just below the pinned header and the
+// status card: the header's height, the card's (--ds-checklist-status-h, which
+// the root measures and writes itself; before the first measure,
+// --_status-est, an estimate of its tallest state) and a 16px gap
+const linked =
+  "scroll-mbs-[calc(var(--ds-header-h,var(--ds-bar-h,0px))_+_var(--ds-checklist-status-h,var(--_status-est))_+_--spacing(4))]";
+
+// a space that adds no width: the word break for text and accessible name,
+// while the badge's own 8px margin is the whole visible gap, in any font
+const Space = () => <span className="text-[0px]"> </span>;
+
 // the fill's shadow is a smudge at 0 wide, and the fill turns success only
 // with every item ticked
 const fill_class = {
@@ -192,6 +210,10 @@ type ViewProps = {
   /** Keep my ticks. */
   on_keep: () => void;
   words?: WordsOverride;
+  /** each item row's `id` is the item's own id and each section's is the
+   *  section's own, so `#<id>` links land; the app keeps them unique on the
+   *  page. off: ids carry a per-instance prefix, safe for two lists. */
+  link_ids?: boolean;
   /** appended last, on the root. */
   classes?: string;
 };
@@ -209,6 +231,7 @@ export function ChecklistView({
   on_reset,
   on_keep,
   words: words_in,
+  link_ids = false,
   classes = "",
 }: ViewProps) {
   const words = merged(words_in);
@@ -240,9 +263,28 @@ export function ChecklistView({
     (confirming ? keep_ref : reset_ref).current?.focus();
   }, [confirming]);
 
+  // the card's real height, for a linked row's scroll margin: long words, a
+  // wrapped tally badge or text zoom make it taller than the estimate
+  const root = useRef<HTMLDivElement>(null);
+  const card = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const [r, c] = [root.current, card.current];
+    if (!r || !c) return;
+    const measure = () =>
+      r.style.setProperty("--ds-checklist-status-h", `${c.offsetHeight}px`);
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(c);
+    return () => {
+      watch.disconnect();
+      r.style.removeProperty("--ds-checklist-status-h");
+    };
+  }, []);
+
   return (
     <div
-      className={`flex flex-col gap-4 text-gray-12 [print-color-adjust:exact] sm:gap-5 ${classes}`}
+      ref={root}
+      className={`flex flex-col gap-4 text-gray-12 [--_status-est:--spacing(56)] [print-color-adjust:exact] sm:gap-5 sm:[--_status-est:--spacing(48)] ${classes}`}
     >
       {flag_total > 0 && (
         // inline, so on a phone the sentence runs on after the badge
@@ -250,11 +292,13 @@ export function ChecklistView({
           <Badge variant="warning" classes="me-2">
             {words.flag}
           </Badge>
+          <Space />
           <span className="text-gray-11">{words.legend}</span>
         </p>
       )}
 
       <Card
+        ref={card}
         aria-label={words.score}
         classes="sticky inset-bs-[var(--ds-header-h,var(--ds-bar-h,0px))] z-subbar print:static"
       >
@@ -349,7 +393,12 @@ export function ChecklistView({
       {sections.map((section) => {
         const title_id = `${uid}-${section.id}`;
         return (
-          <Card key={section.id} aria-labelledby={title_id}>
+          <Card
+            key={section.id}
+            id={link_ids ? section.id : undefined}
+            aria-labelledby={title_id}
+            classes={link_ids ? linked : ""}
+          >
             <CardHeader classes="text-lg">
               <h2 id={title_id}>{section.title}</h2>
               {section.sub && (
@@ -364,7 +413,8 @@ export function ChecklistView({
                 return (
                   <li
                     key={item.id}
-                    className="grid grid-cols-[auto_1fr] gap-3 border-bs border-hairline py-2.5 break-inside-avoid first:border-bs-0"
+                    id={link_ids ? item.id : undefined}
+                    className={`grid grid-cols-[auto_1fr] gap-3 border-bs border-hairline py-2.5 break-inside-avoid first:border-bs-0 ${link_ids ? linked : ""}`}
                   >
                     <input
                       type="checkbox"
@@ -377,15 +427,21 @@ export function ChecklistView({
                         text wraps and is heard before the question */}
                     <label htmlFor={box_id} className="cursor-pointer text-sm">
                       {item.flag && (
-                        <Badge variant="warning" classes="me-2">
-                          {words.flag}
-                        </Badge>
+                        <>
+                          <Badge variant="warning" classes="me-2">
+                            {words.flag}
+                          </Badge>
+                          <Space />
+                        </>
                       )}
                       {item.text}
                       {item.note && (
-                        <span className="block mbs-1 text-xs text-gray-11">
-                          {item.note}
-                        </span>
+                        <>
+                          {" "}
+                          <span className="block mbs-1 text-xs text-gray-11">
+                            {item.note}
+                          </span>
+                        </>
                       )}
                     </label>
                   </li>
@@ -405,6 +461,8 @@ type Props = {
    *  renaming ids, when the list changes shape. */
   storage_key: string;
   words?: WordsOverride;
+  /** see `ChecklistView`: item and section ids as given, for `#<id>` links. */
+  link_ids?: boolean;
   /** appended last, on the root. */
   classes?: string;
 };
@@ -412,7 +470,13 @@ type Props = {
 /** a checklist whose ticks persist in localStorage: it renders empty, as the
  *  server does, and restores in an effect after the first paint. a storage
  *  that throws leaves it working for the session. */
-export function Checklist({ sections, storage_key, words, classes }: Props) {
+export function Checklist({
+  sections,
+  storage_key,
+  words,
+  link_ids,
+  classes,
+}: Props) {
   const [checked, set_checked] = useState<ReadonlySet<string>>(() => new Set());
   const [confirming, set_confirming] = useState(false);
   // a string, so a parent that rebuilds the same list each render does not
@@ -447,6 +511,7 @@ export function Checklist({ sections, storage_key, words, classes }: Props) {
       checked={checked}
       confirming={confirming}
       words={words}
+      link_ids={link_ids}
       classes={classes}
       on_toggle={(id) => {
         const next = new Set(checked);

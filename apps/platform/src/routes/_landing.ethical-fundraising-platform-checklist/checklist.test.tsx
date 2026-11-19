@@ -151,4 +151,13 @@ describe("EthicsChecklist", () => {
     await expect.element(screen.getByLabelText(PLAIN)).not.toBeChecked();
     expect(localStorage.getItem(STORAGE_KEY)).toBe("[]");
   });
+
+  test("link_ids puts each item's and section's own id on its element", async () => {
+    await render(<EthicsChecklist />);
+
+    const row = document.getElementById("consent-solicit");
+    expect(row?.tagName).toBe("LI");
+    expect(row?.textContent).toMatch(FLASHPOINT);
+    expect(document.getElementById("consent")?.tagName).toBe("SECTION");
+  });
 });

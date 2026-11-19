@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "dir": "src",
-  "registryVersion": "4.1.0",
+  "registryVersion": "4.2.0",
   "items": {
     "badge": {
       "version": "1.2.1",
@@ -26,10 +26,10 @@
       }
     },
     "checklist": {
-      "version": "1.0.0",
+      "version": "1.1.0",
       "files": {
-        "components/checklist.tsx": "fad31dfe805ffa9a7ddfb7e9ed19321a3c79b1f3167935e288dad9d4009d31e8",
-        "components/checklist.usage.md": "8f82136b8a81e76b3687aef5a29bbc9f2ad228c67b3aad8adb30cfe141ae81d0"
+        "components/checklist.tsx": "5dd2ecb6fc19171d2a216fbf7de99984d541e49b045770db2207f8df35df8023",
+        "components/checklist.usage.md": "e531d7efbe7c7103c593d998d9596afb243a453782e061a8b4950ab48bceeb73"
       }
     },
     "dialog": {

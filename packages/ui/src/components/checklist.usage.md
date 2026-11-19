@@ -31,6 +31,7 @@ const sections: ChecklistSection[] = [
 - `sections`: `ChecklistSection[]`, each `{ id, title, sub?, items }`; an item is `{ id, text, flag?, note? }`. The total and the flagged total come from the list.
 - `storage_key`: the `localStorage` key the ticks are kept under, as a JSON array of item ids. When the list changes shape, change the key (`-v2`) rather than renaming ids: a renamed id drops its tick.
 - `words`: optional, any of the strings below; `verdict` merges per tier, so one tier can be reworded alone.
+- `link_ids`: when set, each item row's `id` is the item's own `id` and each section's `id` is the section's own, so a link like `#arrival-step-free` lands on that row (and `#arrival` on the section). Unset, the ids carry a per-instance prefix and two checklists can share a page. The app keeps the ids unique on the page when it sets `link_ids`: two linked lists on a page, or an item id equal to a section id, jump to the first match. A linked row or section scrolls to just below the pinned header and status card: its `scroll-margin-block-start` is the header's height (`--ds-header-h`, else `--ds-bar-h`), the card's height and 16px. The root measures the card itself (a `ResizeObserver` writes `--ds-checklist-status-h` on the root), so an app does not set it, and long `words`, a wrapped tally badge or text zoom are counted; until the first measure the margin reads an estimate of the card's tallest state, 14rem under 640px and 12rem from there. The header's height is already in the margin, so an app that also sets `scroll-padding-top` for its header counts it twice: drop the `scroll-padding-top` (dropping `--ds-header-h` would pin the card behind the header).
 - `classes`: appended last, on the root.
 
 The page's title and introduction are the app's (`page-header` or its own `h1`); the item starts at the legend. Its root sets no margin and no width: put it in the page's column.
@@ -42,9 +43,9 @@ The page's title and introduction are the app's (`page-header` or its own `h1`);
 ## Parts, top to bottom
 
 - **Legend** (only when an item is flagged): the flag badge (`badge` `warning`), 8px before `words.legend` in gray-11, `text-sm`, inline, so on a phone the sentence runs on after the badge.
-- **Status card**, a `Card` named `words.score` ("Your score"): the count, "9 of 28 checked" (the figure `font-display` `text-3xl` bold, tabular; the rest gray-11), the tally badge at the end of the row, an 8px bar under it, and the verdict band. On screen it is `position: sticky` under the site nav's header or the app shell's top bar (`inset-block-start: var(--ds-header-h, var(--ds-bar-h, 0px))`, `z-subbar`), so the score stays in view while the list scrolls.
+- **Status card**, a `Card` named `words.score` ("Your score"): the count, "9 of 28 checked" (the figure `font-display` `text-3xl` bold, tabular; the rest gray-11), the tally badge at the end of the row, an 8px bar under it, and the verdict band. On screen it is `position: sticky` under the site nav's header or the app shell's top bar (`inset-block-start: var(--ds-header-h, var(--ds-bar-h, 0px))`, `z-subbar`), so the score stays in view while the list scrolls. `site-nav` sets `--ds-header-h` and the app shell sets `--ds-bar-h`; an app with its own header sets `--ds-header-h` to that header's height on a wrapper around the list (`style={{ "--ds-header-h": "72px" }}`). With neither set, the card pins at 0, behind the header.
 - **Controls**: Print or save as PDF (`secondary`, Printer) and Reset all (`ghost`, RotateCcw). Under 640px they stack, each the full width, 8px apart.
-- **Sections**: a `Card` each, labelled by its `h2` (the title, `text-lg`; the page's `h1` sits above the item) with `sub` under it in gray-11, then the items: a native checkbox and its `<label>`, 12px apart, rows 10px top and bottom with a hairline between. A flagged item's badge comes first in the label, 8px before the text; `note` sits under the text in `text-xs` gray-11.
+- **Sections**: a `Card` each, labelled by its `h2` (the title, `text-lg`; the page's `h1` sits above the item) with `sub` under it in gray-11, then the items: a native checkbox and its `<label>`, 12px apart, rows 10px top and bottom with a hairline between. A flagged item's badge comes first in the label, 8px before the text; `note` sits under the text in `text-xs` gray-11. The badge, the text and the note are separated by real spaces, so the label's text and the checkbox's name read "Priority There is a step-free route… Ask how many bays…", and the legend reads "Priority Items that matter most…".
 
 ## States
 
@@ -70,7 +71,7 @@ Print or save as PDF calls `window.print()`. Printed, the controls row and the c
 ## Accessibility
 
 - Each item is a native `<input type="checkbox">` with a `<label for>`: the whole text, badge and note included, is its name and its target. Space toggles it.
-- The flag badge is first in the label, so it heads the first line when the text wraps and is heard before the question.
+- The flag badge is first in the label, so it heads the first line when the text wraps and is heard before the question; a space follows the badge, and another follows the text before the note, so the name does not run the words together. The space after the badge has no width (`font-size: 0`), so the badge's 8px margin is the whole visible gap in any font.
 - Two polite live regions (`role="status"`, `aria-live="polite"`): the count, whose figure and words are separated by a real space so it reads "9 of 28 checked", and the verdict, whose text changes only at a tier change, so a tick inside a tier is not read twice. The bar is `aria-hidden`: the count says it.
 - Glyphs are `aria-hidden`.
 
