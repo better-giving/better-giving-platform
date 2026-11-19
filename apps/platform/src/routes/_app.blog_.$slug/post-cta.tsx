@@ -12,7 +12,7 @@ interface IPostCta {
 }
 
 export function PostCta({ cta }: IPostCta) {
-  const img_url = urlFor(cta.image)?.width(560).url();
+  const img_url = urlFor(cta.image)?.width(560).auto("format").url();
   const heading_mb = cta.body ? "mb-6" : "mb-9";
   const link1 = is_safe_href(cta.link1?.href) ? cta.link1 : null;
   const link2 = is_safe_href(cta.link2?.href) ? cta.link2 : null;

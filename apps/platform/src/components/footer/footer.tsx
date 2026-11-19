@@ -179,6 +179,8 @@ export function Footer({ classes = "", variant = "full", width }: Props) {
             <img
               src={guidestar.seal}
               alt="Candid GuideStar Transparency Seal"
+              loading="lazy"
+              decoding="async"
               className="h-18 w-auto"
             />
           </ExtLink>

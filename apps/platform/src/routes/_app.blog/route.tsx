@@ -121,10 +121,16 @@ function PostList({ firstPage }: IPostList) {
 }
 
 const Cards = (props: { posts: POSTS_QUERY_RESULT["items"] }) =>
-  props.posts.map((post) => {
+  props.posts.map((post, i) => {
     const path = post_path(post.slug.current);
     if (!path) return null;
-    const img_src = urlFor(post.image)?.width(1024).height(576).url();
+    // auto=format hands a browser that takes webp/avif that, not the uploaded
+    // png — the covers were 550-830 KB each
+    const img_src = urlFor(post.image)
+      ?.width(1024)
+      .height(576)
+      .auto("format")
+      .url();
     return (
       <NavLink
         key={post._id}
@@ -136,6 +142,11 @@ const Cards = (props: { posts: POSTS_QUERY_RESULT["items"] }) =>
             src={img_src}
             // the title below already names the link, so the cover is decorative
             alt=""
+            // the first cover is the page's largest paint; the rest wait
+            // their turn instead of sharing the connection with it
+            {...(i === 0
+              ? { fetchPriority: "high" as const }
+              : { loading: "lazy" as const, decoding: "async" as const })}
             className="w-full aspect-video object-cover"
           />
         ) : (

@@ -26,6 +26,8 @@ export function OwnGrow({ classes = "" }: IOwnGrow) {
               src={laira_shaking_hands}
               width={120}
               alt="Two Lairas shaking hands"
+              loading="lazy"
+              decoding="async"
             />
             <h3 className="text-2xl font-bold">Own it.</h3>
             <p className="text-base/relaxed text-gray-11">
@@ -45,6 +47,8 @@ export function OwnGrow({ classes = "" }: IOwnGrow) {
               src={laira_presentation}
               width={120}
               alt="Laira presenting a growth chart"
+              loading="lazy"
+              decoding="async"
             />
             <h3 className="text-2xl font-bold">Grow it.</h3>
             <p className="text-base/relaxed text-gray-11">

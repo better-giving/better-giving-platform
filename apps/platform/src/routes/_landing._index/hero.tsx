@@ -79,6 +79,8 @@ export function Hero({ classes = "" }: IHero) {
             src={laira_heart}
             width={150}
             alt="Laira holding a heart"
+            loading="lazy"
+            decoding="async"
             className="absolute -bottom-9 -left-8 rotate-3 max-lg:hidden"
           />
         </div>
