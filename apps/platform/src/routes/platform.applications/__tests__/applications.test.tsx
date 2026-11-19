@@ -644,7 +644,7 @@ describe("applications — the filter popover closes", () => {
 
     await expect
       .element(screen.getByRole("button", { name: apply() }))
-      .not.toBeVisible();
+      .not.toBeInTheDocument();
   });
 
   it("on Reset", async () => {
@@ -655,7 +655,7 @@ describe("applications — the filter popover closes", () => {
 
     await expect
       .element(screen.getByRole("button", { name: apply() }))
-      .not.toBeVisible();
+      .not.toBeInTheDocument();
   });
 });
 
