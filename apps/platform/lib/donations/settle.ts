@@ -77,7 +77,7 @@ export function is_reversed(status: IDonation["status"]): boolean {
 /**
  * was this donation recorded twice and its duplicate cancelled? the duplicate's
  * dist reads `refunded`, but no refund was made. a cancelled donation with no
- * dist (a cancelled DAF grant, a checkout a campaign close shut) or with a
+ * dist (a cancelled DAF grant, a checkout a campaign's close shut) or with a
  * `refunded_loss` dist (money did go back) is not one
  */
 export function is_cancelled_duplicate(
