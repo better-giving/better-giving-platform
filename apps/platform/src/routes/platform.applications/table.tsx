@@ -175,7 +175,7 @@ function Status({ status, reg, connect_routing }: IStatusProps) {
   return (
     <div className="inline-flex flex-col items-center gap-1.5">
       <span
-        className={`${text_color[status]} inline-flex items-center gap-1.5 text-xs font-medium capitalize`}
+        className={`${text_color[status]} inline-flex items-center gap-1.5 text-xs font-medium`}
       >
         <span
           className={`${dot_color[status]} size-2 rounded-full inline-block shrink-0`}
