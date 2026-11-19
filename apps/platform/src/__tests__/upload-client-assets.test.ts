@@ -188,6 +188,35 @@ describe("r2", () => {
       ]);
     });
 
+    test("a thrown network error on a signed call is retried", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      let heads = 0;
+      let stored = "";
+      fetch_mock.mockImplementation(async (req) => {
+        if (typeof req === "string") {
+          return req.includes("/_probe/")
+            ? new Response(stored)
+            : served("x", "text/javascript");
+        }
+        if (req.method === "HEAD" && ++heads < 3) {
+          throw new Error("ECONNRESET");
+        }
+        if (req.method === "PUT") stored = await req.text();
+        return res(req.method === "HEAD" ? 200 : 204);
+      });
+      await upload_client_assets(BASE, { ...opts, dir });
+      expect(heads).toBe(3);
+    });
+
+    test("a signed call that keeps throwing fails the build", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      fetch_mock.mockRejectedValue(new Error("ECONNRESET"));
+      await expect(
+        upload_client_assets(BASE, { ...opts, dir })
+      ).rejects.toThrow(/ECONNRESET/);
+      expect(fetch_mock).toHaveBeenCalledTimes(3);
+    });
+
     test("a failed DELETE only logs", async () => {
       await writeFile(path.join(dir, "a-1.js"), "x");
       serve({ del: 403, get: () => served("x", "text/javascript") });

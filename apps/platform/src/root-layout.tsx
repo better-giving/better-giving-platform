@@ -12,10 +12,14 @@ export function Layout({ children }: PropsWithChildren<{ classes?: string }>) {
   // the blob origin serves images (no-cors); the asset origin (vite base, baked
   // at build) serves the module scripts and fonts (cors). a connection opened
   // without `crossorigin` is not reused by a cors request, so each mode gets
-  // its own. a "/" base is same-origin and needs no hint.
+  // its own. the asset origin also serves the stylesheet and images as plain
+  // requests, so it gets both. a "/" base is same-origin and needs no hint.
   preconnect("https://cnfc6hjkztdschkg.public.blob.vercel-storage.com");
   const assets = asset_origin(import.meta.env.BASE_URL);
-  if (assets) preconnect(assets, { crossOrigin: "anonymous" });
+  if (assets) {
+    preconnect(assets);
+    preconnect(assets, { crossOrigin: "anonymous" });
+  }
 
   useConsent();
 

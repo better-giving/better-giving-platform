@@ -36,6 +36,8 @@ const CONCURRENCY = 12;
 const IMMUTABLE_MAX_AGE = 31_536_000; // 1y — hashed assets never change
 const PROBE_TRIES = 5;
 const PROBE_DELAY_MS = 2000;
+const REQUEST_TIMEOUT_MS = 60_000;
+const NET_TRIES = 3;
 const CACHE_CONTROL = `public, max-age=${IMMUTABLE_MAX_AGE}, immutable`;
 
 const S3_KEYS = [
@@ -80,7 +82,12 @@ export function content_type(rel: string): string {
 
 type Env = Record<string, string | undefined>;
 
-type R2 = { client: AwsClient; endpoint: string; bucket: string };
+type R2 = {
+  client: AwsClient;
+  endpoint: string;
+  bucket: string;
+  retry_ms: number;
+};
 
 function r2_from_env(env: Env): R2 {
   const missing = S3_KEYS.filter((k) => !env[k]);
@@ -95,12 +102,14 @@ function r2_from_env(env: Env): R2 {
       secretAccessKey: env.ASSETS_S3_SECRET_ACCESS_KEY as string,
       service: "s3",
       region: "auto",
-      // aws4fetch's default is 10 retries with doubling backoff (~50s); a
-      // build is better off failing sooner.
+      // aws4fetch retries only 5xx and 429 answers, 10 times by default
+      // (~50s of backoff); a build is better off failing sooner. a thrown
+      // network error is r2_fetch's.
       retries: 3,
     }),
     endpoint: (env.ASSETS_S3_ENDPOINT as string).replace(/\/+$/, ""),
     bucket: env.ASSETS_S3_BUCKET as string,
+    retry_ms: 500,
   };
 }
 
@@ -117,6 +126,9 @@ export async function upload_client_assets(
     );
   }
   const r2 = is_blob ? null : r2_from_env(env);
+  if (r2 && opts.probe_delay_ms !== undefined) {
+    r2.retry_ms = opts.probe_delay_ms;
+  }
   const entries = await readdir(dir, {
     recursive: true,
     withFileTypes: true,
@@ -174,6 +186,23 @@ const app_origin = (env: Env) => {
   }
 };
 
+// a build makes ~800 signed calls and one reset or DNS blip must not fail it:
+// retry a thrown error (aws4fetch won't), and bound each attempt so a stalled
+// socket can't hold the build until the platform's own timeout.
+async function r2_fetch(r2: R2, url: string, init: RequestInit) {
+  for (let i = 1; ; i++) {
+    try {
+      return await r2.client.fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch (err) {
+      if (i >= NET_TRIES) throw err;
+      await new Promise((r) => setTimeout(r, r2.retry_ms * i));
+    }
+  }
+}
+
 const object_url = (r2: R2, key: string) =>
   `${r2.endpoint}/${r2.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
 
@@ -215,7 +244,7 @@ const probe_error = (r2: R2, base: string, url: string, why: string) =>
 async function probe_sentinel(r2: R2, base: string, delay_ms: number) {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const key = `assets/_probe/${id}.txt`;
-  const put_res = await r2.client.fetch(object_url(r2, key), {
+  const put_res = await r2_fetch(r2, object_url(r2, key), {
     method: "PUT",
     body: id,
     headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" },
@@ -227,12 +256,14 @@ async function probe_sentinel(r2: R2, base: string, delay_ms: number) {
   }
   const url = `${base}${key}`;
   const why = await with_retries(async () => {
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
     if (res.status !== 200) return `status ${res.status}`;
     return (await res.text()) === id ? null : "a different body";
   }, delay_ms);
   try {
-    const del = await r2.client.fetch(object_url(r2, key), {
+    const del = await r2_fetch(r2, object_url(r2, key), {
       method: "DELETE",
     });
     if (!del.ok) {
@@ -270,7 +301,10 @@ async function probe_asset(
   const want_type = content_type(rel);
   const want = await readFile(path.join(dir, rel));
   const why = await with_retries(async () => {
-    const res = await fetch(url, { headers: { Origin: origin } });
+    const res = await fetch(url, {
+      headers: { Origin: origin },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
     const got_type = (res.headers.get("content-type") ?? "")
       .split(";")[0]
       .trim()
@@ -306,14 +340,14 @@ async function put_blob(base: string, pathname: string, file: string) {
 
 async function put_r2(r2: R2, key: string, file: string, rel: string) {
   const url = object_url(r2, key);
-  const probe = await r2.client.fetch(url, { method: "HEAD" });
+  const probe = await r2_fetch(r2, url, { method: "HEAD" });
   if (probe.ok) return false;
   if (probe.status !== 404) {
     throw new Error(
       `[upload-client-assets] HEAD ${key} answered ${probe.status}`
     );
   }
-  const res = await r2.client.fetch(url, {
+  const res = await r2_fetch(r2, url, {
     method: "PUT",
     body: await readFile(file),
     headers: {
