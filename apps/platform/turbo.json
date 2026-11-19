@@ -7,12 +7,12 @@
       // upload gate). in the root env it hashes into every member's build and
       // misses the remote cache on each commit. $TURBO_EXTENDS$ appends;
       // without it this array replaces the root's.
-      // the r2 asset upload (utils/upload-client-assets.ts) is platform's
-      // alone, so its credentials stay out of every other member's hash.
       "env": [
         "$TURBO_EXTENDS$",
         "VERCEL_GIT_COMMIT_SHA",
         "SLACK_BOT_TOKEN",
+        // the r2 asset upload (utils/upload-client-assets.ts) is platform's
+        // alone, so its credentials stay out of every other member's hash.
         "ASSETS_S3_ENDPOINT",
         "ASSETS_S3_BUCKET",
         "ASSETS_S3_ACCESS_KEY_ID",

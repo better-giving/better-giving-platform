@@ -7,7 +7,7 @@ import { AwsClient } from "aws4fetch";
 
 // mirror content-hashed client assets to the deploy-independent store behind
 // ASSET_BASE_URL so html cached from a rotated-out deployment can still load
-// its assets (see vite.config.ts `base` + entry.server.tsx `durable_assets`).
+// its assets (see vite.config.ts `base` + entry.server.tsx skew-protection note).
 // the base url picks the store: a vercel blob host (*.blob.vercel-storage.com)
 // uploads to blob, any other base uploads to cloudflare r2 (S3 api, behind
 // cloudflare's cache) and needs all four ASSETS_S3_* vars. the base is what the
@@ -254,7 +254,8 @@ async function probe_sentinel(r2: R2, base: string, delay_ms: number) {
 // and no cache holds a stale 404 for it.
 // module scripts and fonts are cors requests, and r2 sends no
 // access-control-allow-origin until the bucket has a CORS policy, so a missing
-// header is a dead site. the policy must allow "*": the fonts are also fetched
+// header is a dead site. the policy must answer exactly "*", not echo an
+// origin: the fonts are also fetched
 // from inside Stripe's iframe and previews get a new host per deployment.
 async function probe_asset(
   r2: R2,
@@ -279,7 +280,7 @@ async function probe_asset(
     if (got_type !== want_type) {
       return `content-type "${got_type}", expected "${want_type}"`;
     }
-    if (acao !== "*" && acao !== origin) {
+    if (acao !== "*") {
       return `access-control-allow-origin ${acao ? `"${acao}"` : "missing"} for Origin ${origin}; the bucket CORS policy must allow "*"`;
     }
     if (Buffer.compare(Buffer.from(await res.arrayBuffer()), want)) {

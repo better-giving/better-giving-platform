@@ -295,7 +295,7 @@ describe("r2", () => {
         }
         if (req.includes("/_probe/")) return new Response(stored);
         seen.push(new Headers(init?.headers).get("origin"));
-        return served("x", "text/javascript", "https://app.example");
+        return served("x", "text/javascript");
       });
       await upload_client_assets(BASE, {
         ...opts,
@@ -303,6 +303,73 @@ describe("r2", () => {
         env: { ...ENV, BASE_URL: "https://app.example/path" },
       });
       expect(seen).toEqual(["https://app.example"]);
+    });
+
+    test("throws when access-control-allow-origin echoes the origin", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      serve({
+        get: () => served("x", "text/javascript", "https://better.giving"),
+      });
+      await expect(
+        upload_client_assets(BASE, { ...opts, dir })
+      ).rejects.toThrow(/"https:\/\/better\.giving" for Origin/);
+    });
+
+    test("a fetch that throws is retried, then reported", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      let tries = 0;
+      serve({
+        get: () => {
+          tries++;
+          throw new Error("getaddrinfo ENOTFOUND assets.better.giving");
+        },
+      });
+      await expect(
+        upload_client_assets(BASE, { ...opts, dir })
+      ).rejects.toThrow(/fetch failed: getaddrinfo ENOTFOUND.*5 tries/);
+      expect(tries).toBe(5);
+    });
+
+    test("a .woff2 is PUT as font/woff2 and probed against it", async () => {
+      await writeFile(path.join(dir, "inter-1.woff2"), "font");
+      serve({ head: 404, get: () => served("font", "font/woff2") });
+      await upload_client_assets(BASE, { ...opts, dir });
+      expect(req_at(1).method).toBe("PUT");
+      expect(req_at(1).headers.get("content-type")).toBe("font/woff2");
+    });
+
+    test("more than 12 files all upload, 12 at a time", async () => {
+      for (let i = 0; i < 13; i++) {
+        await writeFile(path.join(dir, `f-${i}.js`), "x");
+      }
+      let inflight = 0;
+      let max = 0;
+      let puts = 0;
+      let stored = "";
+      fetch_mock.mockImplementation(async (req) => {
+        if (typeof req === "string") {
+          return req.includes("/_probe/")
+            ? new Response(stored)
+            : served("x", "text/javascript");
+        }
+        const probe = req.url.includes("/_probe/");
+        if (req.method === "HEAD") {
+          max = Math.max(max, ++inflight);
+          await new Promise((r) => setTimeout(r, 1));
+          return res(404);
+        }
+        if (req.method === "PUT") {
+          if (probe) stored = await req.text();
+          else {
+            inflight--;
+            puts++;
+          }
+        }
+        return res(200);
+      });
+      await upload_client_assets(BASE, { ...opts, dir });
+      expect(puts).toBe(13);
+      expect(max).toBe(12);
     });
 
     test("throws after 5 tries on 404, naming base, status and bucket", async () => {
@@ -370,6 +437,12 @@ describe("backend choice", () => {
     await upload_client_assets(BLOB_BASE, { dir, env: {} });
     expect(head).toHaveBeenCalledWith(`${BLOB_BASE}assets/a-1.xyz`);
     expect(put).toHaveBeenCalledTimes(1);
+    expect(put).toHaveBeenCalledWith("assets/a-1.xyz", expect.any(Buffer), {
+      access: "public",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      cacheControlMaxAge: 31_536_000,
+    });
     expect(fetch_mock).not.toHaveBeenCalled();
   });
 
