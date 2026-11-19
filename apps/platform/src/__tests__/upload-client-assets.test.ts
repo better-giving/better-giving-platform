@@ -21,7 +21,7 @@ const BASE = "https://assets.better.giving/";
 const BLOB_BASE = "https://abc123.public.blob.vercel-storage.com/";
 
 let dir: string;
-const fetch_mock = vi.fn<(req: Request) => Promise<Response>>();
+const fetch_mock = vi.fn<(req: Request | string) => Promise<Response>>();
 
 beforeEach(async () => {
   dir = await mkdtemp(path.join(tmpdir(), "assets-"));
@@ -36,15 +36,31 @@ afterEach(async () => {
 });
 
 const res = (status: number) => new Response(null, { status });
+const req_at = (i: number) => fetch_mock.mock.calls[i][0] as Request;
+const served = (body: string, type: string) =>
+  new Response(body, { status: 200, headers: { "content-type": type } });
+
+// signed s3 calls arrive as Requests; the probe is a plain string url
+function serve(o: {
+  head?: number;
+  put?: number;
+  get: (url: string) => Response;
+}) {
+  fetch_mock.mockImplementation(async (req) => {
+    if (typeof req === "string") return o.get(req);
+    if (req.method === "HEAD") return res(o.head ?? 200);
+    return res(o.put ?? 200);
+  });
+}
 
 describe("r2", () => {
   test("an existing object is skipped", async () => {
     await writeFile(path.join(dir, "a-1.js"), "x");
-    fetch_mock.mockResolvedValue(res(200));
-    await upload_client_assets(BASE, { dir, env: ENV });
-    expect(fetch_mock).toHaveBeenCalledTimes(1);
-    expect(fetch_mock.mock.calls[0][0].method).toBe("HEAD");
-    expect(fetch_mock.mock.calls[0][0].url).toBe(
+    serve({ get: () => served("x", "text/javascript") });
+    await upload_client_assets(BASE, { dir, env: ENV, probe_delay_ms: 0 });
+    expect(fetch_mock).toHaveBeenCalledTimes(2);
+    expect(req_at(0).method).toBe("HEAD");
+    expect(req_at(0).url).toBe(
       "https://acct.r2.cloudflarestorage.com/bg-platform-assets/assets/a-1.js"
     );
   });
@@ -52,13 +68,13 @@ describe("r2", () => {
   test("a missing object is PUT with type and cache headers; maps are skipped", async () => {
     await writeFile(path.join(dir, "sub", "a-1.css"), "x");
     await writeFile(path.join(dir, "a-1.js.map"), "x");
-    fetch_mock.mockImplementation(async (req) =>
-      res(req.method === "HEAD" ? 404 : 200)
+    serve({ head: 404, get: () => served("x", "text/css") });
+    await upload_client_assets(BASE, { dir, env: ENV, probe_delay_ms: 0 });
+    const methods = fetch_mock.mock.calls.map(([r]) =>
+      typeof r === "string" ? "GET" : r.method
     );
-    await upload_client_assets(BASE, { dir, env: ENV });
-    const methods = fetch_mock.mock.calls.map(([r]) => r.method);
-    expect(methods).toEqual(["HEAD", "PUT"]);
-    const put_req = fetch_mock.mock.calls[1][0];
+    expect(methods).toEqual(["HEAD", "PUT", "GET"]);
+    const put_req = req_at(1);
     expect(put_req.url).toContain("/assets/sub/a-1.css");
     expect(put_req.headers.get("content-type")).toBe("text/css");
     expect(put_req.headers.get("cache-control")).toBe(
@@ -68,9 +84,7 @@ describe("r2", () => {
 
   test("a failed PUT throws", async () => {
     await writeFile(path.join(dir, "a-1.js"), "x");
-    fetch_mock.mockImplementation(async (req) =>
-      res(req.method === "HEAD" ? 404 : 403)
-    );
+    serve({ head: 404, put: 403, get: () => res(500) });
     await expect(upload_client_assets(BASE, { dir, env: ENV })).rejects.toThrow(
       /PUT assets\/a-1\.js answered 403/
     );
@@ -82,6 +96,53 @@ describe("r2", () => {
     await expect(upload_client_assets(BASE, { dir, env: ENV })).rejects.toThrow(
       /HEAD assets\/a-1\.js answered 403/
     );
+  });
+
+  describe("probe through the base url", () => {
+    const opts = { dir: "", env: ENV, probe_delay_ms: 0 };
+
+    test("passes on 200 with matching bytes, preferring entry.client", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "other");
+      await writeFile(path.join(dir, "entry.client-9f.js"), "boot");
+      const urls: string[] = [];
+      serve({
+        get: (url) => {
+          urls.push(url);
+          return served("boot", "text/javascript; charset=utf-8");
+        },
+      });
+      await upload_client_assets(BASE, { ...opts, dir });
+      expect(urls).toEqual([`${BASE}assets/entry.client-9f.js`]);
+    });
+
+    test("throws after 5 tries on 404, naming base, status and bucket", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      serve({ get: () => res(404) });
+      await expect(
+        upload_client_assets(BASE, { ...opts, dir })
+      ).rejects.toThrow(
+        /https:\/\/assets\.better\.giving\/.*"bg-platform-assets".*status 404.*5 tries/
+      );
+      expect(
+        fetch_mock.mock.calls.filter(([r]) => typeof r === "string")
+      ).toHaveLength(5);
+    });
+
+    test("throws on a byte mismatch", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      serve({ get: () => served("not x", "text/javascript") });
+      await expect(
+        upload_client_assets(BASE, { ...opts, dir })
+      ).rejects.toThrow(/bytes differ/);
+    });
+
+    test("throws on a content-type mismatch", async () => {
+      await writeFile(path.join(dir, "a-1.js"), "x");
+      serve({ get: () => served("x", "application/octet-stream") });
+      await expect(
+        upload_client_assets(BASE, { ...opts, dir })
+      ).rejects.toThrow(/content-type "application\/octet-stream"/);
+    });
   });
 
   test("an unknown extension throws before any request", async () => {

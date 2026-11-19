@@ -35,6 +35,8 @@ import { AwsClient } from "aws4fetch";
 const BLOB_HOST = ".blob.vercel-storage.com";
 const CONCURRENCY = 12;
 const IMMUTABLE_MAX_AGE = 31_536_000; // 1y — hashed assets never change
+const PROBE_TRIES = 5;
+const PROBE_DELAY_MS = 2000;
 const CACHE_CONTROL = `public, max-age=${IMMUTABLE_MAX_AGE}, immutable`;
 
 const S3_KEYS = [
@@ -106,7 +108,7 @@ function r2_from_env(env: Env): R2 {
 
 export async function upload_client_assets(
   asset_base_url: string,
-  opts: { dir?: string; env?: Env } = {}
+  opts: { dir?: string; env?: Env; probe_delay_ms?: number } = {}
 ) {
   const dir = opts.dir ?? path.resolve("build/client/assets");
   const env = opts.env ?? process.env;
@@ -141,8 +143,65 @@ export async function upload_client_assets(
       })
     );
   }
+  if (r2) {
+    await probe_base(
+      asset_base_url,
+      r2.bucket,
+      dir,
+      probe_rel(rel_paths),
+      opts.probe_delay_ms ?? PROBE_DELAY_MS
+    );
+  }
   console.log(
     `[upload-client-assets] ${r2 ? "r2" : "blob"}: ${uploaded} uploaded, ${skipped} already present`
+  );
+}
+
+const probe_rel = (rel_paths: string[]) =>
+  rel_paths.find((r) => /^entry\.client-.*\.js$/.test(path.basename(r))) ??
+  rel_paths[0];
+
+// the upload goes to the S3 endpoint and the html reads ASSET_BASE_URL; nothing
+// ties the two together, so a wrong bucket (preview keys with the prod base, a
+// typo) uploads fine and ships html whose every asset 404s. fetch one file back
+// through the public base — status, content type and bytes — and throw so the
+// previous deployment stays live. plain unsigned fetch: this is the url a
+// browser uses. the file was just uploaded or confirmed present by HEAD, and
+// names are content-hashed, so a name this build introduces was never requested
+// before and no cache can hold a stale 404 for it. retries cover a fresh custom
+// domain that lags.
+async function probe_base(
+  base: string,
+  bucket: string,
+  dir: string,
+  rel: string | undefined,
+  delay_ms: number
+) {
+  if (!rel) return;
+  const url = `${base}assets/${rel.split(path.sep).join("/")}`;
+  const want_type = content_type(rel);
+  const want = await readFile(path.join(dir, rel));
+  let why = "";
+  for (let i = 1; i <= PROBE_TRIES; i++) {
+    try {
+      const res = await fetch(url);
+      const got_type = (res.headers.get("content-type") ?? "")
+        .split(";")[0]
+        .trim()
+        .toLowerCase();
+      if (res.status !== 200) why = `status ${res.status}`;
+      else if (got_type !== want_type) {
+        why = `content-type "${got_type}", expected "${want_type}"`;
+      } else if (Buffer.compare(Buffer.from(await res.arrayBuffer()), want)) {
+        why = "bytes differ from the uploaded file";
+      } else return;
+    } catch (err) {
+      why = `fetch failed: ${err instanceof Error ? err.message : err}`;
+    }
+    if (i < PROBE_TRIES) await new Promise((r) => setTimeout(r, delay_ms));
+  }
+  throw new Error(
+    `[upload-client-assets] ASSET_BASE_URL ${base} does not serve what was uploaded to R2 bucket "${bucket}": ${url} gave ${why} after ${PROBE_TRIES} tries`
   );
 }
 
