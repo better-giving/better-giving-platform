@@ -91,7 +91,9 @@ function plan_for(
   npo_id: number,
   o: {
     payout?: "pending" | "settled" | null;
-    commission?: { status: "pending" | "processing" | "paid" } | null;
+    commission?: {
+      status: "pending" | "processing" | "paid" | "returned";
+    } | null;
     alloc?: { liq: number; lock: number; cash: number };
     amount?: number;
     fees?: { base: number; fsa: number; processing: number };
@@ -230,7 +232,9 @@ describe("apply_refund_plan lock order", () => {
 });
 
 describe("apply_refund_plan commission_status", () => {
-  async function seed_commission(status: "pending" | "processing" | "paid") {
+  async function seed_commission(
+    status: "pending" | "processing" | "paid" | "returned"
+  ) {
     const [npo] = await test_db.db
       .insert(npos)
       .values({
@@ -329,6 +333,29 @@ describe("apply_refund_plan commission_status", () => {
     expect(await owed_for_donation("don-1", as_db(test_db.db))).toEqual([
       referrer_row,
     ]);
+  });
+
+  // its transfer came back, so the referrer never had the money; a ref left on
+  // it would read as a transfer that paid it
+  test("a returned commission is marked refunded, its ref cleared, owed by nobody", async () => {
+    const npo_id = await seed_commission("returned");
+
+    const res = await apply_refund_plan(
+      as_db(test_db.db),
+      plan_for(npo_id, { payout: null, commission: { status: "returned" } }),
+      SRC
+    );
+
+    const [row] = await test_db.db
+      .select({
+        status: referrer_commissions.status,
+        ref: referrer_commissions.ref,
+      })
+      .from(referrer_commissions);
+    expect(row).toEqual({ status: "refunded", ref: null });
+    expect(res.commission_in_flight).toBeUndefined();
+    expect(res.owed).toEqual([]);
+    expect(await owed_for_donation("don-1", as_db(test_db.db))).toEqual([]);
   });
 });
 
@@ -447,5 +474,43 @@ describe("apply_refund_plan savings shortfall beside a cash payout", () => {
     expect(await npo_cash(npo_id)).toBe(100);
     const [owed] = await owed_for_donation("don-1", as_db(test_db.db));
     expect(owed).toMatchObject({ received_usd: 100, outstanding_usd: 102 });
+  });
+
+  test("a returned commission on a loss is refunded_loss with no ref, and only the npo owes", async () => {
+    const npo_id = await seed_payout("settled");
+    await seed_donation();
+    await test_db.db
+      .update(npos)
+      .set({ referral_id: "NPO-REF" })
+      .where(eq(npos.id, npo_id));
+    await test_db.db.insert(referrer_commissions).values({
+      referrer_npo: "NPO-REF",
+      date: "2026-09-01T00:00:00.000Z",
+      donation_id: "dist-1",
+      npo_id,
+      amount: 5,
+      status: "returned",
+      ref: "ref-1",
+    });
+    const plan = plan_for(npo_id, {
+      payout: "settled",
+      alloc: { liq: 50, lock: 0, cash: 50 },
+      amount: 110,
+      fees: { base: 5, fsa: 3, processing: 2 },
+      bal: { liq: 10, lock_units: 0, cash: 100 },
+      commission: { status: "returned" },
+    });
+
+    await apply_refund_plan(as_db(test_db.db), plan, SRC);
+
+    const [row] = await test_db.db
+      .select({
+        status: referrer_commissions.status,
+        ref: referrer_commissions.ref,
+      })
+      .from(referrer_commissions);
+    expect(row).toEqual({ status: "refunded_loss", ref: null });
+    const owed = await owed_for_donation("don-1", as_db(test_db.db));
+    expect(owed).toEqual([expect.objectContaining({ npo_id })]);
   });
 });

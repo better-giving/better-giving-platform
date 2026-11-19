@@ -5,18 +5,21 @@ import {
   Content as HoverContent,
 } from "@better-giving/ui/hover-card";
 import { Arrow, Content } from "@better-giving/ui/tooltip";
+import { format } from "date-fns";
 import {
   ArrowDownToLineIcon,
   ArrowLeftRightIcon,
   ArrowUpFromLineIcon,
 } from "lucide-react";
-import { NavLink } from "react-router";
+import { Link, NavLink } from "react-router";
 import { Cell, Pie, PieChart } from "recharts";
+import { WarningCallout } from "#/components/warning-callout";
 import { category_colors } from "#/pages/admin/ticker-category-colors";
 import { use_admin_data } from "#/pages/admin/use-admin-data";
 import type { TickerCategory } from "@/nav/interfaces";
 import { group_by_category } from "@/nav/interfaces";
 import { min_payout_amount } from "@/npo/schema";
+import type { IReturnedPayouts } from "$/pg/queries/payout";
 import type { DashboardData } from "./api";
 import { GrantsTable } from "./common/grants-table";
 import { PayoutsTable } from "./common/payouts-table";
@@ -33,6 +36,24 @@ export function Loaded({ classes = "", ...props }: Props) {
 
   return (
     <div className={classes}>
+      {/* one notice at a time: awaiting repair, then charged back, then
+          returned (with any bounced beside it), then bounced */}
+      {props.awaiting_repair ? (
+        <AwaitingNotice {...props.awaiting_repair} classes="mb-4" />
+      ) : props.charged_back ? (
+        <ChargedBackNotice {...props.charged_back} classes="mb-4" />
+      ) : props.returned ? (
+        <ReturnedNotice
+          returned={props.returned}
+          bounced={props.bounced}
+          classes="mb-4"
+        />
+      ) : (
+        props.bounced &&
+        props.bounce_hold && (
+          <BouncedNotice bounced={props.bounced} classes="mb-4" />
+        )
+      )}
       <div className="grid gap-4 @lg:grid-cols-2">
         <Figure
           title="Savings"
@@ -153,16 +174,25 @@ export function Loaded({ classes = "", ...props }: Props) {
 
           {/* no bank: what is held is news before any payout exists */}
           {(props.recent_payouts.items.length > 0 ||
-            props.payout_to.kind !== "bank") && (
-            <Payout
-              next_payout={props.next_payout}
-              bal_cash={props.bal_cash}
-              threshold={payout_min}
-              to={props.payout_to}
-              bank_pending={props.bank_pending}
-              classes=""
-            />
-          )}
+            props.payout_to.kind !== "bank") &&
+            (props.payout_to.kind === "bank" && props.charged_back ? (
+              <ChargedBackHold />
+            ) : props.payout_to.kind === "bank" &&
+              ((props.return_hold && !props.bounce_hold) ||
+                (props.bounce_hold && props.returned)) ? (
+              <ReturnHold />
+            ) : props.payout_to.kind === "bank" && props.bounce_hold ? (
+              <BounceHold count={props.bounced?.count ?? 1} />
+            ) : (
+              <Payout
+                next_payout={props.next_payout}
+                bal_cash={props.bal_cash}
+                threshold={payout_min}
+                to={props.payout_to}
+                bank_pending={props.bank_pending}
+                classes=""
+              />
+            ))}
         </section>
 
         <section className="card">
@@ -183,5 +213,150 @@ export function Loaded({ classes = "", ...props }: Props) {
         </section>
       </div>
     </div>
+  );
+}
+
+interface IReturnedNotice {
+  returned: IReturnedPayouts;
+  /** payouts still on their way back: the one notice counts them too */
+  bounced?: IReturnedPayouts | null;
+  classes?: string;
+}
+
+function ReturnedNotice({ returned, bounced, classes = "" }: IReturnedNotice) {
+  const total = to_usd(returned.total + (bounced?.total ?? 0), 2);
+  return (
+    <WarningCallout
+      title="Your bank sent a payout back"
+      classes={classes}
+      action={
+        <Link to="../banking" className="btn btn-primary btn-sm">
+          Update bank details
+        </Link>
+      }
+    >
+      {bounced
+        ? `${returned.count + bounced.count} payouts (${total}) didn't reach your bank account: ${returned.count} back in your balance and ${bounced.count} still on the way back. Update your bank details, and they go out again once the new ones are approved.`
+        : returned.count === 1
+          ? `${total} from ${format(returned.latest_date, "MMM d")} didn't reach your bank account, so it's back in your balance. Update your bank details, and it goes out again once the new ones are approved.`
+          : `${returned.count} payouts (${total}) didn't reach your bank account, so they're back in your balance. Update your bank details, and they go out again once the new ones are approved.`}
+    </WarningCallout>
+  );
+}
+
+interface IBouncedNotice {
+  bounced: IReturnedPayouts;
+  classes?: string;
+}
+
+/** wise reports a transfer bounced: the npo is held, and the bank may still be fixed */
+function BouncedNotice({ bounced, classes = "" }: IBouncedNotice) {
+  const total = to_usd(bounced.total, 2);
+  return (
+    <WarningCallout
+      title="Your bank didn't accept a payout"
+      classes={classes}
+      action={
+        <Link to="../banking" className="btn btn-primary btn-sm">
+          Check bank details
+        </Link>
+      }
+    >
+      {bounced.count === 1
+        ? `${total} from ${format(bounced.latest_date, "MMM d")} couldn't be delivered to your bank account and is on its way back to your balance. Check your bank details and update them if they're wrong.`
+        : `${bounced.count} payouts (${total}) couldn't be delivered to your bank account and are on their way back to your balance. Check your bank details and update them if they're wrong.`}
+    </WarningCallout>
+  );
+}
+
+interface IAwaitingNotice {
+  amount: number;
+  date: string;
+  classes?: string;
+}
+
+/** a transfer came back and which donations it covered is still being checked */
+export function AwaitingNotice({
+  amount,
+  date,
+  classes = "",
+}: IAwaitingNotice) {
+  return (
+    <WarningCallout
+      title="Your bank sent a payout back"
+      classes={classes}
+      action={
+        <Link to="../banking" className="btn btn-primary btn-sm">
+          Update bank details
+        </Link>
+      }
+    >
+      {`${to_usd(amount, 2)} from ${format(date, "MMM d")} didn't reach your bank account. We're checking which donations it covered and will add them back to your balance. Payouts are paused until you update your bank details and the new ones are approved.`}
+    </WarningCallout>
+  );
+}
+
+interface IBounceHold {
+  count: number;
+}
+
+/** a bounce is open: payouts wait on how it resolves, which needs nothing new approved yet */
+function BounceHold({ count }: IBounceHold) {
+  return (
+    <p className="text-sm">
+      {count === 1
+        ? "Payouts are paused while this payout comes back to your balance."
+        : "Payouts are paused while these payouts come back to your balance."}{" "}
+      Donations wait in your Better Giving balance. Nothing is lost.
+    </p>
+  );
+}
+
+/** the transfer was reversed for good: the money is not accounted for, so no "nothing is lost" */
+function ChargedBackHold() {
+  return (
+    <p className="text-sm">
+      Payouts are on hold until you add a different{" "}
+      <Link to="../banking" className="link font-medium">
+        bank account
+      </Link>{" "}
+      and it's approved. Donations wait in your Better Giving balance.
+    </p>
+  );
+}
+
+interface IChargedBackNotice {
+  amount: number;
+  date: string;
+  classes?: string;
+}
+
+/** a transfer was reversed after it was sent: nothing is credited, and ops sorts it out by hand */
+function ChargedBackNotice({ amount, date, classes = "" }: IChargedBackNotice) {
+  return (
+    <WarningCallout
+      title="A payout was reversed"
+      classes={classes}
+      action={
+        <Link to="../banking" className="btn btn-primary btn-sm">
+          Add bank account
+        </Link>
+      }
+    >
+      {`${to_usd(amount, 2)} from ${format(date, "MMM d")} was reversed after it was sent, and it hasn't come back to your balance. We're sorting it out by hand. Payouts stay paused until you add a different bank account and it's approved.`}
+    </WarningCallout>
+  );
+}
+
+function ReturnHold() {
+  return (
+    <p className="text-sm">
+      Payouts are on hold until your{" "}
+      <Link to="../banking" className="link font-medium">
+        new bank details
+      </Link>{" "}
+      are approved. Donations wait in your Better Giving balance. Nothing is
+      lost.
+    </p>
   );
 }

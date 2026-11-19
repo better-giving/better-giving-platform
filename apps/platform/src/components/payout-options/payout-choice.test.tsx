@@ -3,6 +3,7 @@ import { createRoutesStub } from "react-router";
 import { describe, expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
+import { doc_href } from "@/docs";
 import type { TConnectStatus } from "@/stripe-connect/readiness";
 import { BankRequired } from "./bank-required";
 import { type IPayoutChoice, PayoutChoice } from "./payout-choice";
@@ -693,7 +694,7 @@ describe("SavedBank", () => {
     const screen = await render(
       <SavedBank
         account_id="acct-77"
-        statement_href="https://example.com/s.pdf"
+        statement_ref="https://example.com/s.pdf"
         onChange={onChange}
       />
     );
@@ -702,7 +703,7 @@ describe("SavedBank", () => {
     await expect.element(screen.getByText("acct-77")).toBeVisible();
     await expect
       .element(screen.getByRole("link", { name: "Bank statement" }))
-      .toHaveAttribute("href", "https://example.com/s.pdf");
+      .toHaveAttribute("href", doc_href("https://example.com/s.pdf"));
     // the heading already says it: no "Bank payout:" lead-in
     await expect
       .element(
@@ -716,5 +717,14 @@ describe("SavedBank", () => {
       .toBeVisible();
     await screen.getByRole("button", { name: "Change" }).click();
     expect(onChange).toHaveBeenCalledOnce();
+  });
+
+  test("offers no statement link when none is on file", async () => {
+    const screen = await render(
+      <SavedBank account_id="acct-77" statement_ref="" onChange={vi.fn()} />
+    );
+    const card = screen.getByRole("region", { name: "Bank payout" });
+    await expect.element(card.getByText("acct-77")).toBeVisible();
+    await expect.element(card.getByRole("link")).not.toBeInTheDocument();
   });
 });

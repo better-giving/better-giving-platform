@@ -5,9 +5,11 @@
    so a button sitting beside a field cannot drift from it.
    `.field-input` pins itself to it below, which is a no-op today and the point:
    change this and the field follows, instead of the arithmetic silently
-   disagreeing. */
+   disagreeing. it is the field's own sum, not a multiple of the base: 14px
+   padding twice, the 20px line and the 1px edge twice, so it stays the
+   input's height when --spacing is not 4px. */
 :root {
-  --field-size: calc(var(--spacing) * 12.5) /* 50px */;
+  --field-size: calc(var(--spacing) * 12 + 2px) /* 50px */;
 }
 
 @layer components {
@@ -16,21 +18,47 @@
      @utility so they are variant-capable (`xl:btn-lg`) and win this layer.
      radius is var(--radius) (6px), the control corner of the two (a
      container's is --radius-card); an integer step, since a fractional corner
-     shows against .btn-secondary's 1px edge. */
+     shows against .btn-secondary's 1px edge.
+     every variant has an edge, transparent where none shows, and the tiers
+     take its width, --btn-edge, back out of padding-block, so every variant
+     of a tier is the tier's height (36px here) whatever its edge: buttons side
+     by side line up, and with the btn-icon square. in forced colors the
+     transparent edge is drawn, so a filled button keeps its boundary.
+     hover and press colors move at the control speed; the reduced-motion
+     guard on the speed ladder collapses it. */
   .btn {
     display: flex;
-    justify-content: center;
-    align-items: center;
+    justify-content: safe center;
+    align-items: safe center;
     font-weight: 700;
     /* published for btn-icon, which squares a button on its tier's own height.
        bare .btn carries no tier class, so the md value has to live here too. */
     --btn-size: calc(var(--spacing) * 9) /* 36px */;
-    padding-block: calc(var(--spacing) * 2);
+    --btn-edge: 1px;
+    border: var(--btn-edge) solid transparent;
+    padding-block: calc(var(--spacing) * 2 - var(--btn-edge));
     padding-inline: calc(var(--spacing) * 6);
     font-size: var(--text-sm) /* 0.875rem = 14px */;
     line-height: var(--tw-leading, var(--text-sm--line-height));
     min-block-size: var(--btn-size);
     border-radius: var(--radius);
+    /* the containing block for btn-sm's coarse hit area. here, not on the
+       tier: a caller's `absolute` (utilities layer) has to win it, and is a
+       containing block all the same. */
+    position: relative;
+    transition-property: color, background-color, border-color;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out);
+    /* an icon beside the label: the tiers in utilities.css restate both for
+       sm and lg. the icon size is a variable so a size class on the icon
+       itself (utilities layer) still wins. */
+    --btn-icon: calc(var(--spacing) * 4) /* 16px */;
+    gap: calc(var(--spacing) * 2);
+    & > svg {
+      flex: none;
+      inline-size: var(--btn-icon);
+      block-size: var(--btn-icon);
+    }
   }
 
   /* the neutral control on radix's roles: steps 3 / 4 / 5 are its fill at
@@ -42,9 +70,11 @@
     background-color: var(--gray-3);
     color: var(--gray-12);
     border: 1px solid var(--gray-7);
-    &:hover:not(:disabled):not([aria-disabled="true"]) {
-      background-color: var(--gray-4);
-      border-color: var(--gray-8);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: var(--gray-4);
+        border-color: var(--gray-8);
+      }
     }
     /* same specificity as the hover and after it, so a press reads over a
        hover rather than under it. */
@@ -58,8 +88,10 @@
   .btn-ghost {
     background-color: transparent;
     color: inherit;
-    &:hover:not(:disabled):not([aria-disabled="true"]) {
-      background-color: var(--gray-4);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: var(--gray-4);
+      }
     }
     &:active:not(:disabled):not([aria-disabled="true"]) {
       background-color: var(--gray-5);
@@ -67,6 +99,23 @@
     &:disabled {
       background-color: var(--gray-3);
       color: var(--gray-11);
+    }
+  }
+
+  /* the neutral rank between ghost and secondary, for toolbars and row
+     actions: secondary's 3 / 4 / 5 fill with no visible edge. no solid fill,
+     so no press nudge. disabled keeps the rest fill and drops the ink to 11,
+     in the shared blocks below. */
+  .btn-soft {
+    background-color: var(--gray-3);
+    color: var(--gray-12);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: var(--gray-4);
+      }
+    }
+    &:active:not(:disabled):not([aria-disabled="true"]) {
+      background-color: var(--gray-5);
     }
   }
 
@@ -82,8 +131,10 @@
       background-color: var(--primary-hover);
       transform: translateY(1px);
     }
-    &:hover:not(:disabled):not([aria-disabled="true"]) {
-      background-color: var(--primary-hover);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: var(--primary-hover);
+      }
     }
   }
 
@@ -94,8 +145,30 @@
       background-color: var(--destructive-hover);
       transform: translateY(1px);
     }
-    &:hover:not(:disabled):not([aria-disabled="true"]) {
-      background-color: var(--destructive-hover);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: var(--destructive-hover);
+      }
+    }
+  }
+
+  /* the destructive action that opens a confirm step, beside secondary
+     buttons; the solid .btn-destructive stays for the confirm itself. it has no
+     solid fill, so no press nudge: the press is a third rung,
+     --destructive-subtle-active. the edge goes to --gray-7 off and in flight,
+     below the shared disabled blocks, so a dead control doesn't read as live. */
+  .btn-destructive-outline {
+    background-color: transparent;
+    color: var(--destructive-subtle-fg);
+    border: 1px solid var(--destructive);
+    /* a tap opens the confirm and leaves `:hover` on the button under it */
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: var(--destructive-subtle);
+      }
+    }
+    &:active:not(:disabled):not([aria-disabled="true"]) {
+      background-color: var(--destructive-subtle-active);
     }
   }
 
@@ -106,8 +179,10 @@
       background-color: var(--success-hover);
       transform: translateY(1px);
     }
-    &:hover:not(:disabled):not([aria-disabled="true"]) {
-      background-color: var(--success-hover);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: var(--success-hover);
+      }
     }
   }
 
@@ -118,19 +193,31 @@
       background-color: var(--warning-hover);
       transform: translateY(1px);
     }
-    &:hover:not(:disabled):not([aria-disabled="true"]) {
-      background-color: var(--warning-hover);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: var(--warning-hover);
+      }
     }
   }
 
-  /* the filled button on a brand fill: --primary on --primary (or on
-     --primary-deep) is no button at all, so it inverts to the fill's own ink.
-     no hover rung — the --primary-fg alpha ladder is unmeasured
-     (design-system.md, "--primary-fg alpha steps") — so it keeps only the
-     filled variants' press. its ring is below the shared one. */
+  /* the filled button on a --primary fill: --primary on --primary is no
+     button at all, so it inverts to the fill's own ink. the --primary-deep
+     ground takes .btn-inverse-deep below, not this one.
+     no hover rung — the --primary-fg alpha ladder is unmeasured,
+     so it keeps only the filled variants' press. its ring is below the shared one. */
   .btn-inverse {
     background-color: var(--primary-fg);
     color: var(--primary);
+    &:active {
+      transform: translateY(1px);
+    }
+  }
+
+  /* the same inversion on the deep ground: --primary-deep-fg (step 1) fills it
+     and --primary-deep (step 12) is the label, in light and in dark. */
+  .btn-inverse-deep {
+    background-color: var(--primary-deep-fg);
+    color: var(--primary-deep);
     &:active {
       transform: translateY(1px);
     }
@@ -152,23 +239,28 @@
   .btn-outline {
     background-color: transparent;
     color: inherit;
-    border: 2px solid color-mix(in oklab, currentColor 40%, transparent);
-    &:hover:not(:disabled):not([aria-disabled="true"]) {
-      background-color: color-mix(in oklab, currentColor 10%, transparent);
+    --btn-edge: 2px;
+    border: var(--btn-edge) solid
+      color-mix(in oklab, currentColor 40%, transparent);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: color-mix(in oklab, currentColor 10%, transparent);
+      }
     }
-    &:active {
+    /* the hover's specificity and after it, so a mouse press reads over it */
+    &:active:not(:disabled):not([aria-disabled="true"]) {
       background-color: color-mix(in oklab, currentColor 15%, transparent);
     }
   }
 
-  /* one focus indicator for every variant. the per-variant outline colors this
-     replaces were tints of the button's own fill and were invisible against it;
-     one ring for every variant is the fix, and the offset is what makes it
-     work rather than the color. --ring is the ramp's step 8, Lc 44.6 against
-     the page — clear of the Lc 30 a focus indicator needs, taken as radix
-     assigns it. on a .btn-primary fill it measures Lc 30.0, on that line and
-     not over it, which is why the offset stays and why a
-     --primary-filled panel still scopes with `surface-primary`. */
+  /* one focus indicator for every variant: a ring tinted from the button's own
+     fill would vanish against it, so the offset does the work, not the color.
+     --ring is the ramp's step 8 in light and dark, taken as radix assigns it:
+     Lc 44.6 against the light page, clear of the Lc 30 a focus indicator
+     needs, and under it in dark (a named miss in the brand ledger). on a light
+     .btn-primary fill it measures Lc 30.0, on that line and not over it, which
+     is why the offset stays and why a --primary-filled panel still scopes with
+     `surface-primary`. */
   .btn,
   .btn-sm,
   .btn-md,
@@ -176,10 +268,12 @@
   .btn-ghost,
   .btn-outline,
   .btn-secondary,
+  .btn-soft,
   .btn-success,
   .btn-primary,
   .btn-warning,
-  .btn-destructive {
+  .btn-destructive,
+  .btn-destructive-outline {
     &:focus-visible {
       outline: 2px solid var(--ring);
       outline-offset: 2px;
@@ -187,18 +281,26 @@
   }
 
   /* the inverse button's ring is --primary-ring whatever scope it sits in: the
-     offset puts the ring on the brand fill around it, where --ring (blue-8)
-     does not read. after the shared ring, so it wins at equal specificity. */
+     offset puts the ring on the brand fill around it, where --ring (accent-8)
+     does not read. after the shared ring, so it wins at equal
+     specificity. */
   .btn-inverse:focus-visible {
     outline-color: var(--primary-ring);
+  }
+  .btn-inverse-deep:focus-visible {
+    outline-color: var(--primary-deep-fg);
   }
 
   .btn-outline,
   .btn-secondary,
+  .btn-soft,
   .btn-success,
   .btn-primary,
   .btn-warning,
-  .btn-destructive {
+  .btn-destructive,
+  .btn-destructive-outline,
+  .btn-inverse,
+  .btn-inverse-deep {
     &:disabled {
       background-color: var(--gray-3);
       color: var(--gray-11);
@@ -213,16 +315,22 @@
      and both element forms.
      `pointer-events: none` because the state is set by the component rather
      than by the element's own `:disabled`, which would stop the click itself.
-     nothing here is reachable at rest: `.pending` is a class the component
-     writes only while a submission is in flight. */
+     nothing here is reachable at rest: the component writes `.pending` and
+     `aria-busy="true"` only while a submission is in flight. the attribute
+     is the one button-css keys its busy look off, so hand-written markup
+     takes the same look in either sheet. */
   .btn-primary,
   .btn-secondary,
   .btn-ghost,
+  .btn-soft,
   .btn-outline,
   .btn-destructive,
+  .btn-destructive-outline,
   .btn-success,
-  .btn-warning {
-    &.pending {
+  .btn-warning,
+  .btn-inverse,
+  .btn-inverse-deep {
+    &:is(.pending, [aria-busy="true"]) {
       background-color: var(--gray-3);
       color: var(--gray-11);
       pointer-events: none;
@@ -234,16 +342,119 @@
   a.btn-success,
   a.btn-primary,
   a.btn-ghost,
+  a.btn-soft,
   a.btn-outline,
-  a.btn-destructive {
+  a.btn-destructive,
+  a.btn-destructive-outline,
+  a.btn-inverse,
+  a.btn-inverse-deep {
     &[aria-disabled="true"] {
       background-color: var(--gray-3);
       color: var(--gray-11);
     }
   }
 
+  /* aria-disabled on a <button>: the disabled link's look on a control that
+     stays focusable and keeps its pointer events, so a tooltip saying why it
+     is off still opens on it. the component blocks the activation. :active
+     still matches here, so the filled variants' press nudge comes off. */
+  .btn:is(button)[aria-disabled="true"] {
+    background-color: var(--gray-3);
+    color: var(--gray-11);
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-destructive-outline {
+    /* biome-ignore lint/style/noDescendingSpecificity: the edge only, beside the a.btn-* fill */
+    &[aria-disabled="true"],
+    &:disabled,
+    &:is(.pending, [aria-busy="true"]) {
+      border-color: var(--gray-7);
+    }
+  }
+
+  /* the states below each take the not-off guard as three chained :not()s,
+     as the hover and press rules do: at their specificity plus the state's
+     attribute, a held state outranks the hover and press under it. */
+
+  /* held open: while the menu or popover the button controls is open it holds
+     its own pressed rung, with no press nudge, and its chevron turns. */
+  .btn-secondary,
+  .btn-ghost,
+  .btn-soft {
+    &[aria-expanded="true"]:not(:disabled):not([aria-disabled="true"]):not(
+        :is(.pending, [aria-busy="true"])
+      ) {
+      background-color: var(--gray-5);
+    }
+  }
+  .btn-primary[aria-expanded="true"]:not(:disabled):not(
+    [aria-disabled="true"]
+  ):not(:is(.pending, [aria-busy="true"])) {
+    background-color: var(--primary-hover);
+  }
+  .btn-outline[aria-expanded="true"]:not(:disabled):not(
+    [aria-disabled="true"]
+  ):not(:is(.pending, [aria-busy="true"])) {
+    background-color: color-mix(in oklab, currentColor 15%, transparent);
+  }
+  .btn-destructive-outline[aria-expanded="true"]:not(:disabled):not(
+    [aria-disabled="true"]
+  ):not(:is(.pending, [aria-busy="true"])) {
+    background-color: var(--destructive-subtle-active);
+  }
+  /* --duration-fast collapses under reduced motion, so the turn does too */
+  .btn-chevron {
+    transition: transform var(--duration-fast) var(--ease-in-out);
+  }
+  .btn[aria-expanded="true"] > .btn-chevron {
+    transform: rotate(180deg);
+  }
+
+  /* a toggle that is on (aria-pressed="true") takes the tinted selected rung,
+     the one a selected option takes: accent 5 fill, accent 12 ink. the bordered
+     toggle also tints its edge, 7 at rest and 8 under the pointer. off, it is
+     the plain button. */
+  .btn-secondary,
+  .btn-soft,
+  .btn-ghost {
+    &[aria-pressed="true"]:not(:disabled):not([aria-disabled="true"]):not(
+        :is(.pending, [aria-busy="true"])
+      ) {
+      background-color: var(--secondary-active);
+      color: var(--accent-12);
+    }
+  }
+  .btn-secondary[aria-pressed="true"]:not(:disabled):not(
+    [aria-disabled="true"]
+  ):not(:is(.pending, [aria-busy="true"])) {
+    border-color: var(--accent-7);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .btn-secondary[aria-pressed="true"]:hover:not(:disabled):not(
+        [aria-disabled="true"]
+      ):not(:is(.pending, [aria-busy="true"])) {
+      border-color: var(--accent-8);
+    }
+  }
+
+  /* done: the work succeeded, and the button says so for a moment (useDone
+     holds it 2000ms) before it returns to rest. the success tint, not the
+     in-flight gray, and no edge. inert to the pointer, so a second click
+     cannot land while it shows, but still focusable; the Button component
+     stops the keyboard's Enter and Space as well. */
+  .btn[data-done="true"]:not(:disabled):not([aria-disabled="true"]):not(
+    :is(.pending, [aria-busy="true"])
+  ) {
+    background-color: var(--success-subtle);
+    color: var(--success-subtle-fg);
+    border-color: transparent;
+    pointer-events: none;
+  }
+
   .field-input {
-    width: 100%;
+    inline-size: 100%;
     border-radius: var(--radius);
     font-size: var(--text-sm) /* 0.875rem = 14px */;
     line-height: var(
@@ -253,45 +464,82 @@
     background-color: var(--surface);
     padding: calc(var(--spacing) * 3.5) calc(var(--spacing) * 4);
     min-block-size: var(--field-size);
-    /* --input, radix's interactive-border step 7 (under 1.4.11's 3:1 by PM
-       decision, packages/brand/src/colors.css). the hover leaves an invalid
+    /* --input, radix's interactive-border step 7 (under the APCA ledger's Lc 30
+       for a non-text part, an accepted miss recorded in
+       packages/brand/src/colors.css). the hover leaves an invalid
        field's destructive edge alone. */
     border: 1px solid var(--input);
     outline-color: var(--ring);
     color: var(--gray-12);
 
-    &:hover:not(
-        :disabled,
-        [readonly],
-        [aria-disabled="true"],
-        :user-invalid,
-        [aria-invalid="true"]
-      ) {
-      border-color: var(--input-hover);
+    /* a textarea is inline-block on its line's baseline, so the line box runs
+       past its bottom edge and the field grows by that strip; as a block it
+       is its own box. an <input> keeps its display */
+    &:where(textarea) {
+      display: block;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(
+          :disabled,
+          [readonly],
+          [aria-disabled="true"],
+          :user-invalid:not([data-manual-invalid]),
+          [aria-invalid="true"]
+        ) {
+        border-color: var(--input-hover);
+      }
     }
 
     &::placeholder {
       color: var(--gray-11);
     }
+    /* the house ring: 2px of --ring, 2px out. a text field matches
+       :focus-visible on a click too, so a pointer user sees it as well. */
+    &:focus-visible {
+      outline: 2px solid var(--ring);
+      outline-offset: 2px;
+    }
+    /* biome-ignore lint/style/noDescendingSpecificity: unrelated to a.btn-* selectors */
+    &[aria-disabled="true"],
+    &:disabled {
+      pointer-events: none;
+    }
+    /* read-only is muted like disabled but stays selectable and copyable: it
+       takes pointer events, text selection and focus, and keeps the text
+       cursor. only the hover edge is withheld, above. */
     /* biome-ignore lint/style/noDescendingSpecificity: unrelated to a.btn-* selectors */
     &[aria-disabled="true"],
     &[readonly],
     &:disabled {
-      pointer-events: none;
       background-color: var(--gray-3);
       color: var(--gray-11);
     }
 
     /* :user-invalid, never :invalid — :invalid paints every required-but-empty
-       field destructive on first paint, before the field has been touched. */
-    &:user-invalid,
+       field destructive on first paint, before the field has been touched.
+       data-manual-invalid opts a field out of :user-invalid: the browser's
+       constraint is not its rule (a money value it rounds), so it says
+       aria-invalid itself. */
+    &:user-invalid:not([data-manual-invalid]),
     &[aria-invalid="true"] {
       @apply border-destructive;
     }
   }
 
+  /* a key, secret or id. read-only keeps the muted fill but takes full ink:
+     the value is what the reader came to read and copy. */
+  .field-input-mono {
+    font-family: var(--font-mono);
+    font-variant-ligatures: none;
+    text-overflow: ellipsis;
+    &[readonly]:not(:disabled, [aria-disabled="true"]) {
+      color: var(--gray-12);
+    }
+  }
+
   .field-input-container {
-    width: 100%;
+    inline-size: 100%;
     border-radius: var(--radius);
     font-size: var(--text-sm) /* 0.875rem = 14px */;
     line-height: var(
@@ -302,50 +550,131 @@
     border: 1px solid var(--input);
     color: var(--gray-12);
 
-    &:hover:not(
-        :has(
-          input:disabled,
-          input[readonly],
-          input[aria-disabled="true"],
-          input:user-invalid,
-          input[aria-invalid="true"]
-        )
-      ) {
-      border-color: var(--input-hover);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(
+          :has(
+            input:disabled,
+            input[readonly],
+            input[aria-disabled="true"],
+            input:user-invalid:not([data-manual-invalid]),
+            input[aria-invalid="true"]
+          )
+        ) {
+        border-color: var(--input-hover);
+      }
     }
 
-    &:has(input:focus) {
-      outline: solid;
-      outline-width: 2px;
-      outline-color: var(--ring);
+    /* the input's ring, drawn on the container that holds its edge */
+    &:has(input:focus-visible) {
+      outline: 2px solid var(--ring);
+      outline-offset: 2px;
     }
 
-    &:has(input::placeholder) {
-      color: var(--gray-11);
+    &:has(input[aria-disabled="true"]),
+    &:has(input:disabled) {
+      pointer-events: none;
     }
+    /* read-only: muted, but the input inside stays selectable and copyable */
     &:has(input[aria-disabled="true"]),
     &:has(input[readonly]),
     &:has(input:disabled) {
-      pointer-events: none;
       background-color: var(--gray-3);
       color: var(--gray-11);
     }
 
-    &:has(input:user-invalid),
+    &:has(input:user-invalid:not([data-manual-invalid])),
     &:has(input[aria-invalid="true"]) {
       @apply border-destructive;
     }
   }
 
   .field-err {
-    text-align: right;
+    text-align: start;
     font-size: var(--text-xs);
-    color: var(--destructive);
+    color: var(--destructive-subtle-fg);
+  }
+
+  /* the warning shares the error's slot and never colours the edge. the mark
+     is centred on the first line, so a wrapped message keeps it at the top. */
+  .field-warn {
+    display: flex;
+    align-items: flex-start;
+    gap: calc(var(--spacing) * 1);
+    margin-block-start: calc(var(--spacing) * 1);
+    text-align: start;
+    font-size: var(--text-xs);
+    color: var(--warning-subtle-fg);
+    /* rendered while empty, never hidden: it is a live region, and a hidden
+       one is out of the accessibility tree until its text arrives */
+    &:empty {
+      margin: 0;
+    }
+    & > svg {
+      flex: none;
+      inline-size: calc(var(--spacing) * 3);
+      block-size: calc(var(--spacing) * 3);
+      margin-block-start: calc((1lh - var(--spacing) * 3) / 2);
+    }
+  }
+
+  /* the hint under the control, below the message when one shows */
+  .field-help {
+    margin-block-start: calc(var(--spacing) * 1);
+    text-align: start;
+    font-size: var(--text-xs);
+    color: var(--gray-11);
+    overflow-wrap: break-word;
+    &:empty {
+      display: none;
+    }
+  }
+
+  /* a field whose control has buttons beside it: [control column][action]. the
+     message and the hint are inside the control column, so they sit under the
+     input and never under the row. the action keeps the control's height with
+     `btn-field`. when the row itself is under 384px — a phone-width column,
+     or any container that narrow, whatever the viewport — one button wraps
+     under the control, and the column takes the whole row so the message stays
+     under the control; two or more buttons wrap under 576px, and wrap among
+     themselves when the row is narrower than they are. the row is an
+     inline-size container, so it takes its width from its parent and never
+     from its content: inside a shrink-to-fit parent (an auto-width flex item,
+     say) give the field a width. */
+  .field-row {
+    container-type: inline-size;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: calc(var(--spacing) * 2);
+  }
+  .field-control {
+    flex: 1 1 0%;
+    min-inline-size: 0;
+    @container (width < 24rem) {
+      flex-basis: 100%;
+    }
+    &:has(+ .field-action > .btn ~ .btn) {
+      @container (width < 36rem) {
+        flex-basis: 100%;
+      }
+    }
+  }
+  .field-action {
+    display: flex;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    max-inline-size: 100%;
+    align-items: flex-start;
+    gap: calc(var(--spacing) * 2);
+    /* a done label ("Copied") is no wider than this, so the row never shifts */
+    & > [data-done] {
+      min-inline-size: calc(var(--spacing) * 32);
+    }
   }
 
   .selector-btn {
     display: flex;
-    align-items: center;
+    align-items: safe center;
     justify-content: space-between;
   }
   /* zag's select item emits data-state="checked"|"unchecked", data-highlighted
@@ -361,8 +690,119 @@
     &[data-highlighted] {
       background-color: var(--secondary-hover);
     }
-    &:hover {
-      background-color: var(--secondary-hover);
+    /* pressed: the selected step, on touch too */
+    &:active:not([data-disabled]) {
+      background-color: var(--secondary-active);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        background-color: var(--secondary-hover);
+      }
+    }
+    /* the checked row keeps step 5 under the keyboard or the pointer; zag
+       highlights the checked row on open */
+    &[data-state="checked"][data-highlighted] {
+      background-color: var(--secondary-active);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      &[data-state="checked"]:hover {
+        background-color: var(--secondary-active);
+      }
+    }
+    /* forced colors repaint both tints to Canvas, and focus stays on the
+       listbox, so the highlighted row needs a mark the palette keeps */
+    @media (forced-colors: active) {
+      &[data-highlighted] {
+        outline: 2px solid CanvasText;
+        outline-offset: -2px;
+      }
+    }
+  }
+
+  /* the two badges that carry no status, each the whole chip on its own (the
+     React badge's shape, restated): quiet is secondary metadata beside a
+     title, at 500 on the neutral fill with the softer step-11 ink; outline is
+     an ended or archived record, no fill, its edge an inset shadow so the
+     chip stays 20px tall like the filled ones. neither is a control. */
+  .badge-quiet,
+  .badge-outline {
+    display: inline-flex;
+    align-items: safe center;
+    gap: calc(var(--spacing) * 1);
+    border-radius: calc(infinity * 1px);
+    padding-inline: calc(var(--spacing) * 2.5);
+    padding-block: calc(var(--spacing) * 0.5);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+    white-space: nowrap;
+    color: var(--gray-11);
+  }
+  .badge-quiet {
+    background-color: var(--gray-3);
+    font-weight: var(--font-weight-medium);
+  }
+  .badge-outline {
+    background-color: transparent;
+    font-weight: var(--font-weight-semibold);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+  }
+
+  /* the card that starts making a new one: a link or a button on the card
+     corner, a dashed field edge and no fill. it rests on the field's edge
+     rungs (7, 8 under the pointer) and the ghost fill rungs (none, 4 hovered,
+     5 pressed); a transparent control has no solid to nudge, so no press
+     nudge. in a grid it stretches to the row; alone it keeps 96px. */
+  .card-create {
+    display: flex;
+    flex-direction: column;
+    align-items: safe center;
+    justify-content: safe center;
+    gap: calc(var(--spacing) * 2);
+    min-block-size: calc(var(--spacing) * 24) /* 96px */;
+    padding-block: calc(var(--spacing) * 5);
+    padding-inline: calc(var(--spacing) * 6);
+    border: 1px dashed var(--input);
+    border-radius: var(--radius-card);
+    background-color: transparent;
+    color: var(--gray-12);
+    font-family: var(--font-display);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition-property: color, background-color, border-color;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out);
+    & > svg {
+      flex: none;
+      inline-size: calc(var(--spacing) * 5);
+      block-size: calc(var(--spacing) * 5);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not([aria-disabled="true"]) {
+        background-color: var(--gray-4);
+        border-color: var(--input-hover);
+      }
+    }
+    /* after the hover at its specificity, so a press reads over it */
+    &:active:not([aria-disabled="true"]) {
+      background-color: var(--gray-5);
+      border-color: var(--input-hover);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--ring);
+      outline-offset: 2px;
+    }
+    /* stays focusable, so a reason beside it can be reached; the component
+       blocks the activation */
+    /* biome-ignore lint/style/noDescendingSpecificity: unrelated to a.btn-* selectors */
+    &[aria-disabled="true"] {
+      background-color: var(--gray-3);
+      border-color: var(--hairline);
+      color: var(--gray-11);
+      cursor: not-allowed;
     }
   }
 
@@ -372,7 +812,7 @@
     font-weight: var(--font-weight-medium);
     &[data-required="true"]::after {
       content: " *";
-      color: var(--destructive);
+      color: var(--destructive-subtle-fg);
     }
     &[data-required="false"]::after {
       content: " (optional)";
@@ -384,20 +824,22 @@
 
   .label-floating {
     position: absolute;
-    left: 0;
-    color: var(--ring);
+    inset-inline-start: 0;
+    /* the raised label is text, so it takes the text step 11, not --ring:
+       the light ring is the border step 8. */
+    color: var(--accent-11);
     transition: transform var(--duration-base) var(--ease-out);
     /* the field's own fill: the raised label straddles the field's top edge,
        and its lower half sits on the field. */
     background-color: var(--surface);
-    padding-right: var(--spacing);
+    padding-inline-end: var(--spacing);
     font-weight: var(--font-weight-semibold);
     font-size: var(--text-xs);
-    bottom: calc(100% - 0.5lh);
+    inset-block-end: calc(100% - 0.5lh);
 
     &[data-required="true"]::after {
       content: " *";
-      color: var(--destructive);
+      color: var(--destructive-subtle-fg);
     }
     &[data-required="false"]::after {
       content: " (optional)";
@@ -421,13 +863,46 @@
      rest there and the raised declarations stand. nothing turns on which rule
      is written last. */
   :has(input:placeholder-shown):not(:has(input:focus)) > .label-floating {
-    left: calc(var(--spacing) * 4);
+    inset-inline-start: calc(var(--spacing) * 4);
     font-weight: normal;
     background-color: transparent;
-    bottom: 50%;
+    inset-block-end: 50%;
     transform: translateY(50%);
     font-size: var(--text-sm);
     color: var(--gray-11);
+  }
+
+  /* the lead row: a status, badge, count or icon beside text that can wrap
+     sits on the text's first line, not the middle of the block. the row
+     aligns to the start and the mark's box is one line tall, the mark centred
+     in it. 1lh is the box's own line-height, inherited from the row, so the
+     text beside it takes its size from the row too. the first child is the
+     text and takes the room; the box keeps its own width, several marks 8px
+     apart. card-status is the card's name for the box. */
+  .lead-row {
+    display: flex;
+    align-items: start;
+    gap: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+    & > :where(:first-child) {
+      flex: 1 1 0%;
+      min-inline-size: 0;
+    }
+  }
+  .lead-1lh,
+  .card-status {
+    display: flex;
+    flex: none;
+    align-items: safe center;
+    gap: calc(var(--spacing) * 2);
+    block-size: 1lh;
+  }
+  /* the header holding a status is that row. :where() keeps it at one class,
+     so a class of the page's own on the header still wins */
+  .card-header:where(:has(> .card-status)) {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: calc(var(--spacing) * 2);
   }
 
   /* a data table is a card with its inset delegated: the card's fill, edge
@@ -441,12 +916,13 @@
   .table {
     --table-fill: var(--card);
     /* the control corner, not the card's: a 12px curve clips the header
-       row's first and last labels (PM, 2026-11-02). */
+       row's first and last labels. */
     --table-corner: var(--radius);
-    min-width: 100%;
+    min-inline-size: 100%;
     border-collapse: separate;
     border-spacing: 0;
-    font-feature-settings: "tnum", "zero";
+    /* tabular figures so a column lines up; the zero stays plain */
+    font-feature-settings: "tnum";
     background-color: var(--table-fill);
     border-radius: var(--table-corner);
     border: 1px solid var(--hairline);
@@ -459,7 +935,7 @@
     }
 
     /* the header row is a well on the table's fill: step 3 on step 2, so
-       the labels read apart from the rows under them (PM, 2026-11-02). */
+       the labels read apart from the rows under them. */
     /* biome-ignore lint/style/noDescendingSpecificity: unrelated to the shell selectors above */
     & thead th {
       background-color: var(--panel);
@@ -472,12 +948,24 @@
 
     /* row dividers */
     & :is(tbody, tfoot) > tr > :is(th, td) {
-      border-top: 1px solid var(--hairline);
+      border-block-start: 1px solid var(--hairline);
     }
 
     & :is(th, td) {
-      padding: calc(var(--spacing) * 2);
-      text-align: left;
+      padding: calc(var(--spacing) * 3) calc(var(--spacing) * 4);
+      text-align: start;
+    }
+
+    /* a row tints on hover, in its cells' boxes; the corner cells below keep
+       the fill inside the shell's corner. only where a pointer can hover: a
+       tap on a touch screen leaves `:hover` on the row it hit. */
+    & tbody > tr > * {
+      transition: background-color var(--duration-fast);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      & tbody > tr:hover > * {
+        background-color: var(--gray-4);
+      }
     }
 
     /* a filled row (a hovered or tinted one) paints in its cells' boxes, which
@@ -488,7 +976,7 @@
     &
       > :is(thead, tbody, tfoot):not(:is(thead, tbody, tfoot) ~ *)
       > tr:first-child {
-      & > :first-child {
+      & > :where(:first-child) {
         border-start-start-radius: var(--table-corner);
       }
       & > :last-child {
@@ -498,7 +986,7 @@
     &
       > :is(thead, tbody, tfoot):not(:has(~ :is(thead, tbody, tfoot)))
       > tr:last-child {
-      & > :first-child {
+      & > :where(:first-child) {
         border-end-start-radius: var(--table-corner);
       }
       & > :last-child {
@@ -509,7 +997,7 @@
     /* a money or count column: header and cells both carry `num`, so the
        figures line up on the decimal and the label sits over them. */
     & :is(th, td).num {
-      text-align: right;
+      text-align: end;
     }
 
     /* the load-more row: a neutral control resting transparent, 4 hovered and
@@ -517,18 +1005,20 @@
     & tfoot button {
       font-size: var(--text-xs);
       font-weight: var(--font-weight-semibold);
-      width: 100%;
+      inline-size: 100%;
       /* the load-more row is the table's last: its hover fill keeps the corner */
       border-end-start-radius: var(--table-corner);
       border-end-end-radius: var(--table-corner);
       padding: calc(var(--spacing) * 2);
       display: flex;
-      align-items: center;
-      justify-content: center;
+      align-items: safe center;
+      justify-content: safe center;
       gap: calc(var(--spacing) * 2);
-      /* biome-ignore lint/style/noDescendingSpecificity: unrelated to .btn-* selectors */
-      &:hover:not(:disabled):not([aria-disabled="true"]) {
-        background-color: var(--gray-4);
+      /* gated as the row's tint is */
+      @media (hover: hover) and (pointer: fine) {
+        &:hover:not(:disabled):not([aria-disabled="true"]) {
+          background-color: var(--gray-4);
+        }
       }
       /* biome-ignore lint/style/noDescendingSpecificity: unrelated to .btn-* selectors */
       &:active {
@@ -573,5 +1063,47 @@
     background-color: transparent;
     border-radius: 0;
     border-width: 0;
+  }
+
+  /* a text field under 16px makes iOS zoom the page on focus: on a touch
+     pointer the field is 16px, its line held at 20px so its height stays
+     --field-size */
+  @media (pointer: coarse) {
+    .field-input,
+    .field-input-container {
+      font-size: max(16px, 1rem);
+      line-height: 1.25rem;
+    }
+  }
+
+  /* pressed: a small control gives under the finger, where motion is wanted */
+  @media (prefers-reduced-motion: no-preference) {
+    .radio > input:active:not(:disabled),
+    .checkbox:active:not(:disabled),
+    .check-field > input:active:not(:disabled),
+    .switch:active:not(:disabled) {
+      scale: 0.95;
+    }
+    /* the switch eases its scale in its own utility, whose transition list
+       outranks this layer */
+    .radio > input,
+    .checkbox,
+    .check-field > input {
+      transition: scale var(--duration-fast) var(--ease-out);
+    }
+  }
+
+  /* the page's top bar is the site header's own height (its 4rem row and 1px
+     edge; SiteNav adds the announcement band's while it shows), so a page state under it centers in what is left: `--ds-bar-h` is
+     what page-state takes off the viewport. an app shell declares its own on
+     its root, which wins inside it. */
+  :root:has(.ds-site-nav) {
+    --ds-header-h: calc(var(--spacing) * 16 + 1px);
+    --ds-bar-h: var(--ds-header-h);
+  }
+  /* the band's one-line height (8px a side and a 12px line at 1.5), the
+     estimate that paints on the server; SiteNav measures the real one */
+  :root:has(.ds-site-nav-announce) {
+    --ds-bar-h: calc(var(--ds-header-h) + var(--spacing) * 8.5);
   }
 }

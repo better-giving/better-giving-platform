@@ -237,7 +237,8 @@ describe("hubspot bank fields", () => {
     expect(v2_account).toHaveBeenCalledWith(777);
     expect(company_of()).toMatchObject({
       bank_account_number: "0012",
-      bank_statament: "https://s/statement.pdf",
+      // the app's link, which asks for sign-in, not the stored reference
+      bank_statament: `http://x/api/docs?ref=${encodeURIComponent("https://s/statement.pdf")}`,
     });
   });
 

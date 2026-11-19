@@ -18,6 +18,10 @@ interface Props {
   /** wraps each trigger in a heading of this level, so the rows sit in the
    * page outline; leave it off when a heading above the list already names it */
   heading_level?: 2 | 3 | 4 | 5 | 6;
+  /** the `value` of the row open on first render, in Ark's one-item array;
+   * none by default. One row opens at a time, so name one.
+   * Read once, so a caller that changes it later remounts the list. */
+  default_value?: string[];
   /** outer placement only — width, margin */
   className?: string;
 }
@@ -47,12 +51,17 @@ export function Accordion({
   items,
   variant = "compact",
   heading_level,
+  default_value,
   className = "",
 }: Props) {
   const look = looks[variant];
   const Heading = heading_level ? (`h${heading_level}` as const) : null;
   return (
-    <Ark.Root collapsible className={`${look.root} ${className}`}>
+    <Ark.Root
+      collapsible
+      defaultValue={default_value}
+      className={`${look.root} ${className}`}
+    >
       {items.map((it) => (
         <Ark.Item key={it.value} value={it.value} className="group">
           {Heading ? (

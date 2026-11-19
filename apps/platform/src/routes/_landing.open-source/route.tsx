@@ -68,7 +68,7 @@ export default function Page() {
               </Link>
             </div>
           </div>
-          <TerminalCard label="AngelProtocolFinance / better-giving">
+          <TerminalCard label="better-giving / better-giving-platform">
             <TermComment>public source for the managed platform</TermComment>
             <TermCmd>donation form, settlement, receipts</TermCmd>
             <TermComment>read how a gift is processed</TermComment>

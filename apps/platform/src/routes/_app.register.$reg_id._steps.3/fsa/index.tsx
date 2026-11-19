@@ -12,8 +12,9 @@ import { useState } from "react";
 import type { SubmitHandler } from "react-hook-form";
 import { Link, useFetcher, useNavigate } from "react-router";
 import { report_error } from "#/errors/report";
-import { uploadFile } from "#/helpers/upload-file";
+import { upload_document } from "#/helpers/upload-file";
 import { steps } from "#/pages/registration/routes";
+import { doc_href } from "@/docs";
 import type { IFsaDocs } from "@/reg";
 import { type FV, fileSpec, type Props } from "./types";
 import { use_rhf } from "./use-rhf";
@@ -72,7 +73,8 @@ export function FsaForm(props: Props) {
         onChange={poi.onChange}
         specs={fileSpec}
         error={errors.proof_of_identity?.message}
-        upload={uploadFile}
+        upload={upload_document}
+        view_href={doc_href}
         report_error={report_error}
       />
 
@@ -98,7 +100,8 @@ export function FsaForm(props: Props) {
         onChange={por.onChange}
         specs={fileSpec}
         error={errors.proof_of_reg?.message}
-        upload={uploadFile}
+        upload={upload_document}
+        view_href={doc_href}
         report_error={report_error}
       />
 

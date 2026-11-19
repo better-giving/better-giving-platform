@@ -1,10 +1,15 @@
 import type { IPayout, PayoutStatus } from "@/payouts";
+import { CHARGED_BACK } from "@/payouts/wise-path";
 import type { payouts } from "../../schema/payout";
 
 type PayoutRow = typeof payouts.$inferSelect;
 type PayoutInsert = typeof payouts.$inferInsert;
 
-export function to_payout(row: PayoutRow): IPayout {
+/** `settlement_status` is the stored state of the transfer the payout rode, where the caller joined it */
+export function to_payout(
+  row: PayoutRow,
+  settlement_status?: string | null
+): IPayout {
   const base = {
     id: row.id,
     source_id: row.source_id,
@@ -36,8 +41,23 @@ export function to_payout(row: PayoutRow): IPayout {
       return { ...base, type: "cancelled" };
     case "processing":
       return { ...base, type: "processing", ref: row.message ?? "" };
-    default:
+    case "returned":
+      return { ...base, type: "returned" };
+    case "bounced":
+      return {
+        ...base,
+        type: "bounced",
+        ...(settlement_status === CHARGED_BACK && { charged_back: true }),
+      };
+    case "void":
+      return { ...base, type: "void" };
+    case "pending":
       return { ...base, type: "pending" };
+    default: {
+      // a type the union gains fails to compile here, not reads as pending
+      const unmapped: never = row.type;
+      throw new Error(`payout ${row.id} has unmapped type ${unmapped}`);
+    }
   }
 }
 

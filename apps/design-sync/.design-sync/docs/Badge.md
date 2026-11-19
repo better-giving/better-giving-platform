@@ -6,6 +6,6 @@ category: Content
 
 A small rounded label naming a category or a state: a resource type, a fundraiser's `closed`/`completed`/`expired` status, a marketing tag.
 
-The look is closed: `tone` picks an authored fill + ink pair, `size` picks padding (`sm` inside a card or a dense row, `md` on a marketing section). `warning` is the warning band (`--warning-subtle` + its ink) for a state that needs attention, such as pending review. `on-primary` is only for a badge sitting inside a `surface-primary` block. `className` is for placement only.
+The look is closed, one size: `variant` picks an authored look. `neutral`, `primary`, `success`, `warning` and `destructive` are status chips on a subtle fill with its own ink; `warning` is for a state that needs attention, such as pending review. `quiet` is secondary metadata beside a title (a designation, a payment-method tag). `outline` is an ended or archived record, never a status colour. `on_photo` is the look for a status badge laid over an image (not for `quiet` or `outline`). `classes` is appended last.
 
 Static text, never a control: a removable or selectable filter chip is a button, not a Badge.

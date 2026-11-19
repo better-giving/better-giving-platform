@@ -18,7 +18,9 @@ import { seed_user } from "#/__tests__/fixtures/funds";
 import { lock_order, logged_db } from "#/__tests__/fixtures/locks";
 import { dists } from "../pg/schema/dist";
 import { donations } from "../pg/schema/donation";
+import { npos } from "../pg/schema/npo";
 import { owed_amounts } from "../pg/schema/owed";
+import { loss_logs } from "../pg/schema/revenue";
 import type { TestDb } from "../pg/test-utils/pglite";
 
 // --- mocks ---
@@ -422,5 +424,75 @@ describe("refund_failed — a refused transfer's cut", () => {
     const short = lines.filter((l) => l.includes("short"));
     expect(short).toHaveLength(1);
     expect(short[0]).toMatch(/short \$16\.67\b/);
+  });
+});
+
+describe("refund_failed — a void payout's gift", () => {
+  // $90 net, half void cash and half savings the npo no longer holds, so the
+  // reversal records $45 owed, $1.60 of the $3.20 card fee, and a platform
+  // loss of $45 + $3.40 + $1.60
+  const HALF_SAVED = { ...PAID_GRANT, payout: "void", savings: 50 } as const;
+
+  const reversed_by_two_halves = async () => {
+    const { id } = await seed(HALF_SAVED);
+    await test_db.current!.db.update(npos).set({ liq: 0 });
+    await refund(id, 50, "re_a");
+    await refund(id, 50, "re_b");
+    expect((await gift(id))?.status).toBe("refunded_loss");
+    return id;
+  };
+
+  const loss_of = async (id: string) =>
+    (
+      await test_db
+        .current!.db.select()
+        .from(loss_logs)
+        .where(eq(loss_logs.donation_id, id))
+    ).map((l) => ({
+      amount: l.amount,
+      npo_amount: l.npo_amount,
+      fees_bg: l.fees_bg,
+      fees_processing: l.fees_processing,
+    }));
+
+  test("one of two half-refunds failing credits back half the void gift's fee, not all of it", async () => {
+    const id = await reversed_by_two_halves();
+    const [owed] = await owed_for_donation(id);
+    expect([owed?.received_usd, owed?.fee_processing_usd]).toEqual([45, 1.6]);
+
+    await fail(id, "re_b");
+
+    const [after] = await owed_for_donation(id);
+    // half the $45 and half the $1.60 fee, and nothing more
+    expect(after?.credited_back_usd).toBeCloseTo(22.5 + 0.8, 6);
+  });
+
+  test("one of two half-refunds failing leaves the platform's loss at what the donor got back", async () => {
+    const id = await reversed_by_two_halves();
+    expect(await loss_of(id)).toEqual([
+      {
+        amount: expect.closeTo(50, 6),
+        npo_amount: 45,
+        fees_bg: 3.4,
+        fees_processing: 1.6,
+      },
+    ]);
+
+    await fail(id, "re_b");
+
+    expect(await taken(id)).toBe(0.5);
+    const [loss] = await loss_of(id);
+    expect(loss).toMatchObject({ npo_amount: 22.5, fees_bg: 1.7 });
+    expect(loss?.fees_processing).toBeCloseTo(0.8, 6);
+    expect(loss?.amount).toBeCloseTo(25, 6);
+  });
+
+  test("the second half-refund failing too books no loss", async () => {
+    const id = await reversed_by_two_halves();
+
+    await fail(id, "re_b");
+    await fail(id, "re_a");
+
+    expect(await loss_of(id)).toEqual([]);
   });
 });

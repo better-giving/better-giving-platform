@@ -17,10 +17,10 @@ export const popup_anim =
  * theirs inside their own components; this one is shared by two.
  *
  * the floating fill on the page ink: `bg-popover` (step 1) + `rounded-card`,
- * and no edge — the layer is told from what it covers by `shadow-floating`,
- * which with `z-floating` is the ledger's `floating` elevation row. the arrow
- * tip carries no edge either, and is filled from `--popover` by the
- * positioner.
+ * with a 1px `--hairline` edge, so the layer is told from what it covers by
+ * its edge as well as by `shadow-floating` (with `z-floating`, the ledger's
+ * `floating` elevation row). the arrow tip, filled from `--popover` by the
+ * positioner, draws the same edge on its two outer sides (tooltip.tsx).
  *
  * the inset is the shell's (`packages/brand/design-system.md` → *A shell owns
  * its padding and radius*). a caller passes its width cap, type size and
@@ -28,4 +28,4 @@ export const popup_anim =
  * for a respelling.
  */
 export const popup_shell =
-  "bg-popover text-gray-12 shadow-floating rounded-card p-4 z-floating";
+  "bg-popover text-gray-12 border border-hairline shadow-floating rounded-card p-4 z-floating";

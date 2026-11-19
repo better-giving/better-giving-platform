@@ -1,6 +1,18 @@
+import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-react";
+import { Button } from "../button";
 import { Field } from "./field";
+
+// the field mints its help-text ids with useId, so a test names each by its
+// role (the suffix the field gives it), in the order the control reads them
+const roles = (input: Element) =>
+  (input.getAttribute("aria-describedby") ?? "")
+    .split(" ")
+    .filter(Boolean)
+    .map((id) => id.match(/(sub|error|hint)$/)?.[1] ?? id);
+const by_role = (role: "sub" | "error" | "hint") =>
+  document.querySelector(`[id$="${role}"]`) as HTMLElement;
 
 describe("Field: autofill", () => {
   it("defaults to off — the visitor's saved values must not prefill somebody else's data", async () => {
@@ -200,9 +212,7 @@ describe("Field: help text announcement", () => {
     );
     const input = screen.getByLabelText("Work email").element();
 
-    expect(input.getAttribute("aria-describedby")).toBe(
-      "__sub_email __error_email"
-    );
+    expect(roles(input)).toEqual(["sub", "error"]);
   });
 
   it("lists every id in reading order, whatever shape the sub note is", async () => {
@@ -221,9 +231,7 @@ describe("Field: help text announcement", () => {
     );
     const input = screen.getByLabelText("Custom URL").element();
 
-    expect(input.getAttribute("aria-describedby")).toBe(
-      "__sub_slug __tooltip_slug outside_note __error_slug"
-    );
+    expect(roles(input)).toEqual(["sub", "error", "hint", "outside_note"]);
   });
 
   it("describes nothing when there is no help text and no error", async () => {
@@ -244,7 +252,7 @@ describe("Field: help text announcement", () => {
     const input = screen.getByLabelText("Work email").element();
 
     expect(input.hasAttribute("sub")).toBe(false);
-    expect(input.getAttribute("aria-describedby")).toBe("__sub_email");
+    expect(roles(input)).toEqual(["sub"]);
   });
 
   it("treats a whitespace-only sub as absent: no note, nothing described", async () => {
@@ -254,6 +262,236 @@ describe("Field: help text announcement", () => {
     const input = screen.getByLabelText("Address").element();
 
     expect(input.getAttribute("aria-describedby")).toBe(null);
-    expect(document.getElementById("__sub_street")).toBe(null);
+    expect(by_role("sub")).toBe(null);
+  });
+});
+
+// the row is an inline-size container: it takes its width from its parent, so
+// the test names that width rather than inheriting the runner's viewport.
+const WIDE = 600;
+const NARROW = 300;
+const render_at = (width: number, node: ReactNode) =>
+  render(<div style={{ width }}>{node}</div>);
+
+describe("Field: action", () => {
+  it("renders the action beside the control, in the same row", async () => {
+    const screen = await render_at(
+      WIDE,
+      <Field
+        label="Custom URL"
+        name="slug"
+        action={<button type="button">Check</button>}
+      />
+    );
+    const input = screen.getByLabelText("Custom URL").element();
+    const button = screen.getByRole("button", { name: "Check" }).element();
+
+    const a = input.getBoundingClientRect();
+    const b = button.getBoundingClientRect();
+    expect(b.left).toBeGreaterThanOrEqual(a.right);
+    // one row: the button's box overlaps the input's vertically
+    expect(b.top).toBeLessThan(a.bottom);
+    expect(b.bottom).toBeGreaterThan(a.top);
+  });
+
+  it("keeps the error and the tooltip under the control, not under the row", async () => {
+    const screen = await render_at(
+      WIDE,
+      <Field
+        label="Custom URL"
+        name="slug"
+        tooltip="Lowercase only."
+        error="Already taken"
+        action={<button type="button">Check</button>}
+      />
+    );
+    const control = screen.getByLabelText("Custom URL").element();
+    const button = screen.getByRole("button", { name: "Check" }).element();
+    const a = control.getBoundingClientRect();
+    const b = button.getBoundingClientRect();
+
+    for (const role of ["hint", "error"] as const) {
+      const r = by_role(role).getBoundingClientRect();
+      // under the control, in its column: below its box, wholly left of the
+      // action (a message spanning the row would run past the button's left edge)
+      expect(r.top).toBeGreaterThanOrEqual(a.bottom);
+      expect(r.right).toBeLessThanOrEqual(b.left);
+    }
+  });
+
+  it("keeps the error under the control when there is no tooltip", async () => {
+    const screen = await render_at(
+      WIDE,
+      <Field
+        label="Custom URL"
+        name="slug"
+        error="Already taken"
+        action={<button type="button">Check</button>}
+      />
+    );
+    const a = screen
+      .getByLabelText("Custom URL")
+      .element()
+      .getBoundingClientRect();
+    const b = screen
+      .getByRole("button", { name: "Check" })
+      .element()
+      .getBoundingClientRect();
+    const r = by_role("error").getBoundingClientRect();
+
+    expect(r.top).toBeGreaterThanOrEqual(a.bottom);
+    expect(r.right).toBeLessThanOrEqual(b.left);
+  });
+
+  it("still describes the control by ids that exist, with an action present", async () => {
+    const screen = await render_at(
+      WIDE,
+      <>
+        <p id="outside_note">Only numbers and letters are permitted.</p>
+        <Field
+          label="Custom URL"
+          name="slug"
+          sub="Your page address."
+          tooltip="Lowercase only."
+          describedby="outside_note"
+          error="Already taken"
+          action={<button type="button">Check</button>}
+        />
+      </>
+    );
+    const input = screen.getByLabelText("Custom URL").element();
+    const ids = (input.getAttribute("aria-describedby") ?? "").split(" ");
+
+    expect(roles(input)).toEqual(["sub", "error", "hint", "outside_note"]);
+    for (const id of ids) expect(document.getElementById(id)).not.toBe(null);
+    await expect
+      .element(input)
+      .toHaveAccessibleDescription(
+        "Your page address. Already taken Lowercase only. Only numbers and letters are permitted."
+      );
+  });
+
+  it("describes the control by its error when there is no action", async () => {
+    const screen = await render(
+      <Field label="Custom URL" name="slug" error="Already taken" />
+    );
+    const input = screen.getByLabelText("Custom URL").element();
+
+    expect(screen.getByRole("button").query()).toBeNull();
+    expect(roles(input)).toEqual(["error"]);
+  });
+});
+
+describe("Field: action row width", () => {
+  const field = (
+    <Field
+      label="Custom URL"
+      name="slug"
+      tooltip="Lowercase only."
+      error="Already taken"
+      action={
+        <Button variant="primary" size="field" type="button">
+          Check
+        </Button>
+      }
+    />
+  );
+  const boxes = (screen: Awaited<ReturnType<typeof render>>) => ({
+    input: screen
+      .getByLabelText("Custom URL")
+      .element()
+      .getBoundingClientRect(),
+    button: screen
+      .getByRole("button", { name: "Check" })
+      .element()
+      .getBoundingClientRect(),
+    error: by_role("error").getBoundingClientRect(),
+  });
+
+  it("sits beside the control at 384px, the narrowest row that does", async () => {
+    const { input, button } = boxes(await render_at(384, field));
+
+    expect(button.left).toBeGreaterThanOrEqual(input.right);
+    expect(button.top).toBeLessThan(input.bottom);
+  });
+
+  it("wraps the action under the control 1px below that", async () => {
+    const { input, button } = boxes(await render_at(383, field));
+
+    expect(button.top).toBeGreaterThanOrEqual(input.bottom);
+  });
+
+  it("gives the control the whole row when narrow, and the message stays under it", async () => {
+    const { input, button, error } = boxes(await render_at(NARROW, field));
+
+    expect(input.width).toBe(NARROW);
+    expect(button.top).toBeGreaterThanOrEqual(input.bottom);
+    expect(error.top).toBeGreaterThanOrEqual(input.bottom);
+    expect(error.top).toBeLessThan(button.top);
+  });
+
+  it("keeps the action beside the control on a wide row", async () => {
+    const { input, button } = boxes(await render_at(WIDE, field));
+
+    expect(input.width).toBeLessThan(WIDE);
+    expect(button.left).toBeGreaterThanOrEqual(input.right);
+  });
+});
+
+describe("Field: action button height", () => {
+  it('size="field" is exactly the control\'s height, the same as btn-field on a plain button', async () => {
+    const screen = await render_at(
+      WIDE,
+      <>
+        <Field
+          label="Custom URL"
+          name="slug"
+          action={
+            <Button variant="primary" size="field" type="button">
+              Check
+            </Button>
+          }
+        />
+        <button type="button" className="btn btn-primary btn-field">
+          Plain
+        </button>
+      </>
+    );
+    const input = screen.getByLabelText("Custom URL").element();
+    const prop = screen.getByRole("button", { name: "Check" }).element();
+    const plain = screen.getByRole("button", { name: "Plain" }).element();
+
+    expect(prop.className).toContain("btn-field");
+    expect(prop.getBoundingClientRect().height).toBe(
+      plain.getBoundingClientRect().height
+    );
+    expect(prop.getBoundingClientRect().height).toBe(
+      input.getBoundingClientRect().height
+    );
+  });
+
+  it("a default-size button is shorter than the control, so the prop is what aligns the row", async () => {
+    const screen = await render_at(
+      WIDE,
+      <Field
+        label="Custom URL"
+        name="slug"
+        action={
+          <Button variant="primary" type="button">
+            Check
+          </Button>
+        }
+      />
+    );
+
+    expect(
+      screen
+        .getByRole("button", { name: "Check" })
+        .element()
+        .getBoundingClientRect().height
+    ).toBeLessThan(
+      screen.getByLabelText("Custom URL").element().getBoundingClientRect()
+        .height
+    );
   });
 });

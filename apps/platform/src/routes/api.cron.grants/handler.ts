@@ -1,13 +1,20 @@
 import { report_error } from "#/errors/report";
 import { group_by } from "@/helpers/array";
 import type { IPayout, IPendingStatus } from "@/payouts";
+import { CHARGED_BACK } from "@/payouts/wise-path";
 import { stage } from "$/env";
 import { aws_monitor } from "$/kit/slack";
 import { owed_netting_on, undo_deductions } from "$/payouts/owed-run";
 import { settle_npo_payouts } from "$/payouts/settle";
 import { wise_pay } from "$/payouts/wise-pay";
-import { pending_payouts, processing_payouts } from "$/pg/queries/payout";
-import { grant_eligibility } from "./eligibility";
+import {
+  hold_alert_claim,
+  hold_alert_unclaim,
+  npo_returned_payouts,
+  pending_payouts,
+  processing_payouts,
+} from "$/pg/queries/payout";
+import { type GrantEligibility, grant_eligibility } from "./eligibility";
 
 // optional npo_id to retry a single npo
 interface IInput {
@@ -49,8 +56,9 @@ export async function index(event?: IInput) {
 /**
  * a processing row was claimed and never settled or released: a killed run, a
  * failed release, a transfer whose funding or record is unknown, or a
- * concurrent run still in flight. `pending_payouts` never returns these rows,
- * so without this they sit unpaid and unannounced
+ * concurrent run still in flight. a funded one is no longer this: it waits on
+ * wise's delivery under its transfer. `pending_payouts` never returns these
+ * rows, so without this they sit unpaid and unannounced
  */
 async function alert_unsettled_claims() {
   try {
@@ -79,6 +87,48 @@ async function alert_unsettled_claims() {
   }
 }
 
+/** once per returned settlement: the npo stays held run after run until a new
+ * account is the one the run pays, and ops needs telling only when it starts */
+async function alert_held(el: Extract<GrantEligibility, { status: "held" }>) {
+  const { npo, hold, total } = el;
+  if (!(await hold_alert_claim(hold.settlement_id))) return;
+  try {
+    const repair = hold.status === "awaiting_repair";
+    const bounced = hold.status === "bounced";
+    const returned =
+      repair || bounced ? null : await npo_returned_payouts(npo.id);
+    await aws_monitor.send_alert({
+      type: "ERROR",
+      from: fn,
+      title: `Grants held for npo:${npo.id}: ${npo.name}`,
+      body: repair
+        ? "its last transfer came back but which payouts it covered is unclear, so nothing more is sent until ops repairs the settlement and a new bank account is approved and made its default. if a new account lifts the hold first, the repair is still pending"
+        : bounced && hold.wise_state === CHARGED_BACK
+          ? "its last transfer was charged back, so nothing more is sent until a new bank account is approved and made its default. nothing was credited and the payouts stay bounced: resolve them by hand (do not cancel, settle or return them before a different account is approved: that ends the hold, so the next run pays the npo's other pending payouts to that account)"
+          : bounced
+            ? "its last transfer bounced (Wise may still deliver it late or refund it), so nothing more is sent until a new bank account is approved and made its default, or Wise delivers it. if Wise refunds it, the payouts become returned and go out once a new account is approved"
+            : "its last transfer came back, so nothing more is sent until a new bank account is approved and made its default; the returned payouts then go out with the next run",
+      fields: [
+        {
+          name: "returned",
+          value: repair
+            ? "awaiting repair: nothing credited yet"
+            : bounced
+              ? "bounced: not credited unless Wise refunds it"
+              : returned
+                ? `${returned.count} payout(s), ${returned.total}`
+                : "none left",
+        },
+        { name: "pending", value: total.toString() },
+        { name: "settlement", value: hold.settlement_id },
+      ],
+    });
+  } catch (err) {
+    report_error(err, { npo_id: npo.id });
+    await hold_alert_unclaim(hold.settlement_id);
+  }
+}
+
 async function process_item(npo_id: number, items: IPayout<IPendingStatus>[]) {
   try {
     // a run that doesn't net skips the locking claim tx for an npo still under
@@ -93,6 +143,7 @@ async function process_item(npo_id: number, items: IPayout<IPendingStatus>[]) {
       console.info(`npo:${npo_id} not paid: ${el.reason}`);
       return;
     }
+    if (el.status === "held") return await alert_held(el);
     const { npo, minimum, wise_id } = el;
 
     const res = await settle_npo_payouts(

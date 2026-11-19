@@ -8,7 +8,9 @@ export function LoadText({
 }: PropsWithChildren<{ is_loading?: boolean; text?: string }>) {
   return is_loading ? (
     <>
-      <LoaderCircle className="inline animate-spin mr-1 bottom-px relative" />
+      {/* a .btn spaces its children with its own gap; any other host gets the
+          margin */}
+      <LoaderCircle className="inline animate-spin inset-be-px relative me-1 in-[.btn]:me-0" />
       {text}
     </>
   ) : (

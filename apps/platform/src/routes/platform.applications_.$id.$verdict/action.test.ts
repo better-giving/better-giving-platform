@@ -208,6 +208,18 @@ const dedupe_keys = (kind: string) =>
   new Set(enqueued.filter((m) => m.id === kind).map((m) => m.dedupe));
 
 describe("approve", () => {
+  test("approval files the registration's bank as the default, and refuses nothing over whose account it is", async () => {
+    const res = await verdict("approved");
+
+    expect(res.status).toBe(302);
+    const db = test_db.current!.db;
+    expect(await db.select().from(npos)).toHaveLength(1);
+    const banks = await db.select().from(banking_apps);
+    expect(banks).toHaveLength(1);
+    expect(banks[0]?.status).toBe("default");
+    expect((await reg_get(RID))?.status).toBe("03");
+  });
+
   test("enqueues the approved row, which mails the approval", async () => {
     const res = await verdict("approved");
 

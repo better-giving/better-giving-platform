@@ -324,7 +324,7 @@ function CardShell({
           <Heading id={heading_id} className="text-lg font-semibold">
             Stripe account
           </Heading>
-          {badge && <Badge tone="neutral">{badge}</Badge>}
+          {badge && <Badge variant="neutral">{badge}</Badge>}
         </div>
         {status}
       </div>

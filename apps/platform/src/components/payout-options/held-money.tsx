@@ -126,7 +126,7 @@ export function HeldMoneyCard(props: IHeldMoneyCard) {
         };
   return (
     <HeldShell {...props} {...copy}>
-      <table className="table plain-zero-table">
+      <table className="table">
         <thead>
           <tr>
             <th>What's waiting</th>
@@ -172,7 +172,7 @@ export function PayoutsHeldCard(props: IHeldMoneyCard) {
         };
   return (
     <HeldShell {...props} {...copy}>
-      <table className="table plain-zero-table">
+      <table className="table">
         <thead>
           <tr>
             <th>From</th>
@@ -272,7 +272,7 @@ function HeldShell({
           <h2 id={heading_id} className="text-lg font-semibold">
             {heading}
           </h2>
-          <Badge tone="warning">Held</Badge>
+          <Badge variant="warning">Held</Badge>
         </div>
         <p className="text-gray-11 max-w-3xl">{lead}</p>
       </div>

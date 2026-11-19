@@ -47,7 +47,7 @@ export function SfPerChart(
       open={props.open}
       onClose={props.onClose}
       size="md"
-      classes="h-96 p-4 bg-popover"
+      classes="h-96! p-4 bg-popover"
     >
       <div className="flex flex-wrap gap-y-2 justify-between">
         <h4>Investment performance</h4>

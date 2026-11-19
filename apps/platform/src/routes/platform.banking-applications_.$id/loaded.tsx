@@ -3,6 +3,7 @@ import { SquareArrowOutUpRight } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { href, NavLink } from "react-router";
 import type { LoaderData } from "#/pages/platform-admin/banking-applications/api";
+import { doc_href } from "@/docs";
 import { is_approvable } from "./approvable";
 
 export function Loaded(props: LoaderData) {
@@ -16,8 +17,8 @@ export function Loaded(props: LoaderData) {
     <>
       {prev_verdict && (
         <Badge
-          tone={is_approved ? "success" : "destructive"}
-          className="justify-self-start -mt-3"
+          variant={is_approved ? "success" : "destructive"}
+          classes="justify-self-start -mt-3"
         >
           {is_approved ? "Approved" : "Rejected"}
         </Badge>
@@ -61,12 +62,17 @@ export function Loaded(props: LoaderData) {
             ))}
           </>
         )}
-        <Row label="Bank statement">
-          <ExtLink href={props.ba.bank_statement_url} className="link">
-            <span className="break-all">{props.ba.bank_statement_url}</span>
-            <SquareArrowOutUpRight className="inline relative bottom-px ml-2 icon-md" />
-          </ExtLink>
-        </Row>
+        {props.ba.bank_statement_url && (
+          <Row label="Bank statement">
+            <ExtLink
+              href={doc_href(props.ba.bank_statement_url)}
+              className="link"
+            >
+              <span className="break-all">{props.ba.bank_statement_url}</span>
+              <SquareArrowOutUpRight className="inline relative bottom-px ml-2 icon-md" />
+            </ExtLink>
+          </Row>
+        )}
       </dl>
       {props.wacc_unavailable && (
         <p className="text-sm text-gray-11 -mt-2">

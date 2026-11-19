@@ -84,7 +84,7 @@ export default function Page() {
   return (
     <main>
       <Hero />
-      <PartnersStrip classes="border-y border-t-hairline border-b-blue-6" />
+      <PartnersStrip classes="border-y border-t-hairline border-b-accent-6" />
       <Steps classes="py-24" />
       <OwnGrow classes="bg-band py-24" />
       <Pillars classes="py-24" />

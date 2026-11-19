@@ -63,7 +63,7 @@ export default function Page({ loaderData: d }: Route.ComponentProps) {
           to={href("/platform")}
           className="card flex items-center gap-x-3 mb-8 transition-colors hover:border-gray-8 hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
         >
-          <span className="size-8 rounded-full bg-secondary text-blue-11 grid place-items-center shrink-0">
+          <span className="size-8 rounded-full bg-secondary text-accent-11 grid place-items-center shrink-0">
             <ShieldIcon className="icon-lg" />
           </span>
           <span className="text-sm font-medium">Platform admin</span>

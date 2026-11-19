@@ -5,10 +5,13 @@ import { BOOK_A_DEMO } from "#/constants/urls";
 
 interface ICtaBand {
   title: string;
-  subtitle: string;
+  /** the line under the title; a page with none leaves it off */
+  subtitle?: string;
   classes?: string;
   /** the ask the page has been making — audience pages name their own */
   cta_label?: string;
+  /** the second action; off for a page whose copy carries one ask only */
+  show_demo?: boolean;
 }
 
 export function CtaBand({
@@ -16,6 +19,7 @@ export function CtaBand({
   subtitle,
   classes = "",
   cta_label = "Join free forever",
+  show_demo = true,
 }: ICtaBand) {
   return (
     <section
@@ -28,16 +32,20 @@ export function CtaBand({
         className="mx-auto mb-4"
       />
       <h2 className="section-heading max-w-2xl mx-auto">{title}</h2>
-      <p className="mt-4 text-lg text-gray-11 max-w-xl mx-auto text-pretty">
-        {subtitle}
-      </p>
+      {subtitle && (
+        <p className="mt-4 text-lg text-gray-11 max-w-xl mx-auto text-pretty">
+          {subtitle}
+        </p>
+      )}
       <div className="flex max-sm:flex-col sm:flex-wrap justify-center gap-3.5 mt-8">
         <Link to={href("/register")} className="btn btn-primary btn-lg">
           {cta_label}
         </Link>
-        <ExtLink href={BOOK_A_DEMO} className="btn btn-lg btn-secondary">
-          Book a demo
-        </ExtLink>
+        {show_demo && (
+          <ExtLink href={BOOK_A_DEMO} className="btn btn-lg btn-secondary">
+            Book a demo
+          </ExtLink>
+        )}
       </div>
     </section>
   );

@@ -161,6 +161,19 @@ describe("api.donation-intents action", () => {
     await expect(res!.json()).resolves.toEqual({ id: "don-5" });
   });
 
+  it("refuses a non-USD DAF gift: chariot is usd-only and its row would be stored at a rate of 1", async () => {
+    const res = await invoke(
+      post({ ...(valid_body("chariot") as object), currency: "eur" })
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.headers.get("x-refusal")).toBe("1");
+    await expect(res.text()).resolves.toBe(
+      "We couldn't process this donation. Please refresh the page and try again."
+    );
+    expect(chariot_intent_mock).not.toHaveBeenCalled();
+  });
+
   // a marked 4xx body is what `json_ok` shows the donor
   it("returns a donor sentence with 404 when recipient not found", async () => {
     npo_get_mock.mockResolvedValueOnce(undefined);

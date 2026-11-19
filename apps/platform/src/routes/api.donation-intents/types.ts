@@ -16,3 +16,7 @@ export interface IntentResult {
 }
 
 export type Provider = (ctx: Ctx) => Promise<Response | IntentResult>;
+
+/** what a donor reads when the intent route refuses a request it can't act on */
+export const REFUSED_COPY =
+  "We couldn't process this donation. Please refresh the page and try again.";

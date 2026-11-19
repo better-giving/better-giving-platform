@@ -135,6 +135,17 @@ describe("dashboard edit-profile", () => {
       .toBeDisabled();
   });
 
+  it("draws its one form as a plain section, not a card", async () => {
+    const screen = await render_page();
+
+    const form = screen
+      .getByRole("button", { name: /submit changes/i })
+      .element()
+      .closest("form");
+    expect(form).not.toBeNull();
+    expect(form?.className ?? "").not.toMatch(/\bcard\b/);
+  });
+
   it("avatar upload: select file -> crop -> upload -> submit", async () => {
     upload_mock.mockResolvedValue("https://cdn.example.com/avatar.png");
     const screen = await render_page();

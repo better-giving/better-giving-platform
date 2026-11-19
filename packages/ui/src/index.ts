@@ -27,7 +27,12 @@ export {
   use_ask,
 } from "./components/ask/ask";
 export { ask_prompt, use_ask_prompt } from "./components/ask/ask-prompt";
-export type { BadgeTone } from "./components/badge";
+export {
+  Checklist,
+  type ChecklistItem,
+  type ChecklistSection,
+  type ChecklistWords,
+} from "./components/checklist";
 export type { FileOutput, FileSpec } from "./components/file-dropzone/types";
 export {
   FloatingField,

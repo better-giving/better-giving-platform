@@ -13,7 +13,8 @@ vi.mock("$/pg/queries/banking", () => ({
   bapp_set_default: q.bapp_set_default,
 }));
 vi.mock("$/kit/queue", () => ({ enqueue: q.enqueue }));
-vi.mock("$/kit/wise", () => ({ wise: { v2_account: vi.fn() } }));
+const wise = vi.hoisted(() => ({ v2_account: vi.fn() }));
+vi.mock("$/kit/wise", () => ({ wise }));
 vi.mock("#/.server/auth", async () =>
   (await import("$/auth/test-utils")).make_auth_mock()
 );
@@ -50,6 +51,7 @@ const row = (o: { npo_id?: number; status: string }) => ({
 beforeEach(() => {
   for (const f of Object.values(q)) f.mockReset();
   q.bapp_set_default.mockResolvedValue(true);
+  wise.v2_account.mockReset().mockResolvedValue({ currency: "USD" });
 });
 
 describe("set default payout method", () => {

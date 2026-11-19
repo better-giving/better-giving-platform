@@ -37,7 +37,7 @@ export function BankRequired({
           <h2 id={heading_id} className="text-xl">
             Set up your bank payout
           </h2>
-          {ineligible && <Badge tone="primary">Required</Badge>}
+          {ineligible && <Badge variant="primary">Required</Badge>}
         </div>
         <div className="grid gap-1 rounded bg-panel px-4 py-3 text-sm">
           {ineligible ? (
