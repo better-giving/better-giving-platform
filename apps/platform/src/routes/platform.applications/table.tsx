@@ -27,6 +27,10 @@ export function Table({
   const [params, setParams] = useSearchParams();
   const sort_key = (params.get("sort_key") ?? "updated_at") as TRegsSortKey;
   const sort_dir = (params.get("sort_dir") ?? "desc") as "asc" | "desc";
+  // the detail page takes the list's view, so its Back returns to it
+  const view_params = new URLSearchParams(params);
+  view_params.delete("next");
+  const view = view_params.size ? `?${view_params}` : "";
 
   const handle_sort = (key: TRegsSortKey) => () => {
     const copy = new URLSearchParams(params);
@@ -111,7 +115,7 @@ export function Table({
                     to={
                       row.status === "01"
                         ? href("/register/:reg_id", { reg_id: row.id })
-                        : href("/platform/applications/:id", { id: row.id })
+                        : `${href("/platform/applications/:id", { id: row.id })}${view}`
                     }
                     className="text-center w-full inline-block [.pending]:text-gray-11 link"
                   >
@@ -154,7 +158,7 @@ const text_color: { [key in TStatus]: string } = {
 
 const text: { [key in TStatus]: string } = {
   "03": "Approved",
-  "02": "Pending",
+  "02": "Under review",
   "04": "Rejected",
   "01": "Incomplete",
 };

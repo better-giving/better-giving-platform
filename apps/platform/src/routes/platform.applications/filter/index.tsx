@@ -34,6 +34,18 @@ export function Filter({ classes = "", isDisabled }: Props) {
       if (v) copy.set(k, v);
     }
     setParams(copy);
+    set_open(false);
+  }
+
+  // clears the filters and the search; the sort stays, as Apply keeps it
+  function onReset() {
+    const copy = new URLSearchParams();
+    for (const k of ["sort_key", "sort_dir"]) {
+      const v = params.get(k);
+      if (v) copy.set(k, v);
+    }
+    setParams(copy);
+    set_open(false);
   }
 
   return (
@@ -54,11 +66,7 @@ export function Filter({ classes = "", isDisabled }: Props) {
 
         <Portal>
           <Popover.Positioner>
-            <Form
-              params={parsed}
-              onSubmit={onSubmit}
-              onReset={() => setParams({})}
-            />
+            <Form params={parsed} onSubmit={onSubmit} onReset={onReset} />
           </Popover.Positioner>
         </Portal>
       </Popover.Root>

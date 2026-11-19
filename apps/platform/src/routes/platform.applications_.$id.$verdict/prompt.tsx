@@ -2,13 +2,20 @@ import { Actions, Badge, Field } from "@better-giving/ui";
 import { valibotResolver } from "@hookform/resolvers/valibot";
 import { ChevronRight, CircleAlert, Info, X } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { Link, useFetcher, useParams, useRouteLoaderData } from "react-router";
+import {
+  Link,
+  useFetcher,
+  useLocation,
+  useParams,
+  useRouteLoaderData,
+} from "react-router";
 import { nonEmpty, object, pipe, string, trim } from "valibot";
 import { RouteModal } from "#/components/route-modal";
 import type { LoaderData } from "#/routes/platform.applications_.$id/api";
 
 function Content() {
   const { verdict } = useParams();
+  const { search } = useLocation();
   const review = useRouteLoaderData<LoaderData>(
     "routes/platform.applications_.$id"
   );
@@ -38,7 +45,8 @@ function Content() {
         fetcher.submit(fv, {
           encType: "application/json",
           method: "POST",
-          action: ".",
+          // the list's view rides to the action, whose redirect carries it on
+          action: `.${search}`,
         })
       )}
       className="contents"
@@ -52,7 +60,7 @@ function Content() {
           aria-disabled={fetcher.state !== "idle"}
           preventScrollReset
           replace
-          to=".."
+          to={{ pathname: "..", search }}
           className="btn btn-icon btn-secondary absolute top-1/2 right-4 -translate-y-1/2 aria-disabled:pointer-events-none"
         >
           <X className="icon-xl" />
@@ -91,7 +99,7 @@ function Content() {
       </div>
 
       <div className="flex items-center gap-2 mb-6">
-        <Badge>Pending</Badge>
+        <Badge>Under review</Badge>
         <ChevronRight className="icon-xl" />
         {verdict === "approved" ? (
           <Badge variant="success">Approved</Badge>
@@ -114,7 +122,7 @@ function Content() {
 
       <Actions band>
         <Link
-          to={".."}
+          to={{ pathname: "..", search }}
           aria-disabled={fetcher.state === "submitting"}
           type="button"
           className="btn-secondary btn"

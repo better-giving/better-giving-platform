@@ -1,0 +1,1 @@
+CREATE INDEX "registrations_updated_at_id_idx" ON "registrations" USING btree ("updated_at" DESC NULLS LAST,"id");

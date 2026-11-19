@@ -29,7 +29,9 @@ export const loader = async (args: Route.LoaderArgs) => {
   if (args.params.verdict !== "approved") return null;
   const { approvable } = await review_get(args.params.id);
   if (!approvable) {
-    throw redirect(href("/platform/applications/:id", { id: args.params.id }));
+    throw redirect(
+      `${href("/platform/applications/:id", { id: args.params.id })}${new URL(args.request.url).search}`
+    );
   }
   return null;
 };
@@ -43,6 +45,8 @@ export const action: ActionFunction = async ({ request, params }) => {
   const p1 = safeParse(reg_id, params.id);
   if (p1.issues) throw resp.status(400, p1.issues[0].message);
   const id = p1.output;
+  // the list's view, carried on to the success page and its way back
+  const success = `../success${new URL(request.url).search}`;
   const p2 = safeParse(schema, {
     type: params.verdict,
     reason: fv.reason ?? "",
@@ -77,11 +81,11 @@ export const action: ActionFunction = async ({ request, params }) => {
     if (in_dedupe_window(row.updated_at)) {
       await enqueue(msg("reg-updated", row));
     }
-    return redirect("../success");
+    return redirect(success);
   }
   if (reg.status === "03") {
     console.info("NPO approved:", await announce_approval(reg));
-    return redirect("../success");
+    return redirect(success);
   }
 
   // only a new approval files banking; no need to look at fsa
@@ -96,5 +100,5 @@ export const action: ActionFunction = async ({ request, params }) => {
   if (!r) throw resp.status(400, "registration has incomplete steps");
   const npo = await npo_new(r);
   console.info("NPO approved:", npo);
-  return redirect("../success");
+  return redirect(success);
 };

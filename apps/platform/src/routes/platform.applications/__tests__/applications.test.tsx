@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { createRoutesStub } from "react-router";
+import { createRoutesStub, useLocation } from "react-router";
 import {
   afterAll,
   beforeAll,
@@ -36,7 +36,14 @@ vi.mock("remix-client-cache", () => ({
   createClientLoaderCache: () => undefined,
 }));
 
+vi.mock("#/errors/report", async (orig) => ({
+  ...(await orig<typeof import("#/errors/report")>()),
+  report_error: vi.fn(),
+}));
+
 // --- imports (after mocks hoisted) ---
+
+import { report_error } from "#/errors/report";
 
 import { create_test_db } from "$/pg/test-utils/pglite";
 import { loader } from "../api";
@@ -550,5 +557,147 @@ describe("applications — search", () => {
     await userEvent.keyboard("{Enter}");
 
     await expect.element(screen.getByText("Pending Org")).toBeInTheDocument();
+  });
+});
+
+describe("applications — the view travels to an application", () => {
+  it("the details link carries filters, search and sort", async () => {
+    const view = "?status=02&query=Pending&sort_key=o_name&sort_dir=asc";
+    const Stub = createRoutesStub([
+      {
+        path: "/platform/applications",
+        Component: Applications,
+        HydrateFallback: () => null,
+        loader,
+      },
+      {
+        path: "/platform/applications/:id",
+        Component: () => (
+          <p data-testid="detail-search">{useLocation().search}</p>
+        ),
+      },
+    ]);
+    const screen = await render(
+      <Stub initialEntries={[`/platform/applications${view}`]} />
+    );
+
+    await screen
+      .getByRole("link", { name: "application details" })
+      .first()
+      .click();
+
+    await expect
+      .element(screen.getByTestId("detail-search"))
+      .toHaveTextContent(view);
+  });
+});
+
+describe("applications — Under review", () => {
+  it("names status 02 Under review in the table, never Pending", async () => {
+    const screen = await render_applications();
+
+    await expect
+      .element(screen.getByText("Under review", { exact: true }))
+      .toBeVisible();
+    expect(screen.getByText("Pending", { exact: true }).query()).toBeNull();
+  });
+});
+
+describe("applications — reset keeps the sort", () => {
+  it("Reset filters clears filters and search but the sort stays", async () => {
+    const screen = await render_applications(
+      "?status=03&query=Org&sort_key=o_name&sort_dir=asc"
+    );
+    await expect.element(screen.getByText("Approved Org")).toBeInTheDocument();
+
+    await screen.getByRole("button", { name: /^filter$/i }).click();
+    await screen.getByRole("button", { name: /reset filters/i }).click();
+
+    await expect.element(screen.getByText("Rejected Org")).toBeInTheDocument();
+    await expect
+      .element(screen.getByPlaceholder(/search applications/i))
+      .toHaveValue("");
+    // by name, ascending; the default order would put Rejected before Pending
+    const order = [
+      ...screen.container.querySelectorAll("tbody tr td:first-child"),
+    ].map((td) => td.textContent);
+    expect(order).toEqual([
+      "Approved Org",
+      "Incomplete Org",
+      "Pending Org",
+      "Rejected Org",
+    ]);
+  });
+});
+
+describe("applications — the filter popover closes", () => {
+  const apply = () => /apply filters/i;
+
+  it("on Apply", async () => {
+    const screen = await render_applications();
+    await screen.getByRole("button", { name: /^filter$/i }).click();
+    await expect
+      .element(screen.getByRole("button", { name: apply() }))
+      .toBeVisible();
+
+    await screen.getByRole("button", { name: apply() }).click();
+
+    await expect
+      .element(screen.getByRole("button", { name: apply() }))
+      .not.toBeVisible();
+  });
+
+  it("on Reset", async () => {
+    const screen = await render_applications("?status=03");
+    await screen.getByRole("button", { name: /^filter$/i }).click();
+
+    await screen.getByRole("button", { name: /reset filters/i }).click();
+
+    await expect
+      .element(screen.getByRole("button", { name: apply() }))
+      .not.toBeVisible();
+  });
+});
+
+describe("applications — a failed View more", () => {
+  it("keeps the rows, drops the button, reports, and a new search starts fresh", async () => {
+    await test_db.current!.db.insert(registrations).values(
+      Array.from({ length: 20 }, (_, i) => ({
+        id: `reg-fail-${String(i).padStart(2, "0")}`,
+        r_id: `user-fail-${i}`,
+        status: "03" as const,
+        o_name: `Fail Org ${String(i).padStart(2, "0")}`,
+        o_hq_country: "Kenya",
+        created_at: days_ago(10),
+        updated_at: days_ago(10),
+      }))
+    );
+    const screen = await render_applications("?status=03");
+    const more = screen.getByRole("button", { name: /view more/i });
+    await expect.element(more).toBeVisible();
+
+    const boom = new Error("neon unreachable");
+    const select = vi
+      .spyOn(test_db.current!.db, "select")
+      .mockImplementationOnce(() => {
+        throw boom;
+      });
+    await more.click();
+
+    await expect
+      .element(screen.getByRole("button", { name: /view more/i }))
+      .not.toBeInTheDocument();
+    await expect.element(screen.getByText("Fail Org 19")).toBeInTheDocument();
+    expect(report_error).toHaveBeenCalledWith(boom, expect.anything());
+    expect(screen.getByText(/couldn.t load|try again/i).query()).toBeNull();
+    select.mockRestore();
+
+    // a new search starts fresh, with the button back
+    const search_input = screen.getByPlaceholder(/search applications/i);
+    await search_input.fill("Fail Org");
+    await userEvent.keyboard("{Enter}");
+    await expect
+      .element(screen.getByRole("button", { name: /view more/i }))
+      .toBeVisible();
   });
 });
