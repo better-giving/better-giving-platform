@@ -141,10 +141,8 @@ export async function settle_npo_payouts(
         return { status: "amount_mismatch", net: plan.net } as const;
       }
       await deduct(tx, { npo_id: npo.id }, "grant_run", plan, to.settlement_id);
-      // the net, by the PM's rule for manual wires. the wise path debits the
-      // gross instead, and a recovery moves no cash itself, so with owed rows
-      // the recovered share stays in cash here: `gross` is the one-line switch
-      const balance_debit = plan.net;
+      // the cash debit is the gross, as on the wise path; the recovered share comes out of the gross
+      const balance_debit = gross;
       await settle_recorded(tx, npo.id, locked, plan.net, balance_debit, to);
       return {
         status: "wired",

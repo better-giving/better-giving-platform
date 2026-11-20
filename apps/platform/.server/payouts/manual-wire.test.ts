@@ -235,7 +235,7 @@ describe("mark_wired", () => {
     expect(settled.map((p) => p.settled_id)).toEqual([s!.id, s!.id]);
   });
 
-  test("owing $93.20 on $500 pending, a $406.80 wire settles the payouts, recovers the owed and takes the net $406.80 off the cash, not the $500 gross", async () => {
+  test("owing $93.20 on $500 pending, a $406.80 wire settles the payouts, recovers the owed and takes the $500 gross off the cash", async () => {
     deductions.on = true;
     const npo = await seed_npo({ cash: 500 });
     await seed_payout(npo, "p-1", 500);
@@ -247,7 +247,7 @@ describe("mark_wired", () => {
 
     expect(res).toMatchObject({ status: "ok", net: 406.8 });
     expect(await payout_types()).toEqual({ "p-1": "settled" });
-    expect(await npo_cash(npo)).toBe(93.2);
+    expect(await npo_cash(npo)).toBe(0);
     const [s] = await db().select().from(settlements);
     expect(s).toMatchObject({ amount: 406.8 });
     const [row] = await db().select().from(owed_amounts);
