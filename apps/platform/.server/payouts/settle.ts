@@ -1,4 +1,5 @@
 import { report_error } from "#/errors/report";
+import { PAID } from "@/payouts/wise-path";
 import type { Alert } from "@/slack";
 import { stage } from "../env";
 import { aws_monitor } from "../kit/slack";
@@ -52,7 +53,11 @@ export type SettleResult =
   | { status: "settled"; ref: string; total: number; transfer_id: string }
   /** every payout went to what the npo owes: settled with no transfer */
   | { status: "recovered"; ref: string; total: number }
-  | { status: "no_recipient"; total: number };
+  | { status: "no_recipient"; total: number }
+  /** a recorded send whose amount is not what the claim nets: nothing written */
+  | { status: "amount_mismatch"; net: number }
+  /** a recorded send: its payouts settled and the balance debited with it */
+  | { status: "wired"; settlement_id: string; total: number };
 
 export interface ISettleNpo {
   id: number;
@@ -67,12 +72,33 @@ export interface IRecipient {
   pay: Pay;
 }
 
+/**
+ * a send made outside the app (a wire ops sent by hand), recorded with the
+ * claim in its one transaction: the payouts end settled, never `processing`,
+ * and the settlement is stored `PAID` so no poll ever reads it as a transfer
+ */
+export interface IRecordedSend {
+  /** keyed on the send's own reference, so recording one send twice collides */
+  settlement_id: string;
+  /** the send's own reference, stored as the settlement's `other_id` */
+  reference: string;
+  /** iso; the settlement's date and its payouts' `settled_date` */
+  date: string;
+  /** whether the send is what the claim nets; false refuses with nothing written */
+  matches: (net: number) => boolean;
+  /** records the send against its settlement, in the claim's tx; moves no money */
+  record: (tx: DbOrTx, settlement_id: string) => Promise<void>;
+}
+
+const is_recorded = (to: IRecipient | IRecordedSend): to is IRecordedSend =>
+  "settlement_id" in to;
+
 /** `to` is null for an npo with no recipient: only a run that sends nothing
  * settles */
 export async function settle_npo_payouts(
   npo: ISettleNpo,
   payout_ids: string[],
-  to: IRecipient | null
+  to: IRecipient | IRecordedSend | null
 ): Promise<SettleResult> {
   const nets = await owed_netting_on();
   const claim = await db.transaction(async (tx) => {
@@ -84,7 +110,11 @@ export async function settle_npo_payouts(
     // eligibility resolved `to` before this lock: a return and a newer default
     // account since then cleared the hold, but `to` is still the account that
     // bounced
-    if (to !== null && (await npo_last_return(npo.id, tx))) {
+    if (
+      to !== null &&
+      !is_recorded(to) &&
+      (await npo_last_return(npo.id, tx))
+    ) {
       const now = await npo_default_bapp(npo.id, tx);
       if (now === undefined || String(now.id) !== to.ref_key) {
         return { status: "recipient_changed", ref_key: to.ref_key } as const;
@@ -103,6 +133,25 @@ export async function settle_npo_payouts(
       return { status: "under_minimum", total, minimum } as const;
     }
     const ids = locked.map((p) => p.id);
+    if (to !== null && is_recorded(to)) {
+      if (plan.status === "recover_only") {
+        return { status: "amount_mismatch", net: 0 } as const;
+      }
+      if (!to.matches(plan.net)) {
+        return { status: "amount_mismatch", net: plan.net } as const;
+      }
+      await deduct(tx, { npo_id: npo.id }, "grant_run", plan, to.settlement_id);
+      // the net, by the PM's rule for manual wires. the wise path debits the
+      // gross instead, and a recovery moves no cash itself, so with owed rows
+      // the recovered share stays in cash here: `gross` is the one-line switch
+      const balance_debit = plan.net;
+      await settle_recorded(tx, npo.id, locked, plan.net, balance_debit, to);
+      return {
+        status: "wired",
+        settlement_id: to.settlement_id,
+        total: plan.net,
+      } as const;
+    }
     if (plan.status === "recover_only") {
       const ref = recovered_run_ref(npo.id, ids);
       await deduct(tx, { npo_id: npo.id }, "grant_run", plan, ref);
@@ -250,6 +299,44 @@ export async function settle_npo_payouts(
     });
   }
   return { status: "settled", ref, total, transfer_id };
+}
+
+/** a recorded send's settlement of the net, its payouts settled and the npo's
+ * cash debited, in the claim's tx */
+async function settle_recorded(
+  tx: DbOrTx,
+  npo_id: number,
+  payouts: { id: string; source_id: string }[],
+  net: number,
+  balance_debit: number,
+  send: IRecordedSend
+) {
+  await settlement_put(tx, {
+    id: send.settlement_id,
+    other_id: send.reference,
+    npo_id,
+    date: send.date,
+    amount: net,
+    sources: payouts.map((p) => p.source_id),
+    status: PAID,
+  });
+  await payouts_move(
+    tx,
+    payouts.map((p) => p.id),
+    "pending",
+    {
+      type: "settled",
+      settled_date: send.date,
+      settled_id: send.settlement_id,
+    }
+  );
+  await npo_balance_update(
+    tx,
+    npo_id,
+    { liq: 0, lock: 0, lock_units: 0, cash: balance_debit },
+    "dec"
+  );
+  await send.record(tx, send.settlement_id);
 }
 
 /** a settlement of $0 under the run's ref, no transfer behind it */

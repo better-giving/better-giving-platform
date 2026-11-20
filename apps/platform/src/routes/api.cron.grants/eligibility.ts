@@ -2,6 +2,7 @@ import { min_payout_amount } from "@/npo/schema";
 import { type IReturnHold, npo_return_hold } from "$/payouts/resend-returned";
 import { payout_total } from "$/payouts/transfer";
 import { npo_default_bapp } from "$/pg/queries/banking";
+import { npos_manual_wire } from "$/pg/queries/manual-wire";
 import { npo_get } from "$/pg/queries/npo";
 
 type Npo = NonNullable<Awaited<ReturnType<typeof npo_get>>>;
@@ -15,6 +16,9 @@ export type GrantEligibility =
       total: number;
       reason: string;
     }
+  /** paid by a wire ops sends by hand from the Manual wires page: the run never
+   * sends it through wise, whatever else holds */
+  | { status: "manual_wire"; npo: Npo; minimum: number; total: number }
   /** a transfer came back and no new account pays yet: sending more would
    * bounce it too */
   | {
@@ -58,6 +62,9 @@ export async function grant_eligibility(
   const skip = (reason: string) =>
     ({ status: "skipped", npo, minimum, total, reason }) as const;
 
+  if ((await npos_manual_wire([npo.id])).has(npo.id)) {
+    return { status: "manual_wire", npo, minimum, total };
+  }
   if (npo.active === false) return skip("inactive");
   const hold = await npo_return_hold(npo.id);
   if (hold) return { status: "held", npo, minimum, total, hold };

@@ -44,6 +44,18 @@ export function recovered_run_ref(
   return uuid_v5(JSON.stringify(["recovered", party, [...ids].sort()]));
 }
 
+/**
+ * a manual wire's settlement id: uuid v5 of the provider + its own reference
+ * for the wire, so the same reference at two providers never collides and
+ * recording one wire twice does
+ */
+export function wire_settlement_id(
+  provider: string,
+  provider_tx_id: string
+): string {
+  return uuid_v5(JSON.stringify(["manual_wire", provider, provider_tx_id]));
+}
+
 function uuid_v5(name: string): string {
   const b = createHash("sha1")
     .update(REF_NAMESPACE)

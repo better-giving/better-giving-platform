@@ -142,11 +142,16 @@ async function seed_npo(o: {
   recipient?: boolean;
   /** the bank's status; an old approval left it "approved", no default flag */
   bank_status?: "default" | "approved";
+  /** a second npo in one test needs its own */
+  ein?: string;
+  recipient_id?: number;
+  payout_method?: "wise" | "manual_wire";
 }) {
   const [npo] = await db()
     .insert(npos)
     .values({
-      registration_number: "EIN-GRANTS",
+      registration_number: o.ein ?? "EIN-GRANTS",
+      payout_method: o.payout_method,
       name: "Grants Test NPO",
       endow_designation: "Charity",
       overview_pt: "[]",
@@ -159,7 +164,7 @@ async function seed_npo(o: {
     await db()
       .insert(banking_apps)
       .values({
-        id: String(WISE_RECIPIENT),
+        id: String(o.recipient_id ?? WISE_RECIPIENT),
         npo_id: npo!.id,
         status: o.bank_status ?? "default",
       });
@@ -405,6 +410,38 @@ describe("grants cron execute", () => {
       "p-1": "pending",
       "p-2": "pending",
     });
+  });
+
+  test("an npo paid by manual wire is never sent through wise: its payouts stay pending while a wise npo in the same run is paid", async () => {
+    const wired = await seed_npo({
+      cash: 5000,
+      ein: "EIN-WIRED",
+      recipient_id: 888,
+      payout_method: "manual_wire",
+    });
+    await seed_payout(wired, "w-1", 3000);
+    const paid = await seed_npo({ cash: 500 });
+    await seed_payout(paid, "p-1", 100);
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    await index();
+
+    expect(report_error_mock).not.toHaveBeenCalled();
+    expect(settle_spy).toHaveBeenCalledOnce();
+    expect(settle_spy.mock.calls[0]![0]).toMatchObject({ id: paid });
+    expect(wise_pay_mock).toHaveBeenCalledOnce();
+    expect(wise_pay_mock).toHaveBeenCalledWith(
+      WISE_RECIPIENT,
+      100,
+      expect.any(String)
+    );
+    expect(await payout_types()).toEqual({
+      "w-1": "pending",
+      "p-1": "processing",
+    });
+    expect(await npo_cash(wired)).toBe(5000);
+    expect(info).toHaveBeenCalledWith(`npo:${wired} not paid: manual wire`);
+    info.mockRestore();
   });
 
   test("a pending total of 49.996 meets a 50 minimum and is paid as 50", async () => {

@@ -233,8 +233,16 @@ describe("the empty state", () => {
     // third convention this replaced, and a trailing period is the fourth
     // spelling of the same sentence. which of the two is true stays the call
     // site's call; that it is one of them is not.
+    // one design-approved exception: the manual wires list says what is due
+    // now, which is neither of the two (BGP-134)
+    const approved = new Set(["No manual wires due"]);
     const offenders = empty_states
-      .filter((e) => e.headline && !/^No .+ (yet|found)$/.test(e.headline))
+      .filter(
+        (e) =>
+          e.headline &&
+          !approved.has(e.headline) &&
+          !/^No .+ (yet|found)$/.test(e.headline)
+      )
       .map((e) => `${e.file}:${e.n} ${JSON.stringify(e.headline)}`);
     expect(offenders).toEqual([]);
   });

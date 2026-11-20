@@ -143,6 +143,10 @@ async function process_item(npo_id: number, items: IPayout<IPendingStatus>[]) {
       console.info(`npo:${npo_id} not paid: ${el.reason}`);
       return;
     }
+    if (el.status === "manual_wire") {
+      console.info(`npo:${npo_id} not paid: manual wire`);
+      return;
+    }
     if (el.status === "held") return await alert_held(el);
     const { npo, minimum, wise_id } = el;
 
