@@ -116,8 +116,12 @@ describe("mark wired dialog", () => {
 
     await screen.getByLabelText("Transaction id").fill(TX);
     await screen.getByLabelText("Amount sent").fill("4200");
-    await screen.getByRole("spinbutton").first().click();
-    await userEvent.keyboard("{Backspace}");
+    // the date input reports a change only once every segment is cleared, and
+    // a segment takes a Backspace per typed digit
+    for (const segment of screen.getByRole("spinbutton").all()) {
+      await segment.click();
+      await userEvent.keyboard("{Backspace}{Backspace}{Backspace}{Backspace}");
+    }
     press(submit_button(screen).element());
     await expect
       .element(screen.getByText("required", { exact: true }))
