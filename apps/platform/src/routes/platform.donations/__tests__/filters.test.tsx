@@ -159,7 +159,7 @@ describe("paging and empty state", () => {
   it("shows View More only when the loader returns next", async () => {
     const { screen } = await render_page("/platform/donations");
     await expect
-      .element(screen.getByRole("cell", { name: "ada@test.com" }))
+      .element(screen.getByRole("cell", { name: "ada@test.com", exact: true }))
       .toBeInTheDocument();
     await expect
       .element(screen.getByRole("button", { name: "View More" }))
