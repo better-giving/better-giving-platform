@@ -1,10 +1,12 @@
 export interface IWirePayout {
   /** the payout's id */
   id: string;
-  /** who the payout is for: the donor's email, else name ("Unknown donor"
-   * when the gift has neither on record); "Savings" or "Investments" for a
+  /** who the payout is for: the donor's email, else name ("Donation" when
+   * the gift has neither on record); "Savings" or "Investments" for a
    * withdrawal */
   label: string;
+  /** the payout's source id, masked to its first and last 4 characters */
+  ref: string;
   /** iso; when the payout was created */
   date: string;
   amount: number;

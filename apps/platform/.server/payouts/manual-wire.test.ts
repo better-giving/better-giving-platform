@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   afterAll,
   beforeAll,
@@ -65,6 +65,7 @@ vi.mock("../pg/db", () => ({
 const { mark_wired } = await import("./manual-wire");
 const { poll_wise_returns } = await import("./wise-return");
 const { settle_npo_payouts } = await import("./settle");
+const { resend_returned } = await import("./resend-returned");
 const { create_test_db } = await import("../pg/test-utils/pglite");
 const { npos } = await import("../pg/schema/npo");
 const { payouts, settlements, manual_wires } = await import(
@@ -151,19 +152,34 @@ async function seed_payout(
     });
 }
 
-const wire = (
+const pending_ids = async (npo_id: number) =>
+  (
+    await db()
+      .select({ id: payouts.id })
+      .from(payouts)
+      .where(and(eq(payouts.npo_id, npo_id), eq(payouts.type, "pending")))
+  ).map((p) => p.id);
+
+/** marks a wire for the npo's payouts pending now, as the page lists them */
+const mark = async (
   npo_id: number,
-  o: Partial<Parameters<typeof mark_wired>[0]>
-) => ({
-  npo_id,
-  wire_date: "2026-11-18",
-  provider: "Mercury",
-  provider_tx_id: "tx-1",
-  wire_fee: 0,
-  amount_sent: 0,
-  recorded_by: ADMIN,
-  ...o,
-});
+  o: Partial<Parameters<typeof mark_wired>[0]>,
+  providers?: readonly string[]
+) =>
+  mark_wired(
+    {
+      npo_id,
+      payout_ids: await pending_ids(npo_id),
+      wire_date: "2026-11-18",
+      provider: "Mercury",
+      provider_tx_id: "tx-1",
+      wire_fee: 0,
+      amount_sent: 0,
+      recorded_by: ADMIN,
+      ...o,
+    },
+    providers
+  );
 
 const payout_types = async () =>
   Object.fromEntries(
@@ -219,9 +235,11 @@ describe("mark_wired", () => {
     await seed_payout(npo, "p-2", 40);
     await seed_payout(other, "o-1", 70);
 
-    const res = await mark_wired(
-      wire(npo, { amount_sent: 75, wire_fee: 25, provider_tx_id: "mt-9" })
-    );
+    const res = await mark(npo, {
+      amount_sent: 75,
+      wire_fee: 25,
+      provider_tx_id: "mt-9",
+    });
 
     expect(res).toMatchObject({ status: "ok" });
     expect(await payout_types()).toEqual({
@@ -257,9 +275,7 @@ describe("mark_wired", () => {
     await seed_payout(npo, "p-1", 500);
     await seed_owed(npo, "don-owed", 93.2);
 
-    const res = await mark_wired(
-      wire(npo, { amount_sent: 396.8, wire_fee: 10 })
-    );
+    const res = await mark(npo, { amount_sent: 396.8, wire_fee: 10 });
 
     expect(res).toMatchObject({ status: "ok", net: 406.8 });
     expect(await payout_types()).toEqual({ "p-1": "settled" });
@@ -274,9 +290,9 @@ describe("mark_wired", () => {
     const npo = await seed_npo({ cash: 1000 });
     await seed_payout(npo, "p-1", 100);
 
-    const res = await mark_wired(wire(npo, { amount_sent: 100, wire_fee: 25 }));
+    const res = await mark(npo, { amount_sent: 100, wire_fee: 25 });
 
-    expect(res).toEqual({ status: "amount_mismatch", net: 100, expected: 75 });
+    expect(res).toEqual({ status: "invalid", field: "amount_sent" });
     expect(await payout_types()).toEqual({ "p-1": "pending" });
     expect(await npo_cash(npo)).toBe(1000);
     expect(await db().select().from(manual_wires)).toEqual([]);
@@ -288,9 +304,7 @@ describe("mark_wired", () => {
     await seed_payout(npo, "p-1", 0.1);
     await seed_payout(npo, "p-2", 0.2);
 
-    const res = await mark_wired(
-      wire(npo, { amount_sent: 0.2, wire_fee: 0.1 })
-    );
+    const res = await mark(npo, { amount_sent: 0.2, wire_fee: 0.1 });
 
     expect(res).toMatchObject({ status: "ok", net: 0.3 });
   });
@@ -298,7 +312,7 @@ describe("mark_wired", () => {
   test("a provider reference already recorded is a duplicate, and nothing is written", async () => {
     const npo = await seed_npo({ cash: 1000 });
     await seed_payout(npo, "p-1", 100);
-    expect(await mark_wired(wire(npo, { amount_sent: 100 }))).toMatchObject({
+    expect(await mark(npo, { amount_sent: 100 })).toMatchObject({
       status: "ok",
     });
     await seed_payout(npo, "p-2", 80);
@@ -309,7 +323,7 @@ describe("mark_wired", () => {
       cash: await npo_cash(npo),
     };
 
-    const res = await mark_wired(wire(npo, { amount_sent: 80 }));
+    const res = await mark(npo, { amount_sent: 80 });
 
     expect(res).toEqual({ status: "duplicate" });
     expect({
@@ -325,11 +339,12 @@ describe("mark_wired", () => {
     const providers = ["Mercury", "Other Bank"];
     const npo = await seed_npo({ cash: 1000 });
     await seed_payout(npo, "p-1", 100);
-    await mark_wired(wire(npo, { amount_sent: 100 }), providers);
+    await mark(npo, { amount_sent: 100 }, providers);
     await seed_payout(npo, "p-2", 80);
 
-    const res = await mark_wired(
-      wire(npo, { amount_sent: 80, provider: "Other Bank" }),
+    const res = await mark(
+      npo,
+      { amount_sent: 80, provider: "Other Bank" },
       providers
     );
 
@@ -345,28 +360,81 @@ describe("mark_wired", () => {
     const npo = await seed_npo();
     await seed_payout(npo, "p-1", 100);
 
-    const res = await mark_wired(
-      wire(npo, { amount_sent: 100, provider: "Other Bank" })
-    );
+    const res = await mark(npo, { amount_sent: 100, provider: "Other Bank" });
 
     expect(res).toEqual({ status: "invalid", field: "provider" });
     expect(await payout_types()).toEqual({ "p-1": "pending" });
   });
 
-  test("a negative fee is refused", async () => {
+  test.each([
+    ["a blank or NaN amount", { amount_sent: Number.NaN }, "amount_sent"],
+    ["a negative amount", { amount_sent: -100 }, "amount_sent"],
+    ["a zero amount", { amount_sent: 0 }, "amount_sent"],
+    ["an amount past the cent", { amount_sent: 99.995 }, "amount_sent"],
+    ["a blank or NaN fee", { wire_fee: Number.NaN }, "wire_fee"],
+    ["a negative fee", { amount_sent: 105, wire_fee: -5 }, "wire_fee"],
+    [
+      "a fee past the cent",
+      { amount_sent: 99.999, wire_fee: 0.001 },
+      "wire_fee",
+    ],
+  ] as const)("%s is refused on its field", async (_, o, field) => {
     const npo = await seed_npo();
     await seed_payout(npo, "p-1", 100);
 
-    const res = await mark_wired(wire(npo, { amount_sent: 105, wire_fee: -5 }));
+    const res = await mark(npo, { amount_sent: 100, ...o });
 
-    expect(res).toEqual({ status: "invalid", field: "wire_fee" });
+    expect(res).toEqual({ status: "invalid", field });
+    expect(await payout_types()).toEqual({ "p-1": "pending" });
+  });
+
+  test("a zero fee is fine", async () => {
+    const npo = await seed_npo();
+    await seed_payout(npo, "p-1", 100);
+
+    expect(await mark(npo, { amount_sent: 100, wire_fee: 0 })).toMatchObject({
+      status: "ok",
+    });
+  });
+
+  test.each([
+    ["no payouts", []],
+    ["a payout twice", ["p-1", "p-1"]],
+  ])("%s is refused on payout_ids", async (_, payout_ids) => {
+    const npo = await seed_npo();
+    await seed_payout(npo, "p-1", 100);
+
+    const res = await mark(npo, { amount_sent: 100, payout_ids });
+
+    expect(res).toEqual({ status: "invalid", field: "payout_ids" });
+  });
+
+  test.each([
+    ["one more pending than marked", ["p-1"]],
+    ["one fewer pending than marked", ["p-1", "p-2", "p-3"]],
+    ["another payout in place of one pending", ["p-1", "p-9"]],
+  ])("%s: payouts_changed, nothing written", async (_, payout_ids) => {
+    const npo = await seed_npo({ cash: 1000 });
+    await seed_payout(npo, "p-1", 60);
+    await seed_payout(npo, "p-2", 40);
+
+    const res = await mark(npo, { amount_sent: 100, payout_ids });
+
+    expect(res).toEqual({ status: "payouts_changed" });
+    expect(await payout_types()).toEqual({
+      "p-1": "pending",
+      "p-2": "pending",
+    });
+    expect(await npo_cash(npo)).toBe(1000);
+    expect(await db().select().from(manual_wires)).toEqual([]);
+    expect(await db().select().from(settlements)).toEqual([]);
   });
 
   test("a net under the npo's minimum is refused, and nothing is written", async () => {
     const npo = await seed_npo({ cash: 1000, payout_minimum: 150 });
     await seed_payout(npo, "p-1", 100);
 
-    const res = await mark_wired(wire(npo, { amount_sent: 100 }));
+    const res = await mark(npo, { amount_sent: 100 });
 
     expect(res).toEqual({ status: "under_minimum", net: 100, minimum: 150 });
     expect(await payout_types()).toEqual({ "p-1": "pending" });
@@ -378,7 +446,7 @@ describe("mark_wired", () => {
     const npo = await seed_npo();
     await seed_payout(npo, "p-1", 40);
 
-    const res = await mark_wired(wire(npo, { amount_sent: 40 }));
+    const res = await mark(npo, { amount_sent: 40 });
 
     expect(res).toEqual({ status: "under_minimum", net: 40, minimum: 50 });
   });
@@ -387,18 +455,18 @@ describe("mark_wired", () => {
     const npo = await seed_npo({ payout_method: "wise" });
     await seed_payout(npo, "p-1", 100);
 
-    const res = await mark_wired(wire(npo, { amount_sent: 100 }));
+    const res = await mark(npo, { amount_sent: 100 });
 
     expect(res).toEqual({ status: "not_manual_wire" });
     expect(await payout_types()).toEqual({ "p-1": "pending" });
     expect(await db().select().from(manual_wires)).toEqual([]);
   });
 
-  test("an npo with nothing pending has nothing to wire", async () => {
+  test("an npo whose payouts all settled since the page loaded has nothing to wire", async () => {
     const npo = await seed_npo();
     await seed_payout(npo, "p-1", 100, { type: "settled" });
 
-    const res = await mark_wired(wire(npo, { amount_sent: 100 }));
+    const res = await mark(npo, { amount_sent: 100, payout_ids: ["p-1"] });
 
     expect(res).toEqual({ status: "none_pending" });
   });
@@ -406,11 +474,11 @@ describe("mark_wired", () => {
   test("a concurrent mark of the same wire that commits first makes this one a duplicate, and nothing is written", async () => {
     const npo = await seed_npo({ cash: 1000 });
     await seed_payout(npo, "p-1", 100);
-    await mark_wired(wire(npo, { amount_sent: 100 }));
+    await mark(npo, { amount_sent: 100 });
     await seed_payout(npo, "p-2", 80);
     precheck_miss.once = true;
 
-    const res = await mark_wired(wire(npo, { amount_sent: 80 }));
+    const res = await mark(npo, { amount_sent: 80 });
 
     expect(res).toEqual({ status: "duplicate" });
     expect(await payout_types()).toEqual({
@@ -444,7 +512,7 @@ describe("a returned wise transfer on record", () => {
     await seed_returned_transfer(npo);
     await seed_payout(npo, "p-1", 100);
 
-    const res = await mark_wired(wire(npo, { amount_sent: 100 }));
+    const res = await mark(npo, { amount_sent: 100 });
 
     expect(res).toMatchObject({ status: "ok" });
     expect(await payout_types()).toEqual({ "p-1": "settled" });
@@ -500,6 +568,37 @@ describe("a returned wise transfer on record", () => {
 
     expect(res).toMatchObject({ status: "held" });
   });
+
+  test("a manual-wire npo's returned payouts go back to pending for the next wire, with no bank account approved", async () => {
+    const npo = await seed_npo({ cash: 1000 });
+    await seed_returned_transfer(npo);
+    await seed_payout(npo, "p-1", 100);
+    await db()
+      .update(payouts)
+      .set({ type: "returned", settled_id: `returned-${npo}` })
+      .where(eq(payouts.id, "p-1"));
+
+    const res = await resend_returned(npo);
+
+    expect(res).toEqual({ status: "resent", ids: ["p-1"] });
+    expect(await payout_types()).toEqual({ "p-1": "pending" });
+    expect(await pending_ids(npo)).toEqual(["p-1"]);
+  });
+
+  test("a wise npo's returned payouts stay returned while it is held", async () => {
+    const npo = await seed_npo({ cash: 1000, payout_method: "wise" });
+    await seed_returned_transfer(npo);
+    await seed_payout(npo, "p-1", 100);
+    await db()
+      .update(payouts)
+      .set({ type: "returned", settled_id: `returned-${npo}` })
+      .where(eq(payouts.id, "p-1"));
+
+    const res = await resend_returned(npo);
+
+    expect(res).toMatchObject({ status: "held" });
+    expect(await payout_types()).toEqual({ "p-1": "returned" });
+  });
 });
 
 describe("the wise returns poll", () => {
@@ -507,9 +606,7 @@ describe("the wise returns poll", () => {
     const npo = await seed_npo({ cash: 1000 });
     await seed_payout(npo, "p-1", 100);
     const today = new Date().toISOString();
-    await mark_wired(
-      wire(npo, { amount_sent: 100, wire_date: today.slice(0, 10) })
-    );
+    await mark(npo, { amount_sent: 100, wire_date: today.slice(0, 10) });
     await db().insert(settlements).values({
       id: "4242",
       other_id: "ref-4242",

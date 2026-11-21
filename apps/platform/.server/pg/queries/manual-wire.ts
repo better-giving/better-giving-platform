@@ -1,7 +1,9 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { mask_string } from "#/helpers/mask-string";
 import type { IManualWireRow } from "#/pages/platform-admin/manual-wires/types";
 import { to_units } from "@/helpers/decimal";
 import { min_payout_amount } from "@/npo/schema";
+import type { PayoutMethod } from "@/payouts";
 import { payout_cents } from "../../payouts/amount";
 import { net_owed } from "../../payouts/net-owed";
 import { owed_netting_on } from "../../payouts/owed-run";
@@ -37,6 +39,18 @@ export async function manual_wire_by_tx(
   return row;
 }
 
+/** how the npo is paid; undefined for no such npo */
+export async function npo_payout_method(
+  db_: DbOrTx,
+  npo_id: number
+): Promise<PayoutMethod | undefined> {
+  const [row] = await db_
+    .select({ payout_method: npos.payout_method })
+    .from(npos)
+    .where(eq(npos.id, npo_id));
+  return row?.payout_method;
+}
+
 /** what a wire is judged against: how the npo is paid and its own minimum */
 export async function npo_wire_terms(npo_id: number) {
   const [row] = await db
@@ -51,31 +65,21 @@ export async function npo_wire_terms(npo_id: number) {
   return row;
 }
 
-/** the ids of every payout of the npo still pending */
-export async function npo_pending_payout_ids(
-  npo_id: number
-): Promise<string[]> {
-  const rows = await db
-    .select({ id: payouts.id })
-    .from(payouts)
-    .where(and(eq(payouts.npo_id, npo_id), eq(payouts.type, "pending")));
-  return rows.map((r) => r.id);
-}
-
 /** who a pending payout is for: a gift's donor by email, else name (a
  * donation payout's `source_id` is its dist); a withdrawal by the account it
  * left */
 const payout_label = sql<string>`case
   when ${payouts.source} = 'liq' then 'Savings'
   when ${payouts.source} = 'lock' then 'Investments'
-  else coalesce(nullif(${donation_donors.email}, ''), nullif(${donation_donors.name}, ''), 'Unknown donor')
+  else coalesce(nullif(${donation_donors.email}, ''), nullif(${donation_donors.name}, ''), 'Donation')
 end`;
 
 /**
- * every npo paid by manual wire that a wire is due to, by name, with its
- * pending payouts oldest first. each row carries the net the next wire must
- * carry, as `mark_wired` judges it: the gross less what the npo owes, when owed
- * netting is on
+ * every active npo paid by manual wire with a net above 0 pending, by name,
+ * with its pending payouts oldest first. each row carries the net the next
+ * wire must carry, as `mark_wired` judges it: the gross less what the npo
+ * owes, when owed netting is on. a net under the minimum keeps its row, which
+ * `mark_wired` refuses
  */
 export async function manual_wire_rows(): Promise<IManualWireRow[]> {
   const rows = await db
@@ -84,6 +88,7 @@ export async function manual_wire_rows(): Promise<IManualWireRow[]> {
       name: npos.name,
       payout_minimum: npos.payout_minimum,
       id: payouts.id,
+      source_id: payouts.source_id,
       label: payout_label,
       date: payouts.date,
       amount: payouts.amount,
@@ -99,7 +104,11 @@ export async function manual_wire_rows(): Promise<IManualWireRow[]> {
       eq(donation_donors.donation_id, dists.donation_id)
     )
     .where(
-      and(eq(payouts.type, "pending"), eq(npos.payout_method, "manual_wire"))
+      and(
+        eq(payouts.type, "pending"),
+        eq(npos.payout_method, "manual_wire"),
+        eq(npos.active, true)
+      )
     )
     .orderBy(asc(npos.name), asc(npos.id), asc(payouts.date), asc(payouts.id));
 
@@ -115,8 +124,8 @@ export async function manual_wire_rows(): Promise<IManualWireRow[]> {
       const gross_cents = payout_cents(of_npo.map((r) => r.amount));
       const owed = nets ? await outstanding_for_npo(db, npo_id) : [];
       const plan = net_owed(gross_cents / 100, owed, minimum);
-      // due by the rule a wise run pays on: a net above 0 and at the minimum
-      if (plan.status !== "pay") return [];
+      // what the npo owes takes it all: no wire to send
+      if (plan.status === "recover_only") return [];
       const net_cents = to_units(plan.net, 2);
       const bank = (await npo_default_bapp(npo_id))?.bank_summary;
       const row: IManualWireRow = {
@@ -127,9 +136,10 @@ export async function manual_wire_rows(): Promise<IManualWireRow[]> {
         net: net_cents / 100,
         minimum,
         bank: bank || "No bank account on file",
-        payouts: of_npo.map(({ id, label, date, amount }) => ({
+        payouts: of_npo.map(({ id, source_id, label, date, amount }) => ({
           id,
           label,
+          ref: mask_string(source_id, 4),
           date,
           amount,
         })),

@@ -144,6 +144,17 @@ describe("run_migrate", () => {
     expect(log.slice(-2)).toEqual([UNLOCK, "end"]);
   });
 
+  test("retries the apply on a deadlock its DDL lost, under the one lock, and exits 0", async () => {
+    const deadlock = new Error("Failed query", {
+      cause: Object.assign(new Error("deadlock detected"), { code: "40P01" }),
+    });
+    const { make, log } = fake_client([{ re: /^apply$/, err: deadlock }]);
+    expect(await run(make, capture().log)).toBe(0);
+    expect(log.filter((l) => l === "apply")).toHaveLength(2);
+    expect(log.filter((l) => l === LOCK)).toHaveLength(1);
+    expect(log.slice(-2)).toEqual([UNLOCK, "end"]);
+  });
+
   test("stops retrying after the last attempt, unlocks, and exits 1", async () => {
     const { make, log } = fake_client(
       Array.from({ length: 4 }, () => ({ re: /^apply$/, err: lock_timeout() }))

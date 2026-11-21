@@ -66,6 +66,11 @@ export const link_groups: LinkGroup[] = [
         icon: { fn: BanknoteIcon },
       },
       {
+        title: "Manual wires",
+        to: routes.manual_wires,
+        icon: { fn: BanknoteArrowUpIcon },
+      },
+      {
         title: "Revenue",
         to: routes.revenue,
         icon: { fn: DollarSignIcon },
@@ -79,11 +84,6 @@ export const link_groups: LinkGroup[] = [
         title: "Amounts owed",
         to: routes.owed,
         icon: { fn: HandCoinsIcon },
-      },
-      {
-        title: "Manual wires",
-        to: routes.manual_wires,
-        icon: { fn: BanknoteArrowUpIcon },
       },
       {
         title: "Campaign moderation",

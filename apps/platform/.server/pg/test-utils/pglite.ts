@@ -10,21 +10,31 @@ const migrations = import.meta.glob("../migrations/*.sql", {
   eager: true,
 }) as Record<string, string>;
 
+/** each file in a transaction, as drizzle's migrator runs it: `LOCK TABLE`
+ * and `SET LOCAL` only work inside one */
 async function apply(client: PGlite, files: string[]) {
   for (const file of files) {
     const sql = migrations[file];
+    await client.exec("BEGIN");
     // drizzle-kit uses `--> statement-breakpoint` as separator
     for (const stmt of sql!.split("--> statement-breakpoint")) {
       const trimmed = stmt.trim();
       if (!trimmed) continue;
+      await client.exec("SAVEPOINT stmt");
       try {
         await client.exec(trimmed);
+        await client.exec("RELEASE SAVEPOINT stmt");
       } catch (e: any) {
         // skip statements that need extensions pglite doesn't have (e.g. pg_trgm)
-        if (e.message?.includes("does not exist")) continue;
+        if (e.message?.includes("does not exist")) {
+          await client.exec("ROLLBACK TO SAVEPOINT stmt");
+          continue;
+        }
+        await client.exec("ROLLBACK");
         throw e;
       }
     }
+    await client.exec("COMMIT");
   }
 }
 

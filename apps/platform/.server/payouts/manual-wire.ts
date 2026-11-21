@@ -5,7 +5,6 @@ import { is_unique_violation } from "../pg/errors";
 import {
   manual_wire_by_tx,
   manual_wire_put,
-  npo_pending_payout_ids,
   npo_wire_terms,
 } from "../pg/queries/manual-wire";
 import { MANUAL_WIRES_PROVIDER_TX_UNIQ } from "../pg/schema/payout";
@@ -14,9 +13,11 @@ import { wire_settlement_id } from "./transfer";
 
 export interface IMarkWired {
   npo_id: number;
+  /** the payouts the wire covers: the npo's pending set as the page showed it */
+  payout_ids: string[];
   /** `YYYY-MM-DD`, the day the provider sent it */
   wire_date: string;
-  /** what reached the npo's bank, usd */
+  /** what reached the npo's bank, usd: the net less `wire_fee` */
   amount_sent: number;
   provider: string;
   provider_tx_id: string;
@@ -28,20 +29,21 @@ export interface IMarkWired {
 
 export type MarkWiredResult =
   | { status: "ok"; settlement_id: string; net: number }
-  /** a field the route should have refused: nothing written */
+  /** a field refused, `amount_sent` included when it is not the net less the
+   * fee: nothing written */
   | { status: "invalid"; field: keyof IMarkWired }
   /** this provider's reference is already recorded: nothing written */
   | { status: "duplicate" }
   | { status: "not_manual_wire" }
   | { status: "none_pending" }
   | { status: "under_minimum"; net: number; minimum: number }
-  /** `amount_sent` must be the net less the fee: `expected` */
-  | { status: "amount_mismatch"; net: number; expected: number };
+  /** the npo's pending payouts are no longer `payout_ids`: nothing written */
+  | { status: "payouts_changed" };
 
 /**
  * records a wire sent by hand to an npo paid by `manual_wire`, settling
- * all its pending payouts in one transaction with the wire and its settlement.
- * tests pass a second provider through `providers`
+ * `payout_ids` (all its pending payouts) in one transaction with the wire and
+ * its settlement. tests pass a second provider through `providers`
  */
 export async function mark_wired(
   input: IMarkWired,
@@ -50,7 +52,7 @@ export async function mark_wired(
   const provider_tx_id = input.provider_tx_id.trim();
   const invalid = invalid_field({ ...input, provider_tx_id }, providers);
   if (invalid) return { status: "invalid", field: invalid };
-  const { npo_id, provider, wire_date, amount_sent, wire_fee, recorded_by } =
+  const { npo_id, payout_ids, provider, wire_date, amount_sent, wire_fee } =
     input;
 
   if (await manual_wire_by_tx(provider, provider_tx_id)) {
@@ -71,7 +73,7 @@ export async function mark_wired(
         payout_minimum: npo.payout_minimum ?? min_payout_amount,
         payout_method: npo.payout_method,
       },
-      await npo_pending_payout_ids(npo.id),
+      payout_ids,
       {
         settlement_id,
         reference: provider_tx_id,
@@ -86,19 +88,16 @@ export async function mark_wired(
             amount_sent,
             wire_fee,
             settlement_id,
-            recorded_by,
+            recorded_by: input.recorded_by,
           }),
       }
     );
     switch (res.status) {
       case "wired":
         return { status: "ok", settlement_id, net: res.total };
+      // the expected figure stays on the server
       case "amount_mismatch":
-        return {
-          status: "amount_mismatch",
-          net: res.net,
-          expected: (to_units(res.net, 2) - fee_cents) / 100,
-        };
+        return { status: "invalid", field: "amount_sent" };
       case "under_minimum":
         return {
           status: "under_minimum",
@@ -106,6 +105,7 @@ export async function mark_wired(
           minimum: res.minimum,
         };
       case "none_pending":
+      case "payouts_changed":
         return { status: res.status };
       default:
         throw new Error(`mark_wired: unexpected settle result ${res.status}`);
@@ -122,6 +122,7 @@ export async function mark_wired(
   }
 }
 
+/** a finite usd figure in whole cents: `99.995` is past the cent */
 const in_cents = (n: number) =>
   Number.isFinite(n) && Number.isInteger(snap(n * 100));
 
@@ -142,5 +143,7 @@ function invalid_field(
   if (!in_cents(i.wire_fee) || i.wire_fee < 0) return "wire_fee";
   if (!in_cents(i.amount_sent) || i.amount_sent <= 0) return "amount_sent";
   if (i.recorded_by === "") return "recorded_by";
+  const ids = new Set(i.payout_ids);
+  if (ids.size === 0 || ids.size !== i.payout_ids.length) return "payout_ids";
   return null;
 }

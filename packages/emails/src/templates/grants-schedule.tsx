@@ -139,7 +139,15 @@ function Jsx({
             <tr key={r.id} style={row_style[r.effect]}>
               <td style={td}>{r.id}</td>
               <td style={td}>{r.name}</td>
-              <td style={td_right}>{usd(r.amount)}</td>
+              <td
+                style={
+                  !nets && r.effect === "manual_wire"
+                    ? { ...td_right, fontWeight: 600 }
+                    : td_right
+                }
+              >
+                {usd(r.amount)}
+              </td>
               {nets && (
                 <td style={td_right}>
                   {signed((r.deductions ?? []).reduce((a, d) => a + d.usd, 0))}
@@ -186,8 +194,8 @@ function Jsx({
           }}
         >
           <b style={{ color: flat_colors.gray_12 }}>manual wire</b> is not sent
-          by this run: send the Net by wire, then mark it wired on the Manual
-          wires page.
+          by this run: send the {nets ? "Net" : "Grant"} less any wire fee, then
+          mark it wired on the Manual wires page.
         </Text>
       )}
 

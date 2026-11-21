@@ -25,6 +25,8 @@ export interface IMarkWiredValues {
   provider: string;
   provider_tx_id: string;
   amount_sent: number;
+  /** the payouts the dialog showed at submit: the wire settles these */
+  payout_ids: string[];
 }
 
 export interface IMarkWiredDialog {
@@ -42,9 +44,8 @@ export interface IMarkWiredDialog {
   return_focus_fallback?: () => HTMLElement | null;
 }
 
-/** a deduction as the summary writes it: "−$612.40", "−$0.00" when none; a
- * negative one (an addition) prints unsigned */
-const less = (n: number) => (n < 0 ? usd(-n) : `−${usd(n)}`);
+/** a deduction as the summary writes it: "−$612.40", "−$0.00" */
+const less = (n: number) => `\u2212${usd(n)}`;
 
 /** what the wire must carry: the net total less the fee; a blank fee is $0 */
 const to_send = (net: number, fee: string) => snap(net - (Number(fee) || 0));
@@ -102,6 +103,9 @@ export function MarkWiredDialog({
     >
       {row && (
         <Body
+          // keyed by the nonprofit, not the row object: a revalidated row
+          // (its payouts changed) keeps what was typed, and the summary and
+          // the amount check follow the new figures
           key={row.npo_id}
           row={row}
           providers={providers}
@@ -164,6 +168,7 @@ function Body({
             ...x,
             wire_fee: Number(x.wire_fee),
             amount_sent: Number(x.amount_sent),
+            payout_ids: row.payouts.map((p) => p.id),
           })
         )
       )}
@@ -224,7 +229,9 @@ function Body({
           className="bg-panel rounded p-4 grid gap-1 text-sm figures"
         >
           <SumRow label="Pending" value={usd(row.gross)} />
-          <SumRow label="Owed, deducted" value={less(row.owed)} />
+          {row.owed > 0 && (
+            <SumRow label="Owed, deducted" value={less(row.owed)} />
+          )}
           <SumRow label="Net total" value={usd(row.net)} />
           <SumRow label="Wire fee" value={less(Number(fee) || 0)} />
           <SumRow
@@ -309,8 +316,6 @@ function SumRow({ label, value, total }: ISumRow) {
   );
 }
 
-const short_id = (id: string) => `${id.slice(0, 4)}...${id.slice(-4)}`;
-
 interface IPayouts {
   payouts: IWirePayout[];
 }
@@ -340,9 +345,7 @@ function Payouts({ payouts }: IPayouts) {
                 <span className="col-span-full truncate" title={p.label}>
                   {p.label}
                 </span>
-                <span className="shrink-0 text-xs text-gray-11">
-                  {short_id(p.id)}
-                </span>
+                <span className="shrink-0 text-xs text-gray-11">{p.ref}</span>
               </span>
               <span className="text-gray-11 max-sm:text-xs">
                 {toPP(p.date)}

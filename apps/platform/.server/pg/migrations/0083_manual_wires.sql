@@ -1,4 +1,5 @@
 SET LOCAL lock_timeout = '2s';--> statement-breakpoint
+LOCK TABLE "npos", "settlements", "user" IN ACCESS EXCLUSIVE MODE;--> statement-breakpoint
 CREATE TABLE "manual_wires" (
 	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "manual_wires_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"npo_id" integer NOT NULL,

@@ -14,8 +14,8 @@ import type { TWireAnswer } from "./api";
 export { action, loader } from "./api";
 export const meta: Route.MetaFunction = () => metas({ title: "Manual wires" });
 
-// a refusal (a duplicate, a row already settled, an amount that moved) answers
-// a 409, which React Router doesn't revalidate after: the rows would stay as
+// a refusal (a duplicate, payouts that changed, an amount off the net) answers
+// a 4xx, which React Router doesn't revalidate after: the rows would stay as
 // they were when the dialog opened
 export const shouldRevalidate: ShouldRevalidateFunction = ({
   formMethod,
@@ -25,7 +25,8 @@ export const shouldRevalidate: ShouldRevalidateFunction = ({
 interface IDialog {
   /** the row it opened on, with the row's place in the list */
   at: IWireReturnAt;
-  /** stays set after closing, so the dialog keeps its body while it animates out */
+  /** the row as it opened; stays set after closing, so the dialog keeps its
+   * body while it animates out of a list the row has left */
   row: IManualWireRow;
   open: boolean;
   /** one per opening: each opening's request gets a fetcher with no earlier answer */
@@ -37,6 +38,11 @@ export default function Page({ loaderData }: Route.ComponentProps) {
   const n = dialog?.n ?? 0;
   const mark = useFetcher<TWireAnswer>({ key: `manual-wire-${n}` });
   const settled = answer(mark);
+  // the open npo's row as the latest read has it: a refusal revalidates, and
+  // the dialog sends the payout ids it shows
+  const row =
+    dialog &&
+    (loaderData.rows.find((r) => r.npo_id === dialog.row.npo_id) ?? dialog.row);
 
   return (
     <div className="px-4 py-4 md:px-10 md:py-8 w-full grid content-start">
@@ -47,7 +53,7 @@ export default function Page({ loaderData }: Route.ComponentProps) {
       />
       <MarkWiredDialog
         open={!!dialog?.open && !settled.done}
-        row={dialog?.row ?? null}
+        row={row}
         submitting={mark.state !== "idle"}
         error={settled.error}
         on_submit={(x) =>

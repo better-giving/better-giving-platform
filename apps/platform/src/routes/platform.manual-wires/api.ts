@@ -21,6 +21,7 @@ const LABELS: Record<keyof IMarkWired, string> = {
   provider_tx_id: "transaction id",
   wire_fee: "wire fee",
   recorded_by: "signed-in account",
+  payout_ids: "payouts",
 };
 
 // shapes only: `mark_wired` judges the values and answers `invalid`
@@ -31,6 +32,7 @@ const body = v.object({
   provider: v.string(),
   provider_tx_id: v.pipe(v.string(), v.trim()),
   wire_fee: v.number(),
+  payout_ids: v.array(v.string()),
 });
 
 interface IDone {
@@ -62,8 +64,15 @@ function answer(sent: IMarkWired, res: MarkWiredResult) {
   switch (res.status) {
     case "ok":
       return { ok: true } satisfies IDone;
+    // `mark_wired` judges the amount against the live net; no figure in the
+    // answer, so a stale or hand-crafted post is not handed the amount
     case "invalid":
-      return resp.fail(400, `Check the ${LABELS[res.field]}`);
+      return res.field === "amount_sent"
+        ? resp.fail(
+            400,
+            "The amount sent doesn't match the net total less the wire fee, so nothing was recorded."
+          )
+        : resp.fail(400, `Check the ${LABELS[res.field]}`);
     case "duplicate":
       return resp.fail(
         409,
@@ -75,10 +84,17 @@ function answer(sent: IMarkWired, res: MarkWiredResult) {
       return resp.fail(409, "Nothing is pending for this nonprofit");
     case "under_minimum":
       return resp.fail(409, `Under the ${usd(res.minimum)} payout minimum`);
-    case "amount_mismatch":
+    case "payouts_changed":
       return resp.fail(
         409,
-        `The amount sent must be ${usd(res.expected)}, the net total less the wire fee`
+        "The payouts changed while this was open, so nothing was recorded. Check the updated amounts and mark it wired again."
       );
+    default:
+      return unanswered(res);
   }
+}
+
+/** typecheck fails here when `mark_wired` gains a result with no answer */
+function unanswered(res: never): never {
+  throw new Error(`mark_wired: no answer for ${JSON.stringify(res)}`);
 }

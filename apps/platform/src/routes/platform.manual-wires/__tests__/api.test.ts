@@ -1,3 +1,4 @@
+import { and, eq } from "drizzle-orm";
 import { RouterContextProvider } from "react-router";
 import {
   afterAll,
@@ -32,11 +33,23 @@ vi.mock("$/pg/db", () => ({
     }
   ),
 }));
-// the real context; only the better-auth instance stays out of the bundle
-vi.mock("#/.server/auth/auth", () => ({ auth: {} }));
+/** who the request's session cookie signs in, or no one */
+const session = vi.hoisted(() => ({
+  user: null as { id: string; role: string } | null,
+}));
+// the real guard and context; only the better-auth instance is a stand-in
+vi.mock("#/.server/auth/auth", () => ({
+  auth: {
+    api: { getSession: async () => session.user && { user: session.user } },
+  },
+}));
 vi.mock("#/.server/auth", async () => {
   const m = await import("#/.server/auth/middleware");
-  return { user_ctx: m.user_ctx };
+  return {
+    user_ctx: m.user_ctx,
+    auth_mdlwr: m.auth_mdlwr,
+    admin_mdlwr: m.admin_mdlwr,
+  };
 });
 // a second provider reaches `mark_wired` only through its `providers`
 // argument, as in its own tests: `WIRE_PROVIDERS` names one
@@ -50,7 +63,7 @@ vi.mock("$/payouts/manual-wire", async (io) => {
 });
 
 const { action, loader } = await import("../api");
-const { user_ctx } = await import("#/.server/auth");
+const { middleware } = await import("../../platform/route");
 const { user } = await import("$/pg/schema/auth");
 const { create_test_db } = await import("$/pg/test-utils/pglite");
 const { npos } = await import("$/pg/schema/npo");
@@ -131,25 +144,34 @@ async function seed_payout(
     });
 }
 
-const wire = (npo_id: number, o: Record<string, unknown> = {}) => ({
+/** the ids of the npo's payouts pending now, as the dialog sends them */
+const pending_ids = async (npo_id: number) =>
+  (
+    await db()
+      .select({ id: payouts.id })
+      .from(payouts)
+      .where(and(eq(payouts.npo_id, npo_id), eq(payouts.type, "pending")))
+      .orderBy(payouts.id)
+  ).map((p) => p.id);
+
+/** a wire for what the npo has pending now, unless `o` says otherwise */
+const wire = async (npo_id: number, o: Record<string, unknown> = {}) => ({
   npo_id,
   wire_date: "2026-11-18",
   amount_sent: 100,
   provider: "Mercury",
   provider_tx_id: "tx-1",
   wire_fee: 0,
+  payout_ids: await pending_ids(npo_id),
   ...o,
 });
 
-/** the request context the admin guard leaves: the signed-in admin */
-const admin_context = () => {
-  const context = new RouterContextProvider();
-  context.set(user_ctx, { id: ADMIN, role: "admin" } as any);
-  return context;
-};
+const AS_ADMIN = { id: ADMIN, role: "admin" };
 
-async function post(body: unknown) {
-  const res = (await action({
+/** posts through the platform layout's own middleware, as a request does */
+async function post(body: unknown, as: typeof session.user = AS_ADMIN) {
+  session.user = as;
+  const args = {
     ...doc_args(
       new Request("https://app.test/platform/manual-wires", {
         method: "POST",
@@ -157,12 +179,20 @@ async function post(body: unknown) {
         body: typeof body === "string" ? body : JSON.stringify(body),
       })
     ),
-    context: admin_context(),
+    context: new RouterContextProvider(),
     params: {},
-  } as any)) as Response | object;
-  return res instanceof Response
-    ? { status: res.status, body: await res.json() }
-    : { status: 200, body: res };
+  };
+  const run = (i: number): Promise<unknown> => {
+    const mw = middleware[i];
+    return mw ? (mw as any)(args, () => run(i + 1)) : action(args as any);
+  };
+  const res = await run(0).catch((e: unknown) => {
+    if (e instanceof Response) return e;
+    throw e;
+  });
+  if (!(res instanceof Response)) return { status: 200, body: res };
+  const text = await res.text();
+  return { status: res.status, body: text ? JSON.parse(text) : null };
 }
 
 /** everything a mark writes */
@@ -180,7 +210,7 @@ describe("mark wired", () => {
   test("a transaction already recorded at that provider is refused with 409, and nothing is written", async () => {
     const npo = await seed_npo();
     await seed_payout(npo, "p-1", 100);
-    expect(await post(wire(npo, { provider_tx_id: "MT-77" }))).toEqual({
+    expect(await post(await wire(npo, { provider_tx_id: "MT-77" }))).toEqual({
       status: 200,
       body: { ok: true },
     });
@@ -188,7 +218,7 @@ describe("mark wired", () => {
     const before = await ledger();
 
     const res = await post(
-      wire(npo, { provider_tx_id: "MT-77", amount_sent: 80 })
+      await wire(npo, { provider_tx_id: "MT-77", amount_sent: 80 })
     );
 
     expect(res).toEqual({
@@ -206,7 +236,10 @@ describe("mark wired", () => {
     const npo = await seed_npo();
     await seed_payout(npo, "p-1", 100);
 
-    expect(await post(wire(npo))).toEqual({ status: 200, body: { ok: true } });
+    expect(await post(await wire(npo))).toEqual({
+      status: 200,
+      body: { ok: true },
+    });
 
     const { wires } = await ledger();
     expect(wires).toEqual([expect.objectContaining({ recorded_by: ADMIN })]);
@@ -215,11 +248,11 @@ describe("mark wired", () => {
   test("the same transaction id at another provider is a different wire, and settles", async () => {
     const npo = await seed_npo();
     await seed_payout(npo, "p-1", 100);
-    await post(wire(npo, { provider_tx_id: "MT-77" }));
+    await post(await wire(npo, { provider_tx_id: "MT-77" }));
     await seed_payout(npo, "p-2", 80);
 
     const res = await post(
-      wire(npo, {
+      await wire(npo, {
         provider_tx_id: "MT-77",
         provider: "Other Bank",
         amount_sent: 80,
@@ -240,25 +273,59 @@ describe("mark wired", () => {
     body: { status, message },
   });
 
-  test("a wire that is not the net less its fee names the amount it must be", async () => {
+  test("a wire that is not the net less its fee is refused without the figure, and nothing is written", async () => {
     const npo = await seed_npo();
     await seed_payout(npo, "p-1", 1234.5);
+    const before = await ledger();
 
-    const res = await post(wire(npo, { amount_sent: 1234.5, wire_fee: 25 }));
+    const res = await post(
+      await wire(npo, { amount_sent: 1234.5, wire_fee: 25 })
+    );
 
     expect(res).toEqual(
       refused(
-        409,
-        "The amount sent must be $1,209.50, the net total less the wire fee"
+        400,
+        "The amount sent doesn't match the net total less the wire fee, so nothing was recorded."
       )
     );
+    expect(await ledger()).toEqual(before);
+  });
+
+  test("payouts that changed while the dialog was open are refused, and nothing is written", async () => {
+    const npo = await seed_npo();
+    await seed_payout(npo, "p-1", 100);
+    const opened = await wire(npo);
+    await seed_payout(npo, "p-2", 80);
+    const before = await ledger();
+
+    expect(await post(opened)).toEqual(
+      refused(
+        409,
+        "The payouts changed while this was open, so nothing was recorded. Check the updated amounts and mark it wired again."
+      )
+    );
+    expect(await ledger()).toEqual(before);
+  });
+
+  test("anyone but a signed-in platform admin is refused by the platform guard, and nothing is written", async () => {
+    const npo = await seed_npo();
+    await seed_payout(npo, "p-1", 100);
+    const before = await ledger();
+
+    expect(await post(await wire(npo), { id: ADMIN, role: "user" })).toEqual({
+      status: 403,
+      body: null,
+    });
+    const anonymous = await post(await wire(npo), null);
+    expect(anonymous.status).toBe(302);
+    expect(await ledger()).toEqual(before);
   });
 
   test("a net under the nonprofit's minimum is refused with that minimum", async () => {
     const npo = await seed_npo({ payout_minimum: 150 });
     await seed_payout(npo, "p-1", 100);
 
-    expect(await post(wire(npo))).toEqual(
+    expect(await post(await wire(npo))).toEqual(
       refused(409, "Under the $150.00 payout minimum")
     );
   });
@@ -267,16 +334,16 @@ describe("mark wired", () => {
     const npo = await seed_npo({ payout_method: "wise" });
     await seed_payout(npo, "p-1", 100);
 
-    expect(await post(wire(npo))).toEqual(
+    expect(await post(await wire(npo))).toEqual(
       refused(409, "This nonprofit is not paid by manual wire")
     );
   });
 
-  test("a nonprofit with nothing pending is refused", async () => {
+  test("a nonprofit whose payouts were all settled since the page loaded is refused", async () => {
     const npo = await seed_npo();
     await seed_payout(npo, "p-1", 100, "settled");
 
-    expect(await post(wire(npo))).toEqual(
+    expect(await post(await wire(npo, { payout_ids: ["p-1"] }))).toEqual(
       refused(409, "Nothing is pending for this nonprofit")
     );
   });
@@ -285,13 +352,13 @@ describe("mark wired", () => {
     const npo = await seed_npo();
     await seed_payout(npo, "p-1", 100);
 
-    expect(await post(wire(npo, { provider: "Nobody" }))).toEqual(
+    expect(await post(await wire(npo, { provider: "Nobody" }))).toEqual(
       refused(400, "Check the provider")
     );
-    expect(await post(wire(npo, { wire_date: "2026-02-31" }))).toEqual(
+    expect(await post(await wire(npo, { wire_date: "2026-02-31" }))).toEqual(
       refused(400, "Check the wire date")
     );
-    expect(await post(wire(npo, { provider_tx_id: "  " }))).toEqual(
+    expect(await post(await wire(npo, { provider_tx_id: "  " }))).toEqual(
       refused(400, "Check the transaction id")
     );
   });
@@ -304,10 +371,10 @@ describe("mark wired", () => {
     expect(await post("not json")).toEqual(
       refused(400, "Check the form and try again")
     );
-    expect(await post(wire(npo, { amount_sent: "100" }))).toEqual(
+    expect(await post(await wire(npo, { amount_sent: "100" }))).toEqual(
       refused(400, "Check the amount sent")
     );
-    expect(await post(wire(npo, { npo_id: 1.5 }))).toEqual(
+    expect(await post(await wire(npo, { npo_id: 1.5 }))).toEqual(
       refused(400, "Check the nonprofit")
     );
     expect(await ledger()).toEqual(before);
@@ -330,14 +397,25 @@ describe("the list", () => {
     ]);
   });
 
-  test("holds only what the run would pay: a net under the nonprofit's minimum is not due", async () => {
+  test("holds a nonprofit under its minimum with that minimum, and no wise or inactive nonprofit", async () => {
     const due = await seed_npo({ name: "River Trust", payout_minimum: 100 });
     await seed_payout(due, "p-1", 100);
     const short = await seed_npo({ name: "Short Trust", payout_minimum: 250 });
     await seed_payout(short, "p-2", 100);
+    const by_wise = await seed_npo({
+      name: "Wise Trust",
+      payout_method: "wise",
+    });
+    await seed_payout(by_wise, "w-1", 100);
+    const closed = await seed_npo({ name: "Closed Trust" });
+    await db().update(npos).set({ active: false }).where(eq(npos.id, closed));
+    await seed_payout(closed, "c-1", 100);
 
     const { rows } = await loader();
 
-    expect(rows.map((r) => r.npo_id)).toEqual([due]);
+    expect(rows.map((r) => [r.name, r.net, r.minimum])).toEqual([
+      ["River Trust", 100, 100],
+      ["Short Trust", 100, 250],
+    ]);
   });
 });

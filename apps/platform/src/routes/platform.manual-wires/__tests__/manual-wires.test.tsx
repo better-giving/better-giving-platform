@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   createRoutesStub,
   isRouteErrorResponse,
@@ -131,6 +131,15 @@ async function seed_payout(npo_id: number, amount: number) {
     });
 }
 
+/** the ids of the npo's payouts pending now */
+const pending_ids = async (npo_id: number) =>
+  (
+    await db()
+      .select({ id: payouts.id })
+      .from(payouts)
+      .where(and(eq(payouts.npo_id, npo_id), eq(payouts.type, "pending")))
+  ).map((p) => p.id);
+
 async function seed_admin() {
   const admin = await seed_user(db(), `ops${++n}@admin.test`, "Grace", "Ops");
   await db()
@@ -261,6 +270,7 @@ describe("manual wires", () => {
       provider_tx_id: "MT-77",
       wire_fee: 0,
       recorded_by: await seed_admin(),
+      payout_ids: await pending_ids(npo),
     });
     await seed_payout(npo, 80);
 
@@ -277,5 +287,41 @@ describe("manual wires", () => {
     expect(
       document.querySelector("tbody > tr[data-row-id]")?.textContent
     ).toContain("$80.00");
+  });
+
+  it("refuses a wire whose payouts changed while it was open: the dialog stays open with what was typed, and the row shows the new amounts", async () => {
+    const npo = await seed_wire_npo("River Trust", 100);
+
+    const screen = await open_wires();
+    await screen
+      .getByRole("button", { name: "Mark wired, River Trust" })
+      .click();
+    const dialog = screen.getByRole("dialog");
+    await dialog.getByLabelText("Transaction id").fill("MT-9");
+    await dialog.getByLabelText("Amount sent").fill("100");
+    // a gift's payout lands while the dialog is open
+    await seed_payout(npo, 80);
+    press(
+      dialog.getByRole("button", { name: "Mark wired", exact: true }).element()
+    );
+
+    await expect
+      .element(dialog.getByRole("alert"))
+      .toMatchTextContent(
+        "The payouts changed while this was open, so nothing was recorded. Check the updated amounts and mark it wired again."
+      );
+    await expect.element(screen.getByRole("dialog")).toBeVisible();
+    await expect
+      .element(dialog.getByLabelText("Transaction id"))
+      .toHaveValue("MT-9");
+    await expect
+      .element(dialog.getByRole("list", { name: "Payouts settled" }))
+      .toMatchTextContent("$80.00");
+    // the open modal hides the table from role queries, so the row is read off the DOM
+    await vi.waitFor(() =>
+      expect(
+        document.querySelector("tbody > tr[data-row-id]")?.textContent
+      ).toContain("$180.00")
+    );
   });
 });

@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import {
   afterAll,
   beforeAll,
@@ -107,6 +108,9 @@ async function seed_gift(id: string, created_at = "2026-08-01T00:00:00.000Z") {
   });
 }
 
+/** long as a real dist id, so its mask keeps both ends: `dist..._p-1` */
+const source_id = (id: string) => `dist_7f3a9c2e81_${id}`;
+
 async function seed_payout(
   npo_id: number,
   id: string,
@@ -118,7 +122,7 @@ async function seed_payout(
     .insert(payouts)
     .values({
       id,
-      source_id: `dist-${id}`,
+      source_id: source_id(id),
       npo_id,
       source: o.source ?? "donation",
       date,
@@ -142,7 +146,7 @@ async function seed_donor_payout(
   await db()
     .insert(dists)
     .values({
-      id: `dist-${id}`,
+      id: source_id(id),
       donation_id: `don-${id}`,
       status: "settled",
       date_created: date,
@@ -198,6 +202,7 @@ describe("manual_wire_rows", () => {
           {
             id: "a-1",
             label: "Investments",
+            ref: "dist..._a-1",
             date: "2026-09-05T00:00:00.000Z",
             amount: 75,
           },
@@ -215,24 +220,28 @@ describe("manual_wire_rows", () => {
           {
             id: "p-1",
             label: "Bob Donor",
+            ref: "dist..._p-1",
             date: "2026-09-01T00:00:00.000Z",
             amount: 40.5,
           },
           {
             id: "p-2",
             label: "ann@example.com",
+            ref: "dist..._p-2",
             date: "2026-09-02T00:00:00.000Z",
             amount: 60,
           },
           {
             id: "p-3",
             label: "Savings",
+            ref: "dist..._p-3",
             date: "2026-09-03T00:00:00.000Z",
             amount: 10,
           },
           {
             id: "p-4",
-            label: "Unknown donor",
+            label: "Donation",
+            ref: "dist..._p-4",
             date: "2026-09-04T00:00:00.000Z",
             amount: 5,
           },
@@ -252,14 +261,16 @@ describe("manual_wire_rows", () => {
     expect(row).toMatchObject({ gross: 500, owed: 93.2, net: 406.8 });
   });
 
-  test("an npo whose net is under its minimum has no row", async () => {
+  test("an npo whose net is under its minimum keeps its row, with that net and minimum", async () => {
     const small = await seed_npo("Small Wire");
     await seed_payout(small, "s-1", 30, "2026-09-01T00:00:00.000Z");
 
-    expect(await manual_wire_rows()).toEqual([]);
+    expect(await manual_wire_rows()).toMatchObject([
+      { npo_id: small, net: 30, minimum: 50 },
+    ]);
   });
 
-  test("netting on, an npo the owed takes under its minimum, or whose owed covers its pending, has no row", async () => {
+  test("netting on, an npo the owed takes under its minimum keeps its row; one whose owed covers its pending has none", async () => {
     deductions.on = true;
     const short = await seed_npo("Short Wire");
     await seed_payout(short, "s-1", 100, "2026-09-01T00:00:00.000Z");
@@ -267,6 +278,16 @@ describe("manual_wire_rows", () => {
     const covered = await seed_npo("Covered Wire");
     await seed_payout(covered, "c-1", 80, "2026-09-01T00:00:00.000Z");
     await seed_owed(covered, "don-covered", 93.2);
+
+    expect(await manual_wire_rows()).toMatchObject([
+      { npo_id: short, gross: 100, owed: 60, net: 40, minimum: 50 },
+    ]);
+  });
+
+  test("an inactive npo has no row", async () => {
+    const gone = await seed_npo("Gone Wire");
+    await db().update(npos).set({ active: false }).where(eq(npos.id, gone));
+    await seed_payout(gone, "g-1", 100, "2026-09-01T00:00:00.000Z");
 
     expect(await manual_wire_rows()).toEqual([]);
   });

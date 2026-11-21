@@ -49,10 +49,14 @@ const wire_row = (id: number, name: string, net: number): Row => ({
   net,
   deductions: [{ donation_id: `don-${id}`, usd: 612.4 }],
 });
+/** a run that nets nothing: rows carry their gross alone */
+const gross = ({ net: _, deductions: __, ...r }: Row): Row => r;
 /** the tint a manual-wire row takes, as the html carries it */
 const tint = `background-color:${flat_colors.accent_2}`;
-const LEGEND =
-  "manual wire is not sent by this run: send the Net by wire, then mark it wired on the Manual wires page.";
+const LEGEND_NET =
+  "manual wire is not sent by this run: send the Net less any wire fee, then mark it wired on the Manual wires page.";
+const LEGEND_GROSS =
+  "manual wire is not sent by this run: send the Grant less any wire fee, then mark it wired on the Manual wires page.";
 
 /** the text line beginning with `first`, split on the column gutter */
 const row_cells = (text: string, first: string) =>
@@ -153,7 +157,8 @@ describe("grants schedule text part", () => {
     );
 
     expect(text).toContain("Manual wires: $4,200.00 · 1 nonprofit");
-    expect(text).toContain(LEGEND);
+    expect(text).toContain(LEGEND_NET);
+    expect(text).not.toContain(LEGEND_GROSS);
     expect(row_cells(text, "1293826")).toEqual([
       "1293826",
       "SXM Paws",
@@ -191,14 +196,49 @@ describe("grants schedule text part", () => {
     expect(html).not.toContain(tint);
   });
 
-  test("no provider is named anywhere in a schedule with a manual wire", async () => {
+  test("netting off, the table has no Owed or Net column and no deductions, the wire's Grant is bold and the line sums Grants", async () => {
     const { text, html } = await sent(
-      schedule([pass_row, wire_row(1293826, "SXM Paws", 4200)])
+      schedule([
+        gross(pass_row),
+        gross(wire_row(1293826, "SXM Paws", 4200)),
+        gross(wire_row(12, "Reef Aid", 150.5)),
+      ])
     );
 
-    for (const provider of WIRE_PROVIDERS) {
-      expect(text).not.toContain(provider);
-      expect(html).not.toContain(provider);
-    }
+    // the text part sets header cells in capitals
+    expect(row_cells(text, "ID")).toEqual([
+      "ID",
+      "NAME",
+      "GRANT",
+      "MIN",
+      "EFFECT",
+    ]);
+    expect(row_cells(text, "1293826")).toEqual([
+      "1293826",
+      "SXM Paws",
+      "$4,812.40",
+      "$100.00",
+      "manual wire",
+    ]);
+    expect(text).not.toContain("Deductions by gift");
+    expect(text).toContain("Manual wires: $9,624.80 · 2 nonprofits");
+    expect(text).toContain(LEGEND_GROSS);
+    expect(text).not.toContain(LEGEND_NET);
+    expect(html).toMatch(/<td[^>]*font-weight:600[^>]*>\$4,812\.40<\/td>/);
   });
+
+  test.each([
+    ["netting", [pass_row, wire_row(1293826, "SXM Paws", 4200)]],
+    ["gross", [gross(pass_row), gross(wire_row(1293826, "SXM Paws", 4200))]],
+  ])(
+    "no provider is named anywhere in a %s schedule with a manual wire",
+    async (_, rows) => {
+      const { text, html } = await sent(schedule(rows));
+
+      for (const provider of WIRE_PROVIDERS) {
+        expect(text).not.toContain(provider);
+        expect(html).not.toContain(provider);
+      }
+    }
+  );
 });

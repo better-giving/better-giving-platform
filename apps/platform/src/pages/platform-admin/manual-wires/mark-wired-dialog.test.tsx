@@ -21,12 +21,14 @@ const row: IManualWireRow = {
     {
       id: "f3b1c0de-0000-4000-8000-00000000e8f4",
       label: "maya.okafor@brightmail.com",
+      ref: "f3b1...e8f4",
       date: "2026-10-01T12:00:00.000Z",
       amount: 1904.1,
     },
     {
       id: "6d20c0de-0000-4000-8000-00000000d165",
       label: "Savings",
+      ref: "6d20...d165",
       date: "2026-11-01T12:00:00.000Z",
       amount: 2908.3,
     },
@@ -42,6 +44,12 @@ const dialog_props = (o: Partial<IMarkWiredDialog> = {}): IMarkWiredDialog => ({
   ...o,
 });
 
+/** the summary's labels, top to bottom */
+const summary_rows = (screen: Awaited<ReturnType<typeof render>>) =>
+  [...screen.getByLabelText("Summary").element().querySelectorAll("dt")].map(
+    (dt) => dt.textContent
+  );
+
 const submit_button = (screen: Awaited<ReturnType<typeof render>>) =>
   screen.getByRole("button", { name: "Mark wired", exact: true });
 
@@ -56,10 +64,16 @@ describe("mark wired dialog", () => {
       .element(screen.getByRole("combobox", { name: "Provider" }))
       .toMatchTextContent("Mercury");
 
+    // each payout reads label, masked ref, date, amount
     const payouts = screen.getByRole("list", { name: "Payouts settled" });
-    await expect.element(payouts).toMatchTextContent("f3b1...e8f4");
-    await expect.element(payouts).toMatchTextContent("Oct 1, 2026");
-    await expect.element(payouts).toMatchTextContent("$2,908.30");
+    await expect
+      .element(payouts.getByRole("listitem").first())
+      .toHaveTextContent(
+        "maya.okafor@brightmail.comf3b1...e8f4Oct 1, 2026$1,904.10"
+      );
+    await expect
+      .element(payouts.getByRole("listitem").nth(1))
+      .toHaveTextContent("Savings6d20...d165Nov 1, 2026$2,908.30");
 
     const summary = screen.getByLabelText("Summary");
     await expect.element(summary).toMatchTextContent("Owed, deducted−$612.40");
@@ -72,23 +86,50 @@ describe("mark wired dialog", () => {
     await expect.element(summary).toMatchTextContent("Balance debit$4,812.40");
   });
 
-  test.each([
-    // owing: the recovered share leaves the cash with the rest of the gross
-    ["$500 pending, $93.20 owed", 500, 93.2, 406.8, "$406.80", "$500.00"],
-    ["nothing owed", 4200, 0, 4200, "$4,200.00", "$4,200.00"],
-  ])(
-    "the balance debit is the gross of the payouts settled: %s",
-    async (_, gross, owed, net, net_text, debit_text) => {
+  test("owing, the summary deducts it, and the balance debit is the pending gross", async () => {
+    const screen = await render(
+      <MarkWiredDialog
+        {...dialog_props({
+          row: { ...row, gross: 500, owed: 93.2, net: 406.8 },
+        })}
+      />
+    );
+    const summary = screen.getByLabelText("Summary");
+    await expect.element(summary).toMatchTextContent("Pending$500.00");
+    await expect.element(summary).toMatchTextContent("Owed, deducted−$93.20");
+    await expect.element(summary).toMatchTextContent("Net total$406.80");
+    await expect.element(summary).toMatchTextContent("Balance debit$500.00");
+    expect(summary_rows(screen)).toEqual([
+      "Pending",
+      "Owed, deducted",
+      "Net total",
+      "Wire fee",
+      "Amount to send",
+      "Balance debit",
+    ]);
+  });
+
+  test.each([0, -12.5])(
+    "owing nothing (owed %d), the summary has no owed row",
+    async (owed) => {
       const screen = await render(
         <MarkWiredDialog
-          {...dialog_props({ row: { ...row, gross, owed, net } })}
+          {...dialog_props({
+            row: { ...row, gross: 4200 - owed, owed, net: 4200 },
+          })}
         />
       );
-      const summary = screen.getByLabelText("Summary");
-      await expect.element(summary).toMatchTextContent(`Net total${net_text}`);
       await expect
-        .element(summary)
-        .toMatchTextContent(`Balance debit${debit_text}`);
+        .element(screen.getByLabelText("Summary"))
+        .toMatchTextContent("Net total$4,200.00");
+      expect(summary_rows(screen)).toEqual([
+        "Pending",
+        "Net total",
+        "Wire fee",
+        "Amount to send",
+        "Balance debit",
+      ]);
+      expect(screen.getByText("Owed, deducted").query()).toBeNull();
     }
   );
 
@@ -182,6 +223,7 @@ describe("mark wired dialog", () => {
         provider: "Mercury",
         provider_tx_id: TX,
         amount_sent: 4175,
+        payout_ids: row.payouts.map((p) => p.id),
       })
     );
     await new Promise((r) => setTimeout(r, 50));
@@ -215,5 +257,77 @@ describe("mark wired dialog", () => {
     await expect
       .element(screen.getByRole("dialog", { name: "Mark wired", exact: true }))
       .toBeVisible();
+  });
+
+  test("payouts changed while open: what was typed stays, the figures and the amount check follow the new row", async () => {
+    const casa: IManualWireRow = {
+      npo_id: 1184407,
+      name: "Casa Esperanza Foundation",
+      gross: 500,
+      owed: 93.2,
+      net: 406.8,
+      minimum: 100,
+      bank: "EUR account ending in 7731",
+      payouts: row.payouts.map((p, i) => ({ ...p, amount: [180, 320][i] })),
+    };
+    const added = {
+      id: "c2e8c0de-0000-4000-8000-000000009f40",
+      label: "tomas.wirth@outlook.com",
+      ref: "c2e8...9f40",
+      date: "2026-11-20T12:00:00.000Z",
+      amount: 120,
+    };
+    const changed: IManualWireRow = {
+      ...casa,
+      gross: 620,
+      net: 526.8,
+      payouts: [...casa.payouts, added],
+    };
+    const refusal =
+      "The payouts changed while this was open, so nothing was recorded. Check the updated amounts and mark it wired again.";
+    const p = dialog_props({ row: casa });
+    const screen = await render(<MarkWiredDialog {...p} />);
+    await screen.getByLabelText("Wire fee").fill("10");
+    await screen.getByLabelText("Transaction id").fill(TX);
+    await screen.getByLabelText("Amount sent").fill("396.80");
+
+    await screen.rerender(
+      <MarkWiredDialog {...p} row={changed} error={refusal} />
+    );
+    await expect.element(screen.getByRole("alert")).toHaveTextContent(refusal);
+    await expect.element(screen.getByLabelText("Wire fee")).toHaveValue("10");
+    await expect
+      .element(screen.getByLabelText("Transaction id"))
+      .toHaveValue(TX);
+    await expect
+      .element(screen.getByLabelText("Amount sent"))
+      .toHaveValue("396.80");
+    const summary = screen.getByLabelText("Summary");
+    await expect.element(summary).toMatchTextContent("Pending$620.00");
+    await expect.element(summary).toMatchTextContent("Net total$526.80");
+    await expect.element(summary).toMatchTextContent("Amount to send$516.80");
+    await expect.element(summary).toMatchTextContent("Balance debit$620.00");
+    await expect
+      .element(screen.getByRole("list", { name: "Payouts settled" }))
+      .toMatchTextContent("tomas.wirth@outlook.comc2e8...9f40");
+
+    press(submit_button(screen).element());
+    await expect
+      .element(screen.getByLabelText("Amount sent"))
+      .toHaveAccessibleDescription(
+        "enter $516.80, the net total less the wire fee"
+      );
+    expect(p.on_submit).not.toHaveBeenCalled();
+
+    await screen.getByLabelText("Amount sent").fill("516.80");
+    press(submit_button(screen).element());
+    await vi.waitFor(() => expect(p.on_submit).toHaveBeenCalledOnce());
+    expect(p.on_submit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        wire_fee: 10,
+        amount_sent: 516.8,
+        payout_ids: changed.payouts.map((x) => x.id),
+      })
+    );
   });
 });

@@ -1,6 +1,7 @@
 import { db } from "../pg/db";
 import { npo_default_bapp } from "../pg/queries/banking";
 import type { DbOrTx } from "../pg/queries/helpers";
+import { npo_payout_method } from "../pg/queries/manual-wire";
 import { npo_last_return, returned_payouts_resend } from "../pg/queries/payout";
 import { lock_run } from "./owed-run";
 import { type HoldCause, return_hold_cause } from "./return-hold";
@@ -74,7 +75,8 @@ export type ResendResult =
 
 /**
  * an npo's payouts whose transfer came back go out again once its grants are
- * no longer held (`npo_return_hold`); until then they stay `returned`. called
+ * no longer held (`npo_return_hold`); until then they stay `returned`. a
+ * manual-wire npo is never held: its go back to pending for the next wire. called
  * when an account is approved or made default, and after a return is taken
  * back; a repeat moves nothing. under the npo's run lock, which
  * `return_settlement` takes too: a return committing between the hold read
@@ -84,7 +86,10 @@ export type ResendResult =
 export async function resend_returned(npo_id: number): Promise<ResendResult> {
   return db.transaction(async (tx): Promise<ResendResult> => {
     await lock_run(tx, `grant_run:npo:${npo_id}`);
-    const hold = await npo_return_hold(npo_id, tx);
+    // a manual-wire npo is never paid to the account that bounced: its
+    // returned payouts go back to pending for the next wire at once
+    const by_wise = (await npo_payout_method(tx, npo_id)) !== "manual_wire";
+    const hold = by_wise ? await npo_return_hold(npo_id, tx) : null;
     if (hold) return { status: "held", reason: hold.reason };
     const ids = await returned_payouts_resend(tx, npo_id);
     return ids.length > 0 ? { status: "resent", ids } : { status: "none" };

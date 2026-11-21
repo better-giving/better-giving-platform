@@ -11,6 +11,7 @@ import { npo_balance_update, npo_get_locked } from "../pg/queries/npo";
 import { outstanding_for_npo, unrecover_owed } from "../pg/queries/owed";
 import {
   npo_last_return,
+  npo_pending_payouts_locked,
   payouts_funded,
   payouts_in,
   payouts_move,
@@ -57,6 +58,9 @@ export type SettleResult =
   | { status: "no_recipient"; total: number }
   /** a recorded send whose amount is not what the claim nets: nothing written */
   | { status: "amount_mismatch"; net: number }
+  /** a recorded send for payouts that are no longer exactly the npo's pending
+   * set: nothing written */
+  | { status: "payouts_changed" }
   /** a recorded send: its payouts settled and the balance debited with it */
   | { status: "wired"; settlement_id: string; total: number };
 
@@ -97,6 +101,11 @@ export interface IRecordedSend {
 const is_recorded = (to: IRecipient | IRecordedSend): to is IRecordedSend =>
   "settlement_id" in to;
 
+const same_ids = (payouts: { id: string }[], ids: string[]) => {
+  const want = new Set(ids);
+  return payouts.length === want.size && payouts.every((p) => want.has(p.id));
+};
+
 /** `to` is null for an npo with no recipient: only a run that sends nothing
  * settles */
 export async function settle_npo_payouts(
@@ -126,8 +135,16 @@ export async function settle_npo_payouts(
         return { status: "recipient_changed", ref_key: to.ref_key } as const;
       }
     }
-    const locked = await pending_payouts_locked(tx, payout_ids);
+    const recorded = to !== null && is_recorded(to);
+    // a recorded send covers what was pending when it was sent: all of the
+    // npo's pending set, locked, and only if that is still `payout_ids`
+    const locked = recorded
+      ? await npo_pending_payouts_locked(tx, npo.id)
+      : await pending_payouts_locked(tx, payout_ids);
     if (locked.length === 0) return { status: "none_pending" } as const;
+    if (recorded && !same_ids(locked, payout_ids)) {
+      return { status: "payouts_changed" } as const;
+    }
     // a refund locks payout, then npo, then owed row; the claim does too
     if (nets) await npo_get_locked(tx, npo.id);
     // wise moves cents: the minimum, quote and cash debit all start from this one figure

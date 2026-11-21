@@ -18,9 +18,27 @@ const wire_row = (o: Partial<IManualWireRow> = {}): IManualWireRow => ({
   minimum: 100,
   bank: "USD account ending in 0412",
   payouts: [
-    { id: "p1", label: "a@x.org", date: "2026-10-01", amount: 1904.1 },
-    { id: "p2", label: "b@x.org", date: "2026-11-01", amount: 2311.8 },
-    { id: "p3", label: "c@x.org", date: "2026-11-12", amount: 596.5 },
+    {
+      id: "p1",
+      label: "a@x.org",
+      ref: "p100...001",
+      date: "2026-10-01",
+      amount: 1904.1,
+    },
+    {
+      id: "p2",
+      label: "b@x.org",
+      ref: "p200...002",
+      date: "2026-11-01",
+      amount: 2311.8,
+    },
+    {
+      id: "p3",
+      label: "c@x.org",
+      ref: "p300...003",
+      date: "2026-11-12",
+      amount: 596.5,
+    },
   ],
   ...o,
 });
@@ -32,7 +50,15 @@ const casa = wire_row({
   owed: 0,
   net: 1250,
   bank: "EUR account ending in 7731",
-  payouts: [{ id: "p4", label: "Savings", date: "2026-10-02", amount: 1250 }],
+  payouts: [
+    {
+      id: "p4",
+      label: "Savings",
+      ref: "p400...004",
+      date: "2026-10-02",
+      amount: 1250,
+    },
+  ],
 });
 
 const kaya = wire_row({
@@ -44,8 +70,20 @@ const kaya = wire_row({
   minimum: 250,
   bank: "USD account ending in 5508",
   payouts: [
-    { id: "p5", label: "d@x.org", date: "2026-10-03", amount: 30 },
-    { id: "p6", label: "e@x.org", date: "2026-10-04", amount: 32 },
+    {
+      id: "p5",
+      label: "d@x.org",
+      ref: "p500...005",
+      date: "2026-10-03",
+      amount: 30,
+    },
+    {
+      id: "p6",
+      label: "e@x.org",
+      ref: "p600...006",
+      date: "2026-10-04",
+      amount: 32,
+    },
   ],
 });
 
