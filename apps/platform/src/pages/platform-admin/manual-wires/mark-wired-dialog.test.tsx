@@ -395,16 +395,36 @@ describe("mark wired dialog", () => {
     expect(date_of()).toBe(date);
   });
 
-  test("the focus trap's initial focus is where focus already is inside the dialog, else the month", async () => {
+  test("the focus trap's target is where focus is, else where it last was in the dialog (even if that element was replaced), else the month", async () => {
     const screen = await render(<MarkWiredDialog {...dialog_props()} />);
+    const none = { el: null, key: null };
     const month = screen.getByRole("spinbutton").first().element();
-    expect(initial_focus()).toBe(month);
+    const tx = screen.getByLabelText("Transaction id").element() as HTMLElement;
+    // the trap has just put focus on the month: that is where focus is
+    expect(initial_focus(none)).toBe(month);
     await screen.getByLabelText("Transaction id").click();
-    expect(initial_focus()).toBe(
-      screen.getByLabelText("Transaction id").element()
-    );
-    // focus on the page behind the dialog, or nowhere: back to the first field
+    expect(initial_focus(none)).toBe(tx);
+    // focus nowhere (read before the dialog puts it back): the last field,
+    // as an element or, if its element was replaced, found again by its name
     (document.activeElement as HTMLElement).blur();
-    expect(initial_focus()).toBe(month);
+    expect(initial_focus({ el: tx, key: '[name="provider_tx_id"]' })).toBe(tx);
+    expect(initial_focus({ el: null, key: '[name="provider_tx_id"]' })).toBe(
+      tx
+    );
+    // nothing remembered: the month
+    expect(initial_focus(none)).toBe(month);
+  });
+
+  test("a field that blurs for a moment gets focus back: the trap never sends it to the date", async () => {
+    const screen = await render(<MarkWiredDialog {...dialog_props()} />);
+    const date = date_of();
+    await screen.getByLabelText("Transaction id").click();
+    (document.activeElement as HTMLElement).blur();
+    await new Promise((r) =>
+      requestAnimationFrame(() => requestAnimationFrame(r))
+    );
+    await new Promise((r) => setTimeout(r, 100));
+    await expect.element(screen.getByLabelText("Transaction id")).toHaveFocus();
+    expect(date_of()).toBe(date);
   });
 });

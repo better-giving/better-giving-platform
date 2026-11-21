@@ -1,7 +1,7 @@
 import { DateField, Field, Modal, Select } from "@better-giving/ui";
 import { valibotResolver } from "@hookform/resolvers/valibot";
 import { format } from "date-fns";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   type Control,
   useController,
@@ -84,19 +84,42 @@ const wired_schema = (net: number, providers: readonly string[]) =>
 
 type TForm = v.InferOutput<ReturnType<typeof wired_schema>>;
 
+/** where focus last was inside the dialog: the element, and how to find the
+ * field again if React replaces its element */
+export interface ILastFocus {
+  el: HTMLElement | null;
+  key: string | null;
+}
+
+const key_of = (el: HTMLElement) => {
+  const name = el.getAttribute("name");
+  if (name) return `[name="${CSS.escape(name)}"]`;
+  const label = el.getAttribute("aria-label");
+  return label ? `[aria-label="${CSS.escape(label)}"]` : null;
+};
+
+const last_in = (dialog: HTMLElement, last: ILastFocus) => {
+  if (last.el?.isConnected && dialog.contains(last.el)) return last.el;
+  return last.key ? dialog.querySelector<HTMLElement>(last.key) : null;
+};
+
 /**
- * what the focus trap focuses when it arms, and again whenever it re-runs its
- * initial focus: wherever focus already is inside the dialog, else the date's
- * month segment. a re-run must never pull focus off the field the admin is
- * typing in: the keystrokes would land in the date, and the wire date is a
- * money record
+ * what the focus trap focuses when it arms, and every time it pulls focus
+ * back: wherever focus is now if that is inside the dialog, else where it last
+ * was inside the dialog, and only on first open the date's month segment. the
+ * trap must never send focus to the date once the admin is in the form: the
+ * next keystrokes would land in it, and the wire date is a money record
  */
-export function initial_focus(): HTMLElement | null {
+export function initial_focus(last: ILastFocus): HTMLElement | null {
   const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
   if (!dialog) return document.body;
   const active = document.activeElement;
   if (active instanceof HTMLElement && dialog.contains(active)) return active;
-  return dialog.querySelector<HTMLElement>('[role="spinbutton"]') ?? dialog;
+  return (
+    last_in(dialog, last) ??
+    dialog.querySelector<HTMLElement>('[role="spinbutton"]') ??
+    dialog
+  );
 }
 
 export function MarkWiredDialog({
@@ -108,12 +131,43 @@ export function MarkWiredDialog({
   providers = WIRE_PROVIDERS,
   ...rest
 }: IMarkWiredDialog) {
+  const last_focused = useRef<ILastFocus>({ el: null, key: null });
+  useEffect(() => {
+    if (!open) return;
+    last_focused.current = { el: null, key: null };
+    const note = (e: FocusEvent) => {
+      const el = e.target;
+      if (el instanceof HTMLElement && el.closest('[role="dialog"]'))
+        last_focused.current = { el, key: key_of(el) };
+    };
+    // a field that loses focus to nothing (a blur between two fills, an
+    // element replaced under it) gets it back, in a microtask so a focus move
+    // already under way wins: only focus left on <body> is put back
+    const keep = (e: FocusEvent) => {
+      const el = e.target;
+      if (e.relatedTarget || !(el instanceof HTMLElement)) return;
+      if (!el.closest('[role="dialog"]')) return;
+      queueMicrotask(() => {
+        const dialog = document.querySelector<HTMLElement>(
+          '[role="dialog"][data-state="open"]'
+        );
+        if (!dialog || document.activeElement !== document.body) return;
+        last_in(dialog, last_focused.current)?.focus({ preventScroll: true });
+      });
+    };
+    document.addEventListener("focusin", note, true);
+    document.addEventListener("focusout", keep, true);
+    return () => {
+      document.removeEventListener("focusin", note, true);
+      document.removeEventListener("focusout", keep, true);
+    };
+  }, [open]);
   return (
     <Modal
       open={open}
       onClose={on_close}
       busy={submitting}
-      initialFocusEl={initial_focus}
+      initialFocusEl={() => initial_focus(last_focused.current)}
       returnFocusFallback={return_focus_fallback}
       classes="bg-popover"
     >

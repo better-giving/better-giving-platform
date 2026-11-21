@@ -220,100 +220,21 @@ const press = (el: Element) => (el as HTMLElement).click();
 const dialog_ready = (dialog: ReturnType<Screen["getByRole"]>) =>
   expect.element(dialog.getByRole("spinbutton").first()).toHaveFocus();
 
-// DIAG309: temporary diagnostics for a CI-only failure, removed with its fix
+/** a person clicks a field before typing in it */
+async function fill_field(dialog: Dialog, label: string, text: string) {
+  const field = dialog.getByLabelText(label);
+  await field.click();
+  await field.fill(text);
+}
+
 type Dialog = ReturnType<Screen["getByRole"]>;
 
-function diag309() {
-  const lines: string[] = [];
-  const t0 = performance.now();
-  const d = (x: string) =>
-    lines.push(`DIAG309 ${Math.round(performance.now() - t0)}ms ${x}`);
-  const who = (t: EventTarget | null) => {
-    const e = t as HTMLElement | null;
-    if (!e?.tagName) return String(t);
-    return `${e.tagName.toLowerCase()} role=${e.getAttribute("role") ?? ""} name=${e.getAttribute("name") ?? ""} aria-label=${e.getAttribute("aria-label") ?? ""}`;
-  };
-  const value_of = (t: EventTarget | null) =>
-    (t as HTMLInputElement | null)?.value ??
-    (t as HTMLElement | null)?.textContent ??
-    "";
-  const on_event = (e: Event) =>
-    d(
-      `${e.type} [${who(e.target)}] key=${(e as KeyboardEvent).key ?? ""} inputType=${(e as InputEvent).inputType ?? ""} data=${(e as InputEvent).data ?? ""} value=${value_of(e.target)}`
-    );
-  const events = [
-    "focusin",
-    "focusout",
-    "keydown",
-    "beforeinput",
-    "input",
-    "select",
-  ];
-  const date_segments = () =>
-    [...document.querySelectorAll('[role="dialog"] [role="spinbutton"]')]
-      .slice(0, 3)
-      .map(
-        (x) =>
-          `${x.getAttribute("aria-label")}=${x.textContent}(valuenow ${x.getAttribute("aria-valuenow")})`
-      )
-      .join(" ");
-  d(`userAgent=${navigator.userAgent}`);
-  d(`now=${new Date().toString()}`);
-  d(`timeZone=${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
-  return {
-    /** fills Amount sent, recording what resolves, what happens and where it ends */
-    async fill_amount(dialog: Dialog, text: string) {
-      const field = dialog.getByLabelText("Amount sent");
-      const found = field.elements();
-      d(
-        `Amount sent resolves to ${found.length} element(s): ${found.map((f) => `${f.tagName.toLowerCase()} name=${f.getAttribute("name")} id=${f.id} aria-labelledby=${f.getAttribute("aria-labelledby")}`).join(" | ")}`
-      );
-      d(`before amount fill: date ${date_segments()}`);
-      for (const t of events) document.addEventListener(t, on_event, true);
-      try {
-        await field.fill(text);
-      } finally {
-        const input = found[0] as HTMLInputElement | undefined;
-        const a = document.activeElement;
-        d(
-          `after amount fill: active=${who(a)} amountValue=${input?.value} selectionStart=${input?.selectionStart} selectionEnd=${input?.selectionEnd} date ${date_segments()}`
-        );
-        for (const t of events) document.removeEventListener(t, on_event, true);
-      }
-    },
-    d,
-    lines,
-  };
-}
-
-type Diag = ReturnType<typeof diag309>;
-
-/** runs a test body with diagnostics: printed whatever the outcome, and appended to a failure */
-async function with_diag(body: (dg: Diag) => Promise<void>) {
-  const dg = diag309();
-  try {
-    await body(dg);
-  } catch (e) {
-    if (e instanceof Error) e.message += `\n${dg.lines.join("\n")}`;
-    throw e;
-  } finally {
-    console.log(dg.lines.join("\n"));
-  }
-}
-
-async function mark(
-  screen: Screen,
-  name: string,
-  tx: string,
-  sent: string,
-  dg?: Diag
-) {
+async function mark(screen: Screen, name: string, tx: string, sent: string) {
   await screen.getByRole("button", { name: `Mark wired, ${name}` }).click();
   const dialog = screen.getByRole("dialog");
   await dialog_ready(dialog);
-  await dialog.getByLabelText("Transaction id").fill(tx);
-  if (dg) await dg.fill_amount(dialog, sent);
-  else await dialog.getByLabelText("Amount sent").fill(sent);
+  await fill_field(dialog, "Transaction id", tx);
+  await fill_field(dialog, "Amount sent", sent);
   press(
     dialog.getByRole("button", { name: "Mark wired", exact: true }).element()
   );
@@ -358,88 +279,80 @@ describe("manual wires", () => {
     expect(screen.getByRole("status").query()).toBeNull();
   });
 
-  it("after the last row, focus goes to the row above; after the only row, to the empty cell", () =>
-    with_diag(async (dg) => {
-      await seed_wire_npo("A Trust", 100);
-      await seed_wire_npo("B Trust", 200);
+  it("after the last row, focus goes to the row above; after the only row, to the empty cell", async () => {
+    await seed_wire_npo("A Trust", 100);
+    await seed_wire_npo("B Trust", 200);
 
-      const screen = await open_wires();
-      await mark(screen, "B Trust", "MT-1", "200", dg);
-      await expect
-        .element(screen.getByRole("button", { name: "Mark wired, A Trust" }))
-        .toHaveFocus();
+    const screen = await open_wires();
+    await mark(screen, "B Trust", "MT-1", "200");
+    await expect
+      .element(screen.getByRole("button", { name: "Mark wired, A Trust" }))
+      .toHaveFocus();
 
-      await mark(screen, "A Trust", "MT-2", "100", dg);
-      await expect
-        .element(screen.getByText("No manual wires due"))
-        .toBeVisible();
-      await vi.waitFor(() =>
-        expect(document.activeElement?.textContent).toContain(
-          "No manual wires due"
-        )
+    await mark(screen, "A Trust", "MT-2", "100");
+    await expect.element(screen.getByText("No manual wires due")).toBeVisible();
+    await vi.waitFor(() =>
+      expect(document.activeElement?.textContent).toContain(
+        "No manual wires due"
+      )
+    );
+  });
+
+  it("a revalidation that lands while the admin is typing leaves the date, the typed fields and the focus alone", async () => {
+    const npo = await seed_wire_npo("River Trust", 100);
+    await mark_wired({
+      npo_id: npo,
+      wire_date: "2026-11-18",
+      amount_sent: 100,
+      provider: "Mercury",
+      provider_tx_id: "MT-77",
+      wire_fee: 0,
+      recorded_by: await seed_admin(),
+      payout_ids: await pending_ids(npo),
+    });
+    await seed_payout(npo, 80);
+
+    const screen = await open_wires();
+    await screen
+      .getByRole("button", { name: "Mark wired, River Trust" })
+      .click();
+    const dialog = screen.getByRole("dialog");
+    await dialog_ready(dialog);
+    const date_of = () =>
+      [...document.querySelectorAll('[role="dialog"] [role="spinbutton"]')]
+        .slice(0, 3)
+        .map((e) => e.textContent)
+        .join("/");
+    const date = date_of();
+    await fill_field(dialog, "Transaction id", "MT-77");
+    await fill_field(dialog, "Amount sent", "80");
+
+    // the refused wire revalidates the list; that read is held while the admin
+    // goes on typing, and lands under their hands
+    const release = hold_loader();
+    press(
+      dialog.getByRole("button", { name: "Mark wired", exact: true }).element()
+    );
+    await expect
+      .element(dialog.getByRole("button", { name: "Marking wired…" }))
+      .toBeVisible();
+    await fill_field(dialog, "Transaction id", "MT-78");
+    release();
+
+    await expect
+      .element(dialog.getByRole("alert"))
+      .toMatchTextContent(
+        "Transaction MT-77 from Mercury is already recorded."
       );
-    }));
-
-  it("a revalidation that lands while the admin is typing leaves the date, the typed fields and the focus alone", () =>
-    with_diag(async (dg) => {
-      const npo = await seed_wire_npo("River Trust", 100);
-      await mark_wired({
-        npo_id: npo,
-        wire_date: "2026-11-18",
-        amount_sent: 100,
-        provider: "Mercury",
-        provider_tx_id: "MT-77",
-        wire_fee: 0,
-        recorded_by: await seed_admin(),
-        payout_ids: await pending_ids(npo),
-      });
-      await seed_payout(npo, 80);
-
-      const screen = await open_wires();
-      await screen
-        .getByRole("button", { name: "Mark wired, River Trust" })
-        .click();
-      const dialog = screen.getByRole("dialog");
-      await dialog_ready(dialog);
-      const date_of = () =>
-        [...document.querySelectorAll('[role="dialog"] [role="spinbutton"]')]
-          .slice(0, 3)
-          .map((e) => e.textContent)
-          .join("/");
-      const date = date_of();
-      await dialog.getByLabelText("Transaction id").fill("MT-77");
-      await dg.fill_amount(dialog, "80");
-
-      // the refused wire revalidates the list; that read is held while the admin
-      // goes on typing, and lands under their hands
-      const release = hold_loader();
-      press(
-        dialog
-          .getByRole("button", { name: "Mark wired", exact: true })
-          .element()
-      );
-      await expect
-        .element(dialog.getByRole("button", { name: "Marking wired…" }))
-        .toBeVisible();
-      await dialog.getByLabelText("Transaction id").fill("MT-78");
-      release();
-
-      await expect
-        .element(dialog.getByRole("alert"))
-        .toMatchTextContent(
-          "Transaction MT-77 from Mercury is already recorded."
-        );
-      expect(date_of()).toBe(date);
-      await expect
-        .element(dialog.getByLabelText("Transaction id"))
-        .toHaveValue("MT-78");
-      await expect
-        .element(dialog.getByLabelText("Amount sent"))
-        .toHaveValue("80");
-      await expect
-        .element(dialog.getByLabelText("Transaction id"))
-        .toHaveFocus();
-    }));
+    expect(date_of()).toBe(date);
+    await expect
+      .element(dialog.getByLabelText("Transaction id"))
+      .toHaveValue("MT-78");
+    await expect
+      .element(dialog.getByLabelText("Amount sent"))
+      .toHaveValue("80");
+    await expect.element(dialog.getByLabelText("Transaction id")).toHaveFocus();
+  });
 
   it("on a slow client the dialog closes only once the re-read list has dropped the row, so focus goes to the next row and never back to the removed one", async () => {
     const { cdp } = await import("vitest/browser");
@@ -503,8 +416,8 @@ describe("manual wires", () => {
       .click();
     const dialog = screen.getByRole("dialog");
     await dialog_ready(dialog);
-    await dialog.getByLabelText("Transaction id").fill(tx);
-    await dialog.getByLabelText("Amount sent").fill(sent);
+    await fill_field(dialog, "Transaction id", tx);
+    await fill_field(dialog, "Amount sent", sent);
     return dialog;
   }
 
