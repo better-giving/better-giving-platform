@@ -1,4 +1,5 @@
 import {
+  BanknoteArrowUpIcon,
   BanknoteIcon,
   BookOpenCheckIcon,
   Building2Icon,
@@ -63,6 +64,11 @@ export const link_groups: LinkGroup[] = [
         title: "Settle donations",
         to: routes.donation_settlements,
         icon: { fn: BanknoteIcon },
+      },
+      {
+        title: "Manual wires",
+        to: routes.manual_wires,
+        icon: { fn: BanknoteArrowUpIcon },
       },
       {
         title: "Revenue",

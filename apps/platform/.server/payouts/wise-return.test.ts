@@ -986,6 +986,29 @@ describe("poll_wise_returns", () => {
     ]);
   });
 
+  test("a returned transfer of an npo since moved to manual wire puts its payouts back on the Manual wires page, and says so", async () => {
+    const npo = await seed_npo(500);
+    await seed_payout(npo.id, "p-1", 100);
+    await sent(npo, ["p-1"]);
+    await db()
+      .update(npos)
+      .set({ payout_method: "manual_wire" })
+      .where(eq(npos.id, npo.id));
+
+    await poll_wise_returns(async () => "funds_refunded");
+
+    expect(await payout_types()).toEqual({ "p-1": "pending" });
+    const sent_alerts = send_alert.mock.calls.map(([a]) => a);
+    expect(sent_alerts.map((a) => a.title)).toEqual([
+      `Wise transfer returned for npo:${npo.id}`,
+      `Returned payouts re-sent for npo:${npo.id}`,
+    ]);
+    for (const a of sent_alerts) {
+      expect(a.body).toMatch(/back on the Manual wires page to wire/);
+      expect(a.body).not.toMatch(/grants run|approved account/);
+    }
+  });
+
   /** the npo's account the grants run pays, approved or made default at `at` */
   const seed_default_bank = (npo_id: number, at: string) =>
     db().insert(banking_apps).values({

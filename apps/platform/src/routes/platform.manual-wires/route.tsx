@@ -1,0 +1,95 @@
+import { useRef, useState } from "react";
+import { type ShouldRevalidateFunction, useFetcher } from "react-router";
+import { metas } from "#/helpers/seo";
+import { MarkWiredDialog } from "#/pages/platform-admin/manual-wires/mark-wired-dialog";
+import type { IManualWireRow } from "#/pages/platform-admin/manual-wires/types";
+import {
+  type IWireReturnAt,
+  WiresTable,
+  wire_return_target,
+} from "#/pages/platform-admin/manual-wires/wires-table";
+import type { Route } from "./+types/route";
+import type { TWireAnswer } from "./api";
+
+export { ErrorBoundary } from "#/components/error";
+export { action, loader } from "./api";
+export const meta: Route.MetaFunction = () => metas({ title: "Manual wires" });
+
+// a refusal (a duplicate, payouts that changed, an amount off the net) answers
+// a 4xx, which React Router doesn't revalidate after: the rows would stay as
+// they were when the dialog opened
+export const shouldRevalidate: ShouldRevalidateFunction = ({
+  formMethod,
+  defaultShouldRevalidate,
+}) => formMethod === "POST" || defaultShouldRevalidate;
+
+interface IDialog {
+  /** the row it opened on, with the row's place in the list */
+  at: IWireReturnAt;
+  /** the row as it opened; stays set after closing, so the dialog keeps its
+   * body while it animates out of a list the row has left */
+  row: IManualWireRow;
+  open: boolean;
+  /** one per opening: each opening's request gets a fetcher with no earlier answer */
+  n: number;
+}
+
+export default function Page({ loaderData }: Route.ComponentProps) {
+  const [dialog, set_dialog] = useState<IDialog | null>(null);
+  const n = dialog?.n ?? 0;
+  const mark = useFetcher<TWireAnswer>({ key: `manual-wire-${n}` });
+  // the list as it was when the request went out. the fetcher can go idle a
+  // render before the re-read list arrives (a slow client): closing then sends
+  // focus back to the row the wire is about to remove, and it lands on <body>
+  const sent_from = useRef<typeof loaderData | null>(null);
+  const answered = answer(mark);
+  const awaiting_list = answered.done && loaderData === sent_from.current;
+  const settled: IAnswer = awaiting_list ? { done: false } : answered;
+  // the open npo's row as the latest read has it: a refusal revalidates, and
+  // the dialog sends the payout ids it shows
+  const row =
+    dialog &&
+    (loaderData.rows.find((r) => r.npo_id === dialog.row.npo_id) ?? dialog.row);
+
+  return (
+    <div className="px-4 py-4 md:px-10 md:py-8 w-full grid content-start">
+      <h1 className="sr-only">Manual wires</h1>
+      <WiresTable
+        rows={loaderData.rows}
+        on_mark={(row, at) => {
+          sent_from.current = null;
+          set_dialog({ at, row, open: true, n: n + 1 });
+        }}
+      />
+      <MarkWiredDialog
+        open={!!dialog?.open && !settled.done}
+        row={row}
+        submitting={mark.state !== "idle" || awaiting_list}
+        error={settled.error}
+        on_submit={(x) => {
+          if (!dialog) return;
+          sent_from.current = loaderData;
+          mark.submit(
+            { npo_id: dialog.row.npo_id, ...x },
+            { method: "POST", encType: "application/json" }
+          );
+        }}
+        on_close={() => set_dialog((d) => d && { ...d, open: false })}
+        return_focus_fallback={() => dialog && wire_return_target(dialog.at)}
+      />
+    </div>
+  );
+}
+
+interface IAnswer {
+  /** landed: the dialog closes */
+  done: boolean;
+  error?: string;
+}
+
+/** the request's answer once it has settled and the list has revalidated */
+function answer(f: ReturnType<typeof useFetcher<TWireAnswer>>): IAnswer {
+  if (f.state !== "idle" || !f.data) return { done: false };
+  if ("message" in f.data) return { done: false, error: f.data.message };
+  return { done: true };
+}

@@ -68,6 +68,15 @@ export type PayoutStatus =
   | IBouncedStatus
   | IVoidStatus;
 
+/** how an npo's payouts reach it: the grants run's wise transfer, or a wire
+ * sent by hand and recorded (`mark_wired`) */
+export type PayoutMethod = "wise" | "manual_wire";
+
+/** who a manual wire can be sent through; a provider is a value on the wire
+ * record, never part of the payout method */
+export const WIRE_PROVIDERS = ["Mercury"] as const;
+export type WireProvider = (typeof WIRE_PROVIDERS)[number];
+
 /** the types whose money is in the npo's cash, not sent: a refund cancels the
  * payout and takes its cash back */
 export const UNSENT_TYPES = [

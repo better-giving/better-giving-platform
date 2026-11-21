@@ -30,7 +30,8 @@ export interface MigrateRun<C extends MigrateClient> {
   lock_wait?: string;
   /** per-statement lock wait for the migration's DDL */
   ddl_lock_timeout?: string;
-  /** tries of the whole apply when its DDL hits `ddl_lock_timeout` */
+  /** tries of the whole apply when its DDL hits `ddl_lock_timeout` or loses a
+   * deadlock */
   attempts?: number;
   /** backoff unit: try n waits n × this before the next */
   retry_delay_ms?: number;
@@ -41,6 +42,13 @@ const set_lock_timeout = (client: MigrateClient, value: string) =>
   client.query("select set_config('lock_timeout', $1, false)", [value]);
 
 const LOCK_NOT_AVAILABLE = "55P03";
+/** postgres cancels one side of a deadlock; a DDL that lost one retries like a
+ * lock timeout, since the live traffic it met has moved on by the next try */
+const DEADLOCK_DETECTED = "40P01";
+const RETRIED: readonly (string | undefined)[] = [
+  LOCK_NOT_AVAILABLE,
+  DEADLOCK_DETECTED,
+];
 
 /** the postgres code on `err`, or on the driver error drizzle wrapped in it */
 function pg_code(err: unknown): string | undefined {
@@ -133,20 +141,23 @@ export async function run_migrate<C extends MigrateClient>({
           log.log("migrate: done");
           return 0;
         } catch (err) {
-          if (pg_code(err) !== LOCK_NOT_AVAILABLE) {
+          const code = pg_code(err);
+          if (!RETRIED.includes(code)) {
             log.error("migrate: migration failed, rolled back:", err);
             return 1;
           }
+          const hit =
+            code === DEADLOCK_DETECTED
+              ? "a deadlock"
+              : `lock timeout ${ddl_lock_timeout}`;
           if (n >= attempts) {
             log.error(
-              `migrate: DDL hit lock timeout ${ddl_lock_timeout} on all ${attempts} attempts; rolled back:`,
+              `migrate: DDL hit ${hit} on all ${attempts} attempts; rolled back:`,
               err
             );
             return 1;
           }
-          log.log(
-            `migrate: DDL hit lock timeout ${ddl_lock_timeout}; retrying`
-          );
+          log.log(`migrate: DDL hit ${hit}; retrying`);
           await new Promise((r) => setTimeout(r, n * retry_delay_ms));
         }
       }

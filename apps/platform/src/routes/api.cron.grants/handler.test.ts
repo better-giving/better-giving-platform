@@ -142,11 +142,16 @@ async function seed_npo(o: {
   recipient?: boolean;
   /** the bank's status; an old approval left it "approved", no default flag */
   bank_status?: "default" | "approved";
+  /** a second npo in one test needs its own */
+  ein?: string;
+  recipient_id?: number;
+  payout_method?: "wise" | "manual_wire";
 }) {
   const [npo] = await db()
     .insert(npos)
     .values({
-      registration_number: "EIN-GRANTS",
+      registration_number: o.ein ?? "EIN-GRANTS",
+      payout_method: o.payout_method,
       name: "Grants Test NPO",
       endow_designation: "Charity",
       overview_pt: "[]",
@@ -159,7 +164,7 @@ async function seed_npo(o: {
     await db()
       .insert(banking_apps)
       .values({
-        id: String(WISE_RECIPIENT),
+        id: String(o.recipient_id ?? WISE_RECIPIENT),
         npo_id: npo!.id,
         status: o.bank_status ?? "default",
       });
@@ -407,6 +412,38 @@ describe("grants cron execute", () => {
     });
   });
 
+  test("an npo paid by manual wire is never sent through wise: its payouts stay pending while a wise npo in the same run is paid", async () => {
+    const wired = await seed_npo({
+      cash: 5000,
+      ein: "EIN-WIRED",
+      recipient_id: 888,
+      payout_method: "manual_wire",
+    });
+    await seed_payout(wired, "w-1", 3000);
+    const paid = await seed_npo({ cash: 500 });
+    await seed_payout(paid, "p-1", 100);
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    await index();
+
+    expect(report_error_mock).not.toHaveBeenCalled();
+    expect(settle_spy).toHaveBeenCalledOnce();
+    expect(settle_spy.mock.calls[0]![0]).toMatchObject({ id: paid });
+    expect(wise_pay_mock).toHaveBeenCalledOnce();
+    expect(wise_pay_mock).toHaveBeenCalledWith(
+      WISE_RECIPIENT,
+      100,
+      expect.any(String)
+    );
+    expect(await payout_types()).toEqual({
+      "w-1": "pending",
+      "p-1": "processing",
+    });
+    expect(await npo_cash(wired)).toBe(5000);
+    expect(info).toHaveBeenCalledWith(`npo:${wired} not paid: manual wire`);
+    info.mockRestore();
+  });
+
   test("a pending total of 49.996 meets a 50 minimum and is paid as 50", async () => {
     const npo_id = await seed_npo({ cash: 500, payout_minimum: 50 });
     await seed_payout(npo_id, "p-1", 24.998);
@@ -508,6 +545,55 @@ describe("grants cron execute", () => {
 
     expect(report_error_mock).not.toHaveBeenCalled();
     expect(await payout_types()).toEqual({ "p-1": "settled" });
+  });
+
+  test.each([
+    ["more than", 93.2],
+    ["exactly", 80],
+  ])(
+    "switched on, an npo paid by manual wire that owes %s its pending total is settled as recovered, its cash debited by the gross, nothing sent",
+    async (_, owes) => {
+      deductions.on = true;
+      const npo_id = await seed_npo({
+        cash: 500,
+        payout_method: "manual_wire",
+      });
+      await seed_payout(npo_id, "p-1", 80);
+      await seed_owed(npo_id, "don-owed", owes);
+
+      await index();
+
+      expect(report_error_mock).not.toHaveBeenCalled();
+      expect(wise_pay_mock).not.toHaveBeenCalled();
+      expect(settle_spy.mock.calls[0]![0]).toMatchObject({
+        id: npo_id,
+        payout_method: "manual_wire",
+      });
+      expect(settle_spy.mock.calls[0]![2]).toBeNull();
+      expect(await payout_types()).toEqual({ "p-1": "settled" });
+      expect(await npo_cash(npo_id)).toBe(420);
+      expect(send_alert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "NOTICE",
+          title: expect.stringMatching(/^Grant recovered as owed for npo:/),
+        })
+      );
+    }
+  );
+
+  test("switched on, an npo paid by manual wire whose net is payable stays pending", async () => {
+    deductions.on = true;
+    const npo_id = await seed_npo({ cash: 500, payout_method: "manual_wire" });
+    await seed_payout(npo_id, "p-1", 300);
+    await seed_owed(npo_id, "don-owed", 93.2);
+
+    await index();
+
+    expect(report_error_mock).not.toHaveBeenCalled();
+    expect(wise_pay_mock).not.toHaveBeenCalled();
+    expect(await payout_types()).toEqual({ "p-1": "pending" });
+    expect(await npo_cash(npo_id)).toBe(500);
+    expect(await db().select().from(settlements)).toEqual([]);
   });
 
   test("switched on with no terms effective date, a snapshot under the minimum claims nothing, as if switched off", async () => {

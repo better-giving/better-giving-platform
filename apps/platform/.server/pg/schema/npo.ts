@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 import type { IAllocation } from "@/donations";
 import type { ISocialMediaUrls } from "@/npo/schema";
+import type { PayoutMethod } from "@/payouts";
 import type {
   DonateMethodId,
   IIncrement,
@@ -89,6 +90,10 @@ export const npos = pgTable(
       precision: 38,
       scale: 18,
     }),
+    payout_method: text("payout_method")
+      .$type<PayoutMethod>()
+      .notNull()
+      .default("wise"),
     street_address: text("street_address"),
     donor_address_required: boolean("donor_address_required")
       .notNull()
@@ -131,6 +136,10 @@ export const npos = pgTable(
     check(
       "endow_designation_check",
       sql`${t.endow_designation} IN ('Charity', 'Religious Organization', 'University', 'Hospital', 'Other')`
+    ),
+    check(
+      "npos_payout_method_check",
+      sql`${t.payout_method} IN ('wise', 'manual_wire')`
     ),
     check(
       "target_xor",

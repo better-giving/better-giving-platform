@@ -582,6 +582,13 @@
       "when": 1795071206222,
       "tag": "0082_registrations_updated_at_id_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1795186012257,
+      "tag": "0083_manual_wires",
+      "breakpoints": true
     }
   ]
 }

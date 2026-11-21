@@ -303,8 +303,8 @@ export async function npo_bounced_payouts(
   return row && row.count > 0 ? row : null;
 }
 
-/** the npo's returned payouts back to pending, for the next grants run to
- * pay; returns the ids moved. their settlement is cleared with them: a
+/** the npo's returned payouts back to pending, for the next grants run (or,
+ * for a manual-wire npo, the next wire) to pay; returns the ids moved. their settlement is cleared with them: a
  * pending payout names none, and the run that pays them names its own */
 export async function returned_payouts_resend(
   db_: DbOrTx,

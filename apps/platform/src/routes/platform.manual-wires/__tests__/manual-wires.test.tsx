@@ -1,0 +1,514 @@
+import { and, eq } from "drizzle-orm";
+import {
+  createRoutesStub,
+  isRouteErrorResponse,
+  type MiddlewareFunction,
+  useRouteError,
+} from "react-router";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from "vitest";
+import { userEvent } from "vitest/browser";
+import { cleanup, render } from "vitest-browser-react";
+import { seed_user } from "#/__tests__/fixtures/funds";
+import { user } from "$/pg/schema/auth";
+import { npos } from "$/pg/schema/npo";
+import { manual_wires, payouts, settlements } from "$/pg/schema/payout";
+import type { TestDb } from "$/pg/test-utils/pglite";
+
+const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
+
+vi.mock("$/pg/db", () => ({
+  db: new Proxy(
+    {},
+    {
+      get(_, prop) {
+        const real = test_db.current?.db;
+        if (!real) throw new Error("test_db not initialized");
+        return (real as any)[prop];
+      },
+    }
+  ),
+}));
+vi.mock("$/kit/wise", () => ({ wise: {} }));
+// `transfer.ts` hashes its refs with `node:crypto`, which a browser can't
+// load. the refs here only need to be stable per name; the real ones, and the
+// duplicate check keyed on them, are covered by manual-wire.test.ts and
+// api.test.ts in the node project
+vi.mock("$/payouts/transfer", async () => {
+  const { payout_cents, payout_total } = await import("$/payouts/amount");
+  const ref = (name: string) => {
+    let h = 0;
+    for (const c of name) h = (Math.imul(h, 31) + c.charCodeAt(0)) | 0;
+    const hex = (h >>> 0).toString(16).padStart(8, "0");
+    return `${hex}-0000-5000-8000-${hex.repeat(2).slice(0, 12)}`;
+  };
+  return {
+    payout_cents,
+    payout_total,
+    NotFundedError: class extends Error {},
+    transfer_ref: (k: string, t: number, ids: string[], n = "") =>
+      ref(JSON.stringify([k, t, ids, n])),
+    recovered_run_ref: (p: number | string, ids: string[]) =>
+      ref(JSON.stringify(["recovered", p, ids])),
+    wire_settlement_id: (provider: string, tx: string) =>
+      ref(JSON.stringify(["manual_wire", provider, tx])),
+  };
+});
+
+// the real guard and context; only the better-auth instance stays out of the bundle
+vi.mock("#/.server/auth/auth", () => ({ auth: {} }));
+vi.mock("#/.server/auth", async () => {
+  const m = await import("#/.server/auth/middleware");
+  return { user_ctx: m.user_ctx, admin_mdlwr: m.admin_mdlwr };
+});
+
+import { type AuthUser, admin_mdlwr, user_ctx } from "#/.server/auth";
+import { mark_wired } from "$/payouts/manual-wire";
+import { create_test_db } from "$/pg/test-utils/pglite";
+import { action, loader } from "../api";
+import WiresPage, { shouldRevalidate } from "../route";
+
+const db = () => test_db.current!.db;
+
+beforeAll(async () => {
+  test_db.current = await create_test_db();
+}, 30_000);
+
+afterAll(async () => {
+  await test_db.current?.client.close();
+});
+
+/** holds the page's loader, so a revalidation lands when the test says */
+const gate = { held: null as Promise<void> | null };
+
+function hold_loader() {
+  let release!: () => void;
+  gate.held = new Promise<void>((r) => {
+    release = r;
+  });
+  return () => {
+    gate.held = null;
+    release();
+  };
+}
+
+beforeEach(async () => {
+  gate.held = null;
+  await db().delete(payouts);
+  await db().delete(manual_wires);
+  await db().delete(settlements);
+  await db().delete(npos);
+  await db().delete(user);
+});
+
+afterEach(async () => {
+  await cleanup();
+});
+
+let n = 0;
+/** a nonprofit paid by manual wire, with `pending` usd of payouts pending */
+async function seed_wire_npo(name: string, pending: number) {
+  const [npo] = await db()
+    .insert(npos)
+    .values({
+      registration_number: `EIN-WIRES-${++n}`,
+      name,
+      endow_designation: "Charity",
+      overview_pt: "[]",
+      hq_country: "United States",
+      cash: 1000,
+      payout_method: "manual_wire",
+    })
+    .returning();
+  await seed_payout(npo!.id, pending);
+  return npo!.id;
+}
+
+async function seed_payout(npo_id: number, amount: number) {
+  const id = `p-${++n}`;
+  await db()
+    .insert(payouts)
+    .values({
+      id,
+      source_id: `dist-${id}`,
+      npo_id,
+      source: "donation",
+      date: "2026-09-01T00:00:00.000Z",
+      amount,
+      type: "pending",
+    });
+  return id;
+}
+
+/** the ids of the npo's payouts pending now */
+const pending_ids = async (npo_id: number) =>
+  (
+    await db()
+      .select({ id: payouts.id })
+      .from(payouts)
+      .where(and(eq(payouts.npo_id, npo_id), eq(payouts.type, "pending")))
+  ).map((p) => p.id);
+
+async function seed_admin() {
+  const admin = await seed_user(db(), `ops${++n}@admin.test`, "Grace", "Ops");
+  await db()
+    .update(user)
+    .set({ emailVerified: true, role: "admin" })
+    .where(eq(user.id, admin!.id));
+  return admin!.id;
+}
+
+const as_user =
+  (id: string, role: string): MiddlewareFunction =>
+  ({ context }, next) => {
+    context.set(user_ctx, { id, role } as AuthUser);
+    return next();
+  };
+
+function StatusBoundary() {
+  const e = useRouteError();
+  return <p>status {isRouteErrorResponse(e) ? e.status : "unknown"}</p>;
+}
+
+async function open_wires() {
+  const admin = await seed_admin();
+  const Stub = createRoutesStub([
+    {
+      path: "/platform",
+      middleware: [as_user(admin, "admin"), admin_mdlwr],
+      ErrorBoundary: StatusBoundary,
+      HydrateFallback: () => null,
+      children: [
+        {
+          path: "manual-wires",
+          Component: WiresPage as any,
+          loader: (() =>
+            gate.held ? gate.held.then(() => loader()) : loader()) as any,
+          action: action as any,
+          shouldRevalidate,
+        },
+      ],
+    },
+  ]);
+  return render(
+    <Stub
+      initialEntries={["/platform/manual-wires"]}
+      future={{ v8_middleware: true }}
+    />
+  );
+}
+
+type Screen = Awaited<ReturnType<typeof render>>;
+
+/** native clicks: the dialog's backdrop intercepts playwright's pointer */
+const press = (el: Element) => (el as HTMLElement).click();
+
+/**
+ * the dialog's focus trap activates in a rAF after mount and then focuses the
+ * first tabbable, the date's month segment. typing before that lets it pull
+ * focus mid-fill on a slow runner, and the digits typed land in the date
+ * (a wire dated a month ahead, the dialog never closing)
+ */
+const dialog_ready = (dialog: ReturnType<Screen["getByRole"]>) =>
+  expect.element(dialog.getByRole("spinbutton").first()).toHaveFocus();
+
+/** a person clicks a field before typing in it */
+async function fill_field(dialog: Dialog, label: string, text: string) {
+  const field = dialog.getByLabelText(label);
+  await field.click();
+  await field.fill(text);
+}
+
+type Dialog = ReturnType<Screen["getByRole"]>;
+
+async function mark(screen: Screen, name: string, tx: string, sent: string) {
+  await screen.getByRole("button", { name: `Mark wired, ${name}` }).click();
+  const dialog = screen.getByRole("dialog");
+  await dialog_ready(dialog);
+  await fill_field(dialog, "Transaction id", tx);
+  await fill_field(dialog, "Amount sent", sent);
+  press(
+    dialog.getByRole("button", { name: "Mark wired", exact: true }).element()
+  );
+  return dialog;
+}
+
+describe("manual wires", () => {
+  it("lists each nonprofit paid by manual wire with what its wire must carry", async () => {
+    await seed_wire_npo("River Trust", 4200);
+    await seed_wire_npo("Lake Trust", 75.5);
+
+    const screen = await open_wires();
+
+    const river = screen.getByRole("row").filter({ hasText: "River Trust" });
+    await expect.element(river).toMatchTextContent("$4,200.00");
+    await expect.element(river).toMatchTextContent("1 payout");
+    await expect.element(river).toMatchTextContent("No bank account on file");
+    await expect
+      .element(screen.getByRole("row").filter({ hasText: "Lake Trust" }))
+      .toMatchTextContent("$75.50");
+  });
+
+  it("says no manual wires are due when none are", async () => {
+    const screen = await open_wires();
+
+    await expect.element(screen.getByText("No manual wires due")).toBeVisible();
+  });
+
+  it("marks a wire: the dialog closes with no toast, the row leaves, and focus moves to the next row's Mark wired", async () => {
+    await seed_wire_npo("A Trust", 100);
+    await seed_wire_npo("B Trust", 200);
+    await seed_wire_npo("C Trust", 300);
+
+    const screen = await open_wires();
+    await mark(screen, "B Trust", "MT-1", "200");
+
+    await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+    await expect.element(screen.getByText("B Trust")).not.toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("button", { name: "Mark wired, C Trust" }))
+      .toHaveFocus();
+    expect(screen.getByRole("status").query()).toBeNull();
+  });
+
+  it("after the last row, focus goes to the row above; after the only row, to the empty cell", async () => {
+    await seed_wire_npo("A Trust", 100);
+    await seed_wire_npo("B Trust", 200);
+
+    const screen = await open_wires();
+    await mark(screen, "B Trust", "MT-1", "200");
+    await expect
+      .element(screen.getByRole("button", { name: "Mark wired, A Trust" }))
+      .toHaveFocus();
+
+    await mark(screen, "A Trust", "MT-2", "100");
+    await expect.element(screen.getByText("No manual wires due")).toBeVisible();
+    await vi.waitFor(() =>
+      expect(document.activeElement?.textContent).toContain(
+        "No manual wires due"
+      )
+    );
+  });
+
+  it("a revalidation that lands while the admin is typing leaves the date, the typed fields and the focus alone", async () => {
+    const npo = await seed_wire_npo("River Trust", 100);
+    await mark_wired({
+      npo_id: npo,
+      wire_date: "2026-11-18",
+      amount_sent: 100,
+      provider: "Mercury",
+      provider_tx_id: "MT-77",
+      wire_fee: 0,
+      recorded_by: await seed_admin(),
+      payout_ids: await pending_ids(npo),
+    });
+    await seed_payout(npo, 80);
+
+    const screen = await open_wires();
+    await screen
+      .getByRole("button", { name: "Mark wired, River Trust" })
+      .click();
+    const dialog = screen.getByRole("dialog");
+    await dialog_ready(dialog);
+    const date_of = () =>
+      [...document.querySelectorAll('[role="dialog"] [role="spinbutton"]')]
+        .slice(0, 3)
+        .map((e) => e.textContent)
+        .join("/");
+    const date = date_of();
+    await fill_field(dialog, "Transaction id", "MT-77");
+    await fill_field(dialog, "Amount sent", "80");
+
+    // the refused wire revalidates the list; that read is held while the admin
+    // goes on typing, and lands under their hands
+    const release = hold_loader();
+    press(
+      dialog.getByRole("button", { name: "Mark wired", exact: true }).element()
+    );
+    await expect
+      .element(dialog.getByRole("button", { name: "Marking wired…" }))
+      .toBeVisible();
+    await fill_field(dialog, "Transaction id", "MT-78");
+    release();
+
+    await expect
+      .element(dialog.getByRole("alert"))
+      .toMatchTextContent(
+        "Transaction MT-77 from Mercury is already recorded."
+      );
+    expect(date_of()).toBe(date);
+    await expect
+      .element(dialog.getByLabelText("Transaction id"))
+      .toHaveValue("MT-78");
+    await expect
+      .element(dialog.getByLabelText("Amount sent"))
+      .toHaveValue("80");
+    await expect.element(dialog.getByLabelText("Transaction id")).toHaveFocus();
+  });
+
+  it("on a slow client the dialog closes only once the re-read list has dropped the row, so focus goes to the next row and never back to the removed one", async () => {
+    const { cdp } = await import("vitest/browser");
+    await cdp().send("Emulation.setCPUThrottlingRate", { rate: 20 });
+    onTestFinished(async () => {
+      await cdp().send("Emulation.setCPUThrottlingRate", { rate: 1 });
+    });
+    await seed_wire_npo("A Trust", 100);
+    await seed_wire_npo("B Trust", 200);
+    const screen = await open_wires();
+
+    const focused: string[] = [];
+    const on_focus = (e: Event) =>
+      focused.push((e.target as HTMLElement).getAttribute("aria-label") ?? "");
+    document.addEventListener("focusin", on_focus, true);
+    onTestFinished(() =>
+      document.removeEventListener("focusin", on_focus, true)
+    );
+
+    await mark(screen, "B Trust", "MT-1", "200");
+    await expect
+      .element(screen.getByRole("button", { name: "Mark wired, A Trust" }))
+      .toHaveFocus();
+    // B's button took focus once, from the click that opened its dialog
+    expect(focused.filter((l) => l === "Mark wired, B Trust")).toHaveLength(1);
+  }, 60_000);
+
+  it.each([0, 200, 400, 600, 900])(
+    "clicking into the Transaction id %ims after the dialog opens and typing keeps focus there, on a page whose frames come late",
+    async (wait) => {
+      // the focus trap and the date input each arm from a requestAnimationFrame;
+      // on the real page, busy loading, those land a few hundred ms late. a late
+      // arm must not take focus from the field the admin has moved to
+      const raf = window.requestAnimationFrame;
+      window.requestAnimationFrame = ((cb: FrameRequestCallback) =>
+        window.setTimeout(() => cb(performance.now()), 300)) as typeof raf;
+      onTestFinished(() => {
+        window.requestAnimationFrame = raf;
+      });
+      await seed_wire_npo("River Trust", 100);
+      const screen = await open_wires();
+      await screen
+        .getByRole("button", { name: "Mark wired, River Trust" })
+        .click();
+      const dialog = screen.getByRole("dialog");
+      await expect.element(dialog).toBeVisible();
+      const date_of = () =>
+        [...document.querySelectorAll('[role="dialog"] [role="spinbutton"]')]
+          .slice(0, 3)
+          .map((e) => e.textContent)
+          .join("/");
+      const date = date_of();
+      await new Promise((r) => setTimeout(r, wait));
+      await dialog.getByLabelText("Transaction id").click();
+      await userEvent.keyboard("AB");
+      await new Promise((r) => setTimeout(r, 1500));
+      await userEvent.keyboard("7");
+      await expect
+        .element(dialog.getByLabelText("Transaction id"))
+        .toHaveValue("AB7");
+      await expect
+        .element(dialog.getByLabelText("Transaction id"))
+        .toHaveFocus();
+      expect(date_of()).toBe(date);
+    }
+  );
+
+  it("refuses a transaction already recorded: the alert names it and the dialog stays open", async () => {
+    const npo = await seed_wire_npo("River Trust", 100);
+    await mark_wired({
+      npo_id: npo,
+      wire_date: "2026-11-18",
+      amount_sent: 100,
+      provider: "Mercury",
+      provider_tx_id: "MT-77",
+      wire_fee: 0,
+      recorded_by: await seed_admin(),
+      payout_ids: await pending_ids(npo),
+    });
+    await seed_payout(npo, 80);
+
+    const screen = await open_wires();
+    const dialog = await mark(screen, "River Trust", "MT-77", "80");
+
+    await expect
+      .element(dialog.getByRole("alert"))
+      .toMatchTextContent(
+        "Transaction MT-77 from Mercury is already recorded. Check the id with the provider."
+      );
+    await expect.element(screen.getByRole("dialog")).toBeVisible();
+    // the open modal hides the table from role queries, so the row is read off the DOM
+    expect(
+      document.querySelector("tbody > tr[data-row-id]")?.textContent
+    ).toContain("$80.00");
+  });
+
+  /** opens River Trust's dialog and types a wire for `sent` */
+  async function type_wire(screen: Screen, tx: string, sent: string) {
+    await screen
+      .getByRole("button", { name: "Mark wired, River Trust" })
+      .click();
+    const dialog = screen.getByRole("dialog");
+    await dialog_ready(dialog);
+    await fill_field(dialog, "Transaction id", tx);
+    await fill_field(dialog, "Amount sent", sent);
+    return dialog;
+  }
+
+  it("refuses a wire one of whose payouts settled while it was open: the dialog stays open with what was typed, and lists what is left", async () => {
+    const npo = await seed_wire_npo("River Trust", 100);
+    const gone = await seed_payout(npo, 80);
+
+    const screen = await open_wires();
+    const dialog = await type_wire(screen, "MT-9", "180");
+    await db()
+      .update(payouts)
+      .set({ type: "settled" })
+      .where(eq(payouts.id, gone));
+    press(
+      dialog.getByRole("button", { name: "Mark wired", exact: true }).element()
+    );
+
+    await expect
+      .element(dialog.getByRole("alert"))
+      .toMatchTextContent(
+        "The payouts changed while this was open, so nothing was recorded. Check the updated amounts and mark it wired again."
+      );
+    await expect.element(screen.getByRole("dialog")).toBeVisible();
+    await expect
+      .element(dialog.getByLabelText("Transaction id"))
+      .toHaveValue("MT-9");
+    const list = dialog.getByRole("list", { name: "Payouts settled" });
+    await vi.waitFor(() =>
+      expect(list.element().textContent).not.toContain("$80.00")
+    );
+    await expect.element(list).toMatchTextContent("$100.00");
+    // the open modal hides the table from role queries, so the row is read off the DOM
+    expect(
+      document.querySelector("tbody > tr[data-row-id]")?.textContent
+    ).toContain("1 payout");
+  });
+
+  it("records a wire though a payout landed while it was open: the dialog closes, and the new payout stays on the row", async () => {
+    const npo = await seed_wire_npo("River Trust", 100);
+
+    const screen = await open_wires();
+    const dialog = await type_wire(screen, "MT-10", "100");
+    await seed_payout(npo, 80);
+    press(
+      dialog.getByRole("button", { name: "Mark wired", exact: true }).element()
+    );
+
+    await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+    const row = screen.getByRole("row").filter({ hasText: "River Trust" });
+    await expect.element(row).toMatchTextContent("$80.00");
+    await expect.element(row).toMatchTextContent("1 payout");
+  });
+});

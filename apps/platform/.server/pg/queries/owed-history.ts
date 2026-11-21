@@ -217,8 +217,11 @@ export async function grant_run_deductions(
   const [run] = await tx
     .select({
       // a run that sent a transfer is settled under the transfer's id, its
-      // own ref the other id; one that recovered everything, under its ref
-      ref: sql<string>`COALESCE(${settlements.other_id}, ${settlements.id})`,
+      // own ref the other id; one that recovered everything, under its ref;
+      // a wire recorded by hand, under its own id, the other id holding the
+      // provider's transaction id. the deductions sit under one of the two
+      id: settlements.id,
+      other_id: settlements.other_id,
       net: settlements.amount,
     })
     .from(settlements)
@@ -247,7 +250,10 @@ export async function grant_run_deductions(
     .where(
       and(
         eq(owed_amounts.npo_id, npo_id),
-        eq(owed_entries.ref, run.ref),
+        inArray(
+          owed_entries.ref,
+          run.other_id === null ? [run.id] : [run.id, run.other_id]
+        ),
         inArray(owed_entries.kind, ["recover", "repay"])
       )
     )

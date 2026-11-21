@@ -21,11 +21,11 @@ function to_yymm(date: string) {
 
 type Row = grants_schedule.IData["rows"][number];
 
+type Netted = Extract<GrantEligibility, { status: "nets" | "manual_wire" }>;
+
 /** what the run will do for an npo whose owed amounts it nets, as the run's
- * own plan reads it */
-async function netted_row(
-  el: Extract<GrantEligibility, { status: "nets" }>
-): Promise<Row & { net: number }> {
+ * own plan reads it. a manual-wire npo the plan would pay is left to a wire */
+async function netted_row(el: Netted): Promise<Row & { net: number }> {
   const owed = await outstanding_for_npo(db, el.npo.id);
   const plan = net_owed(el.total, owed, el.minimum);
   const base = {
@@ -45,8 +45,31 @@ async function netted_row(
   if (plan.status === "recover_only") {
     return { ...base, net: 0, effect: "recovered", deductions };
   }
-  const effect = el.wise_id ? "pass" : "skipped";
+  const effect =
+    el.status === "manual_wire"
+      ? plan.net > 0
+        ? "manual_wire"
+        : "skipped"
+      : el.wise_id
+        ? "pass"
+        : "skipped";
   return { ...base, net: plan.net, effect, deductions };
+}
+
+/** a manual-wire npo's row when the run nets nothing: due a wire on the
+ * minimum the run pays a wise npo at */
+function gross_wire_row(
+  el: Extract<GrantEligibility, { status: "manual_wire" }>
+): Row {
+  const { npo, total, minimum } = el;
+  const due = total > 0 && total >= minimum;
+  return {
+    id: npo.id,
+    name: npo.name,
+    amount: total,
+    min: minimum,
+    effect: due ? "manual_wire" : "skipped",
+  };
 }
 
 /**
@@ -77,7 +100,11 @@ export async function index() {
         console.info(`NPO ${npo_id} not found, skipping`);
         continue;
       }
-      if (el.status === "nets") {
+      if (el.status === "manual_wire" && !nets) {
+        rows.push(gross_wire_row(el));
+        continue;
+      }
+      if (el.status === "nets" || el.status === "manual_wire") {
         const row = await netted_row(el);
         rows.push(row);
         if (row.effect === "pass") passing.push(row.net);
