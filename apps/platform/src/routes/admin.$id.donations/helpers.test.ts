@@ -39,6 +39,7 @@ const dist: INpoDonation = {
   stripe_transfer_created_at: null,
   refunds_cut_share: null,
   settled_net: null,
+  donation_status: "settled",
   frequency: "one-time",
   via: "stripe",
   source: "bg-marketplace",
@@ -126,4 +127,81 @@ describe("to_csv_row's stripe payout", () => {
     });
     expect(row.stripe_payout).toBe("reversed");
   });
+});
+
+describe("to_csv_row's cancelled flag", () => {
+  test("a reversed duplicate (donation cancelled, dist refunded) is cancelled", () => {
+    const row = to_csv_row({
+      ...dist,
+      status: "refunded",
+      donation_status: "cancelled",
+    });
+    expect(row).toMatchObject({ status: "refunded", cancelled: true });
+  });
+
+  test.each(["refunded", "refunded_loss"] as const)(
+    "a real %s refund is not cancelled",
+    (status) => {
+      const row = to_csv_row({ ...dist, status, donation_status: status });
+      expect(row.cancelled).toBe(false);
+    }
+  );
+
+  test("a settled donation is not cancelled", () => {
+    expect(to_csv_row(dist).cancelled).toBe(false);
+  });
+
+  test("a cancelled donation refunded at a loss is a real refund, not cancelled", () => {
+    const row = to_csv_row({
+      ...dist,
+      status: "refunded_loss",
+      donation_status: "cancelled",
+    });
+    expect(row.cancelled).toBe(false);
+  });
+
+  test("a cancelled donation whose dist is still settled is not cancelled", () => {
+    const row = to_csv_row({ ...dist, donation_status: "cancelled" });
+    expect(row.cancelled).toBe(false);
+  });
+});
+
+describe("a cancelled duplicate's stripe payout", () => {
+  const duplicate = {
+    ...dist,
+    status: "refunded",
+    donation_status: "cancelled",
+    stripe_routed_to: "acct_1",
+    stripe_transfer_id: "tr_1",
+    owed_back: true,
+  } satisfies INpoDonation;
+
+  test.each([true, false])(
+    "never reads refunded when its owed row is open: %s",
+    (owed_open) => {
+      const row = to_csv_row({ ...duplicate, owed_open });
+      expect(row.stripe_payout).toBe("reversed");
+    }
+  );
+
+  test("with no transfer it reads not sent", () => {
+    const row = to_csv_row({ ...duplicate, stripe_transfer_id: null });
+    expect(row.stripe_payout).toBe("not_sent");
+  });
+
+  // a loss under a cancelled donation did refund, so the owed row still reads kept or repaid
+  test.each([
+    [true, "kept"],
+    [false, "repaid"],
+  ] as const)(
+    "a refunded_loss dist (owed open: %s) reads %s",
+    (owed_open, payout) => {
+      const row = to_csv_row({
+        ...duplicate,
+        status: "refunded_loss",
+        owed_open,
+      });
+      expect(row.stripe_payout).toBe(payout);
+    }
+  );
 });

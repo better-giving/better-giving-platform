@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import type { IDonation } from "@/donations";
 import {
   type ISub,
   monthly_amount,
@@ -280,8 +281,13 @@ export interface ISubDist {
   fee_processing: number | null;
   fee_allowance: number | null;
   status: string;
+  /** the parent donation's status; see `INpoDonation.donation_status` */
+  donation_status: IDonation["status"];
   sttl_date: string | null;
 }
+
+// donations.status is untyped text in the schema; the check constraint holds it to the union
+const donation_status = sql<IDonation["status"]>`${donations.status}`;
 
 export async function subscription_dists(
   npo_id: number,
@@ -305,6 +311,7 @@ export async function subscription_dists(
       fee_processing: dists.fee_processing,
       fee_allowance: dists.fee_allowance,
       status: dists.status,
+      donation_status,
       sttl_date: donation_settlements.date,
     })
     .from(donations)
@@ -747,6 +754,7 @@ export async function donor_detail(
         fee_processing: dists.fee_processing,
         fee_allowance: dists.fee_allowance,
         status: dists.status,
+        donation_status,
         sttl_date: donation_settlements.date,
       })
       .from(dists)

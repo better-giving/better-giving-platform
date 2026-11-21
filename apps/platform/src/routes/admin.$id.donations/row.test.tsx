@@ -44,6 +44,24 @@ const refunded = {
   status: "refunded",
 } satisfies IRow;
 
+async function mount(row: IRow) {
+  const Stub = createRoutesStub([
+    {
+      path: "/",
+      Component: () => (
+        <table>
+          <tbody>
+            <tr>
+              <Row {...row} />
+            </tr>
+          </tbody>
+        </table>
+      ),
+    },
+  ]);
+  return render(<Stub initialEntries={["/"]} />);
+}
+
 describe("a refunded donation row", () => {
   test("nets the same figure the allocation shows", async () => {
     const Stub = createRoutesStub([
@@ -72,38 +90,55 @@ describe("a refunded donation row", () => {
 
 describe("a reversed donation's net", () => {
   async function render_row(row: IRow) {
-    const Stub = createRoutesStub([
-      {
-        path: "/",
-        Component: () => (
-          <table>
-            <tbody>
-              <tr>
-                <Row {...row} />
-              </tr>
-            </tbody>
-          </table>
-        ),
-      },
-    ]);
-    const screen = await render(<Stub initialEntries={["/"]} />);
+    const screen = await mount(row);
     const net = screen.getByRole("cell").nth(6);
     await expect.element(net).toBeVisible();
     const figure = net.element().firstElementChild as HTMLElement;
     return {
       struck: getComputedStyle(figure).textDecorationLine === "line-through",
-      // the "Refunded" tooltip's trigger
+      // the reversal tooltip's trigger
       flagged: net.element().querySelector("svg") !== null,
     };
   }
 
-  test.each(["refunded", "refunded_loss"] as const)(
-    "a %s row strikes its net and flags it refunded",
-    async (status) => {
-      expect(await render_row({ ...refunded, status })).toEqual({
+  async function tip_of(row: IRow) {
+    const screen = await mount(row);
+    // scoped to the net cell: a stripe_payout adds its own "More info"
+    const trigger = screen
+      .getByRole("cell")
+      .nth(6)
+      .getByRole("button", { name: "More info", exact: true });
+    await expect.element(trigger).toBeVisible();
+    return trigger;
+  }
+
+  test.each([
+    ["refunded", true],
+    ["refunded", false],
+    ["refunded_loss", false],
+  ] as const)(
+    "a %s row (cancelled: %s) strikes its net and flags it",
+    async (status, cancelled) => {
+      expect(await render_row({ ...refunded, status, cancelled })).toEqual({
         struck: true,
         flagged: true,
       });
+    }
+  );
+
+  test("a cancelled duplicate says Cancelled, not Refunded", async () => {
+    const tip = await tip_of({ ...refunded, cancelled: true });
+    await expect.element(tip).toHaveAccessibleDescription(/^Cancelled/);
+    await expect.element(tip).toHaveAccessibleDescription(/No refund was made/);
+    await expect.element(tip).not.toHaveAccessibleDescription(/Refunded/);
+  });
+
+  // a cancelled donation's loss dist reads not-cancelled: helpers.test.ts
+  test.each(["refunded", "refunded_loss"] as const)(
+    "a %s row that isn't cancelled says Refunded",
+    async (status) => {
+      const tip = await tip_of({ ...refunded, status, cancelled: false });
+      await expect.element(tip).toHaveAccessibleDescription("Refunded");
     }
   );
 
@@ -117,21 +152,7 @@ describe("a reversed donation's net", () => {
 
 describe("where a donation's net went", () => {
   async function render_row(row: IRow) {
-    const Stub = createRoutesStub([
-      {
-        path: "/",
-        Component: () => (
-          <table>
-            <tbody>
-              <tr>
-                <Row {...row} />
-              </tr>
-            </tbody>
-          </table>
-        ),
-      },
-    ]);
-    const screen = await render(<Stub initialEntries={["/"]} />);
+    const screen = await mount(row);
     const cells = screen.getByRole("cell");
     await expect.element(cells.first()).toBeVisible();
     const [net, allocation] = cells.elements().slice(6, 8);
