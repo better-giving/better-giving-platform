@@ -66,6 +66,7 @@ const { mark_wired } = await import("./manual-wire");
 const { poll_wise_returns } = await import("./wise-return");
 const { settle_npo_payouts } = await import("./settle");
 const { resend_returned } = await import("./resend-returned");
+const { grant_run_deductions } = await import("../pg/queries/owed-history");
 const { create_test_db } = await import("../pg/test-utils/pglite");
 const { npos } = await import("../pg/schema/npo");
 const { payouts, settlements, manual_wires } = await import(
@@ -284,6 +285,26 @@ describe("mark_wired", () => {
     expect(s).toMatchObject({ amount: 406.8 });
     const [row] = await db().select().from(owed_amounts);
     expect(row).toMatchObject({ recovered_usd: 93.2, outstanding_usd: 0 });
+  });
+
+  test("the grant history of a recorded wire shows its gross, the deduction by gift and its net", async () => {
+    deductions.on = true;
+    const npo = await seed_npo({ cash: 500 });
+    await seed_payout(npo, "p-1", 500);
+    await seed_owed(npo, "don-owed", 93.2);
+
+    const res = await mark(npo, { amount_sent: 396.8, wire_fee: 10 });
+    if (res.status !== "ok") throw new Error(`wire refused: ${res.status}`);
+
+    // the settlement's other id is the provider's transaction id, not the
+    // ref the deductions sit under
+    const run = await grant_run_deductions(npo, res.settlement_id);
+    expect(run).toMatchObject({ gross: 500, net: 406.8 });
+    expect(run?.deductions).toHaveLength(1);
+    expect(run?.deductions[0]).toMatchObject({
+      donation_id: "don-owed",
+      usd: 93.2,
+    });
   });
 
   test("a wire that is not the net less its fee is refused, and nothing is written", async () => {
