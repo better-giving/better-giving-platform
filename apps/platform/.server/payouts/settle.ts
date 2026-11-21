@@ -73,7 +73,7 @@ export interface IRecipient {
 }
 
 /**
- * a send made outside the app (a wire ops sent by hand), recorded with the
+ * a send made outside the app (a wire sent by hand), recorded with the
  * claim in its one transaction: the payouts end settled, never `processing`,
  * and the settlement is stored `PAID` so no poll ever reads it as a transfer
  */

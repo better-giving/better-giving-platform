@@ -39,7 +39,7 @@ export type MarkWiredResult =
   | { status: "held" };
 
 /**
- * records a wire ops sent by hand to an npo paid by `manual_wire`, settling
+ * records a wire sent by hand to an npo paid by `manual_wire`, settling
  * all its pending payouts in one transaction with the wire and its settlement.
  * `providers` is `WIRE_PROVIDERS` outside tests
  */

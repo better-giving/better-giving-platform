@@ -16,7 +16,7 @@ export type GrantEligibility =
       total: number;
       reason: string;
     }
-  /** paid by a wire ops sends by hand from the Manual wires page: the run never
+  /** paid by a wire sent by hand and marked on the Manual wires page: the run never
    * sends it through wise, whatever else holds */
   | { status: "manual_wire"; npo: Npo; minimum: number; total: number }
   /** a transfer came back and no new account pays yet: sending more would

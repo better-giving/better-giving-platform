@@ -16,7 +16,7 @@ export interface IManualWireRow {
   name: string;
   /** the pending payouts' total, in the cents a wire sends */
   gross: number;
-  /** gross − net: positive is deducted for what the npo owes, may be ≤ 0 */
+  /** gross − net: positive is deducted for what the npo owes, zero or negative when nothing is owed */
   owed: number;
   /** what the wire must carry before its fee */
   net: number;

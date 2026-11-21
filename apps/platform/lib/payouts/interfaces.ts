@@ -69,7 +69,7 @@ export type PayoutStatus =
   | IVoidStatus;
 
 /** how an npo's payouts reach it: the grants run's wise transfer, or a wire
- * ops sends by hand and records (`mark_wired`) */
+ * sent by hand and recorded (`mark_wired`) */
 export type PayoutMethod = "wise" | "manual_wire";
 
 /** who a manual wire can be sent through; a provider is a value on the wire

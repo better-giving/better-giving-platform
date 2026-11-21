@@ -66,7 +66,7 @@ export const settlements = pgTable(
 
 export const MANUAL_WIRES_PROVIDER_TX_UNIQ = "manual_wires_provider_tx_uniq";
 
-/** a wire ops sent by hand to an npo paid by `manual_wire`, and the settlement
+/** a wire sent by hand to an npo paid by `manual_wire`, and the settlement
  * recording it settled that npo's pending payouts */
 export const manual_wires = pgTable(
   "manual_wires",
