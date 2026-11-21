@@ -403,25 +403,31 @@ describe("grants schedule notice", () => {
     expect(text).toMatch(/Grant total: \$100\.00/);
   });
 
-  test("switched on, a manual-wire npo whose owed amounts cover its total is recovered, out of the wires line", async () => {
-    deductions.on = true;
-    await seed_npo("Covered", { amount: 80, payout_method: "manual_wire" });
-    await seed_owed("Covered", "don-big", 93.2);
+  test.each([
+    ["more than", 93.2],
+    ["exactly", 80],
+  ])(
+    "switched on, a manual-wire npo owing %s its total is recovered, as a wise row is, out of the wires line",
+    async (_, owes) => {
+      deductions.on = true;
+      await seed_npo("Covered", { amount: 80, payout_method: "manual_wire" });
+      await seed_owed("Covered", "don-big", owes);
 
-    await index();
+      await index();
 
-    const text = sent_text();
-    expect(row_cells(text, `${npo_ids.Covered}`)).toEqual([
-      `${npo_ids.Covered}`,
-      "Covered",
-      "$80.00",
-      "−$80.00",
-      "$0.00",
-      "$50.00",
-      "recovered",
-    ]);
-    expect(text).not.toContain("Manual wires:");
-  });
+      const text = sent_text();
+      expect(row_cells(text, `${npo_ids.Covered}`)).toEqual([
+        `${npo_ids.Covered}`,
+        "Covered",
+        "$80.00",
+        "−$80.00",
+        "$0.00",
+        "$50.00",
+        "recovered",
+      ]);
+      expect(text).not.toContain("Manual wires:");
+    }
+  );
 
   test("switched off, a manual-wire npo under its minimum is skipped", async () => {
     await seed_npo("Small", { amount: 30, payout_method: "manual_wire" });

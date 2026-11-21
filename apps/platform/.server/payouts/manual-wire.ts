@@ -13,7 +13,8 @@ import { wire_settlement_id } from "./transfer";
 
 export interface IMarkWired {
   npo_id: number;
-  /** the payouts the wire covers: the npo's pending set as the page showed it */
+  /** the payouts the wire covers, as the page showed them; one pending since
+   * stays for the next wire */
   payout_ids: string[];
   /** `YYYY-MM-DD`, the day the provider sent it */
   wire_date: string;
@@ -37,13 +38,15 @@ export type MarkWiredResult =
   | { status: "not_manual_wire" }
   | { status: "none_pending" }
   | { status: "under_minimum"; net: number; minimum: number }
-  /** the npo's pending payouts are no longer `payout_ids`: nothing written */
+  /** `payout_ids` is empty, repeats an id, or names one that is no longer the
+   * npo's pending payout: nothing written */
   | { status: "payouts_changed" };
 
 /**
  * records a wire sent by hand to an npo paid by `manual_wire`, settling
- * `payout_ids` (all its pending payouts) in one transaction with the wire and
- * its settlement. tests pass a second provider through `providers`
+ * exactly `payout_ids` in one transaction with the wire and its settlement:
+ * the net, the minimum and the debit are all of that set. tests pass a second
+ * provider through `providers`
  */
 export async function mark_wired(
   input: IMarkWired,
@@ -143,7 +146,5 @@ function invalid_field(
   if (!in_cents(i.wire_fee) || i.wire_fee < 0) return "wire_fee";
   if (!in_cents(i.amount_sent) || i.amount_sent <= 0) return "amount_sent";
   if (i.recorded_by === "") return "recorded_by";
-  const ids = new Set(i.payout_ids);
-  if (ids.size === 0 || ids.size !== i.payout_ids.length) return "payout_ids";
   return null;
 }

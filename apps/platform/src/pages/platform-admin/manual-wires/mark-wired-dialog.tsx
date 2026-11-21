@@ -177,8 +177,15 @@ function Body({
         <h3 className="text-lg font-bold">Mark wired</h3>
         <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
           <dt className="text-gray-11">Nonprofit</dt>
+          {/* "SXM Paws · 1293826" on one line; below sm the id drops under
+              the name as "ID 1293826" */}
           <dd className="font-semibold">
-            {row.name} · {row.npo_id}
+            {row.name}
+            <span className="max-sm:block max-sm:text-xs max-sm:font-normal max-sm:text-gray-11">
+              <span className="max-sm:hidden"> · </span>
+              <span className="sm:hidden">ID </span>
+              {row.npo_id}
+            </span>
           </dd>
           <dt className="text-gray-11">Bank account</dt>
           <dd className="font-semibold">{row.bank}</dd>

@@ -161,21 +161,6 @@ export async function pending_payouts_locked(
   return rows.map((r) => to_payout(r)) as IPayout<IPendingStatus>[];
 }
 
-/** every payout of the npo still pending, row-locked until `tx` ends, in id
- * order as `pending_payouts_locked` takes them */
-export async function npo_pending_payouts_locked(
-  tx: DbOrTx,
-  npo_id: number
-): Promise<IPayout<IPendingStatus>[]> {
-  const rows = await tx
-    .select()
-    .from(payouts)
-    .where(and(eq(payouts.npo_id, npo_id), eq(payouts.type, "pending")))
-    .orderBy(asc(payouts.id))
-    .for("update");
-  return rows.map((r) => to_payout(r)) as IPayout<IPendingStatus>[];
-}
-
 export async function payout_put(db: DbOrTx, data: IPayout) {
   await db.insert(payouts).values(from_payout_insert(data));
 }
@@ -318,8 +303,8 @@ export async function npo_bounced_payouts(
   return row && row.count > 0 ? row : null;
 }
 
-/** the npo's returned payouts back to pending, for the next grants run to
- * pay; returns the ids moved. their settlement is cleared with them: a
+/** the npo's returned payouts back to pending, for the next grants run (or,
+ * for a manual-wire npo, the next wire) to pay; returns the ids moved. their settlement is cleared with them: a
  * pending payout names none, and the run that pays them names its own */
 export async function returned_payouts_resend(
   db_: DbOrTx,

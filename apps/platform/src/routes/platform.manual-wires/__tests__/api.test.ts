@@ -15,7 +15,19 @@ import type { TestDb } from "$/pg/test-utils/pglite";
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
 
 vi.mock("#/errors/report", () => ({ report_error: vi.fn() }));
-vi.mock("$/env", () => ({ stage: "test", owed_deductions: false }));
+const deductions = vi.hoisted(() => ({ on: false }));
+vi.mock("$/env", () => ({
+  stage: "test",
+  get owed_deductions() {
+    return deductions.on;
+  },
+}));
+// before every gift here, so a run may net what is owed once its notice is sent
+vi.mock("@/terms", async (io) => ({
+  ...(await io<typeof import("@/terms")>()),
+  TERMS_RECOVERY_FROM: "2026-01-01",
+  TERMS_POSTED: "",
+}));
 vi.mock("$/kit/slack", () => ({
   aws_monitor: { send_alert: vi.fn() },
   fiat_monitor: { send_alert: vi.fn() },
@@ -67,6 +79,8 @@ const { middleware } = await import("../../platform/route");
 const { user } = await import("$/pg/schema/auth");
 const { create_test_db } = await import("$/pg/test-utils/pglite");
 const { npos } = await import("$/pg/schema/npo");
+const { donations } = await import("$/pg/schema/donation");
+const { owed_amounts, owed_notices } = await import("$/pg/schema/owed");
 const { payouts, settlements, manual_wires } = await import(
   "$/pg/schema/payout"
 );
@@ -94,6 +108,9 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  deductions.on = false;
+  await db().delete(owed_amounts);
+  await db().delete(donations);
   await db().delete(payouts);
   await db().delete(manual_wires);
   await db().delete(settlements);
@@ -195,6 +212,41 @@ async function post(body: unknown, as: typeof session.user = AS_ADMIN) {
   return { status: res.status, body: text ? JSON.parse(text) : null };
 }
 
+/** a gift refunded after its grant went out, the npo owing `usd` on it, and
+ * told of it, so a run may net it */
+async function seed_owed(npo_id: number, donation_id: string, usd: number) {
+  await db().insert(donations).values({
+    id: donation_id,
+    created_at: "2026-08-01T00:00:00.000Z",
+    upusd: 1,
+    status: "refunded_loss",
+    amount_base: usd,
+    amount_tip: 0,
+    amount_fee_allowance: 0,
+    currency: "USD",
+    frequency: "one-time",
+    source: "bg-marketplace",
+    via: "stripe:card",
+  });
+  const [owed] = await db()
+    .insert(owed_amounts)
+    .values({
+      donation_id,
+      npo_id,
+      source: "refund",
+      source_ref: `re_${donation_id}`,
+      recorded_at: "2026-09-15T00:00:00.000Z",
+      received_usd: usd,
+    })
+    .returning({ id: owed_amounts.id });
+  await db().insert(owed_notices).values({
+    owed_id: owed!.id,
+    kind: "recorded",
+    created_at: "2026-09-15T00:00:00.000Z",
+    sent_at: "2026-09-15T00:00:00.000Z",
+  });
+}
+
 /** everything a mark writes */
 const ledger = async () => ({
   wires: await db().select().from(manual_wires),
@@ -291,18 +343,48 @@ describe("mark wired", () => {
     expect(await ledger()).toEqual(before);
   });
 
-  test("payouts that changed while the dialog was open are refused, and nothing is written", async () => {
+  const CHANGED =
+    "The payouts changed while this was open, so nothing was recorded. Check the updated amounts and mark it wired again.";
+
+  test("a payout settled since the dialog opened is refused, and nothing is written", async () => {
+    const npo = await seed_npo();
+    await seed_payout(npo, "p-1", 100);
+    await seed_payout(npo, "p-2", 80);
+    const opened = await wire(npo, { amount_sent: 180 });
+    await db()
+      .update(payouts)
+      .set({ type: "settled" })
+      .where(eq(payouts.id, "p-2"));
+    const before = await ledger();
+
+    expect(await post(opened)).toEqual(refused(409, CHANGED));
+    expect(await ledger()).toEqual(before);
+  });
+
+  test("a payout added since the dialog opened does not refuse: the wire settles what it showed", async () => {
     const npo = await seed_npo();
     await seed_payout(npo, "p-1", 100);
     const opened = await wire(npo);
     await seed_payout(npo, "p-2", 80);
+
+    expect(await post(opened)).toEqual({ status: 200, body: { ok: true } });
+    const { payouts: after } = await ledger();
+    expect(after).toEqual([
+      { id: "p-1", type: "settled" },
+      { id: "p-2", type: "pending" },
+    ]);
+  });
+
+  test("an empty or repeated payout list is refused as changed payouts, and nothing is written", async () => {
+    const npo = await seed_npo();
+    await seed_payout(npo, "p-1", 100);
     const before = await ledger();
 
-    expect(await post(opened)).toEqual(
-      refused(
-        409,
-        "The payouts changed while this was open, so nothing was recorded. Check the updated amounts and mark it wired again."
-      )
+    expect(await post(await wire(npo, { payout_ids: [] }))).toEqual(
+      refused(409, CHANGED)
+    );
+    expect(await post(await wire(npo, { payout_ids: ["p-1", "p-1"] }))).toEqual(
+      refused(409, CHANGED)
     );
     expect(await ledger()).toEqual(before);
   });
@@ -339,12 +421,12 @@ describe("mark wired", () => {
     );
   });
 
-  test("a nonprofit whose payouts were all settled since the page loaded is refused", async () => {
+  test("a nonprofit whose payouts were all settled since the page loaded is refused as changed payouts", async () => {
     const npo = await seed_npo();
     await seed_payout(npo, "p-1", 100, "settled");
 
     expect(await post(await wire(npo, { payout_ids: ["p-1"] }))).toEqual(
-      refused(409, "Nothing is pending for this nonprofit")
+      refused(409, CHANGED)
     );
   });
 
@@ -417,5 +499,18 @@ describe("the list", () => {
       ["River Trust", 100, 100],
       ["Short Trust", 100, 250],
     ]);
+  });
+
+  test("leaves out a nonprofit whose owed amounts cover its pending total: the cron settles it as recovered", async () => {
+    deductions.on = true;
+    const due = await seed_npo({ name: "River Trust" });
+    await seed_payout(due, "p-1", 100);
+    const covered = await seed_npo({ name: "Owing Trust" });
+    await seed_payout(covered, "p-2", 100);
+    await seed_owed(covered, "don-owed", 100);
+
+    const { rows } = await loader();
+
+    expect(rows.map((r) => r.name)).toEqual(["River Trust"]);
   });
 });

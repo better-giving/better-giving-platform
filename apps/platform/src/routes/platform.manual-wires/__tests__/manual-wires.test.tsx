@@ -129,6 +129,7 @@ async function seed_payout(npo_id: number, amount: number) {
       amount,
       type: "pending",
     });
+  return id;
 }
 
 /** the ids of the npo's payouts pending now */
@@ -290,18 +291,27 @@ describe("manual wires", () => {
     ).toContain("$80.00");
   });
 
-  it("refuses a wire whose payouts changed while it was open: the dialog stays open with what was typed, and the row shows the new amounts", async () => {
-    const npo = await seed_wire_npo("River Trust", 100);
-
-    const screen = await open_wires();
+  /** opens River Trust's dialog and types a wire for `sent` */
+  async function type_wire(screen: Screen, tx: string, sent: string) {
     await screen
       .getByRole("button", { name: "Mark wired, River Trust" })
       .click();
     const dialog = screen.getByRole("dialog");
-    await dialog.getByLabelText("Transaction id").fill("MT-9");
-    await dialog.getByLabelText("Amount sent").fill("100");
-    // a gift's payout lands while the dialog is open
-    await seed_payout(npo, 80);
+    await dialog.getByLabelText("Transaction id").fill(tx);
+    await dialog.getByLabelText("Amount sent").fill(sent);
+    return dialog;
+  }
+
+  it("refuses a wire one of whose payouts settled while it was open: the dialog stays open with what was typed, and lists what is left", async () => {
+    const npo = await seed_wire_npo("River Trust", 100);
+    const gone = await seed_payout(npo, 80);
+
+    const screen = await open_wires();
+    const dialog = await type_wire(screen, "MT-9", "180");
+    await db()
+      .update(payouts)
+      .set({ type: "settled" })
+      .where(eq(payouts.id, gone));
     press(
       dialog.getByRole("button", { name: "Mark wired", exact: true }).element()
     );
@@ -315,14 +325,30 @@ describe("manual wires", () => {
     await expect
       .element(dialog.getByLabelText("Transaction id"))
       .toHaveValue("MT-9");
-    await expect
-      .element(dialog.getByRole("list", { name: "Payouts settled" }))
-      .toMatchTextContent("$80.00");
-    // the open modal hides the table from role queries, so the row is read off the DOM
+    const list = dialog.getByRole("list", { name: "Payouts settled" });
     await vi.waitFor(() =>
-      expect(
-        document.querySelector("tbody > tr[data-row-id]")?.textContent
-      ).toContain("$180.00")
+      expect(list.element().textContent).not.toContain("$80.00")
     );
+    await expect.element(list).toMatchTextContent("$100.00");
+    // the open modal hides the table from role queries, so the row is read off the DOM
+    expect(
+      document.querySelector("tbody > tr[data-row-id]")?.textContent
+    ).toContain("1 payout");
+  });
+
+  it("records a wire though a payout landed while it was open: the dialog closes, and the new payout stays on the row", async () => {
+    const npo = await seed_wire_npo("River Trust", 100);
+
+    const screen = await open_wires();
+    const dialog = await type_wire(screen, "MT-10", "100");
+    await seed_payout(npo, 80);
+    press(
+      dialog.getByRole("button", { name: "Mark wired", exact: true }).element()
+    );
+
+    await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+    const row = screen.getByRole("row").filter({ hasText: "River Trust" });
+    await expect.element(row).toMatchTextContent("$80.00");
+    await expect.element(row).toMatchTextContent("1 payout");
   });
 });

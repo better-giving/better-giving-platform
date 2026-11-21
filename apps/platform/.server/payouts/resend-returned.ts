@@ -70,8 +70,13 @@ export async function npo_return_hold(
 
 export type ResendResult =
   | { status: "none" }
-  | { status: "resent"; ids: string[] }
+  /** `manual_wire`: they wait for a wire by hand, not the grants run */
+  | { status: "resent"; ids: string[]; manual_wire?: true }
   | { status: "held"; reason: string };
+
+/** what an ops notice says of a manual-wire npo's payouts once re-pended */
+export const MANUAL_WIRE_REPENDED =
+  "these payouts are back on the Manual wires page to wire";
 
 /**
  * an npo's payouts whose transfer came back go out again once its grants are
@@ -92,6 +97,9 @@ export async function resend_returned(npo_id: number): Promise<ResendResult> {
     const hold = by_wise ? await npo_return_hold(npo_id, tx) : null;
     if (hold) return { status: "held", reason: hold.reason };
     const ids = await returned_payouts_resend(tx, npo_id);
-    return ids.length > 0 ? { status: "resent", ids } : { status: "none" };
+    if (ids.length === 0) return { status: "none" };
+    return by_wise
+      ? { status: "resent", ids }
+      : { status: "resent", ids, manual_wire: true };
   });
 }

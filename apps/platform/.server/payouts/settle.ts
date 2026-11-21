@@ -11,7 +11,6 @@ import { npo_balance_update, npo_get_locked } from "../pg/queries/npo";
 import { outstanding_for_npo, unrecover_owed } from "../pg/queries/owed";
 import {
   npo_last_return,
-  npo_pending_payouts_locked,
   payouts_funded,
   payouts_in,
   payouts_move,
@@ -101,10 +100,15 @@ export interface IRecordedSend {
 const is_recorded = (to: IRecipient | IRecordedSend): to is IRecordedSend =>
   "settlement_id" in to;
 
-const same_ids = (payouts: { id: string }[], ids: string[]) => {
-  const want = new Set(ids);
-  return payouts.length === want.size && payouts.every((p) => want.has(p.id));
-};
+const distinct_ids = (ids: string[]) =>
+  ids.length > 0 && new Set(ids).size === ids.length;
+
+/** every one of `ids` came back locked as `npo_id`'s pending payout */
+const all_of_npo = (
+  locked: { npo_id: number }[],
+  ids: string[],
+  npo_id: number
+) => locked.length === ids.length && locked.every((p) => p.npo_id === npo_id);
 
 /** `to` is null for an npo with no recipient: only a run that sends nothing
  * settles */
@@ -135,16 +139,18 @@ export async function settle_npo_payouts(
         return { status: "recipient_changed", ref_key: to.ref_key } as const;
       }
     }
+    // a recorded send covers exactly the payouts it was sent for: every one
+    // still this npo's and pending, or none of it is recorded. one pending
+    // since stays for the next send
     const recorded = to !== null && is_recorded(to);
-    // a recorded send covers what was pending when it was sent: all of the
-    // npo's pending set, locked, and only if that is still `payout_ids`
-    const locked = recorded
-      ? await npo_pending_payouts_locked(tx, npo.id)
-      : await pending_payouts_locked(tx, payout_ids);
-    if (locked.length === 0) return { status: "none_pending" } as const;
-    if (recorded && !same_ids(locked, payout_ids)) {
+    if (recorded && !distinct_ids(payout_ids)) {
       return { status: "payouts_changed" } as const;
     }
+    const locked = await pending_payouts_locked(tx, payout_ids);
+    if (recorded && !all_of_npo(locked, payout_ids, npo.id)) {
+      return { status: "payouts_changed" } as const;
+    }
+    if (locked.length === 0) return { status: "none_pending" } as const;
     // a refund locks payout, then npo, then owed row; the claim does too
     if (nets) await npo_get_locked(tx, npo.id);
     // wise moves cents: the minimum, quote and cash debit all start from this one figure

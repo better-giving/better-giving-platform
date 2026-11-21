@@ -547,30 +547,39 @@ describe("grants cron execute", () => {
     expect(await payout_types()).toEqual({ "p-1": "settled" });
   });
 
-  test("switched on, an npo paid by manual wire that owes at least its pending total is settled as recovered, its cash debited by the gross, nothing sent", async () => {
-    deductions.on = true;
-    const npo_id = await seed_npo({ cash: 500, payout_method: "manual_wire" });
-    await seed_payout(npo_id, "p-1", 80);
-    await seed_owed(npo_id, "don-owed", 93.2);
+  test.each([
+    ["more than", 93.2],
+    ["exactly", 80],
+  ])(
+    "switched on, an npo paid by manual wire that owes %s its pending total is settled as recovered, its cash debited by the gross, nothing sent",
+    async (_, owes) => {
+      deductions.on = true;
+      const npo_id = await seed_npo({
+        cash: 500,
+        payout_method: "manual_wire",
+      });
+      await seed_payout(npo_id, "p-1", 80);
+      await seed_owed(npo_id, "don-owed", owes);
 
-    await index();
+      await index();
 
-    expect(report_error_mock).not.toHaveBeenCalled();
-    expect(wise_pay_mock).not.toHaveBeenCalled();
-    expect(settle_spy.mock.calls[0]![0]).toMatchObject({
-      id: npo_id,
-      payout_method: "manual_wire",
-    });
-    expect(settle_spy.mock.calls[0]![2]).toBeNull();
-    expect(await payout_types()).toEqual({ "p-1": "settled" });
-    expect(await npo_cash(npo_id)).toBe(420);
-    expect(send_alert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "NOTICE",
-        title: expect.stringMatching(/^Grant recovered as owed for npo:/),
-      })
-    );
-  });
+      expect(report_error_mock).not.toHaveBeenCalled();
+      expect(wise_pay_mock).not.toHaveBeenCalled();
+      expect(settle_spy.mock.calls[0]![0]).toMatchObject({
+        id: npo_id,
+        payout_method: "manual_wire",
+      });
+      expect(settle_spy.mock.calls[0]![2]).toBeNull();
+      expect(await payout_types()).toEqual({ "p-1": "settled" });
+      expect(await npo_cash(npo_id)).toBe(420);
+      expect(send_alert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "NOTICE",
+          title: expect.stringMatching(/^Grant recovered as owed for npo:/),
+        })
+      );
+    }
+  );
 
   test("switched on, an npo paid by manual wire whose net is payable stays pending", async () => {
     deductions.on = true;

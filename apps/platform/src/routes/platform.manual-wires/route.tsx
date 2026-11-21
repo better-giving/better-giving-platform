@@ -11,6 +11,7 @@ import {
 import type { Route } from "./+types/route";
 import type { TWireAnswer } from "./api";
 
+export { ErrorBoundary } from "#/components/error";
 export { action, loader } from "./api";
 export const meta: Route.MetaFunction = () => metas({ title: "Manual wires" });
 

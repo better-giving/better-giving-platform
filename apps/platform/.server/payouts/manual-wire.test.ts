@@ -397,33 +397,69 @@ describe("mark_wired", () => {
     });
   });
 
-  test.each([
-    ["no payouts", []],
-    ["a payout twice", ["p-1", "p-1"]],
-  ])("%s is refused on payout_ids", async (_, payout_ids) => {
-    const npo = await seed_npo();
-    await seed_payout(npo, "p-1", 100);
-
-    const res = await mark(npo, { amount_sent: 100, payout_ids });
-
-    expect(res).toEqual({ status: "invalid", field: "payout_ids" });
-  });
-
-  test.each([
-    ["one more pending than marked", ["p-1"]],
-    ["one fewer pending than marked", ["p-1", "p-2", "p-3"]],
-    ["another payout in place of one pending", ["p-1", "p-9"]],
-  ])("%s: payouts_changed, nothing written", async (_, payout_ids) => {
+  test("a payout pending since the page loaded stays pending: the wire settles only the ones posted, and debits only their gross", async () => {
     const npo = await seed_npo({ cash: 1000 });
     await seed_payout(npo, "p-1", 60);
     await seed_payout(npo, "p-2", 40);
+    const posted = await pending_ids(npo);
+    await seed_payout(npo, "p-3", 25);
 
-    const res = await mark(npo, { amount_sent: 100, payout_ids });
+    const res = await mark(npo, { amount_sent: 100, payout_ids: posted });
+
+    expect(res).toMatchObject({ status: "ok", net: 100 });
+    expect(await payout_types()).toEqual({
+      "p-1": "settled",
+      "p-2": "settled",
+      "p-3": "pending",
+    });
+    expect(await npo_cash(npo)).toBe(900);
+  });
+
+  test("a posted payout refunded since the page loaded refuses the wire, and nothing is written", async () => {
+    const npo = await seed_npo({ cash: 1000 });
+    await seed_payout(npo, "p-1", 60);
+    await seed_payout(npo, "p-2", 40);
+    const posted = await pending_ids(npo);
+    await db()
+      .update(payouts)
+      .set({ type: "refunded" })
+      .where(eq(payouts.id, "p-2"));
+
+    const res = await mark(npo, { amount_sent: 100, payout_ids: posted });
 
     expect(res).toEqual({ status: "payouts_changed" });
     expect(await payout_types()).toEqual({
       "p-1": "pending",
+      "p-2": "refunded",
+    });
+    expect(await npo_cash(npo)).toBe(1000);
+    expect(await db().select().from(manual_wires)).toEqual([]);
+    expect(await db().select().from(settlements)).toEqual([]);
+  });
+
+  test.each([
+    ["no payouts", []],
+    ["a payout twice", ["p-1", "p-1", "p-2"]],
+    ["a payout that is not there", ["p-1", "p-2", "p-9"]],
+    ["another npo's payout", ["p-1", "p-2", "o-1"]],
+    ["a payout settled since", ["p-1", "p-2", "s-1"]],
+  ])("%s: payouts_changed, nothing written", async (_, payout_ids) => {
+    const npo = await seed_npo({ cash: 1000 });
+    const other = await seed_npo({ cash: 1000 });
+    await seed_payout(npo, "p-1", 60);
+    await seed_payout(npo, "p-2", 40);
+    await seed_payout(npo, "s-1", 30, { type: "settled" });
+    await seed_payout(other, "o-1", 70);
+
+    const res = await mark(npo, { amount_sent: 100, payout_ids });
+
+    expect(res).toEqual({ status: "payouts_changed" });
+    expect(await npo_cash(other)).toBe(1000);
+    expect(await payout_types()).toEqual({
+      "p-1": "pending",
       "p-2": "pending",
+      "s-1": "settled",
+      "o-1": "pending",
     });
     expect(await npo_cash(npo)).toBe(1000);
     expect(await db().select().from(manual_wires)).toEqual([]);
@@ -460,15 +496,6 @@ describe("mark_wired", () => {
     expect(res).toEqual({ status: "not_manual_wire" });
     expect(await payout_types()).toEqual({ "p-1": "pending" });
     expect(await db().select().from(manual_wires)).toEqual([]);
-  });
-
-  test("an npo whose payouts all settled since the page loaded has nothing to wire", async () => {
-    const npo = await seed_npo();
-    await seed_payout(npo, "p-1", 100, { type: "settled" });
-
-    const res = await mark(npo, { amount_sent: 100, payout_ids: ["p-1"] });
-
-    expect(res).toEqual({ status: "none_pending" });
   });
 
   test("a concurrent mark of the same wire that commits first makes this one a duplicate, and nothing is written", async () => {
@@ -580,7 +607,7 @@ describe("a returned wise transfer on record", () => {
 
     const res = await resend_returned(npo);
 
-    expect(res).toEqual({ status: "resent", ids: ["p-1"] });
+    expect(res).toEqual({ status: "resent", ids: ["p-1"], manual_wire: true });
     expect(await payout_types()).toEqual({ "p-1": "pending" });
     expect(await pending_ids(npo)).toEqual(["p-1"]);
   });

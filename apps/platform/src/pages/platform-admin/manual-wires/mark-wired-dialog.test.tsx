@@ -1,6 +1,7 @@
 import { describe, expect, onTestFinished, test, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { reset_viewport } from "#/__tests__/fixtures/viewport";
 import { type IMarkWiredDialog, MarkWiredDialog } from "./mark-wired-dialog";
 import type { IManualWireRow } from "./types";
 
@@ -59,7 +60,6 @@ describe("mark wired dialog", () => {
     await expect
       .element(screen.getByRole("dialog", { name: "Mark wired", exact: true }))
       .toBeVisible();
-    await expect.element(screen.getByText("SXM Paws · 1293826")).toBeVisible();
     await expect
       .element(screen.getByRole("combobox", { name: "Provider" }))
       .toMatchTextContent("Mercury");
@@ -329,5 +329,29 @@ describe("mark wired dialog", () => {
         payout_ids: changed.payouts.map((x) => x.id),
       })
     );
+  });
+
+  test("the nonprofit reads on one line at 1440, its id on a second line at 375", async () => {
+    onTestFinished(reset_viewport);
+    await page.viewport(1440, 900);
+    const screen = await render(<MarkWiredDialog {...dialog_props()} />);
+    const identity = () =>
+      screen.getByText("Nonprofit", { exact: true }).element()
+        .nextElementSibling as HTMLElement;
+    const id_line = () => identity().lastElementChild as HTMLElement;
+
+    await vi.waitFor(() =>
+      expect(identity().innerText).toBe("SXM Paws · 1293826")
+    );
+    expect(getComputedStyle(id_line()).display).toBe("inline");
+
+    await page.viewport(375, 812);
+    await vi.waitFor(() =>
+      expect(identity().innerText).toBe("SXM Paws\nID 1293826")
+    );
+    expect(getComputedStyle(id_line()).display).toBe("block");
+    expect(
+      Number.parseFloat(getComputedStyle(id_line()).fontSize)
+    ).toBeLessThan(Number.parseFloat(getComputedStyle(identity()).fontSize));
   });
 });

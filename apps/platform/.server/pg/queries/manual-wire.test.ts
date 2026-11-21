@@ -284,6 +284,21 @@ describe("manual_wire_rows", () => {
     ]);
   });
 
+  test.each([
+    ["exactly", 80],
+    ["more than", 93.2],
+  ])(
+    "netting on, an npo owing %s its pending total has no row: the cron settles it as recovered",
+    async (_, usd) => {
+      deductions.on = true;
+      const covered = await seed_npo("Covered Wire");
+      await seed_payout(covered, "c-1", 80, "2026-09-01T00:00:00.000Z");
+      await seed_owed(covered, "don-covered", usd);
+
+      expect(await manual_wire_rows()).toEqual([]);
+    }
+  );
+
   test("an inactive npo has no row", async () => {
     const gone = await seed_npo("Gone Wire");
     await db().update(npos).set({ active: false }).where(eq(npos.id, gone));

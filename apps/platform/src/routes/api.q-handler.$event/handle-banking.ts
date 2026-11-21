@@ -4,11 +4,15 @@ import type { IBankingPayload } from "@/queue";
 import { send_email_or_throw } from "$/email";
 import { base_url, stage } from "$/env";
 import { aws_monitor } from "$/kit/slack";
-import { resend_returned } from "$/payouts/resend-returned";
+import {
+  MANUAL_WIRE_REPENDED,
+  resend_returned,
+} from "$/payouts/resend-returned";
 import { npo_admins } from "$/pg/queries/user";
 
 /** the account grants pay may have changed: payouts held after a returned
- * transfer go out again with the next grants run. idempotent, so a retried
+ * transfer go out again with the next grants run (a manual-wire npo's, with
+ * the next wire). idempotent, so a retried
  * message moves nothing twice */
 async function release_returned(npo_id: number) {
   const res = await resend_returned(npo_id);
@@ -18,7 +22,9 @@ async function release_returned(npo_id: number) {
       ? {
           type: "NOTICE" as const,
           title: `Returned payouts re-sent for npo:${npo_id}`,
-          body: "a new bank account was approved: these payouts whose transfer came back are pending again and go out with the next grants run",
+          body: res.manual_wire
+            ? `a new bank account was approved, and the npo is paid by manual wire: ${MANUAL_WIRE_REPENDED}`
+            : "a new bank account was approved: these payouts whose transfer came back are pending again and go out with the next grants run",
           fields: [{ name: "payout_ids", value: res.ids.join(", ") }],
         }
       : {

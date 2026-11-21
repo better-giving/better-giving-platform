@@ -47,6 +47,7 @@
 import { report_error } from "#/errors/report";
 import { db } from "../pg/db";
 import type { DbOrTx } from "../pg/queries/helpers";
+import { npo_payout_method } from "../pg/queries/manual-wire";
 import { npo_balance_update, npo_get_locked } from "../pg/queries/npo";
 import { run_netted_usd, unrecover_owed } from "../pg/queries/owed";
 import {
@@ -65,7 +66,7 @@ import {
 } from "../pg/queries/payout";
 import { reverse_unfunded_payout_loss } from "../refund/unfunded";
 import { lock_run } from "./owed-run";
-import { resend_returned } from "./resend-returned";
+import { MANUAL_WIRE_REPENDED, resend_returned } from "./resend-returned";
 import { payout_cents, payout_total } from "./transfer";
 import { poll_commission_returns } from "./wise-return-commission";
 import {
@@ -167,7 +168,9 @@ async function resend_after_return(npo_id: number) {
     await alert({
       type: "NOTICE",
       title: `Returned payouts re-sent for npo:${npo_id}`,
-      body: "the npo's account that grants pay was approved or made default after the returned transfer was sent: these payouts are pending again and go out with the next grants run (found on the poll that retries a re-send that did not land, or right after the return)",
+      body: res.manual_wire
+        ? `the npo is paid by manual wire: ${MANUAL_WIRE_REPENDED} (found on the poll that retries a re-send that did not land, or right after the return)`
+        : "the npo's account that grants pay was approved or made default after the returned transfer was sent: these payouts are pending again and go out with the next grants run (found on the poll that retries a re-send that did not land, or right after the return)",
       fields: [{ name: "payout_ids", value: res.ids.join(", ") }],
     });
   } catch (err) {
@@ -317,9 +320,14 @@ async function announce(
   }
   if (res.status !== "returned") return;
   const ids = (xs: string[]) => xs.join(", ");
+  const manual_wire =
+    s.npo_id !== null &&
+    (await npo_payout_method(db, s.npo_id)) === "manual_wire";
   await alert({
     title: `Wise transfer returned for npo:${s.npo_id}`,
-    body: "the npo's cash is credited back and its payouts wait as returned until a newer approved account is the one grants pay, then go out with the next grants run (at once, if that account was already approved or made default while the transfer was out)",
+    body: manual_wire
+      ? `the npo's cash is credited back, and the npo is paid by manual wire: ${MANUAL_WIRE_REPENDED}`
+      : "the npo's cash is credited back and its payouts wait as returned until a newer approved account is the one grants pay, then go out with the next grants run (at once, if that account was already approved or made default while the transfer was out)",
     fields: [
       ...base,
       { name: "amount", value: res.credited.toString() },
