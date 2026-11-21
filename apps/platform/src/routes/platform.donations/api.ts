@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "$/pg/db";
 import { decode_date_cursor, encode_date_cursor } from "$/pg/queries/helpers";
 import {
@@ -10,6 +10,8 @@ import {
 import { donation_match_events } from "$/pg/schema/match";
 import { npos } from "$/pg/schema/npo";
 import type { Route } from "./+types/route";
+import { parse_method, parse_status } from "./filter/constants";
+import { method_where, status_where } from "./filter/where";
 
 export interface PaymentRow {
   id: string;
@@ -90,7 +92,8 @@ export const loader = async ({ url }: Route.LoaderArgs) => {
     )
     .where(
       and(
-        inArray(donations.status, ["settled", "refunded", "refunded_loss"]),
+        status_where(parse_status(s.get("status"))),
+        method_where(parse_method(s.get("method"))),
         decoded ? sql`${donations.created_at} < ${decoded}` : undefined
       )
     )
