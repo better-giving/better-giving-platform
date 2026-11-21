@@ -16,6 +16,7 @@ import {
   onTestFinished,
   vi,
 } from "vitest";
+import { userEvent } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import { seed_user } from "#/__tests__/fixtures/funds";
 import { user } from "$/pg/schema/auth";
@@ -379,6 +380,46 @@ describe("manual wires", () => {
     // B's button took focus once, from the click that opened its dialog
     expect(focused.filter((l) => l === "Mark wired, B Trust")).toHaveLength(1);
   }, 60_000);
+
+  it.each([0, 200, 400, 600, 900])(
+    "clicking into the Transaction id %ims after the dialog opens and typing keeps focus there, on a page whose frames come late",
+    async (wait) => {
+      // the focus trap and the date input each arm from a requestAnimationFrame;
+      // on the real page, busy loading, those land a few hundred ms late. a late
+      // arm must not take focus from the field the admin has moved to
+      const raf = window.requestAnimationFrame;
+      window.requestAnimationFrame = ((cb: FrameRequestCallback) =>
+        window.setTimeout(() => cb(performance.now()), 300)) as typeof raf;
+      onTestFinished(() => {
+        window.requestAnimationFrame = raf;
+      });
+      await seed_wire_npo("River Trust", 100);
+      const screen = await open_wires();
+      await screen
+        .getByRole("button", { name: "Mark wired, River Trust" })
+        .click();
+      const dialog = screen.getByRole("dialog");
+      await expect.element(dialog).toBeVisible();
+      const date_of = () =>
+        [...document.querySelectorAll('[role="dialog"] [role="spinbutton"]')]
+          .slice(0, 3)
+          .map((e) => e.textContent)
+          .join("/");
+      const date = date_of();
+      await new Promise((r) => setTimeout(r, wait));
+      await dialog.getByLabelText("Transaction id").click();
+      await userEvent.keyboard("AB");
+      await new Promise((r) => setTimeout(r, 1500));
+      await userEvent.keyboard("7");
+      await expect
+        .element(dialog.getByLabelText("Transaction id"))
+        .toHaveValue("AB7");
+      await expect
+        .element(dialog.getByLabelText("Transaction id"))
+        .toHaveFocus();
+      expect(date_of()).toBe(date);
+    }
+  );
 
   it("refuses a transaction already recorded: the alert names it and the dialog stays open", async () => {
     const npo = await seed_wire_npo("River Trust", 100);

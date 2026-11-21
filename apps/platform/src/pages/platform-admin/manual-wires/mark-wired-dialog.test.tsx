@@ -398,21 +398,24 @@ describe("mark wired dialog", () => {
   test("the focus trap's target is where focus is, else where it last was in the dialog (even if that element was replaced), else the month", async () => {
     const screen = await render(<MarkWiredDialog {...dialog_props()} />);
     const none = { el: null, key: null };
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
     const month = screen.getByRole("spinbutton").first().element();
     const tx = screen.getByLabelText("Transaction id").element() as HTMLElement;
     // the trap has just put focus on the month: that is where focus is
-    expect(initial_focus(none)).toBe(month);
+    expect(initial_focus(dialog, none)).toBe(month);
     await screen.getByLabelText("Transaction id").click();
-    expect(initial_focus(none)).toBe(tx);
+    expect(initial_focus(dialog, none)).toBe(tx);
     // focus nowhere (read before the dialog puts it back): the last field,
     // as an element or, if its element was replaced, found again by its name
     (document.activeElement as HTMLElement).blur();
-    expect(initial_focus({ el: tx, key: '[name="provider_tx_id"]' })).toBe(tx);
-    expect(initial_focus({ el: null, key: '[name="provider_tx_id"]' })).toBe(
-      tx
-    );
+    expect(
+      initial_focus(dialog, { el: tx, key: '[name="provider_tx_id"]' })
+    ).toBe(tx);
+    expect(
+      initial_focus(dialog, { el: null, key: '[name="provider_tx_id"]' })
+    ).toBe(tx);
     // nothing remembered: the month
-    expect(initial_focus(none)).toBe(month);
+    expect(initial_focus(dialog, none)).toBe(month);
   });
 
   test("a field that blurs for a moment gets focus back: the trap never sends it to the date", async () => {

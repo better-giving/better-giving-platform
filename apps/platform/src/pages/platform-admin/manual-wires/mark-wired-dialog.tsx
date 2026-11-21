@@ -1,7 +1,7 @@
 import { DateField, Field, Modal, Select } from "@better-giving/ui";
 import { valibotResolver } from "@hookform/resolvers/valibot";
 import { format } from "date-fns";
-import { useEffect, useMemo, useRef } from "react";
+import { type RefObject, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   type Control,
   useController,
@@ -108,10 +108,14 @@ const last_in = (dialog: HTMLElement, last: ILastFocus) => {
  * back: wherever focus is now if that is inside the dialog, else where it last
  * was inside the dialog, and only on first open the date's month segment. the
  * trap must never send focus to the date once the admin is in the form: the
- * next keystrokes would land in it, and the wire date is a money record
+ * next keystrokes would land in it, and the wire date is a money record.
+ * `dialog` is this dialog's own content, found from its form: the page can
+ * hold other `role="dialog"` elements
  */
-export function initial_focus(last: ILastFocus): HTMLElement | null {
-  const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+export function initial_focus(
+  dialog: HTMLElement | null,
+  last: ILastFocus
+): HTMLElement | null {
   if (!dialog) return document.body;
   const active = document.activeElement;
   if (active instanceof HTMLElement && dialog.contains(active)) return active;
@@ -131,13 +135,18 @@ export function MarkWiredDialog({
   providers = WIRE_PROVIDERS,
   ...rest
 }: IMarkWiredDialog) {
+  const form = useRef<HTMLFormElement>(null);
+  const dialog_of = useCallback(
+    () => form.current?.closest<HTMLElement>('[role="dialog"]') ?? null,
+    []
+  );
   const last_focused = useRef<ILastFocus>({ el: null, key: null });
   useEffect(() => {
     if (!open) return;
     last_focused.current = { el: null, key: null };
     const note = (e: FocusEvent) => {
       const el = e.target;
-      if (el instanceof HTMLElement && el.closest('[role="dialog"]'))
+      if (el instanceof HTMLElement && dialog_of()?.contains(el))
         last_focused.current = { el, key: key_of(el) };
     };
     // a field that loses focus to nothing (a blur between two fills, an
@@ -146,12 +155,11 @@ export function MarkWiredDialog({
     const keep = (e: FocusEvent) => {
       const el = e.target;
       if (e.relatedTarget || !(el instanceof HTMLElement)) return;
-      if (!el.closest('[role="dialog"]')) return;
+      if (!dialog_of()?.contains(el)) return;
       queueMicrotask(() => {
-        const dialog = document.querySelector<HTMLElement>(
-          '[role="dialog"][data-state="open"]'
-        );
-        if (!dialog || document.activeElement !== document.body) return;
+        const dialog = dialog_of();
+        if (dialog?.dataset.state !== "open") return;
+        if (document.activeElement !== document.body) return;
         last_in(dialog, last_focused.current)?.focus({ preventScroll: true });
       });
     };
@@ -161,13 +169,13 @@ export function MarkWiredDialog({
       document.removeEventListener("focusin", note, true);
       document.removeEventListener("focusout", keep, true);
     };
-  }, [open]);
+  }, [open, dialog_of]);
   return (
     <Modal
       open={open}
       onClose={on_close}
       busy={submitting}
-      initialFocusEl={() => initial_focus(last_focused.current)}
+      initialFocusEl={() => initial_focus(dialog_of(), last_focused.current)}
       returnFocusFallback={return_focus_fallback}
       classes="bg-popover"
     >
@@ -181,6 +189,7 @@ export function MarkWiredDialog({
           providers={providers}
           submitting={submitting}
           on_close={on_close}
+          form_ref={form}
           {...rest}
         />
       )}
@@ -195,11 +204,14 @@ interface IBody
   > {
   row: IManualWireRow;
   providers: readonly string[];
+  /** the dialog finds its own content through this */
+  form_ref: RefObject<HTMLFormElement | null>;
 }
 
 function Body({
   row,
   providers,
+  form_ref,
   submitting,
   error,
   on_submit,
@@ -232,6 +244,7 @@ function Body({
 
   return (
     <form
+      ref={form_ref}
       onSubmit={handleSubmit((x) =>
         submit_once(() =>
           on_submit({

@@ -3,6 +3,8 @@ import {
   type DateInputDateValue as DateValue,
 } from "@ark-ui/react/date-input";
 import { parseDate } from "@ark-ui/react/date-picker";
+import { useEffect, useRef } from "react";
+import { guard_segment_focus } from "./guard-segment-focus";
 import { useViewerToday } from "./use-viewer-today";
 
 interface IDateField {
@@ -32,8 +34,14 @@ export function DateField({
 }: IDateField) {
   const min_today = useViewerToday("min");
   const max_today = useViewerToday("max");
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = root.current;
+    return el ? guard_segment_focus(el) : undefined;
+  }, []);
   return (
     <DateInput.Root
+      ref={root}
       selectionMode="single"
       value={to_dv(value)}
       min={minToday ? parseDate(min_today) : undefined}
