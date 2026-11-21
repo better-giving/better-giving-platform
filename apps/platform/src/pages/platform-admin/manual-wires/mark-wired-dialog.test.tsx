@@ -70,8 +70,28 @@ describe("mark wired dialog", () => {
     await screen.getByLabelText("Wire fee").fill("25");
     await expect.element(summary).toMatchTextContent("Wire fee−$25.00");
     await expect.element(summary).toMatchTextContent("Amount to send$4,175.00");
-    await expect.element(summary).toMatchTextContent("Balance debit$4,200.00");
+    await expect.element(summary).toMatchTextContent("Balance debit$4,812.40");
   });
+
+  test.each([
+    // owing: the recovered share leaves the cash with the rest of the gross
+    ["$500 pending, $93.20 owed", 500, 93.2, 406.8, "$406.80", "$500.00"],
+    ["nothing owed", 4200, 0, 4200, "$4,200.00", "$4,200.00"],
+  ])(
+    "the balance debit is the gross of the payouts settled: %s",
+    async (_, gross, owed, net, net_text, debit_text) => {
+      const screen = await render(
+        <MarkWiredDialog
+          {...dialog_props({ row: { ...row, gross, owed, net } })}
+        />
+      );
+      const summary = screen.getByLabelText("Summary");
+      await expect.element(summary).toMatchTextContent(`Net total${net_text}`);
+      await expect
+        .element(summary)
+        .toMatchTextContent(`Balance debit${debit_text}`);
+    }
+  );
 
   test("an amount off the net less the fee names the figure, and follows a fee edit", async () => {
     const p = dialog_props();

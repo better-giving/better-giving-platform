@@ -1,4 +1,4 @@
-import { uuid_v5 } from "@/payouts/uuid-v5";
+import { createHash, randomUUID } from "node:crypto";
 
 export { payout_cents, payout_total } from "./amount";
 
@@ -9,6 +9,9 @@ export class NotFundedError extends Error {
     this.name = "NotFundedError";
   }
 }
+
+// fixed namespace for the uuid v5 below; changing it re-keys every ref
+const REF_NAMESPACE = Buffer.from("cb853edef275466b85c79409fa3f037a", "hex");
 
 /**
  * a claim's wise `customerTransactionId` (its idempotency key): uuid v5 of
@@ -21,7 +24,7 @@ export function transfer_ref(
   ref_key: string,
   total: number,
   ids: string[],
-  nonce: string = crypto.randomUUID()
+  nonce: string = randomUUID()
 ): string {
   return uuid_v5(
     JSON.stringify([ref_key, total.toFixed(2), [...ids].sort(), nonce])
@@ -51,4 +54,16 @@ export function wire_settlement_id(
   provider_tx_id: string
 ): string {
   return uuid_v5(JSON.stringify(["manual_wire", provider, provider_tx_id]));
+}
+
+function uuid_v5(name: string): string {
+  const b = createHash("sha1")
+    .update(REF_NAMESPACE)
+    .update(name)
+    .digest()
+    .subarray(0, 16);
+  b[6] = (b[6]! & 0x0f) | 0x50;
+  b[8] = (b[8]! & 0x3f) | 0x80;
+  const h = b.toString("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }

@@ -37,6 +37,30 @@ vi.mock("$/pg/db", () => ({
   ),
 }));
 vi.mock("$/kit/wise", () => ({ wise: {} }));
+// `transfer.ts` hashes its refs with `node:crypto`, which a browser can't
+// load. the refs here only need to be stable per name; the real ones, and the
+// duplicate check keyed on them, are covered by manual-wire.test.ts and
+// api.test.ts in the node project
+vi.mock("$/payouts/transfer", async () => {
+  const { payout_cents, payout_total } = await import("$/payouts/amount");
+  const ref = (name: string) => {
+    let h = 0;
+    for (const c of name) h = (Math.imul(h, 31) + c.charCodeAt(0)) | 0;
+    const hex = (h >>> 0).toString(16).padStart(8, "0");
+    return `${hex}-0000-5000-8000-${hex.repeat(2).slice(0, 12)}`;
+  };
+  return {
+    payout_cents,
+    payout_total,
+    NotFundedError: class extends Error {},
+    transfer_ref: (k: string, t: number, ids: string[], n = "") =>
+      ref(JSON.stringify([k, t, ids, n])),
+    recovered_run_ref: (p: number | string, ids: string[]) =>
+      ref(JSON.stringify(["recovered", p, ids])),
+    wire_settlement_id: (provider: string, tx: string) =>
+      ref(JSON.stringify(["manual_wire", provider, tx])),
+  };
+});
 
 // the real guard and context; only the better-auth instance stays out of the bundle
 vi.mock("#/.server/auth/auth", () => ({ auth: {} }));

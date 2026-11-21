@@ -231,7 +231,7 @@ function Body({
             value={usd(to_send(row.net, fee))}
             total
           />
-          <SumRow label="Balance debit" value={usd(row.net)} />
+          <SumRow label="Balance debit" value={usd(row.gross)} />
         </dl>
       </div>
       {/* a refusal quotes the provider's transaction id, one unbroken run */}
