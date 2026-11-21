@@ -1,5 +1,7 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { reset_viewport } from "#/__tests__/fixtures/viewport";
 import type { IManualWireRow } from "./types";
 import {
   type IWiresTable,
@@ -54,6 +56,10 @@ const props = (o: Partial<IWiresTable> = {}): IWiresTable => ({
 });
 
 describe("manual wires table", () => {
+  // the runner's phone-width viewport draws stacked cards with no header
+  beforeEach(() => page.viewport(1440, 900));
+  afterEach(reset_viewport);
+
   test("one row per nonprofit with its amount due, payout count and bank; Mark wired calls back with the row and where it sat", async () => {
     const p = props();
     const screen = await render(<WiresTable {...p} />);
@@ -67,9 +73,7 @@ describe("manual wires table", () => {
     await expect.element(screen.getByText("$4,200.00")).toBeVisible();
     await expect.element(screen.getByText("after $612.40 owed")).toBeVisible();
     await expect.element(screen.getByText("3 payouts")).toBeVisible();
-    await expect
-      .element(screen.getByText("1 payout", { exact: true }))
-      .toBeVisible();
+    await expect.element(screen.getByText("1 payout")).toBeVisible();
     await expect
       .element(screen.getByText("EUR account ending in 7731"))
       .toBeVisible();

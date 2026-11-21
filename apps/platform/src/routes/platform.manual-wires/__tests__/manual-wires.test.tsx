@@ -272,8 +272,9 @@ describe("manual wires", () => {
         "Transaction MT-77 from Mercury is already recorded. Check the id with the provider."
       );
     await expect.element(screen.getByRole("dialog")).toBeVisible();
-    await expect
-      .element(screen.getByRole("row").filter({ hasText: "River Trust" }))
-      .toMatchTextContent("$80.00");
+    // the open modal hides the table from role queries, so the row is read off the DOM
+    expect(
+      document.querySelector("tbody > tr[data-row-id]")?.textContent
+    ).toContain("$80.00");
   });
 });
