@@ -194,9 +194,19 @@ type Screen = Awaited<ReturnType<typeof render>>;
 /** native clicks: the dialog's backdrop intercepts playwright's pointer */
 const press = (el: Element) => (el as HTMLElement).click();
 
+/**
+ * the dialog's focus trap activates in a rAF after mount and then focuses the
+ * first tabbable, the date's month segment. typing before that lets it pull
+ * focus mid-fill on a slow runner, and the digits typed land in the date
+ * (a wire dated a month ahead, the dialog never closing)
+ */
+const dialog_ready = (dialog: ReturnType<Screen["getByRole"]>) =>
+  expect.element(dialog.getByRole("spinbutton").first()).toHaveFocus();
+
 async function mark(screen: Screen, name: string, tx: string, sent: string) {
   await screen.getByRole("button", { name: `Mark wired, ${name}` }).click();
   const dialog = screen.getByRole("dialog");
+  await dialog_ready(dialog);
   await dialog.getByLabelText("Transaction id").fill(tx);
   await dialog.getByLabelText("Amount sent").fill(sent);
   press(
@@ -297,6 +307,7 @@ describe("manual wires", () => {
       .getByRole("button", { name: "Mark wired, River Trust" })
       .click();
     const dialog = screen.getByRole("dialog");
+    await dialog_ready(dialog);
     await dialog.getByLabelText("Transaction id").fill(tx);
     await dialog.getByLabelText("Amount sent").fill(sent);
     return dialog;

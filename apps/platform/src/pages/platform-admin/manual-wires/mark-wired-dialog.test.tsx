@@ -1,9 +1,21 @@
 import { describe, expect, onTestFinished, test, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
-import { render } from "vitest-browser-react";
+import { render as render_dialog } from "vitest-browser-react";
 import { reset_viewport } from "#/__tests__/fixtures/viewport";
 import { type IMarkWiredDialog, MarkWiredDialog } from "./mark-wired-dialog";
 import type { IManualWireRow } from "./types";
+
+/**
+ * renders, then waits for the dialog's focus trap: it activates in a rAF after
+ * mount and focuses the first tabbable, the date's month segment. typing
+ * before that lets it pull focus mid-fill on a slow runner, and the digits
+ * typed land in the date
+ */
+const render = async (ui: Parameters<typeof render_dialog>[0]) => {
+  const screen = await render_dialog(ui);
+  await expect.element(screen.getByRole("spinbutton").first()).toHaveFocus();
+  return screen;
+};
 
 // native clicks: the dialog backdrop fails playwright's actionability check
 const press = (el: Element) => (el as HTMLElement).click();
