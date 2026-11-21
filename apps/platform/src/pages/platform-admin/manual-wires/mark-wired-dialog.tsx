@@ -84,6 +84,21 @@ const wired_schema = (net: number, providers: readonly string[]) =>
 
 type TForm = v.InferOutput<ReturnType<typeof wired_schema>>;
 
+/**
+ * what the focus trap focuses when it arms, and again whenever it re-runs its
+ * initial focus: wherever focus already is inside the dialog, else the date's
+ * month segment. a re-run must never pull focus off the field the admin is
+ * typing in: the keystrokes would land in the date, and the wire date is a
+ * money record
+ */
+export function initial_focus(): HTMLElement | null {
+  const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+  if (!dialog) return document.body;
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && dialog.contains(active)) return active;
+  return dialog.querySelector<HTMLElement>('[role="spinbutton"]') ?? dialog;
+}
+
 export function MarkWiredDialog({
   open,
   row,
@@ -98,6 +113,7 @@ export function MarkWiredDialog({
       open={open}
       onClose={on_close}
       busy={submitting}
+      initialFocusEl={initial_focus}
       returnFocusFallback={return_focus_fallback}
       classes="bg-popover"
     >

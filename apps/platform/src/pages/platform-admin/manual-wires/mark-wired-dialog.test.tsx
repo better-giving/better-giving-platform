@@ -2,7 +2,11 @@ import { describe, expect, onTestFinished, test, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render as render_dialog } from "vitest-browser-react";
 import { reset_viewport } from "#/__tests__/fixtures/viewport";
-import { type IMarkWiredDialog, MarkWiredDialog } from "./mark-wired-dialog";
+import {
+  type IMarkWiredDialog,
+  initial_focus,
+  MarkWiredDialog,
+} from "./mark-wired-dialog";
 import type { IManualWireRow } from "./types";
 
 /**
@@ -365,5 +369,42 @@ describe("mark wired dialog", () => {
     expect(
       Number.parseFloat(getComputedStyle(id_line()).fontSize)
     ).toBeLessThan(Number.parseFloat(getComputedStyle(identity()).fontSize));
+  });
+
+  const date_of = () =>
+    [...document.querySelectorAll('[role="dialog"] [role="spinbutton"]')]
+      .slice(0, 3)
+      .map((e) => e.textContent)
+      .join("/");
+
+  test("typing the first character in the Transaction id leaves focus in it and the date as it was", async () => {
+    const screen = await render(<MarkWiredDialog {...dialog_props()} />);
+    const date = date_of();
+    await screen.getByLabelText("Transaction id").click();
+    await userEvent.keyboard("Q");
+    // two animation frames and a little more: whatever a keystroke sets in
+    // motion has had its turn
+    await new Promise((r) =>
+      requestAnimationFrame(() => requestAnimationFrame(r))
+    );
+    await new Promise((r) => setTimeout(r, 200));
+    await expect.element(screen.getByLabelText("Transaction id")).toHaveFocus();
+    await expect
+      .element(screen.getByLabelText("Transaction id"))
+      .toHaveValue("Q");
+    expect(date_of()).toBe(date);
+  });
+
+  test("the focus trap's initial focus is where focus already is inside the dialog, else the month", async () => {
+    const screen = await render(<MarkWiredDialog {...dialog_props()} />);
+    const month = screen.getByRole("spinbutton").first().element();
+    expect(initial_focus()).toBe(month);
+    await screen.getByLabelText("Transaction id").click();
+    expect(initial_focus()).toBe(
+      screen.getByLabelText("Transaction id").element()
+    );
+    // focus on the page behind the dialog, or nowhere: back to the first field
+    (document.activeElement as HTMLElement).blur();
+    expect(initial_focus()).toBe(month);
   });
 });
