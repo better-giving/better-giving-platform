@@ -13,6 +13,7 @@ import {
   describe,
   expect,
   it,
+  onTestFinished,
   vi,
 } from "vitest";
 import { cleanup, render } from "vitest-browser-react";
@@ -85,7 +86,22 @@ afterAll(async () => {
   await test_db.current?.client.close();
 });
 
+/** holds the page's loader, so a revalidation lands when the test says */
+const gate = { held: null as Promise<void> | null };
+
+function hold_loader() {
+  let release!: () => void;
+  gate.held = new Promise<void>((r) => {
+    release = r;
+  });
+  return () => {
+    gate.held = null;
+    release();
+  };
+}
+
 beforeEach(async () => {
+  gate.held = null;
   await db().delete(payouts);
   await db().delete(manual_wires);
   await db().delete(settlements);
@@ -174,7 +190,8 @@ async function open_wires() {
         {
           path: "manual-wires",
           Component: WiresPage as any,
-          loader: loader as any,
+          loader: (() =>
+            gate.held ? gate.held.then(() => loader()) : loader()) as any,
           action: action as any,
           shouldRevalidate,
         },
@@ -271,6 +288,88 @@ describe("manual wires", () => {
       )
     );
   });
+
+  it("a revalidation that lands while the admin is typing leaves the date, the typed fields and the focus alone", async () => {
+    const npo = await seed_wire_npo("River Trust", 100);
+    await mark_wired({
+      npo_id: npo,
+      wire_date: "2026-11-18",
+      amount_sent: 100,
+      provider: "Mercury",
+      provider_tx_id: "MT-77",
+      wire_fee: 0,
+      recorded_by: await seed_admin(),
+      payout_ids: await pending_ids(npo),
+    });
+    await seed_payout(npo, 80);
+
+    const screen = await open_wires();
+    await screen
+      .getByRole("button", { name: "Mark wired, River Trust" })
+      .click();
+    const dialog = screen.getByRole("dialog");
+    await dialog_ready(dialog);
+    const date_of = () =>
+      [...document.querySelectorAll('[role="dialog"] [role="spinbutton"]')]
+        .slice(0, 3)
+        .map((e) => e.textContent)
+        .join("/");
+    const date = date_of();
+    await dialog.getByLabelText("Transaction id").fill("MT-77");
+    await dialog.getByLabelText("Amount sent").fill("80");
+
+    // the refused wire revalidates the list; that read is held while the admin
+    // goes on typing, and lands under their hands
+    const release = hold_loader();
+    press(
+      dialog.getByRole("button", { name: "Mark wired", exact: true }).element()
+    );
+    await expect
+      .element(dialog.getByRole("button", { name: "Marking wired…" }))
+      .toBeVisible();
+    await dialog.getByLabelText("Transaction id").fill("MT-78");
+    release();
+
+    await expect
+      .element(dialog.getByRole("alert"))
+      .toMatchTextContent(
+        "Transaction MT-77 from Mercury is already recorded."
+      );
+    expect(date_of()).toBe(date);
+    await expect
+      .element(dialog.getByLabelText("Transaction id"))
+      .toHaveValue("MT-78");
+    await expect
+      .element(dialog.getByLabelText("Amount sent"))
+      .toHaveValue("80");
+    await expect.element(dialog.getByLabelText("Transaction id")).toHaveFocus();
+  });
+
+  it("on a slow client the dialog closes only once the re-read list has dropped the row, so focus goes to the next row and never back to the removed one", async () => {
+    const { cdp } = await import("vitest/browser");
+    await cdp().send("Emulation.setCPUThrottlingRate", { rate: 20 });
+    onTestFinished(async () => {
+      await cdp().send("Emulation.setCPUThrottlingRate", { rate: 1 });
+    });
+    await seed_wire_npo("A Trust", 100);
+    await seed_wire_npo("B Trust", 200);
+    const screen = await open_wires();
+
+    const focused: string[] = [];
+    const on_focus = (e: Event) =>
+      focused.push((e.target as HTMLElement).getAttribute("aria-label") ?? "");
+    document.addEventListener("focusin", on_focus, true);
+    onTestFinished(() =>
+      document.removeEventListener("focusin", on_focus, true)
+    );
+
+    await mark(screen, "B Trust", "MT-1", "200");
+    await expect
+      .element(screen.getByRole("button", { name: "Mark wired, A Trust" }))
+      .toHaveFocus();
+    // B's button took focus once, from the click that opened its dialog
+    expect(focused.filter((l) => l === "Mark wired, B Trust")).toHaveLength(1);
+  }, 60_000);
 
   it("refuses a transaction already recorded: the alert names it and the dialog stays open", async () => {
     const npo = await seed_wire_npo("River Trust", 100);
