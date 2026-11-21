@@ -1,5 +1,4 @@
-import { format } from "date-fns";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, onTestFinished, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { type IMarkWiredDialog, MarkWiredDialog } from "./mark-wired-dialog";
@@ -162,6 +161,11 @@ describe("mark wired dialog", () => {
   });
 
   test("a valid wire is sent once, as typed", async () => {
+    // the default date is today's: pinned, so a run across midnight can't differ
+    vi.setSystemTime(new Date(2026, 10, 18, 12));
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     const p = dialog_props();
     const screen = await render(<MarkWiredDialog {...p} />);
     await screen.getByLabelText("Wire fee").fill("25");
@@ -173,7 +177,7 @@ describe("mark wired dialog", () => {
     press(submit);
     await vi.waitFor(() =>
       expect(p.on_submit).toHaveBeenCalledWith({
-        wire_date: format(new Date(), "yyyy-MM-dd"),
+        wire_date: "2026-11-18",
         wire_fee: 25,
         provider: "Mercury",
         provider_tx_id: TX,

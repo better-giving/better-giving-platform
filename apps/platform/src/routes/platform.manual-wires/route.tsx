@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
+import { type ShouldRevalidateFunction, useFetcher } from "react-router";
 import { metas } from "#/helpers/seo";
 import { MarkWiredDialog } from "#/pages/platform-admin/manual-wires/mark-wired-dialog";
 import type { IManualWireRow } from "#/pages/platform-admin/manual-wires/types";
@@ -13,6 +13,14 @@ import type { TWireAnswer } from "./api";
 
 export { action, loader } from "./api";
 export const meta: Route.MetaFunction = () => metas({ title: "Manual wires" });
+
+// a refusal (a duplicate, a row already settled, an amount that moved) answers
+// a 409, which React Router doesn't revalidate after: the rows would stay as
+// they were when the dialog opened
+export const shouldRevalidate: ShouldRevalidateFunction = ({
+  formMethod,
+  defaultShouldRevalidate,
+}) => formMethod === "POST" || defaultShouldRevalidate;
 
 interface IDialog {
   /** the row it opened on, with the row's place in the list */
