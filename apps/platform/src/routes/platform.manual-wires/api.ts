@@ -11,7 +11,7 @@ import type { Route } from "./+types/route";
 
 export const loader = async () => ({ rows: await manual_wire_rows() });
 
-/** what a refusal calls each field: the dialog's labels */
+/** what a refusal calls each field */
 const LABELS: Record<keyof IMarkWired, string> = {
   npo_id: "nonprofit",
   wire_date: "wire date",

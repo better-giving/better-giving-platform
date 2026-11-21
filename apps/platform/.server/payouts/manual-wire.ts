@@ -41,7 +41,7 @@ export type MarkWiredResult =
 /**
  * records a wire sent by hand to an npo paid by `manual_wire`, settling
  * all its pending payouts in one transaction with the wire and its settlement.
- * `providers` is `WIRE_PROVIDERS` outside tests
+ * tests pass a second provider through `providers`
  */
 export async function mark_wired(
   input: IMarkWired,

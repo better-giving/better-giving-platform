@@ -141,7 +141,7 @@ export async function settle_npo_payouts(
         return { status: "amount_mismatch", net: plan.net } as const;
       }
       await deduct(tx, { npo_id: npo.id }, "grant_run", plan, to.settlement_id);
-      // the cash debit is the gross, as on the wise path; the recovered share comes out of the gross
+      // the cash debit is the gross, as on the wise path; the recovered share is part of it
       const balance_debit = gross;
       await settle_recorded(tx, npo.id, locked, plan.net, balance_debit, to);
       return {

@@ -42,7 +42,8 @@ export interface IMarkWiredDialog {
   return_focus_fallback?: () => HTMLElement | null;
 }
 
-/** a deduction as the summary writes it: "−$612.40", "−$0.00" when none */
+/** a deduction as the summary writes it: "−$612.40", "−$0.00" when none; a
+ * negative one (an addition) prints unsigned */
 const less = (n: number) => (n < 0 ? usd(-n) : `−${usd(n)}`);
 
 /** what the wire must carry: the net total less the fee; a blank fee is $0 */

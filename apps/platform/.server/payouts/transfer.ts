@@ -47,7 +47,7 @@ export function recovered_run_ref(
 /**
  * a manual wire's settlement id: uuid v5 of the provider + its own reference
  * for the wire, so the same reference at two providers never collides and
- * recording one wire twice does
+ * recording one wire twice collides
  */
 export function wire_settlement_id(
   provider: string,

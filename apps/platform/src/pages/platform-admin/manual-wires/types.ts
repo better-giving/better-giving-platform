@@ -14,7 +14,7 @@ export interface IWirePayout {
 export interface IManualWireRow {
   npo_id: number;
   name: string;
-  /** the pending payouts' total, in the cents a wire sends */
+  /** the pending payouts' total, to the cent */
   gross: number;
   /** gross − net: positive is deducted for what the npo owes, zero or negative when nothing is owed */
   owed: number;
