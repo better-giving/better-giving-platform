@@ -308,7 +308,6 @@ function SumRow({ label, value, total }: ISumRow) {
   );
 }
 
-/** "f3b1...e8f4" */
 const short_id = (id: string) => `${id.slice(0, 4)}...${id.slice(-4)}`;
 
 interface IPayouts {

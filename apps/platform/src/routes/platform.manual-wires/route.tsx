@@ -70,7 +70,7 @@ interface IAnswer {
   error?: string;
 }
 
-/** the request's answer once it has settled, list revalidated and all */
+/** the request's answer once it has settled and the list has revalidated */
 function answer(f: ReturnType<typeof useFetcher<TWireAnswer>>): IAnswer {
   if (f.state !== "idle" || !f.data) return { done: false };
   if ("message" in f.data) return { done: false, error: f.data.message };

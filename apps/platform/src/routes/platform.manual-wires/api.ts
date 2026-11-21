@@ -49,7 +49,7 @@ export const action = async ({ request }: Route.ActionArgs) => {
     const label = LABELS[key as keyof IMarkWired];
     return resp.fail(
       400,
-      label ? `Check the ${label}` : "Send the wire as JSON"
+      label ? `Check the ${label}` : "Check the form and try again"
     );
   }
   return answer(p.output, await mark_wired(p.output));

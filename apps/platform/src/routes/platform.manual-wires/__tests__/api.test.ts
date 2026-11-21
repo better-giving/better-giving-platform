@@ -283,7 +283,7 @@ describe("mark wired", () => {
     const before = await ledger();
 
     expect(await post("not json")).toEqual(
-      refused(400, "Send the wire as JSON")
+      refused(400, "Check the form and try again")
     );
     expect(await post(wire(npo, { amount_sent: "100" }))).toEqual(
       refused(400, "Check the amount sent")
