@@ -1,4 +1,4 @@
-import { EmptyRow, LoadMoreRow } from "@better-giving/ui";
+import { Badge, EmptyRow, LoadMoreRow, TabPanel } from "@better-giving/ui";
 import { format } from "date-fns";
 import { NavLink, Outlet, useSearchParams } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
@@ -9,6 +9,16 @@ import type { IPaginator } from "#/types/components";
 import { via_name } from "@/donations/helpers";
 import type { Route } from "./+types/route";
 import type { PaymentRow } from "./api";
+import {
+  DEFAULT_METHOD,
+  DEFAULT_STATUS,
+  type MethodFilter,
+  parse_method,
+  parse_status,
+  type StatusFilter,
+} from "./filter/constants";
+import { Filters } from "./filter/filters";
+import { donation_tag } from "./filter/tag";
 
 export { loader } from "./api";
 export const clientLoader = createClientLoaderCache<Route.ClientLoaderArgs>();
@@ -16,11 +26,14 @@ export const meta: Route.MetaFunction = () => metas({ title: "Donations" });
 
 export default CacheRoute(Page);
 function Page({ loaderData: page1 }: Route.ComponentProps) {
-  const [params] = useSearchParams();
+  const [params, set_params] = useSearchParams();
+  const status = parse_status(params.get("status"));
+  const method = parse_method(params.get("method"));
 
-  const { node } = use_table<PaymentRow>({
+  const { node, loading } = use_table<PaymentRow>({
     table: (props) => <Table {...props} />,
     page1,
+    filter_key: `${status}:${method}`,
     gen_loader: (load, next) => () => {
       const copy = new URLSearchParams(params);
       if (next) copy.set("cursor", next);
@@ -28,10 +41,31 @@ function Page({ loaderData: page1 }: Route.ComponentProps) {
     },
   });
 
+  // each change applies at once: defaults stay out of the url, the cursor
+  // belongs to the old filter, and replace keeps Back free of filter steps
+  const on_change = (next: { status: StatusFilter; method: MethodFilter }) => {
+    const p = new URLSearchParams(params);
+    p.delete("cursor");
+    if (next.status === DEFAULT_STATUS) p.delete("status");
+    else p.set("status", next.status);
+    if (next.method === DEFAULT_METHOD) p.delete("method");
+    else p.set("method", next.method);
+    set_params(p, { replace: true, preventScrollReset: true });
+  };
+
   return (
-    <div className="px-4 py-4 md:px-10 md:py-8 w-full max-w-5xl grid content-start">
+    <div className="px-4 py-4 md:px-10 md:py-8 w-full grid content-start">
       <h1 className="sr-only">Donations</h1>
-      <div className="table-scroll">{node}</div>
+      <Filters
+        status={status}
+        method={method}
+        loading={loading}
+        on_change={on_change}
+      >
+        <TabPanel value={status}>
+          <div className="table-scroll">{node}</div>
+        </TabPanel>
+      </Filters>
 
       <Outlet />
     </div>
@@ -94,6 +128,7 @@ function Match({ payment: c }: { payment: PaymentRow }) {
       {c.match_event_id && !c.match_voided_at && (
         <NavLink
           to={`${c.donation_id}/void-match`}
+          aria-label={`Void match for donation from ${c.email ?? c.donation_id}`}
           preventScrollReset
           replace
           className="btn-secondary btn btn-sm"
@@ -114,13 +149,14 @@ function Table({
   load_next,
   loading,
   disabled,
-  empty_msg = "No settled donations found",
+  empty_msg = "No donations found",
 }: ITableProps) {
   return (
     <table className="table">
       <thead>
         <tr className="whitespace-nowrap">
           <th>Date</th>
+          <th>Status</th>
           <th>Email</th>
           <th>NPO</th>
           <th>Amount</th>
@@ -134,14 +170,14 @@ function Table({
       </thead>
       <tbody>
         {items.length === 0 ? (
-          <EmptyRow col_span={10}>{empty_msg}</EmptyRow>
+          <EmptyRow col_span={11}>{empty_msg}</EmptyRow>
         ) : (
           items.map((p) => <Row key={p.donation_id} payment={p} />)
         )}
       </tbody>
       {load_next && (
         <LoadMoreRow
-          col_span={10}
+          col_span={11}
           disabled={disabled}
           loading={loading}
           on_load_next={load_next}
@@ -155,11 +191,15 @@ function Row({ payment: c }: { payment: PaymentRow }) {
   // the method half of the via ("Card" for "stripe:card"); one with no method
   // names its processor. a crypto via keeps its network, which via_name drops
   const method = c.via.startsWith("crypto:") ? c.via : via_name(c.via);
-  const is_stripe = c.via.startsWith("stripe:");
+  const can_refund = c.status === "settled" && c.via.startsWith("stripe:");
+  const tag = donation_tag(c.status, c.via);
   return (
     <tr className="text-sm">
       <td className="whitespace-nowrap">
         {format(new Date(c.created_at), "MMM d, yyyy")}
+      </td>
+      <td>
+        <Badge variant={tag.variant}>{tag.label}</Badge>
       </td>
       <td className="truncate max-w-48" title={c.email ?? ""}>
         {c.email ?? "—"}
@@ -196,15 +236,12 @@ function Row({ payment: c }: { payment: PaymentRow }) {
         <Match payment={c} />
       </td>
       <td>
-        {c.status === "refunded" || c.status === "refunded_loss" ? (
-          <span className="text-destructive-subtle-fg text-xs font-semibold">
-            {c.status === "refunded_loss" ? "Refunded (loss)" : "Refunded"}
-          </span>
-        ) : is_stripe ? (
+        {can_refund ? (
           <NavLink
             to={`${c.donation_id}/refund`}
             preventScrollReset
             replace
+            aria-label={`Refund donation from ${c.email ?? c.donation_id}`}
             className="btn-secondary btn btn-sm"
           >
             Refund
