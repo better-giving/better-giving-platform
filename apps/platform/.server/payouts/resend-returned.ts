@@ -76,9 +76,9 @@ export type ResendResult =
 /**
  * an npo's payouts whose transfer came back go out again once its grants are
  * no longer held (`npo_return_hold`); until then they stay `returned`. a
- * manual-wire npo is never held: its go back to pending for the next wire. called
- * when an account is approved or made default, and after a return is taken
- * back; a repeat moves nothing. under the npo's run lock, which
+ * manual-wire npo is never held: its payouts go back to pending for the next
+ * wire. called when an account is approved or made default, and after a
+ * return is taken back; a repeat moves nothing. under the npo's run lock, which
  * `return_settlement` takes too: a return committing between the hold read
  * and the move would otherwise have its fresh `returned` payouts re-sent to
  * the account that bounced them
