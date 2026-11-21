@@ -72,9 +72,10 @@ const payout_label = sql<string>`case
 end`;
 
 /**
- * every npo paid by manual wire with payouts pending, by name: what the next
- * wire nets, as `mark_wired` judges it (netting what the npo owes when owed
- * netting is on), with its pending payouts oldest first
+ * every npo paid by manual wire with payouts pending, by name, with its
+ * pending payouts oldest first. each row carries the net the next wire must
+ * carry, as `mark_wired` judges it: the gross less what the npo owes, when owed
+ * netting is on
  */
 export async function manual_wire_rows(): Promise<IManualWireRow[]> {
   const rows = await db

@@ -299,8 +299,8 @@ export async function settle_npo_payouts(
   return { status: "settled", ref, total, transfer_id };
 }
 
-/** a recorded send's settlement of the net, its payouts settled and the npo's
- * cash debited, in the claim's tx */
+/** settles a recorded send's net: its payouts end settled and the npo's cash
+ * is debited, in the claim's tx */
 async function settle_recorded(
   tx: DbOrTx,
   npo_id: number,
