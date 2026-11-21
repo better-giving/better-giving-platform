@@ -1,3 +1,4 @@
+import { RouterContextProvider } from "react-router";
 import {
   afterAll,
   beforeAll,
@@ -31,6 +32,12 @@ vi.mock("$/pg/db", () => ({
     }
   ),
 }));
+// the real context; only the better-auth instance stays out of the bundle
+vi.mock("#/.server/auth/auth", () => ({ auth: {} }));
+vi.mock("#/.server/auth", async () => {
+  const m = await import("#/.server/auth/middleware");
+  return { user_ctx: m.user_ctx };
+});
 // a second provider reaches `mark_wired` only through its `providers`
 // argument, as in its own tests: `WIRE_PROVIDERS` names one
 vi.mock("$/payouts/manual-wire", async (io) => {
@@ -43,6 +50,8 @@ vi.mock("$/payouts/manual-wire", async (io) => {
 });
 
 const { action, loader } = await import("../api");
+const { user_ctx } = await import("#/.server/auth");
+const { user } = await import("$/pg/schema/auth");
 const { create_test_db } = await import("$/pg/test-utils/pglite");
 const { npos } = await import("$/pg/schema/npo");
 const { payouts, settlements, manual_wires } = await import(
@@ -51,8 +60,20 @@ const { payouts, settlements, manual_wires } = await import(
 
 const db = () => test_db.current!.db;
 
+const ADMIN = "admin-wires";
+
 beforeAll(async () => {
   test_db.current = await create_test_db();
+  await db().insert(user).values({
+    id: ADMIN,
+    name: "Admin Wires",
+    email: "admin-wires@test.com",
+    emailVerified: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    first_name: "Admin",
+    last_name: "Wires",
+  });
 }, 30_000);
 
 afterAll(async () => {
@@ -120,6 +141,13 @@ const wire = (npo_id: number, o: Record<string, unknown> = {}) => ({
   ...o,
 });
 
+/** the request context the admin guard leaves: the signed-in admin */
+const admin_context = () => {
+  const context = new RouterContextProvider();
+  context.set(user_ctx, { id: ADMIN, role: "admin" } as any);
+  return context;
+};
+
 async function post(body: unknown) {
   const res = (await action({
     ...doc_args(
@@ -129,7 +157,7 @@ async function post(body: unknown) {
         body: typeof body === "string" ? body : JSON.stringify(body),
       })
     ),
-    context: {} as any,
+    context: admin_context(),
     params: {},
   } as any)) as Response | object;
   return res instanceof Response
@@ -172,6 +200,16 @@ describe("mark wired", () => {
       },
     });
     expect(await ledger()).toEqual(before);
+  });
+
+  test("the recorded wire carries the signed-in admin who marked it", async () => {
+    const npo = await seed_npo();
+    await seed_payout(npo, "p-1", 100);
+
+    expect(await post(wire(npo))).toEqual({ status: 200, body: { ok: true } });
+
+    const { wires } = await ledger();
+    expect(wires).toEqual([expect.objectContaining({ recorded_by: ADMIN })]);
   });
 
   test("the same transaction id at another provider is a different wire, and settles", async () => {
@@ -243,25 +281,6 @@ describe("mark wired", () => {
     );
   });
 
-  test("a nonprofit whose transfer came back and has no account to pay is held", async () => {
-    const npo = await seed_npo();
-    await seed_payout(npo, "p-1", 100);
-    await db().insert(settlements).values({
-      id: "4242",
-      other_id: "ref-4242",
-      npo_id: npo,
-      date: "2026-10-01T00:00:00.000Z",
-      amount: 50,
-      status: "returned",
-    });
-
-    expect(await post(wire(npo))).toEqual(
-      refused(409, "A returned transfer holds this nonprofit's payouts")
-    );
-    const { payouts: after } = await ledger();
-    expect(after).toEqual([{ id: "p-1", type: "pending" }]);
-  });
-
   test("a value mark_wired refuses names its field", async () => {
     const npo = await seed_npo();
     await seed_payout(npo, "p-1", 100);
@@ -309,5 +328,16 @@ describe("the list", () => {
     expect(rows.map((r) => [r.npo_id, r.name, r.net])).toEqual([
       [due, "River Trust", 100],
     ]);
+  });
+
+  test("holds only what the run would pay: a net under the nonprofit's minimum is not due", async () => {
+    const due = await seed_npo({ name: "River Trust", payout_minimum: 100 });
+    await seed_payout(due, "p-1", 100);
+    const short = await seed_npo({ name: "Short Trust", payout_minimum: 250 });
+    await seed_payout(short, "p-2", 100);
+
+    const { rows } = await loader();
+
+    expect(rows.map((r) => r.npo_id)).toEqual([due]);
   });
 });

@@ -260,6 +260,7 @@ describe("manual wires", () => {
       provider: "Mercury",
       provider_tx_id: "MT-77",
       wire_fee: 0,
+      recorded_by: await seed_admin(),
     });
     await seed_payout(npo, 80);
 

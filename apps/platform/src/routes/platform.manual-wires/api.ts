@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { user_ctx } from "#/.server/auth";
 import { humanize } from "@/helpers/decimal";
 import { resp } from "@/helpers/https";
 import {
@@ -19,6 +20,7 @@ const LABELS: Record<keyof IMarkWired, string> = {
   provider: "provider",
   provider_tx_id: "transaction id",
   wire_fee: "wire fee",
+  recorded_by: "signed-in account",
 };
 
 // shapes only: `mark_wired` judges the values and answers `invalid`
@@ -42,7 +44,7 @@ export type TWireAnswer = IDone | { status: number; message: string };
 /** "$4,200.00", "−$5.00" */
 const usd = (n: number) => `${n < 0 ? "−" : ""}$${humanize(Math.abs(n))}`;
 
-export const action = async ({ request }: Route.ActionArgs) => {
+export const action = async ({ request, context }: Route.ActionArgs) => {
   const p = v.safeParse(body, await request.json().catch(() => null));
   if (p.issues) {
     const key = p.issues[0].path?.[0]?.key;
@@ -52,7 +54,8 @@ export const action = async ({ request }: Route.ActionArgs) => {
       label ? `Check the ${label}` : "Check the form and try again"
     );
   }
-  return answer(p.output, await mark_wired(p.output));
+  const sent = { ...p.output, recorded_by: context.get(user_ctx).id };
+  return answer(sent, await mark_wired(sent));
 };
 
 function answer(sent: IMarkWired, res: MarkWiredResult) {
@@ -76,11 +79,6 @@ function answer(sent: IMarkWired, res: MarkWiredResult) {
       return resp.fail(
         409,
         `The amount sent must be ${usd(res.expected)}, the net total less the wire fee`
-      );
-    case "held":
-      return resp.fail(
-        409,
-        "A returned transfer holds this nonprofit's payouts"
       );
   }
 }

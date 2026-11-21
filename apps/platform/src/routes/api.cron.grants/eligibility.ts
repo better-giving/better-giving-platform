@@ -16,8 +16,9 @@ export type GrantEligibility =
       total: number;
       reason: string;
     }
-  /** paid by a wire sent by hand and marked on the Manual wires page: the run never
-   * sends it through wise, whatever else holds */
+  /** paid by a wire sent by hand and marked on the Manual wires page: the run
+   * never sends it through wise, and settles it only when what it owes covers
+   * its whole total. a wise return doesn't hold it */
   | { status: "manual_wire"; npo: Npo; minimum: number; total: number }
   /** a transfer came back and no new account pays yet: sending more would
    * bounce it too */
@@ -62,10 +63,10 @@ export async function grant_eligibility(
   const skip = (reason: string) =>
     ({ status: "skipped", npo, minimum, total, reason }) as const;
 
+  if (npo.active === false) return skip("inactive");
   if ((await npos_manual_wire([npo.id])).has(npo.id)) {
     return { status: "manual_wire", npo, minimum, total };
   }
-  if (npo.active === false) return skip("inactive");
   const hold = await npo_return_hold(npo.id);
   if (hold) return { status: "held", npo, minimum, total, hold };
   const wise_id = await npo_default_bapp(npo.id).then((x) => x?.id);

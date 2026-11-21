@@ -133,25 +133,34 @@ async function process_item(npo_id: number, items: IPayout<IPendingStatus>[]) {
   try {
     // a run that doesn't net skips the locking claim tx for an npo still under
     // its minimum; one that nets judges the minimum in the claim, under lock
+    const nets = await owed_netting_on();
     const el = await grant_eligibility(
       npo_id,
       items.map((i) => i.amount),
-      await owed_netting_on()
+      nets
     );
     if (el.status === "not_found") throw new Error(`npo:${npo_id} not found`);
     if (el.status === "skipped") {
       console.info(`npo:${npo_id} not paid: ${el.reason}`);
       return;
     }
-    if (el.status === "manual_wire") {
+    if (el.status === "held") return await alert_held(el);
+    const wired = el.status === "manual_wire";
+    // a manual-wire claim settles only what owed covers, and only netting has any
+    if (wired && !nets) {
       console.info(`npo:${npo_id} not paid: manual wire`);
       return;
     }
-    if (el.status === "held") return await alert_held(el);
-    const { npo, minimum, wise_id } = el;
+    const { npo, minimum } = el;
+    const wise_id = wired ? null : el.wise_id;
 
     const res = await settle_npo_payouts(
-      { id: npo.id, name: npo.name, payout_minimum: minimum },
+      {
+        id: npo.id,
+        name: npo.name,
+        payout_minimum: minimum,
+        ...(wired && { payout_method: "manual_wire" as const }),
+      },
       items.map((i) => i.id),
       wise_id === null
         ? null
@@ -173,7 +182,9 @@ async function process_item(npo_id: number, items: IPayout<IPendingStatus>[]) {
       return;
     }
     if (res.status !== "settled") {
-      console.info(`npo:${npo_id} not paid: ${res.status}`);
+      console.info(
+        `npo:${npo_id} not paid: ${wired ? "manual wire" : res.status}`
+      );
       return;
     }
 

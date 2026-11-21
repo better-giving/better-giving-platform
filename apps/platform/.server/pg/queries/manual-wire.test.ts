@@ -245,30 +245,55 @@ describe("manual_wire_rows", () => {
     deductions.on = true;
     const paws = await seed_npo("SXM Paws");
     await seed_payout(paws, "p-1", 500, "2026-09-01T00:00:00.000Z");
-    await seed_gift("don-owed");
-    const [owed] = await db()
-      .insert(owed_amounts)
-      .values({
-        donation_id: "don-owed",
-        npo_id: paws,
-        source: "refund",
-        source_ref: "re_owed",
-        recorded_at: "2026-09-15T00:00:00.000Z",
-        received_usd: 93.2,
-      })
-      .returning({ id: owed_amounts.id });
-    await db().insert(owed_notices).values({
-      owed_id: owed!.id,
-      kind: "recorded",
-      created_at: "2026-09-15T00:00:00.000Z",
-      sent_at: "2026-09-15T00:00:00.000Z",
-    });
+    await seed_owed(paws, "don-owed", 93.2);
 
     const [row] = await manual_wire_rows();
 
     expect(row).toMatchObject({ gross: 500, owed: 93.2, net: 406.8 });
   });
+
+  test("an npo whose net is under its minimum has no row", async () => {
+    const small = await seed_npo("Small Wire");
+    await seed_payout(small, "s-1", 30, "2026-09-01T00:00:00.000Z");
+
+    expect(await manual_wire_rows()).toEqual([]);
+  });
+
+  test("netting on, an npo the owed takes under its minimum, or whose owed covers its pending, has no row", async () => {
+    deductions.on = true;
+    const short = await seed_npo("Short Wire");
+    await seed_payout(short, "s-1", 100, "2026-09-01T00:00:00.000Z");
+    await seed_owed(short, "don-short", 60);
+    const covered = await seed_npo("Covered Wire");
+    await seed_payout(covered, "c-1", 80, "2026-09-01T00:00:00.000Z");
+    await seed_owed(covered, "don-covered", 93.2);
+
+    expect(await manual_wire_rows()).toEqual([]);
+  });
 });
+
+/** a gift refunded after its grant went out, the npo owing `usd` on it, and
+ * told of it so a run may net it */
+async function seed_owed(npo_id: number, donation_id: string, usd: number) {
+  await seed_gift(donation_id);
+  const [owed] = await db()
+    .insert(owed_amounts)
+    .values({
+      donation_id,
+      npo_id,
+      source: "refund",
+      source_ref: `re_${donation_id}`,
+      recorded_at: "2026-09-15T00:00:00.000Z",
+      received_usd: usd,
+    })
+    .returning({ id: owed_amounts.id });
+  await db().insert(owed_notices).values({
+    owed_id: owed!.id,
+    kind: "recorded",
+    created_at: "2026-09-15T00:00:00.000Z",
+    sent_at: "2026-09-15T00:00:00.000Z",
+  });
+}
 
 describe("npos_manual_wire", () => {
   test("names the manual-wire npos among the ids, and no others", async () => {

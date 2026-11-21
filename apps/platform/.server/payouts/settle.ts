@@ -1,4 +1,5 @@
 import { report_error } from "#/errors/report";
+import type { PayoutMethod } from "@/payouts";
 import { PAID } from "@/payouts/wise-path";
 import type { Alert } from "@/slack";
 import { stage } from "../env";
@@ -64,6 +65,9 @@ export interface ISettleNpo {
   name: string;
   /** resolved by the caller: the npo's own minimum or the platform default */
   payout_minimum: number;
+  /** a `manual_wire` npo is paid by hand, never to a wise recipient, so a
+   * returned wise transfer neither holds it nor changes its recipient */
+  payout_method?: PayoutMethod;
 }
 
 export interface IRecipient {
@@ -105,12 +109,14 @@ export async function settle_npo_payouts(
     // the lock `return_settlement` and `resend_returned` take: the hold read
     // and the claim below happen with no return or re-send in between
     await lock_npo_run(tx, npo.id);
-    const hold = await npo_return_hold(npo.id, tx);
+    const by_wise = npo.payout_method !== "manual_wire";
+    const hold = by_wise ? await npo_return_hold(npo.id, tx) : null;
     if (hold) return { status: "held", hold } as const;
     // eligibility resolved `to` before this lock: a return and a newer default
     // account since then cleared the hold, but `to` is still the account that
     // bounced
     if (
+      by_wise &&
       to !== null &&
       !is_recorded(to) &&
       (await npo_last_return(npo.id, tx))

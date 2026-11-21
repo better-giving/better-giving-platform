@@ -22,6 +22,8 @@ export interface IMarkWired {
   provider_tx_id: string;
   /** the provider's fee, usd, paid by the npo out of the net */
   wire_fee: number;
+  /** the signed-in admin's user id */
+  recorded_by: string;
 }
 
 export type MarkWiredResult =
@@ -34,9 +36,7 @@ export type MarkWiredResult =
   | { status: "none_pending" }
   | { status: "under_minimum"; net: number; minimum: number }
   /** `amount_sent` must be the net less the fee: `expected` */
-  | { status: "amount_mismatch"; net: number; expected: number }
-  /** a returned wise transfer holds the npo's payouts */
-  | { status: "held" };
+  | { status: "amount_mismatch"; net: number; expected: number };
 
 /**
  * records a wire sent by hand to an npo paid by `manual_wire`, settling
@@ -50,7 +50,8 @@ export async function mark_wired(
   const provider_tx_id = input.provider_tx_id.trim();
   const invalid = invalid_field({ ...input, provider_tx_id }, providers);
   if (invalid) return { status: "invalid", field: invalid };
-  const { npo_id, provider, wire_date, amount_sent, wire_fee } = input;
+  const { npo_id, provider, wire_date, amount_sent, wire_fee, recorded_by } =
+    input;
 
   if (await manual_wire_by_tx(provider, provider_tx_id)) {
     return { status: "duplicate" };
@@ -68,6 +69,7 @@ export async function mark_wired(
         id: npo.id,
         name: npo.name,
         payout_minimum: npo.payout_minimum ?? min_payout_amount,
+        payout_method: npo.payout_method,
       },
       await npo_pending_payout_ids(npo.id),
       {
@@ -84,6 +86,7 @@ export async function mark_wired(
             amount_sent,
             wire_fee,
             settlement_id,
+            recorded_by,
           }),
       }
     );
@@ -103,7 +106,6 @@ export async function mark_wired(
           minimum: res.minimum,
         };
       case "none_pending":
-      case "held":
         return { status: res.status };
       default:
         throw new Error(`mark_wired: unexpected settle result ${res.status}`);
@@ -139,5 +141,6 @@ function invalid_field(
   if (!is_day(i.wire_date)) return "wire_date";
   if (!in_cents(i.wire_fee) || i.wire_fee < 0) return "wire_fee";
   if (!in_cents(i.amount_sent) || i.amount_sent <= 0) return "amount_sent";
+  if (i.recorded_by === "") return "recorded_by";
   return null;
 }

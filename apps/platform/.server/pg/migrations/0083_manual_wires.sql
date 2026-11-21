@@ -8,6 +8,7 @@ CREATE TABLE "manual_wires" (
 	"amount_sent" numeric(38, 18) NOT NULL,
 	"wire_fee" numeric(38, 18) NOT NULL,
 	"settlement_id" text NOT NULL,
+	"recorded_by" text NOT NULL,
 	"created_at" timestamptz DEFAULT now() NOT NULL,
 	CONSTRAINT "manual_wires_settlement_id_uniq" UNIQUE("settlement_id"),
 	CONSTRAINT "manual_wires_provider_tx_uniq" UNIQUE("provider","provider_tx_id"),
@@ -16,8 +17,9 @@ CREATE TABLE "manual_wires" (
 	CONSTRAINT "manual_wires_provider_tx_id_check" CHECK (btrim("manual_wires"."provider_tx_id") <> '')
 );
 --> statement-breakpoint
-ALTER TABLE "npos" ADD COLUMN "payout_method" text DEFAULT 'wise' NOT NULL;--> statement-breakpoint
 ALTER TABLE "manual_wires" ADD CONSTRAINT "manual_wires_npo_id_npos_id_fk" FOREIGN KEY ("npo_id") REFERENCES "public"."npos"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "manual_wires" ADD CONSTRAINT "manual_wires_settlement_id_settlements_id_fk" FOREIGN KEY ("settlement_id") REFERENCES "public"."settlements"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "manual_wires" ADD CONSTRAINT "manual_wires_recorded_by_user_id_fk" FOREIGN KEY ("recorded_by") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "npos" ADD COLUMN "payout_method" text DEFAULT 'wise' NOT NULL;--> statement-breakpoint
 ALTER TABLE "npos" ADD CONSTRAINT "npos_payout_method_check" CHECK ("npos"."payout_method" IN ('wise', 'manual_wire')) NOT VALID;--> statement-breakpoint
 ALTER TABLE "npos" VALIDATE CONSTRAINT "npos_payout_method_check";

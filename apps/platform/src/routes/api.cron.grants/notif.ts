@@ -23,9 +23,9 @@ type Row = grants_schedule.IData["rows"][number];
 
 type Netted = Extract<GrantEligibility, { status: "nets" | "manual_wire" }>;
 
-/** an npo's row as the run's own netting plan reads it, and that plan's
- * status */
-async function netting(el: Netted) {
+/** what the run will do for an npo whose owed amounts it nets, as the run's
+ * own plan reads it. a manual-wire npo the plan would pay is left to a wire */
+async function netted_row(el: Netted): Promise<Row & { net: number }> {
   const owed = await outstanding_for_npo(db, el.npo.id);
   const plan = net_owed(el.total, owed, el.minimum);
   const base = {
@@ -36,44 +36,40 @@ async function netting(el: Netted) {
   };
   if (plan.status === "under_minimum") {
     const { net, deductions } = plan;
-    return { status: plan.status, row: { ...base, net, deductions } };
+    return { ...base, net, effect: "skipped", deductions };
   }
   const deductions = [
     ...plan.recovered,
     ...plan.repaid.map((r) => ({ ...r, usd: -r.usd })),
   ];
-  const net = plan.status === "recover_only" ? 0 : plan.net;
-  return { status: plan.status, row: { ...base, net, deductions } };
-}
-
-/** what the run will do for an npo whose owed amounts it nets */
-async function netted_row(
-  el: Extract<GrantEligibility, { status: "nets" }>
-): Promise<Row & { net: number }> {
-  const { status, row } = await netting(el);
-  if (status === "under_minimum") return { ...row, effect: "skipped" };
-  if (status === "recover_only") return { ...row, effect: "recovered" };
-  return { ...row, effect: el.wise_id ? "pass" : "skipped" };
-}
-
-/** an npo the run leaves to a wire sent by hand: what the wire nets, as the
- * Manual wires page reads it */
-async function manual_wire_row(
-  el: Extract<GrantEligibility, { status: "manual_wire" }>,
-  nets: boolean
-): Promise<Row> {
-  if (!nets) {
-    const { npo, total, minimum } = el;
-    return {
-      id: npo.id,
-      name: npo.name,
-      amount: total,
-      min: minimum,
-      effect: "manual_wire",
-    };
+  if (plan.status === "recover_only") {
+    return { ...base, net: 0, effect: "recovered", deductions };
   }
-  const { row } = await netting(el);
-  return { ...row, effect: "manual_wire" };
+  const effect =
+    el.status === "manual_wire"
+      ? plan.net > 0
+        ? "manual_wire"
+        : "skipped"
+      : el.wise_id
+        ? "pass"
+        : "skipped";
+  return { ...base, net: plan.net, effect, deductions };
+}
+
+/** a manual-wire npo's row when the run nets nothing: due a wire on the
+ * minimum the run pays a wise npo at */
+function gross_wire_row(
+  el: Extract<GrantEligibility, { status: "manual_wire" }>
+): Row {
+  const { npo, total, minimum } = el;
+  const due = total > 0 && total >= minimum;
+  return {
+    id: npo.id,
+    name: npo.name,
+    amount: total,
+    min: minimum,
+    effect: due ? "manual_wire" : "skipped",
+  };
 }
 
 /**
@@ -104,11 +100,11 @@ export async function index() {
         console.info(`NPO ${npo_id} not found, skipping`);
         continue;
       }
-      if (el.status === "manual_wire") {
-        rows.push(await manual_wire_row(el, nets));
+      if (el.status === "manual_wire" && !nets) {
+        rows.push(gross_wire_row(el));
         continue;
       }
-      if (el.status === "nets") {
+      if (el.status === "nets" || el.status === "manual_wire") {
         const row = await netted_row(el);
         rows.push(row);
         if (row.effect === "pass") passing.push(row.net);

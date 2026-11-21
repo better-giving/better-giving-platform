@@ -10,6 +10,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import type { PayoutStatus, TSource } from "@/payouts";
+import { user } from "./auth";
 import { numeric_as_number, timestamptz, timestamptz_now } from "./columns";
 import { npos } from "./npo";
 
@@ -95,6 +96,10 @@ export const manual_wires = pgTable(
       .notNull()
       .unique("manual_wires_settlement_id_uniq")
       .references(() => settlements.id),
+    /** the signed-in admin who marked it wired */
+    recorded_by: text("recorded_by")
+      .notNull()
+      .references(() => user.id),
     created_at: timestamptz_now("created_at"),
   },
   (t) => [

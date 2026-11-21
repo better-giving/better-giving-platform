@@ -354,7 +354,9 @@ describe("grants schedule notice", () => {
     // the wise balance is 150: counting the wire would flag it low
     expect(data.total_grant).toBe(100);
     expect(data.low_balance).toBe(false);
-    expect(row_cells(sent_text(), "don-owed")).toEqual([
+    const text = sent_text();
+    expect(text).toContain("Manual wires: $2,906.80 · 1 nonprofit");
+    expect(row_cells(text, "don-owed")).toEqual([
       "don-owed",
       `${npo_ids.Wired}`,
       "−$93.20",
@@ -377,5 +379,56 @@ describe("grants schedule notice", () => {
       },
     ]);
     expect(data.total_grant).toBe(0);
+  });
+
+  test("switched on, a manual-wire npo whose net falls under its minimum is skipped, out of the wires line", async () => {
+    deductions.on = true;
+    await seed_npo("Paid", { amount: 100 });
+    await seed_npo("Small", { amount: 80, payout_method: "manual_wire" });
+    await seed_owed("Small", "don-owed", 50);
+
+    await index();
+
+    const text = sent_text();
+    expect(row_cells(text, `${npo_ids.Small}`)).toEqual([
+      `${npo_ids.Small}`,
+      "Small",
+      "$80.00",
+      "−$50.00",
+      "$30.00",
+      "$50.00",
+      "skipped",
+    ]);
+    expect(text).not.toContain("Manual wires:");
+    expect(text).toMatch(/Grant total: \$100\.00/);
+  });
+
+  test("switched on, a manual-wire npo whose owed amounts cover its total is recovered, out of the wires line", async () => {
+    deductions.on = true;
+    await seed_npo("Covered", { amount: 80, payout_method: "manual_wire" });
+    await seed_owed("Covered", "don-big", 93.2);
+
+    await index();
+
+    const text = sent_text();
+    expect(row_cells(text, `${npo_ids.Covered}`)).toEqual([
+      `${npo_ids.Covered}`,
+      "Covered",
+      "$80.00",
+      "−$80.00",
+      "$0.00",
+      "$50.00",
+      "recovered",
+    ]);
+    expect(text).not.toContain("Manual wires:");
+  });
+
+  test("switched off, a manual-wire npo under its minimum is skipped", async () => {
+    await seed_npo("Small", { amount: 30, payout_method: "manual_wire" });
+
+    await index();
+
+    const data = template.mock.calls[0]![0] as any;
+    expect(data.rows[0]).toMatchObject({ amount: 30, effect: "skipped" });
   });
 });

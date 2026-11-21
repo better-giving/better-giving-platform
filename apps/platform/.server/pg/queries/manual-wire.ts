@@ -72,7 +72,7 @@ const payout_label = sql<string>`case
 end`;
 
 /**
- * every npo paid by manual wire with payouts pending, by name, with its
+ * every npo paid by manual wire that a wire is due to, by name, with its
  * pending payouts oldest first. each row carries the net the next wire must
  * carry, as `mark_wired` judges it: the gross less what the npo owes, when owed
  * netting is on
@@ -108,17 +108,18 @@ export async function manual_wire_rows(): Promise<IManualWireRow[]> {
     by_npo.set(r.npo_id, [...(by_npo.get(r.npo_id) ?? []), r]);
   }
   const nets = await owed_netting_on();
-  return Promise.all(
-    [...by_npo.values()].map(async (of_npo) => {
+  const due = await Promise.all(
+    [...by_npo.values()].map(async (of_npo): Promise<IManualWireRow[]> => {
       const { npo_id, name, payout_minimum } = of_npo[0]!;
       const minimum = payout_minimum ?? min_payout_amount;
       const gross_cents = payout_cents(of_npo.map((r) => r.amount));
       const owed = nets ? await outstanding_for_npo(db, npo_id) : [];
       const plan = net_owed(gross_cents / 100, owed, minimum);
-      const net_cents =
-        plan.status === "recover_only" ? 0 : to_units(plan.net, 2);
+      // due by the rule a wise run pays on: a net above 0 and at the minimum
+      if (plan.status !== "pay") return [];
+      const net_cents = to_units(plan.net, 2);
       const bank = (await npo_default_bapp(npo_id))?.bank_summary;
-      return {
+      const row: IManualWireRow = {
         npo_id,
         name,
         gross: gross_cents / 100,
@@ -133,8 +134,10 @@ export async function manual_wire_rows(): Promise<IManualWireRow[]> {
           amount,
         })),
       };
+      return [row];
     })
   );
+  return due.flat();
 }
 
 /** the npos among `ids` paid by manual wire, which the grants run skips */

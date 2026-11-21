@@ -64,18 +64,32 @@ vi.mock("../pg/db", () => ({
 
 const { mark_wired } = await import("./manual-wire");
 const { poll_wise_returns } = await import("./wise-return");
+const { settle_npo_payouts } = await import("./settle");
 const { create_test_db } = await import("../pg/test-utils/pglite");
 const { npos } = await import("../pg/schema/npo");
 const { payouts, settlements, manual_wires } = await import(
   "../pg/schema/payout"
 );
 const { donations } = await import("../pg/schema/donation");
+const { user } = await import("../pg/schema/auth");
 const { owed_amounts, owed_notices } = await import("../pg/schema/owed");
 
 const db = () => test_db.current!.db;
 
+const ADMIN = "admin-1";
+
 beforeAll(async () => {
   test_db.current = await create_test_db();
+  await db().insert(user).values({
+    id: ADMIN,
+    name: "Admin",
+    email: "admin@test.com",
+    emailVerified: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    first_name: "Admin",
+    last_name: "Test",
+  });
 }, 30_000);
 
 afterAll(async () => {
@@ -147,6 +161,7 @@ const wire = (
   provider_tx_id: "tx-1",
   wire_fee: 0,
   amount_sent: 0,
+  recorded_by: ADMIN,
   ...o,
 });
 
@@ -224,6 +239,7 @@ describe("mark_wired", () => {
       wire_date: "2026-11-18",
       amount_sent: 75,
       wire_fee: 25,
+      recorded_by: ADMIN,
     });
     const [s] = await db().select().from(settlements);
     expect(w!.settlement_id).toBe(s!.id);
@@ -403,6 +419,86 @@ describe("mark_wired", () => {
     });
     expect(await npo_cash(npo)).toBe(900);
     expect(await db().select().from(manual_wires)).toHaveLength(1);
+  });
+});
+
+/** a wise transfer of the npo's that came back, with no newer account
+ * approved since: a wise npo's grants are held on it */
+async function seed_returned_transfer(npo_id: number) {
+  await db()
+    .insert(settlements)
+    .values({
+      id: `returned-${npo_id}`,
+      other_id: "ref-returned",
+      npo_id,
+      date: "2026-08-01T00:00:00.000Z",
+      amount: 200,
+      status: "returned",
+      recipient_id: "bank-old",
+    });
+}
+
+describe("a returned wise transfer on record", () => {
+  test("does not stop a manual-wire npo being marked wired", async () => {
+    const npo = await seed_npo({ cash: 1000 });
+    await seed_returned_transfer(npo);
+    await seed_payout(npo, "p-1", 100);
+
+    const res = await mark_wired(wire(npo, { amount_sent: 100 }));
+
+    expect(res).toMatchObject({ status: "ok" });
+    expect(await payout_types()).toEqual({ "p-1": "settled" });
+  });
+
+  test("a manual-wire npo whose owed covers its pending settles as recovered with no wire, the cash down by the gross", async () => {
+    deductions.on = true;
+    const npo = await seed_npo({ cash: 80 });
+    await seed_returned_transfer(npo);
+    await seed_payout(npo, "p-1", 80);
+    await seed_owed(npo, "don-owed", 93.2);
+
+    const res = await settle_npo_payouts(
+      { id: npo, name: "n", payout_minimum: 50, payout_method: "manual_wire" },
+      ["p-1"],
+      null
+    );
+
+    expect(res).toMatchObject({ status: "recovered", total: 80 });
+    expect(await payout_types()).toEqual({ "p-1": "settled" });
+    expect(await npo_cash(npo)).toBe(0);
+    expect(await db().select().from(manual_wires)).toEqual([]);
+    const [row] = await db().select().from(owed_amounts);
+    expect(row).toMatchObject({ recovered_usd: 80 });
+  });
+
+  test("a manual-wire npo with a net to pay and no recipient is left untouched", async () => {
+    const npo = await seed_npo({ cash: 1000 });
+    await seed_returned_transfer(npo);
+    await seed_payout(npo, "p-1", 100);
+
+    const res = await settle_npo_payouts(
+      { id: npo, name: "n", payout_minimum: 50, payout_method: "manual_wire" },
+      ["p-1"],
+      null
+    );
+
+    expect(res).toEqual({ status: "no_recipient", total: 100 });
+    expect(await payout_types()).toEqual({ "p-1": "pending" });
+    expect(await npo_cash(npo)).toBe(1000);
+  });
+
+  test("still holds a wise npo", async () => {
+    const npo = await seed_npo({ cash: 1000, payout_method: "wise" });
+    await seed_returned_transfer(npo);
+    await seed_payout(npo, "p-1", 100);
+
+    const res = await settle_npo_payouts(
+      { id: npo, name: "n", payout_minimum: 50 },
+      ["p-1"],
+      null
+    );
+
+    expect(res).toMatchObject({ status: "held" });
   });
 });
 

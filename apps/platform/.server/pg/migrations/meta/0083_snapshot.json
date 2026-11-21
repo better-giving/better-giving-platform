@@ -1,5 +1,5 @@
 {
-  "id": "6dfb6144-8d7e-4e2f-98a4-08ef8f5a8a3b",
+  "id": "b45882e7-7cba-47fc-8be0-51e69acb41d4",
   "prevId": "86c5fd3e-09fd-49e2-b507-5fd65d5542b2",
   "version": "7",
   "dialect": "postgresql",
@@ -5891,6 +5891,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "recorded_by": {
+          "name": "recorded_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamptz",
@@ -5920,6 +5926,19 @@
           "tableTo": "settlements",
           "columnsFrom": [
             "settlement_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "manual_wires_recorded_by_user_id_fk": {
+          "name": "manual_wires_recorded_by_user_id_fk",
+          "tableFrom": "manual_wires",
+          "tableTo": "user",
+          "columnsFrom": [
+            "recorded_by"
           ],
           "columnsTo": [
             "id"
