@@ -73,7 +73,7 @@ import { type AuthUser, admin_mdlwr, user_ctx } from "#/.server/auth";
 import { mark_wired } from "$/payouts/manual-wire";
 import { create_test_db } from "$/pg/test-utils/pglite";
 import { action, loader } from "../api";
-import WiresPage from "../route";
+import WiresPage, { shouldRevalidate } from "../route";
 
 const db = () => test_db.current!.db;
 
@@ -175,6 +175,7 @@ async function open_wires() {
           Component: WiresPage as any,
           loader: loader as any,
           action: action as any,
+          shouldRevalidate,
         },
       ],
     },
