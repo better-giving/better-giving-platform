@@ -2,6 +2,7 @@ import { createRoutesStub } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
+import { reset_viewport } from "#/__tests__/fixtures/viewport";
 
 vi.mock("remix-client-cache", () => ({
   CacheRoute: (Component: any) => Component,
@@ -12,6 +13,7 @@ import type { PaymentRow } from "../api";
 import Page from "../route";
 
 afterEach(async () => {
+  await reset_viewport();
   await cleanup();
 });
 
@@ -143,7 +145,9 @@ describe("layout", () => {
       .toBeVisible();
     const { list, select } = await rects(screen);
     expect(select.left).toBeGreaterThanOrEqual(list.right - 1);
-    expect(select.top).toBeLessThan(list.bottom);
+    // on the list's own row, not merely overlapping it
+    expect(select.top).toBeGreaterThanOrEqual(list.top - 1);
+    expect(select.bottom).toBeLessThanOrEqual(list.bottom + 1);
     // the table panel stays under both
     const panel = screen
       .getByRole("tabpanel")
@@ -199,6 +203,20 @@ describe("action column", () => {
   });
 });
 
+describe("void match link", () => {
+  it("carries the filters so closing the modal lands on the same list", async () => {
+    const { screen } = await render_page(
+      "/platform/donations?status=all&method=crypto",
+      { items: [row("v", { via: "crypto:eth", match_event_id: "evt" })] }
+    );
+    const link = screen.getByRole("link", { name: /void/i });
+    await expect.element(link).toBeInTheDocument();
+    expect(link.element().getAttribute("href")).toContain(
+      "v/void-match?status=all&method=crypto"
+    );
+  });
+});
+
 describe("status tags", () => {
   it.each([
     ["settled", "stripe:card", "Settled"],
@@ -209,7 +227,9 @@ describe("status tags", () => {
     const { screen } = await render_page("/platform/donations?status=all", {
       items: [row("t", { status, via })],
     });
-    await expect.element(screen.getByText(label).first()).toBeVisible();
+    await expect
+      .element(screen.getByRole("cell", { name: label, exact: true }))
+      .toBeVisible();
   });
 });
 

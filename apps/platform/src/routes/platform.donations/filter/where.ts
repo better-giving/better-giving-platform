@@ -9,7 +9,7 @@ import {
 
 const via = donations.via;
 
-/** SQL twin of `via_group` in constants.ts; the one place a `via` is matched to a payment-method group */
+/** SQL twin of `via_group` in constants.ts: the loader's match of a `via` to a payment-method group */
 const GROUP_SQL: Record<Group, SQL> = {
   stripe: sql`(${via} = 'stripe' OR ${via} LIKE 'stripe:%')`,
   paypal: sql`(${via} LIKE 'paypal%' OR ${via} = 'venmo')`,

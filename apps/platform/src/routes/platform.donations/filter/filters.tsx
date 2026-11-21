@@ -22,7 +22,7 @@ interface IFilters {
 const tabs = STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }));
 const method_values = METHOD_OPTIONS.map((o) => o.value);
 const method_label = (v: MethodFilter) =>
-  METHOD_OPTIONS.find((o) => o.value === v)?.label ?? v;
+  METHOD_OPTIONS.find((o) => o.value === v)?.label;
 
 export function Filters({
   status,
@@ -35,8 +35,7 @@ export function Filters({
   const root = useRef<HTMLDivElement>(null);
 
   // the button removes itself once the defaults land, which would drop focus
-  // to the body; hand it to the default tab first. focusing a tab can select
-  // it, so the reset is issued after and has the last word.
+  // to the body; hand it to the default tab first
   const clear = () => {
     root.current
       ?.querySelector<HTMLElement>(`[role=tab][data-value=${DEFAULT_STATUS}]`)
