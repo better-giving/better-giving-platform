@@ -1,5 +1,6 @@
 import { createRoutesStub } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { page } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 
 vi.mock("remix-client-cache", () => ({
@@ -104,6 +105,62 @@ describe("clear filters", () => {
       await vi.waitFor(() => expect(seen.at(-1)).toBe(""));
     }
   );
+});
+
+describe("clear filters — focus", () => {
+  it("moves focus to the Settled tab as the button goes away", async () => {
+    const { screen } = await render_page(
+      "/platform/donations?status=failed&method=crypto"
+    );
+    await screen.getByRole("button", { name: "Clear filters" }).click();
+    await expect
+      .element(screen.getByRole("button", { name: "Clear filters" }))
+      .not.toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("tab", { name: "Settled" }))
+      .toHaveFocus();
+    expect(document.activeElement).not.toBe(document.body);
+  });
+});
+
+describe("layout", () => {
+  const rects = async (
+    screen: Awaited<ReturnType<typeof render_page>>["screen"]
+  ) => {
+    const list = screen.getByRole("tablist").element().getBoundingClientRect();
+    const select = screen
+      .getByRole("combobox", { name: "Payment method" })
+      .element()
+      .getBoundingClientRect();
+    return { list, select };
+  };
+
+  it("at 1440 the controls sit right of the tabs, on their row", async () => {
+    await page.viewport(1440, 900);
+    const { screen } = await render_page("/platform/donations?status=failed");
+    await expect
+      .element(screen.getByRole("tab", { name: "Settled" }))
+      .toBeVisible();
+    const { list, select } = await rects(screen);
+    expect(select.left).toBeGreaterThanOrEqual(list.right - 1);
+    expect(select.top).toBeLessThan(list.bottom);
+    // the table panel stays under both
+    const panel = screen
+      .getByRole("tabpanel")
+      .element()
+      .getBoundingClientRect();
+    expect(panel.top).toBeGreaterThanOrEqual(list.bottom - 1);
+  });
+
+  it("at 375 the select sits on its own row below the tabs", async () => {
+    await page.viewport(375, 800);
+    const { screen } = await render_page("/platform/donations");
+    await expect
+      .element(screen.getByRole("tab", { name: "Settled" }))
+      .toBeVisible();
+    const { list, select } = await rects(screen);
+    expect(select.top).toBeGreaterThanOrEqual(list.bottom - 1);
+  });
 });
 
 describe("status tabs", () => {
