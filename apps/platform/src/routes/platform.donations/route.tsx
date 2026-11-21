@@ -1,6 +1,6 @@
 import { Badge, EmptyRow, LoadMoreRow, TabPanel } from "@better-giving/ui";
 import { format } from "date-fns";
-import { NavLink, Outlet, useSearchParams } from "react-router";
+import { NavLink, Outlet, useLocation, useSearchParams } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { Money } from "#/components/money";
 import { metas } from "#/helpers/seo";
@@ -91,6 +91,7 @@ function Page({ loaderData: page1 }: Route.ComponentProps) {
  * sql.
  */
 function Match({ payment: c }: { payment: PaymentRow }) {
+  const { search } = useLocation();
   const stamps = [
     ["pack", c.match_pack_sent_at],
     ["chased", c.match_chased_at],
@@ -127,7 +128,7 @@ function Match({ payment: c }: { payment: PaymentRow }) {
       )}
       {c.match_event_id && !c.match_voided_at && (
         <NavLink
-          to={`${c.donation_id}/void-match`}
+          to={{ pathname: `${c.donation_id}/void-match`, search }}
           aria-label={`Void match for donation from ${c.email ?? c.donation_id}`}
           preventScrollReset
           replace
@@ -188,6 +189,8 @@ function Table({
 }
 
 function Row({ payment: c }: { payment: PaymentRow }) {
+  // the modal routes hand the filters back on close, so they ride the link
+  const { search } = useLocation();
   // the method half of the via ("Card" for "stripe:card"); one with no method
   // names its processor. a crypto via keeps its network, which via_name drops
   const method = c.via.startsWith("crypto:") ? c.via : via_name(c.via);
@@ -238,7 +241,7 @@ function Row({ payment: c }: { payment: PaymentRow }) {
       <td>
         {can_refund ? (
           <NavLink
-            to={`${c.donation_id}/refund`}
+            to={{ pathname: `${c.donation_id}/refund`, search }}
             preventScrollReset
             replace
             aria-label={`Refund donation from ${c.email ?? c.donation_id}`}

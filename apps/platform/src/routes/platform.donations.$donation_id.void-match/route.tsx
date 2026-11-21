@@ -1,7 +1,7 @@
 import { Actions } from "@better-giving/ui";
 import { format } from "date-fns";
 import { CheckCircle2Icon } from "lucide-react";
-import { useFetcher, useNavigate } from "react-router";
+import { useFetcher, useLocation, useNavigate } from "react-router";
 import { RouteModal } from "#/components/route-modal";
 import type { Route } from "./+types/route";
 import type { VoidReason } from "./api";
@@ -29,8 +29,13 @@ const reason_label: Record<VoidReason, string> = {
 
 export default function Page({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
+  // the filters live in the search; closing must hand them back to the list
+  const { search } = useLocation();
   const close = () =>
-    navigate("..", { preventScrollReset: true, replace: true });
+    navigate(
+      { pathname: "..", search },
+      { preventScrollReset: true, replace: true }
+    );
 
   return (
     <RouteModal classes="bg-popover">

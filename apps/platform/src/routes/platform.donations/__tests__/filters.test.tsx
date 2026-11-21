@@ -132,7 +132,8 @@ describe("action column", () => {
     await expect.element(links.first()).toBeInTheDocument();
     const els = links.elements();
     expect(els.length).toBe(1);
-    expect(els[0]!.getAttribute("href")).toContain("a/refund");
+    // the filters ride the link so closing the modal lands on the same list
+    expect(els[0]!.getAttribute("href")).toContain("a/refund?status=all");
     expect(els[0]!.getAttribute("aria-label")).toBe(
       "Refund donation from a@test.com"
     );
