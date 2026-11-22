@@ -132,10 +132,9 @@ describe("header filters at 1440", () => {
   it("orders the columns, with the funnels on Status and Method", async () => {
     const { screen } = await render_page("/platform/donations");
     await expect.element(status_btn(screen)).toBeVisible();
-    const heads = screen
-      .getByRole("columnheader")
-      .elements()
-      .map((e) => e.textContent?.trim());
+    const heads = [...document.querySelectorAll("thead th")].map((e) =>
+      e.textContent?.trim()
+    );
     expect(heads).toEqual([
       "Date",
       "Status",
@@ -180,9 +179,11 @@ describe("header filters at 1440", () => {
         screen.getByRole("cell", { name: "Awaiting crypto", exact: true })
       )
       .toBeInTheDocument();
-    expect(
-      screen.getByRole("cell", { name: "Failed", exact: true }).elements()
-    ).toHaveLength(2);
+    await vi.waitFor(() =>
+      expect(
+        screen.getByRole("cell", { name: "Failed", exact: true }).elements()
+      ).toHaveLength(2)
+    );
     expect(
       screen.getByRole("cell", { name: "Refunded", exact: true }).elements()
     ).toHaveLength(0);
@@ -285,8 +286,12 @@ describe("header filters at 1440", () => {
 
   it("Showing reads All statuses and All methods", async () => {
     const { screen } = await render_page("/platform/donations?status=all");
-    await expect.element(screen.getByText("All statuses")).toBeVisible();
-    await expect.element(screen.getByText("All methods")).toBeVisible();
+    await expect
+      .element(status_btn(screen, "Status filter: All statuses"))
+      .toBeVisible();
+    expect(document.body.textContent).toContain(
+      "Showing: All statuses · All methods"
+    );
   });
 
   it("an unknown value falls back and shows no Clear filters", async () => {
