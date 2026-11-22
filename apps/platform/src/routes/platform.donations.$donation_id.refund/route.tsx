@@ -1,7 +1,7 @@
 import { Actions, EmptyState } from "@better-giving/ui";
 import { AlertTriangleIcon, CheckCircle2Icon, XCircleIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { useFetcher, useNavigate } from "react-router";
+import { useFetcher, useLocation, useNavigate } from "react-router";
 import { RouteModal } from "#/components/route-modal";
 import { humanize } from "@/helpers/decimal";
 import type { Route } from "./+types/route";
@@ -12,11 +12,17 @@ export { action, loader } from "./api";
 
 export default function Page({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
+  // the filters live in the search; closing must hand them back to the list
+  const { search } = useLocation();
   const close = () =>
-    navigate("..", { preventScrollReset: true, replace: true });
+    navigate(
+      { pathname: "..", search },
+      { preventScrollReset: true, replace: true }
+    );
 
   return (
-    <RouteModal size="lg" classes="bg-popover">
+    // Escape and the backdrop close through `to`, so it carries the filters too
+    <RouteModal size="lg" classes="bg-popover" to={`..${search}`}>
       <Content data={loaderData} on_close={close} />
     </RouteModal>
   );

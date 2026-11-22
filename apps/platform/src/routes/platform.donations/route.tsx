@@ -1,6 +1,12 @@
-import { EmptyRow, LoadMoreRow } from "@better-giving/ui";
+import { Badge, EmptyRow, LoadMoreRow } from "@better-giving/ui";
 import { format } from "date-fns";
-import { NavLink, Outlet, useSearchParams } from "react-router";
+import {
+  NavLink,
+  Outlet,
+  useLocation,
+  useNavigation,
+  useSearchParams,
+} from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { Money } from "#/components/money";
 import { metas } from "#/helpers/seo";
@@ -9,6 +15,14 @@ import type { IPaginator } from "#/types/components";
 import { via_name } from "@/donations/helpers";
 import type { Route } from "./+types/route";
 import type { PaymentRow } from "./api";
+import {
+  method_param,
+  parse_method,
+  parse_status,
+  status_param,
+} from "./filter/constants";
+import { Filters, type ISel, useHeaderFilters } from "./filter/filters";
+import { donation_tag } from "./filter/tag";
 
 export { loader } from "./api";
 export const clientLoader = createClientLoaderCache<Route.ClientLoaderArgs>();
@@ -16,11 +30,34 @@ export const meta: Route.MetaFunction = () => metas({ title: "Donations" });
 
 export default CacheRoute(Page);
 function Page({ loaderData: page1 }: Route.ComponentProps) {
-  const [params] = useSearchParams();
+  const [committed, set_params] = useSearchParams();
+  const { state, location } = useNavigation();
+  const here = useLocation();
+  // a tick starts a navigation that lands when the loader is done. the lists
+  // stay open meanwhile, so the next tick must build on this one, not on the
+  // url that is still on screen: read the pending search while one is in flight
+  const params =
+    state !== "idle" && location?.pathname === here.pathname
+      ? new URLSearchParams(location.search)
+      : committed;
+  const status = parse_status(params.get("status"));
+  const method = parse_method(params.get("method"));
 
-  const { node } = use_table<PaymentRow>({
+  // the key resets paging when page 1 changes: the filters, and the first
+  // page itself, so a refund that shifts the rows also starts over
+  const { next } = page1 as { next?: string };
+  const filter_key = [
+    status_param(parse_status(committed.get("status"))),
+    method_param(parse_method(committed.get("method"))),
+    next,
+    page1.items.length,
+    (page1.items[0] as PaymentRow | undefined)?.id,
+  ].join(":");
+
+  const { node, loading } = use_table<PaymentRow>({
     table: (props) => <Table {...props} />,
     page1,
+    filter_key,
     gen_loader: (load, next) => () => {
       const copy = new URLSearchParams(params);
       if (next) copy.set("cursor", next);
@@ -28,10 +65,32 @@ function Page({ loaderData: page1 }: Route.ComponentProps) {
     },
   });
 
+  // each change applies at once: defaults stay out of the url, the cursor
+  // belongs to the old filter, and replace keeps Back free of filter steps
+  const on_change = (next: ISel) => {
+    const p = new URLSearchParams(params);
+    p.delete("cursor");
+    for (const [k, v] of [
+      ["status", status_param(next.status)],
+      ["method", method_param(next.method)],
+    ] as const) {
+      if (v === null) p.delete(k);
+      else p.set(k, v);
+    }
+    set_params(p, { replace: true, preventScrollReset: true });
+  };
+
   return (
-    <div className="px-4 py-4 md:px-10 md:py-8 w-full max-w-5xl grid content-start">
+    <div className="px-4 py-4 md:px-10 md:py-8 w-full grid content-start">
       <h1 className="sr-only">Donations</h1>
-      <div className="table-scroll">{node}</div>
+      <Filters
+        status={status}
+        method={method}
+        loading={loading}
+        on_change={on_change}
+      >
+        <div className="table-scroll">{node}</div>
+      </Filters>
 
       <Outlet />
     </div>
@@ -57,6 +116,7 @@ function Page({ loaderData: page1 }: Route.ComponentProps) {
  * sql.
  */
 function Match({ payment: c }: { payment: PaymentRow }) {
+  const { search } = useLocation();
   const stamps = [
     ["pack", c.match_pack_sent_at],
     ["chased", c.match_chased_at],
@@ -93,7 +153,8 @@ function Match({ payment: c }: { payment: PaymentRow }) {
       )}
       {c.match_event_id && !c.match_voided_at && (
         <NavLink
-          to={`${c.donation_id}/void-match`}
+          to={{ pathname: `${c.donation_id}/void-match`, search }}
+          aria-label={`Void match for donation from ${c.email ?? c.donation_id}`}
           preventScrollReset
           replace
           className="btn-secondary btn btn-sm"
@@ -114,34 +175,46 @@ function Table({
   load_next,
   loading,
   disabled,
-  empty_msg = "No settled donations found",
+  empty_msg = "No donations found",
 }: ITableProps) {
+  const filters = useHeaderFilters();
   return (
     <table className="table">
       <thead>
         <tr className="whitespace-nowrap">
           <th>Date</th>
+          <th>
+            <span className="inline-flex items-center gap-1">
+              Status
+              {filters?.status}
+            </span>
+          </th>
           <th>Email</th>
           <th>NPO</th>
           <th>Amount</th>
+          <th>
+            <span className="inline-flex items-center gap-1">
+              Method
+              {filters?.method}
+            </span>
+          </th>
           <th>Tip</th>
           <th>Fee cover</th>
           <th>Fee</th>
-          <th>Method</th>
           <th>Match</th>
-          <th />
+          <th className="md:sticky md:right-0 md:bg-panel" />
         </tr>
       </thead>
       <tbody>
         {items.length === 0 ? (
-          <EmptyRow col_span={10}>{empty_msg}</EmptyRow>
+          <EmptyRow col_span={11}>{empty_msg}</EmptyRow>
         ) : (
           items.map((p) => <Row key={p.donation_id} payment={p} />)
         )}
       </tbody>
       {load_next && (
         <LoadMoreRow
-          col_span={10}
+          col_span={11}
           disabled={disabled}
           loading={loading}
           on_load_next={load_next}
@@ -152,24 +225,31 @@ function Table({
 }
 
 function Row({ payment: c }: { payment: PaymentRow }) {
+  // the modal routes hand the filters back on close, so they ride the link
+  const { search } = useLocation();
   // the method half of the via ("Card" for "stripe:card"); one with no method
   // names its processor. a crypto via keeps its network, which via_name drops
   const method = c.via.startsWith("crypto:") ? c.via : via_name(c.via);
-  const is_stripe = c.via.startsWith("stripe:");
+  const can_refund = c.status === "settled" && c.via.startsWith("stripe:");
+  const tag = donation_tag(c.status, c.via);
   return (
     <tr className="text-sm">
       <td className="whitespace-nowrap">
         {format(new Date(c.created_at), "MMM d, yyyy")}
       </td>
-      <td className="truncate max-w-48" title={c.email ?? ""}>
+      <td>
+        <Badge variant={tag.variant}>{tag.label}</Badge>
+      </td>
+      <td className="truncate max-w-40" title={c.email ?? ""}>
         {c.email ?? "—"}
       </td>
-      <td className="truncate max-w-48" title={c.npo_name ?? ""}>
+      <td className="truncate max-w-40" title={c.npo_name ?? ""}>
         {c.npo_name ?? "—"}
       </td>
       <td className="font-medium whitespace-nowrap">
         <Money amount={c.amount_base} currency={c.currency} />
       </td>
+      <td className="whitespace-nowrap">{method}</td>
       <td className="whitespace-nowrap">
         {c.amount_tip ? (
           <Money amount={c.amount_tip} currency={c.currency} />
@@ -191,20 +271,16 @@ function Row({ payment: c }: { payment: PaymentRow }) {
           "—"
         )}
       </td>
-      <td>{method}</td>
       <td>
         <Match payment={c} />
       </td>
-      <td>
-        {c.status === "refunded" || c.status === "refunded_loss" ? (
-          <span className="text-destructive-subtle-fg text-xs font-semibold">
-            {c.status === "refunded_loss" ? "Refunded (loss)" : "Refunded"}
-          </span>
-        ) : is_stripe ? (
+      <td className="md:sticky md:right-0 md:bg-card">
+        {can_refund ? (
           <NavLink
-            to={`${c.donation_id}/refund`}
+            to={{ pathname: `${c.donation_id}/refund`, search }}
             preventScrollReset
             replace
+            aria-label={`Refund donation from ${c.email ?? c.donation_id}`}
             className="btn-secondary btn btn-sm"
           >
             Refund

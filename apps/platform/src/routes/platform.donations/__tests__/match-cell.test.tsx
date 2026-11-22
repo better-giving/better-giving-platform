@@ -96,7 +96,7 @@ describe("donations table — method cell", () => {
 
     const row = screen.getByRole("row").nth(1);
     await expect.element(row).toBeVisible();
-    const method = row.element().children[7];
+    const method = row.element().children[5];
     expect(method.textContent).toBe(label);
   });
 });

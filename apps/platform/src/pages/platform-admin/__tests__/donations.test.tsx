@@ -251,7 +251,7 @@ async function seed_dist(
   return dist_id;
 }
 
-async function render_list(don_id?: string) {
+async function render_list(don_id?: string, search = "") {
   const Stub = createRoutesStub([
     {
       path: "/platform/refunds",
@@ -271,7 +271,7 @@ async function render_list(don_id?: string) {
     },
   ]);
 
-  return await render(<Stub initialEntries={["/platform/refunds"]} />);
+  return await render(<Stub initialEntries={[`/platform/refunds${search}`]} />);
 }
 
 // --- tests ---
@@ -334,8 +334,11 @@ describe("refunds list — settled stripe donation", () => {
 
     // after revalidation, list should show "Refunded" label
     await cleanup();
-    const screen2 = await render_list();
-    await expect.element(screen2.getByText("Refunded")).toBeVisible();
+    // the default tab lists settled gifts only; the refunded one is on its tab
+    const screen2 = await render_list(undefined, "?status=refunded");
+    await expect
+      .element(screen2.getByRole("cell", { name: "Refunded", exact: true }))
+      .toBeVisible();
     await expect
       .element(screen2.getByRole("link", { name: /refund/i }))
       .not.toBeInTheDocument();
@@ -361,7 +364,7 @@ describe("refunds list — non-stripe donation", () => {
 });
 
 describe("refunds list — filtering", () => {
-  it("shows settled and refunded, excludes created donations", async () => {
+  const seed_three = async () => {
     const npo = await seed_npo();
     await seed_donation(npo.id, npo.name); // settled
     await seed_donation(npo.id, npo.name, {
@@ -370,22 +373,81 @@ describe("refunds list — filtering", () => {
     await seed_donation(npo.id, npo.name, {
       donation: { status: "created" },
     });
+  };
+
+  it("lists settled donations only by default", async () => {
+    await seed_three();
 
     const screen = await render_list();
 
     await expect
       .element(screen.getByRole("heading", { name: /donations/i }))
       .toBeVisible();
-    // 2 rows: settled + refunded (not created)
-    const rows = screen.getByRole("row");
-    // 1 header row + 2 data rows
-    expect(rows.all()).toHaveLength(3);
-
-    // one "Refund" link (settled stripe), one "Refunded" label
+    // 1 header row + the settled donation
+    await vi.waitFor(() =>
+      expect(screen.getByRole("row").all()).toHaveLength(2)
+    );
     await expect
       .element(screen.getByRole("link", { name: /refund/i }))
       .toBeInTheDocument();
-    await expect.element(screen.getByText("Refunded")).toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("cell", { name: "Refunded", exact: true }))
+      .not.toBeInTheDocument();
+  });
+
+  it("?status=refunded lists the refunded donation", async () => {
+    await seed_three();
+
+    const screen = await render_list(undefined, "?status=refunded");
+
+    await vi.waitFor(() =>
+      expect(screen.getByRole("row").all()).toHaveLength(2)
+    );
+    await expect
+      .element(screen.getByRole("cell", { name: "Refunded", exact: true }))
+      .toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("link", { name: /refund/i }))
+      .not.toBeInTheDocument();
+  });
+
+  it("?status=unpaid lists the created donation", async () => {
+    await seed_three();
+
+    const screen = await render_list(undefined, "?status=unpaid");
+
+    await vi.waitFor(() =>
+      expect(screen.getByRole("row").all()).toHaveLength(2)
+    );
+    await expect
+      .element(
+        screen.getByRole("cell", { name: "Unpaid checkout", exact: true })
+      )
+      .toBeInTheDocument();
+  });
+
+  it("?status=all lists every status, each with its own tag", async () => {
+    await seed_three();
+
+    const screen = await render_list(undefined, "?status=all");
+
+    // 1 header row + settled, refunded and created
+    await vi.waitFor(() =>
+      expect(screen.getByRole("row").all()).toHaveLength(4)
+    );
+    await expect
+      .element(screen.getByRole("cell", { name: "Settled", exact: true }))
+      .toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("cell", { name: "Refunded", exact: true }))
+      .toBeInTheDocument();
+    await expect
+      .element(
+        screen.getByRole("cell", { name: "Unpaid checkout", exact: true })
+      )
+      .toBeInTheDocument();
+    // Refund stays on the settled Stripe row alone
+    expect(screen.getByRole("link", { name: /refund/i }).all()).toHaveLength(1);
   });
 });
 
@@ -446,7 +508,7 @@ describe("donations list — the match column", () => {
       },
     });
 
-    const screen = await render_list();
+    const screen = await render_list(undefined, "?status=refunded");
 
     await expect
       .element(screen.getByText(/voided · refunded_loss/i))
