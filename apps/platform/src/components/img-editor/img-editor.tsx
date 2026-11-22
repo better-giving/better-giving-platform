@@ -122,7 +122,7 @@ export function ImgEditor({ ref, id, ...props }: ControlledProps) {
   const styles = unpack(props.classes);
   const is_loading = props.value === "loading";
   const disabled = props.disabled || is_loading;
-  const overlay = `before:content-[''] before:grid before:place-items-center before:absolute before:inset-0 before:rounded-[inherit]data-[drag="true"]:before:bg-secondary data-[loading="true"]:before:bg-secondary/90 data-[loading="true"]:before:content-['._._.'] before:text-xl before:font-bold `;
+  const overlay = `before:content-[''] before:grid before:place-items-center before:absolute before:inset-0 before:rounded-[inherit] data-[drag="true"]:before:bg-secondary data-[loading="true"]:before:bg-secondary/90 data-[loading="true"]:before:content-['._._.'] before:text-xl before:font-bold `;
 
   const file_input = (
     <input
