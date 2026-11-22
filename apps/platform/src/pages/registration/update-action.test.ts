@@ -8,6 +8,7 @@ import {
   vi,
 } from "vitest";
 import type { TStatus } from "@/reg/schema";
+import { npos } from "$/pg/schema/npo";
 import { registrations } from "$/pg/schema/registration";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
@@ -56,6 +57,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await test_db.current!.db.delete(registrations);
+  await test_db.current!.db.delete(npos);
   vi.mocked(enqueue).mockClear();
   vi.mocked(get_session).mockResolvedValue({
     user: { id: "u-1", email: EMAIL, role: null } as any,
@@ -299,5 +301,111 @@ describe("update_action — document urls", () => {
 
     expect(res.status).toBe(302);
     expect((await reg_get(RID))?.r_proof_of_identity).toBe(OWN_DOC);
+  });
+});
+
+describe("update_action — org slug", () => {
+  const save_org = (fields: Record<string, unknown>) =>
+    settle(
+      update_action("3")({
+        request: new Request(`http://localhost/register/${RID}/2`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ update_type: "org", ...fields }),
+        }),
+        params: { reg_id: RID },
+        context: {} as any,
+      } as any)
+    );
+
+  test("stores a valid slug trimmed", async () => {
+    await seed("01");
+
+    const res = await save_org({ o_slug: "  Harbor-Light " });
+
+    expect(res.status).toBe(302);
+    expect((await reg_get(RID))?.o_slug).toBe("Harbor-Light");
+  });
+
+  test("stores a cleared slug as null", async () => {
+    await seed("01");
+    await test_db.current!.db.update(registrations).set({ o_slug: "harbor" });
+
+    const res = await save_org({ o_slug: "" });
+
+    expect(res.status).toBe(302);
+    expect((await reg_get(RID))?.o_slug).toBeNull();
+  });
+
+  // an older client's step form never sends the key
+  test("saves a payload without the slug, leaving a stored one", async () => {
+    await seed("01");
+    await test_db.current!.db.update(registrations).set({ o_slug: "harbor" });
+
+    const res = await save_org({ o_website: "https://after.org" });
+
+    expect(res.status).toBe(302);
+    expect(await reg_get(RID)).toMatchObject({
+      o_website: "https://after.org",
+      o_slug: "harbor",
+    });
+  });
+
+  test.each([
+    ["invalid", "harbor light", /Use only English letters/],
+    ["reserved", "admin", /Pick a different slug: admin is reserved/],
+  ])("refuses an %s slug and saves nothing", async (_, o_slug, message) => {
+    await seed("01");
+
+    const res = await save_org({ o_website: "https://after.org", o_slug });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).message).toMatch(message);
+    expect(await reg_get(RID)).toMatchObject({
+      o_website: "https://before.org",
+      o_slug: null,
+      updated_at: SEEN_AT,
+    });
+  });
+
+  test("answers a slug a nonprofit holds in another case as that field's error, saving nothing", async () => {
+    await seed("01");
+    await test_db.current!.db.insert(npos).values({
+      registration_number: "EIN-OTHER",
+      name: "Other",
+      endow_designation: "Charity",
+      overview_pt: "[]",
+      hq_country: "United States",
+      slug: "harbor-light",
+    });
+
+    const res = await save_org({
+      o_website: "https://after.org",
+      o_slug: "Harbor-Light",
+    });
+
+    // action data, not a thrown refusal: the step reads it off fetcher.data
+    expect(res).toMatchObject({
+      type: "DataWithResponseInit",
+      init: { status: 400 },
+      data: {
+        field_errors: { o_slug: 'Slug "Harbor-Light" is already taken' },
+      },
+    });
+    expect(await reg_get(RID)).toMatchObject({
+      o_website: "https://before.org",
+      o_slug: null,
+      updated_at: SEEN_AT,
+    });
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  test("leaves a submitted application's slug as it was", async () => {
+    await seed("02");
+
+    const res = await save_org({ o_slug: "harbor" });
+
+    expect(res.status).toBe(302);
+    expect((await reg_get(RID))?.o_slug).toBeNull();
   });
 });

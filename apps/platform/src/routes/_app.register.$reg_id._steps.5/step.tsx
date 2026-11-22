@@ -6,12 +6,15 @@ type Props = {
   disabled: boolean;
   num: TStep;
   status?: string;
+  /** the saved org slug, shown as its link text under the title */
+  slug?: string | null;
 };
 
 export function Step({
   num,
   status = "Completed" /** not possible to visit this page without completing steps */,
   disabled,
+  slug,
 }: Props) {
   return (
     <div
@@ -19,7 +22,19 @@ export function Step({
         num === 1 ? "border-t" : ""
       }`}
     >
-      <p className="mr-auto text-left">{title[num]}</p>
+      <div className="mr-auto min-w-0 text-left">
+        <p>{title[num]}</p>
+        {slug && (
+          // not a link: the page isn't live until approval
+          <p className="text-sm text-gray-11 wrap-anywhere">
+            better.giving/
+            <wbr />
+            org/
+            <wbr />
+            {slug}
+          </p>
+        )}
+      </div>
 
       <p className="text-success-subtle-fg font-semibold max-sm:row-start-2">
         {status}

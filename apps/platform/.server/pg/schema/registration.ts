@@ -36,6 +36,7 @@ export const registrations = pgTable(
     o_website: text("o_website"),
     o_sdgs: integer("o_sdgs").array(),
     o_active_in_countries: text("o_active_in_countries").array(),
+    o_slug: text("o_slug"),
 
     // org type (step 3)
     o_type: text("o_type").$type<"501c3" | "other">(),

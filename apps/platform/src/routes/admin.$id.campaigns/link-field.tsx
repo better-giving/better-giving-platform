@@ -5,7 +5,7 @@ import type { UseFormRegisterReturn } from "react-hook-form";
 const PLACEHOLDER_SEGMENT = "your-campaign";
 
 interface ILinkField {
-  reg: UseFormRegisterReturn<"slug">;
+  reg: UseFormRegisterReturn;
   value: string;
   /** the link up to its slug, e.g. `https://host/org/<org-slug>/`; null when
    * the org has no slug yet, so there is no public link to show */
@@ -27,6 +27,16 @@ interface IPublicLinkField extends ILinkField {
   empty_suffix?: string;
   /** ids of notes rendered outside the field */
   describedby?: string;
+}
+
+/** the legal name as lowercase words joined by hyphens, for the empty slug's placeholder */
+export function suggest_slug(name: string): string {
+  const words = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .slice(0, 30)
+    .replace(/^-+|-+$/g, "");
+  return words || "my-nonprofit";
 }
 
 /** a url offers no break of its own; one after each slash keeps a wrap

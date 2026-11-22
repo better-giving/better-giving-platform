@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import {
   afterAll,
   afterEach,
@@ -576,6 +577,112 @@ describe("approve", () => {
     // the loser announces the winner's approval: qstash takes each once
     expect(dedupe_keys("banking-new").size).toBe(1);
     expect(dedupe_keys("reg-updated").size).toBe(1);
+  });
+});
+
+describe("approve, with the org slug", () => {
+  /** one nonprofit with `slug` other than any seeded elsewhere, the
+   * application approved onto it, its registrant a member, and the approval
+   * announced once */
+  const approved_with = async (slug: string | null) => {
+    const db = test_db.current!.db;
+    const reg = await reg_get(RID);
+    expect(reg?.status).toBe("03");
+    const [npo] = await db
+      .select()
+      .from(npos)
+      .where(eq(npos.registration_number, IN_REVIEW.o_ein));
+    expect(npo?.id).toBe(reg?.status_approved_npo_id);
+    expect(npo?.slug).toBe(slug);
+    expect(await db.select().from(user_npo_memberships)).toMatchObject([
+      { npo_id: npo?.id, user_id: "u-1" },
+    ]);
+    expect(dedupe_keys("reg-updated").size).toBe(1);
+    expect(reg_updates()[0]?.payload).toMatchObject({
+      id: RID,
+      status: "03",
+      status_approved_npo_id: npo?.id,
+    });
+  };
+
+  const set_slug = (o_slug: string) =>
+    test_db.current!.db.update(registrations).set({ o_slug });
+
+  test("stores the application's slug on the nonprofit", async () => {
+    await set_slug("harbor-light");
+
+    const res = await verdict("approved");
+
+    expect(res.status).toBe(302);
+    await approved_with("harbor-light");
+  });
+
+  test("approves an application without a slug into a nonprofit without one", async () => {
+    const res = await verdict("approved");
+
+    expect(res.status).toBe(302);
+    await approved_with(null);
+  });
+
+  const other_npo = (slug: string) =>
+    test_db.current!.db.insert(npos).values({
+      registration_number: "EIN-OTHER",
+      name: "Other",
+      endow_designation: "Charity",
+      overview_pt: "[]",
+      hq_country: "United States",
+      slug,
+    });
+
+  test("approves without the slug when a nonprofit took it first, in another case", async () => {
+    await set_slug("Harbor-Light");
+    await other_npo("harbor-light");
+
+    const res = await verdict("approved");
+
+    expect(res.status).toBe(302);
+    await approved_with(null);
+  });
+
+  test("approves without the slug when a nonprofit takes it mid-approval", async () => {
+    await set_slug("harbor-light");
+    vi.mocked(wise.v2_account).mockImplementationOnce(async () => {
+      await other_npo("harbor-light");
+      return {
+        longAccountSummary: "Test Bank ***1234",
+      } as Awaited<ReturnType<typeof wise.v2_account>>;
+    });
+
+    const res = await verdict("approved");
+
+    expect(res.status).toBe(302);
+    await approved_with(null);
+    expect(await test_db.current!.db.select().from(banking_apps)).toHaveLength(
+      1
+    );
+  });
+
+  test.each(["admin", "harbor light", "1234"])(
+    "approves without a stored slug that no longer passes: %s",
+    async (slug) => {
+      await set_slug(slug);
+
+      const res = await verdict("approved");
+
+      expect(res.status).toBe(302);
+      await approved_with(null);
+    }
+  );
+
+  test("a repeat approval creates nothing more", async () => {
+    await set_slug("harbor-light");
+    await verdict("approved");
+
+    const res = await verdict("approved");
+
+    expect(res.status).toBe(302);
+    expect(await test_db.current!.db.select().from(npos)).toHaveLength(1);
+    await approved_with("harbor-light");
   });
 });
 

@@ -589,6 +589,13 @@
       "when": 1795186012257,
       "tag": "0083_manual_wires",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1795367219484,
+      "tag": "0084_registrations_o_slug",
+      "breakpoints": true
     }
   ]
 }

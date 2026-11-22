@@ -1,16 +1,19 @@
 import { addYears } from "date-fns";
 import { eq } from "drizzle-orm";
 import Stripe from "stripe";
+import * as v from "valibot";
 import { report_error } from "#/errors/report";
 import { referral_id } from "#/helpers/referral";
 import { resp } from "@/helpers/https";
 import { msg } from "@/queue";
 import type { Progress, TStatus } from "@/reg";
+import { org_slug } from "@/schemas";
 import { enqueue, in_dedupe_window } from "$/kit/queue";
 import { wise } from "$/kit/wise";
 import { db } from "$/pg/db";
 import { is_unique_violation } from "$/pg/errors";
 import { bapp_put } from "$/pg/queries/banking";
+import type { Tx } from "$/pg/queries/helpers";
 import { reg_update, reg_update_from } from "$/pg/queries/registration";
 import { userxnpo_put } from "$/pg/queries/user";
 import { user } from "$/pg/schema/auth";
@@ -65,6 +68,25 @@ export async function announce_approval(row: IApprovedRow | null) {
     );
   }
   return npo_id;
+}
+
+/** a slug a nonprofit holds by now, case aside (applications don't reserve
+ * one), leaves the new nonprofit without: it can set one in Manage. in a
+ * savepoint, since the unique violation would abort the approval's
+ * transaction */
+async function slug_put(tx: Tx, id: number, slug: string) {
+  try {
+    await tx.transaction((sp) =>
+      sp.update(npos).set({ slug }).where(eq(npos.id, id))
+    );
+  } catch (err) {
+    if (
+      is_unique_violation(err, "npos_slug_unique") ||
+      is_unique_violation(err, "npos_slug_lower_idx")
+    )
+      return;
+    throw err;
+  }
 }
 
 export const npo_new = async (r: NonNullable<Progress["banking"]>) => {
@@ -124,6 +146,10 @@ export const npo_new = async (r: NonNullable<Progress["banking"]>) => {
     fund_opt_in: true,
   };
 
+  // the rules may have tightened since the applicant saved it
+  const parsed = v.safeParse(org_slug, r.o_slug ?? "");
+  const slug = parsed.success ? parsed.output : "";
+
   const acct = r.o_stripe_account_id;
   const acct_taken = () =>
     resp.status(
@@ -179,6 +205,7 @@ export const npo_new = async (r: NonNullable<Progress["banking"]>) => {
         throw resp.status(409, `bank ${bank.id} is already registered`);
       }
     }
+    if (slug) await slug_put(tx, id, slug);
     await userxnpo_put(tx, id, registrant_id);
     return reg_update(tx, r.id, { status_approved_npo_id: id });
   });
