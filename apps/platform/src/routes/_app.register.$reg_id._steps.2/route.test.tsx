@@ -88,7 +88,7 @@ describe("step 2 organization slug", () => {
     await slug.fill(" harbor-light ");
 
     await expect
-      .element(screen.getByText("Donors will find your Better Giving page at"))
+      .element(screen.getByText("Donors will find your campaigns at"))
       .toMatchTextContent(/\/org\/harbor-light$/);
   });
 
@@ -228,7 +228,7 @@ describe("step 2 organization slug", () => {
 
     await slug.fill(SLUG_30);
 
-    const sub = screen.getByText("Donors will find your Better Giving page at");
+    const sub = screen.getByText("Donors will find your campaigns at");
     await expect.element(sub).toMatchTextContent(SLUG_30);
     // the preview's parent is the field's own box (label, input, error, preview)
     const field = sub.element().parentElement as HTMLElement;

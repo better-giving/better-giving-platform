@@ -422,7 +422,7 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
             base={profile_base}
             locked={form.locked}
             label="Organization slug"
-            subject="your Better Giving page"
+            subject="your campaigns"
             placeholder={suggest_slug(form.name)}
             empty_url={id_url}
             empty_suffix=" until you set a link"
