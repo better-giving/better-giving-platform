@@ -38,7 +38,7 @@ const chip_btn =
 const chip_active = "bg-secondary! border-ring text-accent-12";
 
 const row =
-  "flex items-center gap-3 px-3 py-2 text-sm rounded cursor-pointer hover:bg-secondary-hover data-highlighted:bg-secondary-hover data-[state=checked]:bg-secondary-active";
+  "flex items-center gap-3 px-3 py-2 text-sm rounded cursor-pointer hover:bg-secondary-hover data-highlighted:bg-secondary-hover data-[state=checked]:bg-secondary-active data-highlighted:outline-2 data-highlighted:outline-ring data-highlighted:-outline-offset-2";
 
 /** the checkbox glyph; the row itself is the control, so this is decoration */
 function Box({ state }: { state: boolean | "mixed" }) {

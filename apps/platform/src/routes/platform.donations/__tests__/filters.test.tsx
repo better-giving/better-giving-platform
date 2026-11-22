@@ -63,7 +63,8 @@ const PHONE = [375, 800] as const;
 async function render_page(
   entry: string,
   data: { items: PaymentRow[]; next?: string } = { items: [base] },
-  size: readonly [number, number] = DESKTOP
+  size: readonly [number, number] = DESKTOP,
+  delay_ms = 0
 ) {
   await page.viewport(size[0], size[1]);
   const seen: string[] = [];
@@ -72,9 +73,10 @@ async function render_page(
       path: "/platform/donations",
       Component: Page,
       HydrateFallback: () => null,
-      loader: ({ request }) => {
+      loader: async ({ request }) => {
         const url = new URL(request.url);
         seen.push(url.search);
+        if (delay_ms) await new Promise((r) => setTimeout(r, delay_ms));
         const statuses = parse_status(url.searchParams.get("status")).flatMap(
           (k) =>
             STATUS_OPTIONS.find((o) => o.value === k)!
@@ -235,6 +237,25 @@ describe("header filters at 1440", () => {
     await item(screen, "Stocks").click();
     await vi.waitFor(() => expect(seen.at(-1)).toBe(""));
     await expect.element(top).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("a second tick before the list reloads builds on the first", async () => {
+    const { screen, seen } = await render_page(
+      "/platform/donations",
+      { items: mixed_rows },
+      DESKTOP,
+      400
+    );
+    await status_btn(screen).click();
+    // both ticks land while the loader for the first is still pending
+    await item(screen, "Awaiting funds").click();
+    await item(screen, "Failed").click();
+    await vi.waitFor(() =>
+      expect(seen.at(-1)).toBe("?status=settled%2Cawaiting%2Cfailed")
+    );
+    await expect
+      .element(status_btn(screen, "Status filter: 3 selected"))
+      .toBeVisible();
   });
 
   it("a tick drops the cursor", async () => {

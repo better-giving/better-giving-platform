@@ -1,6 +1,12 @@
 import { Badge, EmptyRow, LoadMoreRow } from "@better-giving/ui";
 import { format } from "date-fns";
-import { NavLink, Outlet, useLocation, useSearchParams } from "react-router";
+import {
+  NavLink,
+  Outlet,
+  useLocation,
+  useNavigation,
+  useSearchParams,
+} from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
 import { Money } from "#/components/money";
 import { metas } from "#/helpers/seo";
@@ -25,15 +31,35 @@ export const meta: Route.MetaFunction = () => metas({ title: "Donations" });
 
 export default CacheRoute(Page);
 function Page({ loaderData: page1 }: Route.ComponentProps) {
-  const [params, set_params] = useSearchParams();
+  const [committed, set_params] = useSearchParams();
+  const { state, location } = useNavigation();
+  const here = useLocation();
+  // a tick starts a navigation that lands when the loader is done. the lists
+  // stay open meanwhile, so the next tick must build on this one, not on the
+  // url that is still on screen: read the pending search while one is in flight
+  const params =
+    state !== "idle" && location?.pathname === here.pathname
+      ? new URLSearchParams(location.search)
+      : committed;
   const status = parse_status(params.get("status"));
   const method = parse_method(params.get("method"));
   const off_default = !is_default_filter(status, method);
 
+  // the key resets paging when page 1 changes: the filters, and the first
+  // page itself, so a refund that shifts the rows also starts over
+  const { next } = page1 as { next?: string };
+  const filter_key = [
+    status_param(parse_status(committed.get("status"))),
+    method_param(parse_method(committed.get("method"))),
+    next,
+    page1.items.length,
+    (page1.items[0] as PaymentRow | undefined)?.id,
+  ].join(":");
+
   const { node, loading } = use_table<PaymentRow>({
     table: (props) => <Table {...props} />,
     page1,
-    filter_key: `${status_param(status)}:${method_param(method)}`,
+    filter_key,
     gen_loader: (load, next) => () => {
       const copy = new URLSearchParams(params);
       if (next) copy.set("cursor", next);

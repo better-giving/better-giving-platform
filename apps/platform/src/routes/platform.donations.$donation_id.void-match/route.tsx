@@ -38,7 +38,8 @@ export default function Page({ loaderData }: Route.ComponentProps) {
     );
 
   return (
-    <RouteModal classes="bg-popover">
+    // Escape and the backdrop close through `to`, so it carries the filters too
+    <RouteModal classes="bg-popover" to={`..${search}`}>
       <Content data={loaderData} on_close={close} />
     </RouteModal>
   );
