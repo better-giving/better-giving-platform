@@ -9,7 +9,7 @@ export interface IOption {
 }
 
 interface IFilterMenu {
-  /** "Status" or "Method": the header text and the chip's name */
+  /** "Status" or "Method": the plain trigger's text */
   name: string;
   /** which control this is, for the focus handoff after Clear filters */
   id: "status" | "method";
@@ -22,20 +22,18 @@ interface IFilterMenu {
   on_toggle: (value: string, next: boolean) => void;
   /** the trigger's accessible name, carrying the value */
   aria_label: string;
-  /** off the default: the funnel fills, the chip tints */
+  /** off the default: the header funnel fills */
   active: boolean;
   disabled: boolean;
-  /** a header funnel, or a 375 chip showing `chip_value` */
-  trigger: "header" | "chip";
-  chip_value?: string;
+  /** a header funnel, or under md a plain trigger showing `name` */
+  trigger: "header" | "plain";
 }
 
 const header_btn =
   "glyph-btn text-gray-11 hover:bg-gray-4 disabled:bg-gray-3 focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2";
 const header_active = "text-primary [&_svg]:fill-current";
-const chip_btn =
+const plain_btn =
   "inline-flex items-center gap-1 min-h-8 px-3 py-1.5 text-sm font-medium rounded border border-input bg-surface disabled:bg-gray-3 disabled:text-gray-11 focus-visible:outline-2 focus-visible:outline-ring";
-const chip_active = "bg-secondary! border-ring text-accent-12";
 
 const row =
   "flex items-center gap-3 px-3 py-2 text-sm rounded cursor-pointer hover:bg-secondary-hover data-highlighted:bg-secondary-hover data-[state=checked]:bg-secondary-active data-highlighted:outline-2 data-highlighted:outline-ring data-highlighted:-outline-offset-2";
@@ -75,15 +73,14 @@ export function FilterMenu(p: IFilterMenu) {
         className={
           p.trigger === "header"
             ? `${header_btn} ${p.active ? header_active : ""} max-md:hidden`
-            : `${chip_btn} ${p.active ? chip_active : ""} md:hidden`
+            : `${plain_btn} md:hidden`
         }
       >
         {p.trigger === "header" ? (
           <Filter className="icon-sm" aria-hidden />
         ) : (
           <>
-            <span className="font-normal text-gray-11">{p.name}</span>
-            {p.chip_value}
+            {p.name}
             <ChevronDown className="icon-sm" aria-hidden />
           </>
         )}

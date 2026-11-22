@@ -105,6 +105,14 @@ const method_btn = (s: Screen, name: string | RegExp = /^Method filter/) =>
 const item = (s: Screen, name: string) =>
   s.getByRole("menuitemcheckbox", { name, exact: true });
 
+/** the text of each chip on screen, in order: "Status: Failed", "Crypto" */
+const chip_texts = () =>
+  [...document.querySelectorAll("[data-chip-remove]")].map((b) =>
+    b.closest("span")?.textContent?.trim()
+  );
+const remove_btn = (s: Screen, value: string) =>
+  s.getByRole("button", { name: `Remove filter: ${value}`, exact: true });
+
 const mixed_rows = [
   row("a", { status: "settled", via: "stripe:card" }),
   row("b", { status: "intent", via: "crypto:eth" }),
@@ -114,7 +122,7 @@ const mixed_rows = [
 ];
 
 describe("header filters at 1440", () => {
-  it("shows the defaults without a Showing line or Clear filters", async () => {
+  it("shows the defaults without chips or Clear filters", async () => {
     const { screen } = await render_page("/platform/donations");
     await expect
       .element(status_btn(screen, "Status filter: Settled"))
@@ -125,7 +133,7 @@ describe("header filters at 1440", () => {
     await expect
       .element(screen.getByRole("button", { name: "Clear filters" }))
       .not.toBeInTheDocument();
-    expect(document.body.textContent).not.toContain("Showing:");
+    expect(chip_texts()).toEqual([]);
     expect(
       status_btn(screen).element().className.includes("text-primary")
     ).toBe(false);
@@ -287,34 +295,6 @@ describe("header filters at 1440", () => {
       .toBeVisible();
   });
 
-  it("shows the Showing line off the defaults and collapses three", async () => {
-    const { screen } = await render_page(
-      "/platform/donations?status=awaiting,failed&method=crypto"
-    );
-    await expect
-      .element(screen.getByText("Awaiting funds, Failed"))
-      .toBeVisible();
-    expect(document.body.textContent).toContain("Showing:");
-    expect(document.body.textContent).toContain("Crypto");
-    await cleanup();
-
-    const again = await render_page(
-      "/platform/donations?status=settled,awaiting,failed&method=stripe,paypal,daf"
-    );
-    await expect.element(again.screen.getByText("3 statuses")).toBeVisible();
-    await expect.element(again.screen.getByText("3 methods")).toBeVisible();
-  });
-
-  it("Showing reads All statuses and All methods", async () => {
-    const { screen } = await render_page("/platform/donations?status=all");
-    await expect
-      .element(status_btn(screen, "Status filter: All statuses"))
-      .toBeVisible();
-    expect(document.body.textContent).toContain(
-      "Showing: All statuses · All methods"
-    );
-  });
-
   it("an unknown value falls back and shows no Clear filters", async () => {
     const { screen } = await render_page(
       "/platform/donations?status=x&method=y"
@@ -375,8 +355,154 @@ describe("header filters at 1440", () => {
   });
 });
 
+describe("filter chips", () => {
+  it("shows a prefixed chip per status and method value", async () => {
+    const { screen } = await render_page(
+      "/platform/donations?status=awaiting,failed&method=crypto"
+    );
+    await expect.element(remove_btn(screen, "Failed")).toBeVisible();
+    expect(chip_texts()).toEqual([
+      "Status: Awaiting funds",
+      "Failed",
+      "Method: Crypto",
+    ]);
+  });
+
+  it("gives Settled a chip once Status is off its default", async () => {
+    const { screen } = await render_page(
+      "/platform/donations?status=settled,failed"
+    );
+    await expect.element(remove_btn(screen, "Settled")).toBeVisible();
+    expect(chip_texts()).toEqual(["Status: Settled", "Failed"]);
+  });
+
+  it("names the × by its value", async () => {
+    const { screen } = await render_page(
+      "/platform/donations?status=awaiting,failed"
+    );
+    await expect
+      .element(
+        screen.getByRole("button", { name: "Remove filter: Awaiting funds" })
+      )
+      .toBeVisible();
+  });
+
+  it("is one All statuses chip, and removing it resets to Settled", async () => {
+    const { screen, seen } = await render_page(
+      "/platform/donations?status=all"
+    );
+    expect(chip_texts()).toEqual(["Status: All statuses"]);
+    await remove_btn(screen, "Status: All statuses").click();
+    await vi.waitFor(() => expect(seen.at(-1)).toBe(""));
+    await expect
+      .element(status_btn(screen, "Status filter: Settled"))
+      .toBeVisible();
+    expect(chip_texts()).toEqual([]);
+  });
+
+  it("removing method chips ends with no method param", async () => {
+    const { screen, seen } = await render_page(
+      "/platform/donations?method=stripe,crypto"
+    );
+    expect(chip_texts()).toEqual(["Method: Stripe", "Crypto"]);
+    await remove_btn(screen, "Crypto").click();
+    await vi.waitFor(() => expect(seen.at(-1)).toBe("?method=stripe"));
+    await remove_btn(screen, "Stripe").click();
+    await vi.waitFor(() => expect(seen.at(-1)).toBe(""));
+  });
+
+  it("removing the last status chip resets Status and hides Clear filters", async () => {
+    const { screen, seen } = await render_page(
+      "/platform/donations?status=failed"
+    );
+    await remove_btn(screen, "Failed").click();
+    await vi.waitFor(() => expect(seen.at(-1)).toBe(""));
+    await expect
+      .element(screen.getByRole("button", { name: "Clear filters" }))
+      .not.toBeInTheDocument();
+    expect(chip_texts()).toEqual([]);
+  });
+
+  it("collapses four or more values and its × resets the group", async () => {
+    const { screen, seen } = await render_page(
+      "/platform/donations?status=settled,awaiting,unpaid,failed&method=stripe,paypal,daf"
+    );
+    expect(chip_texts()).toEqual([
+      "Status: 4 selected",
+      "Method: Stripe",
+      "PayPal",
+      "DAF",
+    ]);
+    await remove_btn(screen, "Status: 4 selected").click();
+    await vi.waitFor(() =>
+      expect(seen.at(-1)).toBe("?method=stripe%2Cpaypal%2Cdaf")
+    );
+    await cleanup();
+
+    const again = await render_page(
+      "/platform/donations?method=stripe,paypal,daf,crypto"
+    );
+    expect(chip_texts()).toEqual(["Method: 4 selected"]);
+    await remove_btn(again.screen, "Method: 4 selected").click();
+    await vi.waitFor(() => expect(again.seen.at(-1)).toBe(""));
+  });
+
+  it("draws the × smaller than the chip text", async () => {
+    const { screen } = await render_page(
+      "/platform/donations?status=awaiting,failed"
+    );
+    const btn = remove_btn(screen, "Failed");
+    await expect.element(btn).toBeVisible();
+    const svg = btn.element().querySelector("svg")!;
+    const chip = btn.element().closest("span")!;
+    const font = Number.parseFloat(getComputedStyle(chip).fontSize);
+    expect(svg.getBoundingClientRect().height).toBeLessThan(font);
+    // the hit area around it is the 24px glyph button
+    expect(btn.element().getBoundingClientRect().height).toBeGreaterThanOrEqual(
+      24
+    );
+  });
+
+  it("moves focus to the next chip's ×", async () => {
+    const { screen } = await render_page(
+      "/platform/donations?status=awaiting,failed&method=crypto"
+    );
+    await remove_btn(screen, "Awaiting funds").click();
+    await expect.element(remove_btn(screen, "Failed")).toHaveFocus();
+  });
+
+  it("moves focus to Clear filters after the last chip", async () => {
+    const { screen } = await render_page(
+      "/platform/donations?status=failed&method=crypto"
+    );
+    await remove_btn(screen, "Crypto").click();
+    await expect
+      .element(screen.getByRole("button", { name: "Clear filters" }))
+      .toHaveFocus();
+  });
+
+  it("moves focus to the Status funnel when no chip is left", async () => {
+    const { screen } = await render_page("/platform/donations?status=failed");
+    await remove_btn(screen, "Failed").click();
+    await expect
+      .element(status_btn(screen, "Status filter: Settled"))
+      .toHaveFocus();
+  });
+
+  it("keeps the chips beside an empty table", async () => {
+    const { screen } = await render_page(
+      "/platform/donations?status=failed&method=match",
+      { items: [] }
+    );
+    await expect
+      .element(screen.getByText("No donations found"))
+      .toBeInTheDocument();
+    expect(chip_texts()).toEqual(["Status: Failed", "Method: Employer match"]);
+  });
+});
+
 describe("filters at 375", () => {
-  it("swaps the header funnels for two chips", async () => {
+  it("swaps the header funnels for two plain triggers", async () => {
     const { screen } = await render_page(
       "/platform/donations",
       { items: [base] },
@@ -384,8 +510,9 @@ describe("filters at 375", () => {
     );
     const status = status_btn(screen, "Status filter: Settled");
     await expect.element(status).toBeVisible();
-    expect(status.element().textContent).toContain("Status");
-    expect(status.element().textContent).toContain("Settled");
+    // no value and no count on the trigger: the chips carry them
+    expect(status.element().textContent?.trim()).toBe("Status");
+    expect(method_btn(screen).element().textContent?.trim()).toBe("Method");
     await expect
       .element(method_btn(screen, "Method filter: All methods"))
       .toBeVisible();
@@ -400,7 +527,7 @@ describe("filters at 375", () => {
     expect(chevron.getBoundingClientRect().height).toBeLessThanOrEqual(14);
   });
 
-  it("tints a chip off its default and shows a count for two", async () => {
+  it("shows the chip row under the triggers, with Clear filters last", async () => {
     const { screen } = await render_page(
       "/platform/donations?status=awaiting,failed&method=crypto",
       { items: mixed_rows },
@@ -408,14 +535,26 @@ describe("filters at 375", () => {
     );
     const status = status_btn(screen, "Status filter: Awaiting funds, Failed");
     await expect.element(status).toBeVisible();
-    expect(status.element().textContent).toMatch(/Status\s*2/);
-    expect(status.element().className).toContain("border-ring");
-    await expect
-      .element(screen.getByRole("button", { name: "Clear filters" }))
-      .toBeVisible();
+    expect(status.element().textContent?.trim()).toBe("Status");
+    expect(chip_texts()).toEqual([
+      "Status: Awaiting funds",
+      "Failed",
+      "Method: Crypto",
+    ]);
+    const clear = screen
+      .getByRole("button", { name: "Clear filters" })
+      .element();
+    // below the triggers, and after the last chip in the row
+    expect(clear.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+      status.element().getBoundingClientRect().bottom
+    );
+    const last = [...document.querySelectorAll("[data-chip-remove]")].at(-1)!;
+    expect(
+      clear.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_PRECEDING
+    ).toBeTruthy();
   });
 
-  it("a chip opens the same list", async () => {
+  it("a trigger opens the same list", async () => {
     const { screen, seen } = await render_page(
       "/platform/donations",
       { items: mixed_rows },
@@ -426,7 +565,7 @@ describe("filters at 375", () => {
     await vi.waitFor(() => expect(seen.at(-1)).toBe("?method=crypto"));
   });
 
-  it("Clear filters moves focus to the Status chip", async () => {
+  it("Clear filters moves focus to the Status trigger", async () => {
     const { screen } = await render_page(
       "/platform/donations?method=crypto",
       { items: [base] },

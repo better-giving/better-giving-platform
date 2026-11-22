@@ -88,19 +88,6 @@ const status_label = (k: StatusKey) =>
 const method_label = (k: MethodKey) =>
   METHOD_OPTIONS.find((o) => o.value === k)?.label;
 
-/** one or two values by name, three or more as a count */
-const list = (labels: (string | undefined)[], noun: string) =>
-  labels.length <= 2 ? labels.join(", ") : `${labels.length} ${noun}`;
-
-/** the "Showing:" line */
-export const status_summary = (sel: StatusKey[]) =>
-  sel.length === STATUS_KEYS.length
-    ? STATUS_ALL_LABEL
-    : list(sel.map(status_label), "statuses");
-
-export const method_summary = (sel: MethodKey[]) =>
-  sel.length === 0 ? METHOD_ALL_LABEL : list(sel.map(method_label), "methods");
-
 /** a header button's accessible name: values by name up to two, then a count */
 export const status_name = (sel: StatusKey[]) =>
   `Status filter: ${
@@ -120,20 +107,89 @@ export const method_name = (sel: MethodKey[]) =>
         : sel.map(method_label).join(", ")
   }`;
 
-/** the 375 chip's value: one by name, two or more as a count, every status as All */
-export const status_chip = (sel: StatusKey[]) =>
-  sel.length === STATUS_KEYS.length
-    ? "All"
-    : sel.length === 1
-      ? (status_label(sel[0]!) ?? "")
-      : String(sel.length);
+/** a group with this many values or more collapses to one chip */
+export const COLLAPSE_AT = 4;
 
-export const method_chip = (sel: MethodKey[]) =>
-  sel.length === 0
-    ? "All"
-    : sel.length === 1
-      ? (method_label(sel[0]!) ?? "")
-      : String(sel.length);
+export interface IChip {
+  group: "status" | "method";
+  /** the value this chip removes; null on a collapsed or All chip, which
+   *  resets its whole group */
+  value: string | null;
+  label: string;
+  /** "Status:" or "Method:", on the first chip of each group */
+  prefix?: string;
+  /** the × button's value in "Remove filter: {name}" */
+  name: string;
+}
+
+const group_chips = (
+  group: IChip["group"],
+  head: string,
+  values: { value: string; label: string }[],
+  all_label?: string
+): IChip[] => {
+  const prefix = `${head}:`;
+  if (all_label)
+    return [
+      {
+        group,
+        value: null,
+        label: all_label,
+        prefix,
+        name: `${prefix} ${all_label}`,
+      },
+    ];
+  if (values.length >= COLLAPSE_AT) {
+    const label = `${values.length} selected`;
+    return [{ group, value: null, label, prefix, name: `${prefix} ${label}` }];
+  }
+  return values.map((v, i) => ({
+    group,
+    value: v.value,
+    label: v.label,
+    prefix: i === 0 ? prefix : undefined,
+    name: v.label,
+  }));
+};
+
+/** the removable chips of the active filters: Status chips, then Method
+ *  chips; none while both are on their defaults. Settled gets a chip
+ *  whenever Status is off its default, so every ticked status is visible */
+export const filter_chips = (s: StatusKey[], m: MethodKey[]): IChip[] => {
+  const status =
+    status_param(s) === null
+      ? []
+      : group_chips(
+          "status",
+          "Status",
+          s.map((k) => ({ value: k, label: status_label(k) ?? k })),
+          s.length === STATUS_KEYS.length ? STATUS_ALL_LABEL : undefined
+        );
+  const method =
+    method_param(m) === null
+      ? []
+      : group_chips(
+          "method",
+          "Method",
+          m.map((k) => ({ value: k, label: method_label(k) ?? k }))
+        );
+  return [...status, ...method];
+};
+
+/** the group after its chip's × : the value gone, or the whole group reset.
+ *  an emptied Status returns to Settled and an emptied Method to no filter */
+export const without_status = (
+  sel: StatusKey[],
+  value: string | null
+): StatusKey[] => {
+  const next = value === null ? [] : sel.filter((k) => k !== value);
+  return next.length ? next : [...DEFAULT_STATUS];
+};
+
+export const without_method = (
+  sel: MethodKey[],
+  value: string | null
+): MethodKey[] => (value === null ? [] : sel.filter((k) => k !== value));
 
 export type Group = Exclude<MethodKey, "other">;
 

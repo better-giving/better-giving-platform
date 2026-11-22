@@ -1,20 +1,26 @@
 import { Button } from "@better-giving/ui";
-import { createContext, type ReactNode, useContext, useRef } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useRef,
+} from "react";
+import { FilterChip } from "./chips";
 import {
   DEFAULT_METHOD,
   DEFAULT_STATUS,
+  filter_chips,
   METHOD_ALL_LABEL,
   METHOD_OPTIONS,
   type MethodKey,
-  method_chip,
   method_name,
-  method_summary,
   STATUS_ALL_LABEL,
   STATUS_OPTIONS,
   type StatusKey,
-  status_chip,
   status_name,
-  status_summary,
+  without_method,
+  without_status,
 } from "./constants";
 import { FilterMenu } from "./menu";
 
@@ -35,9 +41,8 @@ const HeaderFilters = createContext<IHeaderFilters | null>(null);
 export const useHeaderFilters = () => useContext(HeaderFilters);
 
 interface IFilters extends ISel {
-  /** a load is in flight: the funnels and chips are disabled */
+  /** a load is in flight: the funnels and triggers are disabled */
   loading: boolean;
-  off_default: boolean;
   on_change: (next: ISel) => void;
   /** the table, which reads the funnels through `useHeaderFilters` */
   children: ReactNode;
@@ -56,39 +61,64 @@ const method_opts = METHOD_OPTIONS.map((o) => ({
 const ordered = <K extends string>(all: { value: K }[], set: K[]) =>
   all.map((o) => o.value).filter((v) => set.includes(v));
 
+/** the Status control on screen: the header funnel from md, the trigger under it */
+const status_trigger = (root: HTMLElement | null) =>
+  [
+    ...(root?.querySelectorAll<HTMLElement>("[data-filter-trigger=status]") ??
+      []),
+  ].find((t) => t.offsetParent);
+
 export function Filters({
   status,
   method,
   loading,
-  off_default,
   on_change,
   children,
 }: IFilters) {
   const root = useRef<HTMLDivElement>(null);
+  const chips = filter_chips(status, method);
+  const chip_key = chips.map((c) => `${c.group}:${c.value}`).join("|");
+
+  // a × removes its chip, so focus would drop to the body: it goes to the chip
+  // that takes that place, else Clear filters, else the Status control. the
+  // chips rerender with the new selection, so the move waits for them
+  const pending_focus = useRef<number | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the chips change
+  useEffect(() => {
+    const at = pending_focus.current;
+    if (at === null) return;
+    pending_focus.current = null;
+    const el = root.current;
+    (
+      el?.querySelectorAll<HTMLElement>("[data-chip-remove]")[at] ??
+      el?.querySelector<HTMLElement>("[data-clear]") ??
+      status_trigger(el)
+    )?.focus();
+  }, [chip_key]);
+
+  const remove = (i: number) => {
+    const c = chips[i]!;
+    pending_focus.current = i;
+    if (c.group === "status") {
+      on_change({ method, status: without_status(status, c.value) });
+    } else {
+      on_change({ status, method: without_method(method, c.value) });
+    }
+  };
 
   // the button removes itself once the defaults land, which would drop focus
-  // to the body: hand it to the Status control that is on screen (the header
-  // funnel from md, the chip under it)
+  // to the body: hand it to the Status control first
   const clear = () => {
-    const triggers = root.current?.querySelectorAll<HTMLElement>(
-      "[data-filter-trigger=status]"
-    );
-    for (const t of triggers ?? []) {
-      if (t.offsetParent) {
-        t.focus();
-        break;
-      }
-    }
+    status_trigger(root.current)?.focus();
     on_change({ status: [...DEFAULT_STATUS], method: [...DEFAULT_METHOD] });
   };
 
   const status_all = status.length === STATUS_OPTIONS.length;
-  const status_menu = (trigger: "header" | "chip") => (
+  const status_menu = (trigger: "header" | "plain") => (
     <FilterMenu
       id="status"
       name="Status"
       trigger={trigger}
-      chip_value={status_chip(status)}
       options={status_opts}
       selected={status}
       all_label={STATUS_ALL_LABEL}
@@ -113,12 +143,11 @@ export function Filters({
       disabled={loading}
     />
   );
-  const method_menu = (trigger: "header" | "chip") => (
+  const method_menu = (trigger: "header" | "plain") => (
     <FilterMenu
       id="method"
       name="Method"
       trigger={trigger}
-      chip_value={method_chip(method)}
       options={method_opts}
       selected={method}
       all_label={METHOD_ALL_LABEL}
@@ -139,33 +168,31 @@ export function Filters({
     />
   );
 
-  const clear_btn = (
-    <Button type="button" variant="secondary" size="sm" onClick={clear}>
-      Clear filters
-    </Button>
-  );
-
   return (
     <div ref={root} className="grid gap-4">
-      {/* under md the header funnels are dropped for two chips */}
+      {/* under md the header funnels are dropped for two plain triggers */}
       <div className="flex flex-wrap items-center gap-2 md:hidden">
-        {status_menu("chip")}
-        {method_menu("chip")}
-        {off_default && clear_btn}
+        {status_menu("plain")}
+        {method_menu("plain")}
       </div>
-      {off_default && (
-        <div className="hidden md:flex items-center gap-3 min-h-8 text-sm text-gray-11">
-          <span>
-            Showing:{" "}
-            <span className="font-medium text-gray-12">
-              {status_summary(status)}
-            </span>{" "}
-            ·{" "}
-            <span className="font-medium text-gray-12">
-              {method_summary(method)}
-            </span>
-          </span>
-          {clear_btn}
+      {chips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {chips.map((c, i) => (
+            <FilterChip
+              key={`${c.group}:${c.value}`}
+              chip={c}
+              on_remove={() => remove(i)}
+            />
+          ))}
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-clear
+            onClick={clear}
+          >
+            Clear filters
+          </Button>
         </div>
       )}
       <HeaderFilters

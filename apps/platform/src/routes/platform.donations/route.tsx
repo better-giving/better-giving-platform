@@ -16,7 +16,6 @@ import { via_name } from "@/donations/helpers";
 import type { Route } from "./+types/route";
 import type { PaymentRow } from "./api";
 import {
-  is_default_filter,
   method_param,
   parse_method,
   parse_status,
@@ -43,7 +42,6 @@ function Page({ loaderData: page1 }: Route.ComponentProps) {
       : committed;
   const status = parse_status(params.get("status"));
   const method = parse_method(params.get("method"));
-  const off_default = !is_default_filter(status, method);
 
   // the key resets paging when page 1 changes: the filters, and the first
   // page itself, so a refund that shifts the rows also starts over
@@ -89,7 +87,6 @@ function Page({ loaderData: page1 }: Route.ComponentProps) {
         status={status}
         method={method}
         loading={loading}
-        off_default={off_default}
         on_change={on_change}
       >
         <div className="table-scroll">{node}</div>
