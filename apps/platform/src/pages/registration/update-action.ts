@@ -101,8 +101,14 @@ export const update_action =
     /* identity + its resets are change-identity.ts's, not a step's */
 
     // applications don't reserve a slug against each other: only a
-    // nonprofit's counts, and approval drops one taken by then
-    if (upd8.update_type === "org" && upd8.o_slug) {
+    // nonprofit's counts, and approval drops one taken by then. a
+    // non-editable application skips the lookup: the write below exits it
+    if (
+      upd8.update_type === "org" &&
+      upd8.o_slug &&
+      reg.status &&
+      EDITABLE.includes(reg.status)
+    ) {
       if (await npo_by_slug(upd8.o_slug)) {
         const refusal: IStepFieldErrors = {
           field_errors: { o_slug: `Slug "${upd8.o_slug}" is already taken` },

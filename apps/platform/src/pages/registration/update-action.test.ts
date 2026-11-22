@@ -415,4 +415,26 @@ describe("update_action — org slug", () => {
     expect(res.status).toBe(302);
     expect((await reg_get(RID))?.o_slug).toBeNull();
   });
+
+  // a stale tab on a submitted application is sent where its loader would
+  // send it, whatever slug it posts
+  test.each(["02", "03"] as const)(
+    "redirects a status %s application before answering a taken slug",
+    async (status) => {
+      await seed(status);
+      await test_db.current!.db.insert(npos).values({
+        registration_number: "EIN-OTHER",
+        name: "Other",
+        endow_designation: "Charity",
+        overview_pt: "[]",
+        hq_country: "United States",
+        slug: "harbor-light",
+      });
+
+      const res = await save_org({ o_slug: "harbor-light" });
+
+      expect(res.status).toBe(302);
+      expect((await reg_get(RID))?.o_slug).toBeNull();
+    }
+  );
 });
