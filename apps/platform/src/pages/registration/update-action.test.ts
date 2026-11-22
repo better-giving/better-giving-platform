@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import type { data } from "react-router";
 import {
   afterAll,
   beforeAll,
@@ -375,37 +376,39 @@ describe("update_action — org slug", () => {
     });
   });
 
-  test("answers a slug a nonprofit holds in another case as that field's error, saving nothing", async () => {
-    await seed("01");
-    await test_db.current!.db.insert(npos).values({
-      registration_number: "EIN-OTHER",
-      name: "Other",
-      endow_designation: "Charity",
-      overview_pt: "[]",
-      hq_country: "United States",
-      slug: "harbor-light",
-    });
+  // a rejected application is editable like a draft, so it is refused alike
+  test.each<TStatus>(["01", "04"])(
+    "answers a slug a nonprofit holds in another case, on a %s application, as that field's error, saving nothing",
+    async (status) => {
+      await seed(status);
+      await test_db.current!.db.insert(npos).values({
+        registration_number: "EIN-OTHER",
+        name: "Other",
+        endow_designation: "Charity",
+        overview_pt: "[]",
+        hq_country: "United States",
+        slug: "harbor-light",
+      });
 
-    const res = await save_org({
-      o_website: "https://after.org",
-      o_slug: "Harbor-Light",
-    });
+      const res = (await save_org({
+        o_website: "https://after.org",
+        o_slug: "Harbor-Light",
+      })) as unknown as ReturnType<typeof data>;
 
-    // action data, not a thrown refusal: the step reads it off fetcher.data
-    expect(res).toMatchObject({
-      type: "DataWithResponseInit",
-      init: { status: 400 },
-      data: {
+      // action data, not a thrown refusal: the step reads it off fetcher.data
+      expect(res.init?.status).toBe(400);
+      expect(res.data).toEqual({
         field_errors: { o_slug: 'Slug "Harbor-Light" is already taken' },
-      },
-    });
-    expect(await reg_get(RID)).toMatchObject({
-      o_website: "https://before.org",
-      o_slug: null,
-      updated_at: SEEN_AT,
-    });
-    expect(enqueue).not.toHaveBeenCalled();
-  });
+      });
+      expect(await reg_get(RID)).toMatchObject({
+        status,
+        o_website: "https://before.org",
+        o_slug: null,
+        updated_at: SEEN_AT,
+      });
+      expect(enqueue).not.toHaveBeenCalled();
+    }
+  );
 
   test("leaves a submitted application's slug as it was", async () => {
     await seed("02");

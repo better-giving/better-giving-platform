@@ -662,7 +662,7 @@ describe("approve, with the org slug", () => {
     );
   });
 
-  test.each(["admin", "harbor light", "1234"])(
+  test.each(["admin", "pricing", "harbor light", "1234"])(
     "approves without a stored slug that no longer passes: %s",
     async (slug) => {
       await set_slug(slug);

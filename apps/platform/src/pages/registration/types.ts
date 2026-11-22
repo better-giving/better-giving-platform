@@ -13,3 +13,9 @@ export type Reg$IdData = {
 export interface IStepFieldErrors {
   field_errors: Partial<Record<"o_slug", string>>;
 }
+
+/** what a step's fetcher reads back: a field refusal, or `resp.fail`'s body
+ * for a refusal no field owns */
+export type TStepAnswer =
+  | IStepFieldErrors
+  | { status: number; message: string };

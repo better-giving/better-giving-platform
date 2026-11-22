@@ -139,6 +139,42 @@ describe("step 2 organization slug", () => {
     expect(body).toMatchObject({ update_type: "org", o_slug: "" });
   });
 
+  test("editing another field leaves a stored slug unsent", async () => {
+    let body: unknown;
+    const action = vi.fn(async ({ request }: { request: Request }) => {
+      body = await request.json();
+      return null;
+    });
+    const { screen, slug } = await render_step(action, { o_slug: "harbor" });
+
+    await screen
+      .getByLabelText("Website of your organization")
+      .fill("newsite.org");
+    await continue_(screen);
+
+    await vi.waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(body).toMatchObject({ update_type: "org" });
+    expect(body).toHaveProperty("o_website");
+    expect(body).not.toHaveProperty("o_slug");
+    await expect.element(slug).toHaveValue("harbor");
+  });
+
+  test("accepts a 30-character slug", async () => {
+    let body: unknown;
+    const action = vi.fn(async ({ request }: { request: Request }) => {
+      body = await request.json();
+      return null;
+    });
+    const { screen, slug } = await render_step(action);
+
+    await slug.fill(SLUG_30);
+    await continue_(screen);
+
+    await vi.waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(body).toMatchObject({ o_slug: SLUG_30 });
+    await expect.element(slug).toHaveAttribute("aria-invalid", "false");
+  });
+
   test.each([
     [SLUG_30.concat("x"), "Use 30 characters or fewer"],
     ["1234", "Don't use only numbers"],

@@ -19,7 +19,7 @@ import { base_url } from "#/constants/env";
 import { TERMS_OF_USE_NPO } from "#/constants/urls";
 import { step_loader } from "#/pages/registration/data/step-loader";
 import { after_org, steps } from "#/pages/registration/routes";
-import type { IStepFieldErrors, Reg$IdData } from "#/pages/registration/types";
+import type { Reg$IdData, TStepAnswer } from "#/pages/registration/types";
 import { update_action } from "#/pages/registration/update-action";
 import {
   PublicLinkField,
@@ -38,7 +38,7 @@ export { ErrorBoundary } from "#/components/error";
 export const loader = step_loader(2);
 export const action = update_action((reg) => after_org(reg.o_type));
 export default function Page({ loaderData: reg }: Route.ComponentProps) {
-  const fetcher = useFetcher<IStepFieldErrors>();
+  const fetcher = useFetcher<TStepAnswer>();
   const navigate = useNavigate();
   const { connect_routing } = useRouteLoaderData(
     "routes/_app.register.$reg_id"
@@ -58,7 +58,10 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
 
   const refusal = fetcher.data;
   useEffect(() => {
-    const taken = refusal?.field_errors?.o_slug;
+    const taken =
+      refusal && "field_errors" in refusal
+        ? refusal.field_errors.o_slug
+        : undefined;
     if (taken) setError("o_slug", { message: taken }, { shouldFocus: true });
   }, [refusal, setError]);
 

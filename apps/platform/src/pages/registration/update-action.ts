@@ -18,7 +18,7 @@ import { FOREIGN_DOC, may_store_doc, REG_DOC_FIELDS } from "$/doc-access";
 import { stripe as stripe_env } from "$/env";
 import { enqueue } from "$/kit/queue";
 import { db } from "$/pg/db";
-import { npo_by_slug } from "$/pg/queries/npo";
+import { npo_slug_taken } from "$/pg/queries/npo";
 import {
   reg_get,
   reg_update_from,
@@ -109,7 +109,7 @@ export const update_action =
       reg.status &&
       EDITABLE.includes(reg.status)
     ) {
-      if (await npo_by_slug(upd8.o_slug)) {
+      if (await npo_slug_taken(upd8.o_slug)) {
         const refusal: IStepFieldErrors = {
           field_errors: { o_slug: `Slug "${upd8.o_slug}" is already taken` },
         };
