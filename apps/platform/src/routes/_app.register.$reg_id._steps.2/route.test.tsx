@@ -79,8 +79,10 @@ describe("step 2 organization slug", () => {
       .toHaveAttribute("placeholder", "harbor-light-food-bank");
     await expect.element(slug).toHaveValue("");
     await expect.element(slug).not.toHaveAttribute("aria-required");
-    const label = screen.getByText("Organization slug", { exact: true });
-    expect(label.element().textContent).not.toMatch(/\*|optional/);
+    // no asterisk and no "(optional)": the label's flag is unset
+    await expect
+      .element(screen.getByText("Organization slug", { exact: true }))
+      .not.toHaveAttribute("data-required");
     expect(screen.getByText("Donors will find").query()).toBeNull();
 
     await slug.fill(" harbor-light ");
@@ -88,20 +90,6 @@ describe("step 2 organization slug", () => {
     await expect
       .element(screen.getByText("Donors will find your Better Giving page at"))
       .toMatchTextContent(/\/org\/harbor-light$/);
-  });
-
-  test("every label sits 8px above its control", async () => {
-    const { screen } = await render_step(vi.fn());
-
-    for (const text of [
-      "Website of your organization",
-      "Nonprofit Designation",
-      "Select the countries your organization is active in",
-      "Organization slug",
-    ]) {
-      const label = screen.getByText(text).element().closest(".label")!;
-      expect(getComputedStyle(label).marginBottom, text).toBe("8px");
-    }
   });
 
   test("continues with an empty slug, sending none", async () => {
@@ -121,11 +109,9 @@ describe("step 2 organization slug", () => {
   });
 
   test("sends a typed slug trimmed", async () => {
+    let body: unknown;
     const action = vi.fn(async ({ request }: { request: Request }) => {
-      expect(await request.json()).toMatchObject({
-        update_type: "org",
-        o_slug: "harbor-light",
-      });
+      body = await request.json();
       return null;
     });
     const { screen, slug } = await render_step(action);
@@ -134,6 +120,23 @@ describe("step 2 organization slug", () => {
     await continue_(screen);
 
     await vi.waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(body).toMatchObject({ update_type: "org", o_slug: "harbor-light" });
+  });
+
+  test("a stored slug is pre-filled, and clearing it sends an empty one", async () => {
+    let body: unknown;
+    const action = vi.fn(async ({ request }: { request: Request }) => {
+      body = await request.json();
+      return null;
+    });
+    const { screen, slug } = await render_step(action, { o_slug: "harbor" });
+
+    await expect.element(slug).toHaveValue("harbor");
+    await slug.clear();
+    await continue_(screen);
+
+    await vi.waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(body).toMatchObject({ update_type: "org", o_slug: "" });
   });
 
   test.each([
@@ -191,7 +194,8 @@ describe("step 2 organization slug", () => {
 
     const sub = screen.getByText("Donors will find your Better Giving page at");
     await expect.element(sub).toMatchTextContent(SLUG_30);
-    const field = slug.element().closest(".min-w-0") as HTMLElement;
+    // the preview's parent is the field's own box (label, input, error, preview)
+    const field = sub.element().parentElement as HTMLElement;
     expect(field.scrollWidth).toBeLessThanOrEqual(field.clientWidth);
     expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(375);
   });

@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import {
   afterAll,
   beforeAll,
@@ -329,7 +330,10 @@ describe("update_action — org slug", () => {
 
   test("stores a cleared slug as null", async () => {
     await seed("01");
-    await test_db.current!.db.update(registrations).set({ o_slug: "harbor" });
+    await test_db
+      .current!.db.update(registrations)
+      .set({ o_slug: "harbor" })
+      .where(eq(registrations.id, RID));
 
     const res = await save_org({ o_slug: "" });
 
@@ -340,7 +344,10 @@ describe("update_action — org slug", () => {
   // an older client's step form never sends the key
   test("saves a payload without the slug, leaving a stored one", async () => {
     await seed("01");
-    await test_db.current!.db.update(registrations).set({ o_slug: "harbor" });
+    await test_db
+      .current!.db.update(registrations)
+      .set({ o_slug: "harbor" })
+      .where(eq(registrations.id, RID));
 
     const res = await save_org({ o_website: "https://after.org" });
 

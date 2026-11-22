@@ -108,7 +108,7 @@ export function PublicLinkField({
           placeholder={placeholder}
           aria-invalid={!!error}
           aria-errormessage={error_id}
-          aria-describedby={described}
+          aria-describedby={described || undefined}
           autoComplete="off"
           spellCheck={false}
           className="min-w-32 flex-1 bg-transparent py-3.5 px-4 outline-none"

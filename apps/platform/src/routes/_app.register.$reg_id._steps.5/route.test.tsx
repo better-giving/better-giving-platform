@@ -30,7 +30,7 @@ const stub = (action: () => unknown, reg: Record<string, unknown> = {}) =>
 
 /** the summary's content width inside the wizard card at a 375 viewport:
  * 20px gutters, the card's 1px edges and its 24px inset each side */
-const SUMMARY_AT_375 = 285;
+const SUMMARY_AT_375 = 375 - 2 * (20 + 1 + 24);
 const SLUG_30 = "harbor-light-food-bank-of-ohio";
 
 /** right edge of the widest line `el`'s text renders on */
@@ -52,7 +52,7 @@ describe("step 5 organization row", () => {
     await expect
       .element(screen.getByText("Organization", { exact: true }))
       .toBeVisible();
-    expect(screen.getByText("better.giving/").query()).toBeNull();
+    expect(screen.getByText("/org/").query()).toBeNull();
   });
 
   test("a 30-character slug wraps clear of Update at 375", async () => {
@@ -67,8 +67,13 @@ describe("step 5 organization row", () => {
     const address = screen.getByText(`better.giving/org/${SLUG_30}`);
     await expect.element(address).toBeVisible();
     const el = address.element();
+    await document.fonts.ready;
     const row = el.parentElement!.parentElement!;
-    const update = row.querySelector("a")!.getBoundingClientRect();
+    const update = page
+      .elementLocator(row)
+      .getByRole("link", { name: "Update" })
+      .element()
+      .getBoundingClientRect();
 
     expect(update.left - widest_line_right(el)).toBeGreaterThanOrEqual(24);
     expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);

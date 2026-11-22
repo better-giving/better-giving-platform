@@ -26,6 +26,7 @@ export function Step({
         <p>{title[num]}</p>
         {slug && (
           // not a link: the page isn't live until approval
+          // wrap-anywhere, not break-words: only it shrinks min-content, so the mr-auto column stays clear of Update
           <p className="text-sm text-gray-11 wrap-anywhere">
             better.giving/
             <wbr />

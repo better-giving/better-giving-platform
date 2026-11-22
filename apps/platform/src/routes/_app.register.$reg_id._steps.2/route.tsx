@@ -58,7 +58,7 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
 
   const refusal = fetcher.data;
   useEffect(() => {
-    const taken = refusal?.field_errors.o_slug;
+    const taken = refusal?.field_errors?.o_slug;
     if (taken) setError("o_slug", { message: taken }, { shouldFocus: true });
   }, [refusal, setError]);
 
