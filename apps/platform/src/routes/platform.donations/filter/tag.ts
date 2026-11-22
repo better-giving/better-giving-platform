@@ -36,7 +36,7 @@ const ANY_METHOD: Record<string, ITag> = {
   refunded_loss: { label: "Refunded (loss)", variant: "destructive" },
 };
 
-/** a pair not in `PAIRS` shows its filter group's word */
+/** a pair not in `PAIRS` shows a word for its status alone */
 const FALLBACK: Record<string, ITag> = {
   intent: { label: "Awaiting funds", variant: "warning" },
   confirmed: { label: "Awaiting funds", variant: "warning" },
