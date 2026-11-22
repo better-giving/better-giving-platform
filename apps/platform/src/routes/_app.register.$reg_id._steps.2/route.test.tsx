@@ -99,7 +99,7 @@ describe("step 2 organization slug", () => {
       "Select the countries your organization is active in",
       "Organization slug",
     ]) {
-      const label = screen.getByText(text).element().closest("label")!;
+      const label = screen.getByText(text).element().closest(".label")!;
       expect(getComputedStyle(label).marginBottom, text).toBe("8px");
     }
   });
