@@ -627,3 +627,85 @@ describe("ImgEditor: description", () => {
     expect(live[0].textContent).toBe("");
   });
 });
+
+// the preview and the loading/drag overlay paint inside the dropzone, so they
+// follow whatever corner the caller gave it — a circle stays a circle
+describe("ImgEditor: corner radius", () => {
+  const BROKEN = "data:image/png;base64,iVBORw0KGgo=";
+  const SIX = "6px";
+
+  const dropzone_of = (c: HTMLElement) =>
+    c.querySelector<HTMLElement>("[data-drag]") as HTMLElement;
+  const radius = (el: Element, pseudo?: string) =>
+    getComputedStyle(el, pseudo).borderTopLeftRadius;
+
+  test("a round dropzone: the preview image matches it", async () => {
+    const screen = await render_editor(
+      make_props({
+        value: PIXEL,
+        classes: { dropzone: "size-24 rounded-full" },
+      })
+    );
+    const dropzone = dropzone_of(screen.container);
+    const img = dropzone.querySelector("img") as HTMLImageElement;
+    expect(radius(dropzone)).not.toBe(SIX);
+    expect(radius(img)).toBe(radius(dropzone));
+  });
+
+  test("a round dropzone: the broken-src placeholder matches it", async () => {
+    const screen = await render_editor(
+      make_props({
+        value: BROKEN,
+        classes: { dropzone: "size-24 rounded-full" },
+      })
+    );
+    const dropzone = dropzone_of(screen.container);
+    let placeholder: HTMLElement | null = null;
+    await vi.waitFor(() => {
+      placeholder =
+        dropzone.querySelector(".lucide-image")?.parentElement ?? null;
+      expect(placeholder).not.toBeNull();
+    });
+    expect(radius(placeholder as unknown as HTMLElement)).toBe(
+      radius(dropzone)
+    );
+    expect(radius(dropzone)).not.toBe(SIX);
+  });
+
+  test("a round dropzone: the loading overlay matches it", async () => {
+    const screen = await render_editor(
+      make_props({
+        value: "loading",
+        classes: { dropzone: "size-24 rounded-full" },
+      })
+    );
+    const dropzone = dropzone_of(screen.container);
+    expect(dropzone.dataset.loading).toBe("true");
+    expect(radius(dropzone, "::before")).toBe(radius(dropzone));
+    expect(radius(dropzone, "::before")).not.toBe(SIX);
+  });
+
+  test("a round dropzone: the drag overlay matches it", async () => {
+    const screen = await render_editor(
+      make_props({
+        value: PIXEL,
+        classes: { dropzone: "size-24 rounded-full" },
+      })
+    );
+    const dropzone = dropzone_of(screen.container);
+    dropzone.dispatchEvent(new Event("dragover", { bubbles: true }));
+    await vi.waitFor(() => expect(dropzone.dataset.drag).toBe("true"));
+    expect(radius(dropzone, "::before")).toBe(radius(dropzone));
+    expect(radius(dropzone, "::before")).not.toBe(SIX);
+  });
+
+  test("no radius from the caller: the preview keeps the 6px control corner", async () => {
+    const screen = await render_editor(
+      make_props({ value: PIXEL, classes: { dropzone: "size-24" } })
+    );
+    const dropzone = dropzone_of(screen.container);
+    const img = dropzone.querySelector("img") as HTMLImageElement;
+    expect(radius(dropzone)).toBe(SIX);
+    expect(radius(img)).toBe(SIX);
+  });
+});
