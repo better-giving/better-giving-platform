@@ -5,6 +5,8 @@ import { TERMS_RECOVERY_FROM, TERMS_ZONE, terms_date_label } from "@/terms";
 import type { Route } from "./+types/route";
 
 const EFFECTIVE = terms_date_label("2026-10-23");
+// the cookie window change has its own date; the header and recovery dates stay
+const COOKIE_CHANGE_EFFECTIVE = terms_date_label("2026-12-07");
 const RECOVERY_FROM = terms_date_label(TERMS_RECOVERY_FROM);
 
 export const headers: Route.HeadersFunction = () => ({
@@ -74,9 +76,19 @@ export default function TermsReferrals() {
           </p>
           <ul>
             <li>Your unique referral link or code</li>
-            <li>A 90-day cookie window</li>
+            <li>
+              A 90-day cookie window (in the United Kingdom, the European Union
+              and wherever we cannot tell a visitor’s location, only if the
+              visitor accepts our referral cookie)
+            </li>
             <li>Manual attribution upon review by Better Giving</li>
           </ul>
+          <p>
+            A visitor who declines the cookie, deletes it, or switches browser
+            or device before registering may not be credited automatically; we
+            may still attribute the referral manually on review.
+          </p>
+          <p>This change takes effect on {COOKIE_CHANGE_EFFECTIVE}.</p>
         </li>
         <li>
           <h3>Payment Terms</h3>
