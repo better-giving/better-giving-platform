@@ -137,8 +137,8 @@ export const method_chip = (sel: MethodKey[]) =>
 
 export type Group = Exclude<MethodKey, "other">;
 
-/** the group of a `via`, for the row tag; mirrors `GROUP_SQL` */
 export type ViaGroup = Group | "other";
+/** the group of a `via`, for the row tag; mirrors `GROUP_SQL` */
 export const via_group = (v: string): ViaGroup => {
   if (v === "stripe" || v.startsWith("stripe:")) return "stripe";
   if (v.startsWith("paypal") || v === "venmo") return "paypal";
