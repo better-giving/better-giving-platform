@@ -71,8 +71,8 @@ export async function announce_approval(row: IApprovedRow | null) {
 }
 
 /** a slug a nonprofit holds by now, case aside (applications don't reserve
- * one), leaves the new nonprofit without: it can set one in Manage. in a
- * savepoint, since the unique violation would abort the approval's
+ * one), leaves the new nonprofit without: it can set one in Manage. Runs in
+ * a savepoint, since the unique violation would abort the approval's
  * transaction */
 async function slug_put(tx: Tx, id: number, slug: string) {
   try {
