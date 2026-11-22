@@ -1,4 +1,4 @@
-import { Badge, EmptyRow, LoadMoreRow, TabPanel } from "@better-giving/ui";
+import { Badge, EmptyRow, LoadMoreRow } from "@better-giving/ui";
 import { format } from "date-fns";
 import { NavLink, Outlet, useLocation, useSearchParams } from "react-router";
 import { CacheRoute, createClientLoaderCache } from "remix-client-cache";
@@ -10,14 +10,13 @@ import { via_name } from "@/donations/helpers";
 import type { Route } from "./+types/route";
 import type { PaymentRow } from "./api";
 import {
-  DEFAULT_METHOD,
-  DEFAULT_STATUS,
-  type MethodFilter,
+  is_default_filter,
+  method_param,
   parse_method,
   parse_status,
-  type StatusFilter,
+  status_param,
 } from "./filter/constants";
-import { Filters } from "./filter/filters";
+import { Filters, type ISel, useHeaderFilters } from "./filter/filters";
 import { donation_tag } from "./filter/tag";
 
 export { loader } from "./api";
@@ -29,11 +28,12 @@ function Page({ loaderData: page1 }: Route.ComponentProps) {
   const [params, set_params] = useSearchParams();
   const status = parse_status(params.get("status"));
   const method = parse_method(params.get("method"));
+  const off_default = !is_default_filter(status, method);
 
   const { node, loading } = use_table<PaymentRow>({
     table: (props) => <Table {...props} />,
     page1,
-    filter_key: `${status}:${method}`,
+    filter_key: `${status_param(status)}:${method_param(method)}`,
     gen_loader: (load, next) => () => {
       const copy = new URLSearchParams(params);
       if (next) copy.set("cursor", next);
@@ -43,13 +43,16 @@ function Page({ loaderData: page1 }: Route.ComponentProps) {
 
   // each change applies at once: defaults stay out of the url, the cursor
   // belongs to the old filter, and replace keeps Back free of filter steps
-  const on_change = (next: { status: StatusFilter; method: MethodFilter }) => {
+  const on_change = (next: ISel) => {
     const p = new URLSearchParams(params);
     p.delete("cursor");
-    if (next.status === DEFAULT_STATUS) p.delete("status");
-    else p.set("status", next.status);
-    if (next.method === DEFAULT_METHOD) p.delete("method");
-    else p.set("method", next.method);
+    for (const [k, v] of [
+      ["status", status_param(next.status)],
+      ["method", method_param(next.method)],
+    ] as const) {
+      if (v === null) p.delete(k);
+      else p.set(k, v);
+    }
     set_params(p, { replace: true, preventScrollReset: true });
   };
 
@@ -60,11 +63,10 @@ function Page({ loaderData: page1 }: Route.ComponentProps) {
         status={status}
         method={method}
         loading={loading}
+        off_default={off_default}
         on_change={on_change}
       >
-        <TabPanel value={status}>
-          <div className="table-scroll">{node}</div>
-        </TabPanel>
+        <div className="table-scroll">{node}</div>
       </Filters>
 
       <Outlet />
@@ -152,21 +154,32 @@ function Table({
   disabled,
   empty_msg = "No donations found",
 }: ITableProps) {
+  const filters = useHeaderFilters();
   return (
     <table className="table">
       <thead>
         <tr className="whitespace-nowrap">
           <th>Date</th>
-          <th>Status</th>
+          <th>
+            <span className="inline-flex items-center gap-1">
+              Status
+              {filters?.status}
+            </span>
+          </th>
           <th>Email</th>
           <th>NPO</th>
           <th>Amount</th>
+          <th>
+            <span className="inline-flex items-center gap-1">
+              Method
+              {filters?.method}
+            </span>
+          </th>
           <th>Tip</th>
           <th>Fee cover</th>
           <th>Fee</th>
-          <th>Method</th>
           <th>Match</th>
-          <th />
+          <th className="md:sticky md:right-0 md:bg-panel" />
         </tr>
       </thead>
       <tbody>
@@ -204,15 +217,16 @@ function Row({ payment: c }: { payment: PaymentRow }) {
       <td>
         <Badge variant={tag.variant}>{tag.label}</Badge>
       </td>
-      <td className="truncate max-w-48" title={c.email ?? ""}>
+      <td className="truncate max-w-40" title={c.email ?? ""}>
         {c.email ?? "—"}
       </td>
-      <td className="truncate max-w-48" title={c.npo_name ?? ""}>
+      <td className="truncate max-w-40" title={c.npo_name ?? ""}>
         {c.npo_name ?? "—"}
       </td>
       <td className="font-medium whitespace-nowrap">
         <Money amount={c.amount_base} currency={c.currency} />
       </td>
+      <td className="whitespace-nowrap">{method}</td>
       <td className="whitespace-nowrap">
         {c.amount_tip ? (
           <Money amount={c.amount_tip} currency={c.currency} />
@@ -234,11 +248,10 @@ function Row({ payment: c }: { payment: PaymentRow }) {
           "—"
         )}
       </td>
-      <td>{method}</td>
       <td>
         <Match payment={c} />
       </td>
-      <td>
+      <td className="md:sticky md:right-0 md:bg-card">
         {can_refund ? (
           <NavLink
             to={{ pathname: `${c.donation_id}/refund`, search }}

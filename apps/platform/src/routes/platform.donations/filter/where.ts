@@ -2,9 +2,9 @@ import { inArray, not, or, type SQL, sql } from "drizzle-orm";
 import { donations } from "$/pg/schema/donation";
 import {
   type Group,
-  type MethodFilter,
+  type MethodKey,
   STATUS_OPTIONS,
-  type StatusFilter,
+  type StatusKey,
 } from "./constants";
 
 const via = donations.via;
@@ -19,13 +19,21 @@ const GROUP_SQL: Record<Group, SQL> = {
   match: sql`${via} = 'match'`,
 };
 
-export const status_where = (f: StatusFilter): SQL | undefined => {
-  const statuses = STATUS_OPTIONS.find((o) => o.value === f)?.statuses ?? [];
-  return statuses.length ? inArray(donations.status, [...statuses]) : undefined;
+const NOT_ANY_GROUP = () => not(or(...Object.values(GROUP_SQL))!);
+
+/** the union of the selected groups' statuses; every group applies no filter */
+export const status_where = (sel: StatusKey[]): SQL | undefined => {
+  if (sel.length === STATUS_OPTIONS.length) return undefined;
+  const statuses = STATUS_OPTIONS.filter((o) => sel.includes(o.value)).flatMap(
+    (o) => o.statuses
+  );
+  return inArray(donations.status, statuses);
 };
 
-export const method_where = (f: MethodFilter): SQL | undefined => {
-  if (f === "all") return undefined;
-  if (f === "other") return not(or(...Object.values(GROUP_SQL))!);
-  return GROUP_SQL[f];
+/** the OR of the selected predicates; none selected applies no filter */
+export const method_where = (sel: MethodKey[]): SQL | undefined => {
+  if (sel.length === 0) return undefined;
+  return or(
+    ...sel.map((k) => (k === "other" ? NOT_ANY_GROUP() : GROUP_SQL[k]))
+  );
 };

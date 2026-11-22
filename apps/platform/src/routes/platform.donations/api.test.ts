@@ -103,6 +103,36 @@ describe("status filter", () => {
 
   test("an unknown value falls back to settled", async () => {
     expect(await ids("?status=bogus")).toEqual(await ids(""));
+    expect(await ids("?status=")).toEqual(await ids(""));
+  });
+
+  test("a list is the union of its groups", async () => {
+    expect(await ids("?status=awaiting,failed")).toEqual(
+      where((s) => ["intent", "confirmed", "failed"].includes(s))
+    );
+    expect(await ids("?status=settled,refunded,closed")).toEqual(
+      where((s) =>
+        [
+          "settled",
+          "refunded",
+          "refunded_loss",
+          "expired",
+          "cancelled",
+        ].includes(s)
+      )
+    );
+  });
+
+  test("every group named is every status", async () => {
+    expect(
+      await ids("?status=settled,awaiting,unpaid,refunded,failed,closed")
+    ).toEqual(where(() => true));
+  });
+
+  test("unknown values in a list are dropped", async () => {
+    expect(await ids("?status=failed,bogus")).toEqual(
+      where((s) => s === "failed")
+    );
   });
 });
 
@@ -135,6 +165,40 @@ describe("method filter", () => {
   test("an unknown value falls back to all", async () => {
     expect(await ids("?status=all&method=bogus")).toEqual(
       await ids("?status=all")
+    );
+  });
+
+  test("a list is the OR of its predicates", async () => {
+    expect(await ids("?status=all&method=stripe,crypto")).toEqual(
+      where((_, v) => groups.stripe!(v) || groups.crypto!(v))
+    );
+    expect(await ids("?status=all&method=paypal,daf,match")).toEqual(
+      where((_, v) => groups.paypal!(v) || groups.daf!(v) || groups.match!(v))
+    );
+  });
+
+  test("other beside a group keeps both", async () => {
+    expect(await ids("?status=all&method=match,other")).toEqual(
+      where(
+        (_, v) => groups.match!(v) || !Object.values(groups).some((g) => g(v))
+      )
+    );
+  });
+
+  test("an empty list, all, or every method applies no filter", async () => {
+    const every = await ids("?status=all");
+    expect(await ids("?status=all&method=")).toEqual(every);
+    expect(await ids("?status=all&method=all")).toEqual(every);
+    expect(
+      await ids(
+        "?status=all&method=stripe,paypal,daf,crypto,stocks,match,other"
+      )
+    ).toEqual(every);
+  });
+
+  test("unknown values in a list are dropped", async () => {
+    expect(await ids("?status=all&method=stocks,bogus")).toEqual(
+      where((_, v) => groups.stocks!(v))
     );
   });
 
