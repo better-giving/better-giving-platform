@@ -83,13 +83,19 @@ describe("step 2 organization slug", () => {
     await expect
       .element(screen.getByText("Organization slug", { exact: true }))
       .not.toHaveAttribute("data-required");
-    expect(screen.getByText("Donors will find").query()).toBeNull();
+    expect(screen.getByText("Your org slug will be part").query()).toBeNull();
 
     await slug.fill(" harbor-light ");
 
     await expect
-      .element(screen.getByText("Donors will find your campaigns at"))
-      .toMatchTextContent(/\/org\/harbor-light$/);
+      .element(
+        screen.getByText(
+          "Your org slug will be part of your campaign URLs, like"
+        )
+      )
+      .toMatchTextContent(
+        /^Your org slug will be part of your campaign URLs, like https?:\/\/\S+\/org\/harbor-light\/your-campaign$/
+      );
   });
 
   test("continues with an empty slug, sending none", async () => {
@@ -228,7 +234,9 @@ describe("step 2 organization slug", () => {
 
     await slug.fill(SLUG_30);
 
-    const sub = screen.getByText("Donors will find your campaigns at");
+    const sub = screen.getByText(
+      "Your org slug will be part of your campaign URLs, like"
+    );
     await expect.element(sub).toMatchTextContent(SLUG_30);
     // the preview's parent is the field's own box (label, input, error, preview)
     const field = sub.element().parentElement as HTMLElement;

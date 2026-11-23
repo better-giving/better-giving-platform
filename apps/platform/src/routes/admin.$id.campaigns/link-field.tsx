@@ -18,8 +18,14 @@ interface ILinkField {
 interface IPublicLinkField extends ILinkField {
   label: string;
   required?: boolean;
-  /** what donors find at the link, e.g. "this campaign" */
-  subject: string;
+  /** the sentence the previewed link ends, e.g. "Donors will find this
+   * campaign at" */
+  lead: string;
+  /** the sentence while the slug is empty; `lead` when absent */
+  empty_lead?: string;
+  /** a path segment shown after the link, outside it, e.g. the campaign
+   * segment under an org's slug */
+  tail?: string;
   placeholder?: string;
   /** the previewed link while the slug is empty */
   empty_url: string | null;
@@ -62,7 +68,7 @@ export function LinkField(props: ILinkField) {
       {...props}
       label="Campaign link"
       required
-      subject="this campaign"
+      lead="Donors will find this campaign at"
       empty_url={props.base && `${props.base}${PLACEHOLDER_SEGMENT}`}
     />
   );
@@ -77,7 +83,9 @@ export function PublicLinkField({
   error,
   label,
   required,
-  subject,
+  lead,
+  empty_lead,
+  tail,
   placeholder,
   empty_url,
   empty_suffix,
@@ -119,13 +127,19 @@ export function PublicLinkField({
       </p>
       {url && (
         <p className="mt-1 text-sm text-gray-11 break-words">
-          Donors will find {subject} at{" "}
+          {segment ? lead : (empty_lead ?? lead)}{" "}
           {locked ? (
             <ExtLink href={url} className="link">
               {url_text}
             </ExtLink>
           ) : (
             url_text
+          )}
+          {tail && (
+            <>
+              /<wbr />
+              {tail}
+            </>
           )}
           {!segment && empty_suffix}
         </p>

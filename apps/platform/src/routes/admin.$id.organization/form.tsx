@@ -422,10 +422,12 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
             base={profile_base}
             locked={form.locked}
             label="Organization slug"
-            subject="your campaigns"
+            lead="Your org slug will be part of your campaign URLs, like"
+            empty_lead="Your campaign URLs use"
+            tail="your-campaign"
             placeholder={suggest_slug(form.name)}
             empty_url={id_url}
-            empty_suffix=" until you set a link"
+            empty_suffix=" until you set an org slug"
             error={form.errors.slug?.message}
           />
           <UrlInput

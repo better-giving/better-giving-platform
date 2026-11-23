@@ -133,7 +133,8 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
           base={`${base_url}/org/`}
           locked={false}
           label="Organization slug"
-          subject="your campaigns"
+          lead="Your org slug will be part of your campaign URLs, like"
+          tail="your-campaign"
           placeholder={suggest_slug(reg.o_name ?? "")}
           empty_url={null}
           error={errors.o_slug?.message}
