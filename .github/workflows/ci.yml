@@ -4,20 +4,25 @@ name: CI
 #
 # no `pull_request`: a pr gets one run, started by hand on its final head once
 # review is done (`gh workflow run ci.yml --ref <branch>`), not one per push.
-# runs on every pr push billed runner minutes for heads nobody merged. a
+# a run per pr push bills runner minutes for heads nobody merges. a
 # dispatched run's check runs land on the branch head's commit, so they show on
 # the pr like any other. a pr head nobody dispatched has none of these checks,
 # so don't merge without one green run on the final head. the run checks the
 # branch head as pushed, not its merge with main: update the branch from main
-# before dispatching. a dispatch can only target a ref in this repo, so a
-# fork's pr gets a run only once its branch is pushed here.
+# before dispatching. a dispatch can only target a ref in this repo, and it
+# runs that ref's own ci.yml and scripts with every repository secret
+# (TURBO_TOKEN included): github withholds them only from fork pull_request
+# runs. a fork's pr gets a run only after its whole diff, .github/ and
+# package scripts included, is reviewed and its branch pushed here.
 #
 # main's push run stays: smoke.yml's production migrate waits on its `gate`,
 # and vercel's deployment checks hold each production deploy on its `checks`
 # and `test`. those checks target production only, so a pr preview never waits
 # on a run. don't dispatch on main: smoke.yml's gate wait takes the newest
-# `gate` from any run on main, so a dispatched run there stands in for the
-# push run's and can hold or release the production migrate on its own.
+# `gate` on the deployed sha from any run on main, and vercel matches
+# `checks`/`test` by name on the sha, so a dispatched run there stands in for
+# the push run's and can hold or release the production deploy and its
+# migrate on its own.
 #
 # `staging` is not in the push list either; like any other branch it gets a run
 # when one is dispatched on it.
@@ -62,8 +67,9 @@ env:
 # onto the sha for workflows triggered by `repository_dispatch`, which has no
 # sha of its own; per vercel's docs it "is not required and you can depend on
 # the check directly" otherwise. this workflow is push/workflow_dispatch-
-# triggered, both on a ref, so each job already produces its own check run on
-# the right commit. the action is also actively worse here — it maps a
+# triggered, and both run on the commit they check (the pushed sha, or the
+# dispatched branch's head), so each job's check run already lands on the
+# right commit. the action is also actively worse here — it maps a
 # cancelled/skipped/null conclusion to success, so a job that never ran would
 # report green.
 
