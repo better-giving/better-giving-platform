@@ -21,7 +21,10 @@ import { href, Outlet } from "react-router";
 import { CountryCombo } from "#/components/country-combo";
 import { ImgEditor } from "#/components/img-editor";
 import { RichText } from "#/components/rich-text";
-import { PublicLinkField } from "#/routes/admin.$id.campaigns/link-field";
+import {
+  PublicLinkField,
+  suggest_slug,
+} from "#/routes/admin.$id.campaigns/link-field";
 import { emails } from "@/constants/common";
 import { country_names } from "@/constants/countries";
 import { sans_https } from "@/helpers/https";
@@ -29,7 +32,7 @@ import type { EndowDesignation } from "@/npo";
 import type { OrgDesignation } from "@/schemas";
 import type { IVideos } from "./api";
 import type { FV, ProfileFV } from "./schema";
-import { bannerSpec, logoSpec, MAX_CHARS, suggest_slug } from "./schema";
+import { bannerSpec, logoSpec, MAX_CHARS } from "./schema";
 import {
   use_organization_form,
   use_page,
@@ -419,10 +422,12 @@ function OrgGroup({ init, id, base_url, set_prompt }: IOrgGroup) {
             base={profile_base}
             locked={form.locked}
             label="Organization slug"
-            subject="your Better Giving page"
+            lead="Your org slug will be part of your campaign URLs, like"
+            empty_lead="Your campaign URLs use"
+            tail="your-campaign"
             placeholder={suggest_slug(form.name)}
             empty_url={id_url}
-            empty_suffix=" until you set a link"
+            empty_suffix=" until you set an org slug"
             error={form.errors.slug?.message}
           />
           <UrlInput

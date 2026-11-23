@@ -299,7 +299,7 @@ describe("organization — slug unset", () => {
       .element(
         screen.getByText(
           new RegExp(
-            `^Donors will find your Better Giving page at https?://[^/]+/org/${npo.id} until you set a link$`
+            `^Your campaign URLs use https?://[^/]+/org/${npo.id}/your-campaign until you set an org slug$`
           )
         )
       )
@@ -309,7 +309,7 @@ describe("organization — slug unset", () => {
     await expect
       .element(
         screen.getByText(
-          /^Donors will find your Better Giving page at https?:\/\/[^/]+\/org\/acme-org$/
+          /^Your org slug will be part of your campaign URLs, like https?:\/\/[^/]+\/org\/acme-org\/your-campaign$/
         )
       )
       .toBeVisible();

@@ -1,9 +1,10 @@
-import { type ActionFunction, redirect, replace } from "react-router";
+import { type ActionFunction, data, redirect, replace } from "react-router";
 import { safeParse } from "valibot";
 import { check_email_url, request_login_link, to_auth } from "#/.server/auth";
 import { reg_user } from "#/pages/registration/data/reg-user";
 import { wizard_exit } from "#/pages/registration/data/step-loader";
 import { GRANT_UPDATE_TYPE, steps } from "#/pages/registration/routes";
+import type { IStepFieldErrors } from "#/pages/registration/types";
 import { resp } from "@/helpers/https";
 import { msg } from "@/queue";
 import type { IReg } from "@/reg";
@@ -17,6 +18,7 @@ import { FOREIGN_DOC, may_store_doc, REG_DOC_FIELDS } from "$/doc-access";
 import { stripe as stripe_env } from "$/env";
 import { enqueue } from "$/kit/queue";
 import { db } from "$/pg/db";
+import { npo_slug_taken } from "$/pg/queries/npo";
 import {
   reg_get,
   reg_update_from,
@@ -97,6 +99,23 @@ export const update_action =
     }
 
     /* identity + its resets are change-identity.ts's, not a step's */
+
+    // applications don't reserve a slug against each other: only a
+    // nonprofit's counts, and approval drops one taken by then. a
+    // non-editable application skips the lookup: the write below exits it
+    if (
+      upd8.update_type === "org" &&
+      upd8.o_slug &&
+      reg.status &&
+      EDITABLE.includes(reg.status)
+    ) {
+      if (await npo_slug_taken(upd8.o_slug)) {
+        const refusal: IStepFieldErrors = {
+          field_errors: { o_slug: `Slug "${upd8.o_slug}" is already taken` },
+        };
+        return data(refusal, { status: 400 });
+      }
+    }
 
     const updated = await reg_update_from(db, rid, EDITABLE, attrs);
     if (!updated.won) {

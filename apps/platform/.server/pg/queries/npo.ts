@@ -239,6 +239,17 @@ export async function npo_by_slug(slug: string): Promise<INpo | undefined> {
   return row_to_npo(row);
 }
 
+/** whether any nonprofit holds `slug`, compared case-insensitively. */
+export async function npo_slug_taken(slug: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: npos.id })
+    .from(npos)
+    // spelled as npos_slug_lower_idx's expression, or the planner can't use it
+    .where(eq(sql`LOWER(${npos.slug})`, slug.toLowerCase()))
+    .limit(1);
+  return rows.length > 0;
+}
+
 export async function npos_batch_get(ids: number[]): Promise<INpo[]> {
   if (ids.length === 0) return [];
   const rows = await joined_select().where(inArray(npos.id, ids));

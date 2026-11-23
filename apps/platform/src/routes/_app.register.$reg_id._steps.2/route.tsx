@@ -7,6 +7,7 @@ import {
   Select,
   UrlInput,
 } from "@better-giving/ui";
+import { useEffect } from "react";
 import type { SubmitHandler } from "react-hook-form";
 import {
   NavLink,
@@ -14,11 +15,16 @@ import {
   useNavigate,
   useRouteLoaderData,
 } from "react-router";
+import { base_url } from "#/constants/env";
 import { TERMS_OF_USE_NPO } from "#/constants/urls";
 import { step_loader } from "#/pages/registration/data/step-loader";
 import { after_org, steps } from "#/pages/registration/routes";
-import type { Reg$IdData } from "#/pages/registration/types";
+import type { Reg$IdData, TStepAnswer } from "#/pages/registration/types";
 import { update_action } from "#/pages/registration/update-action";
+import {
+  PublicLinkField,
+  suggest_slug,
+} from "#/routes/admin.$id.campaigns/link-field";
 import { country_names as cnames } from "@/constants/countries";
 import type { TRegUpdate } from "@/reg";
 import { Progress } from "@/reg/progress";
@@ -29,10 +35,12 @@ import { use_rhf } from "./use-rhf";
 
 export { ErrorBoundary } from "#/components/error";
 
+const SLUG_NOTE_ID = "__o_slug_locks";
+
 export const loader = step_loader(2);
 export const action = update_action((reg) => after_org(reg.o_type));
 export default function Page({ loaderData: reg }: Route.ComponentProps) {
-  const fetcher = useFetcher();
+  const fetcher = useFetcher<TStepAnswer>();
   const navigate = useNavigate();
   const { connect_routing } = useRouteLoaderData(
     "routes/_app.register.$reg_id"
@@ -45,8 +53,19 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
     handleSubmit,
     designation,
     countries,
+    slug,
+    setError,
     dirtyFields: df,
   } = use_rhf(reg);
+
+  const refusal = fetcher.data;
+  useEffect(() => {
+    const taken =
+      refusal && "field_errors" in refusal
+        ? refusal.field_errors.o_slug
+        : undefined;
+    if (taken) setError("o_slug", { message: taken }, { shouldFocus: true });
+  }, [refusal, setError]);
 
   const submit: SubmitHandler<FV> = async (fv) => {
     if (!isDirty && new Progress(reg, connect_routing).org) {
@@ -61,6 +80,7 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
     if (df.o_designation) update.o_designation = fv.o_designation;
     if (df.o_active_in_countries)
       update.o_active_in_countries = fv.o_active_in_countries;
+    if (df.o_slug) update.o_slug = fv.o_slug;
 
     fetcher.submit(update, {
       method: "PATCH",
@@ -107,6 +127,25 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
         error={errors.o_active_in_countries?.message}
         ref={countries.ref}
       />
+
+      <div className="mt-6">
+        <PublicLinkField
+          reg={register("o_slug")}
+          value={slug}
+          base={`${base_url}/org/`}
+          locked={false}
+          label="Organization slug"
+          lead="Your org slug will be part of your campaign URLs, like"
+          tail="your-campaign"
+          placeholder={suggest_slug(reg.o_name ?? "")}
+          empty_url={null}
+          error={errors.o_slug?.message}
+          describedby={SLUG_NOTE_ID}
+        />
+        <p id={SLUG_NOTE_ID} className="mt-1 text-sm text-gray-11">
+          You can't change your org slug after your application is approved.
+        </p>
+      </div>
 
       <p className="text-sm mt-4">
         By submitting this information, you declare that you have read and

@@ -5,7 +5,7 @@ import type { UseFormRegisterReturn } from "react-hook-form";
 const PLACEHOLDER_SEGMENT = "your-campaign";
 
 interface ILinkField {
-  reg: UseFormRegisterReturn<"slug">;
+  reg: UseFormRegisterReturn;
   value: string;
   /** the link up to its slug, e.g. `https://host/org/<org-slug>/`; null when
    * the org has no slug yet, so there is no public link to show */
@@ -18,8 +18,14 @@ interface ILinkField {
 interface IPublicLinkField extends ILinkField {
   label: string;
   required?: boolean;
-  /** what donors find at the link, e.g. "this campaign" */
-  subject: string;
+  /** the sentence the previewed link ends, e.g. "Donors will find this
+   * campaign at" */
+  lead: string;
+  /** the sentence while the slug is empty; `lead` when absent */
+  empty_lead?: string;
+  /** a path segment shown after the link, outside it, e.g. the campaign
+   * segment under an org's slug */
+  tail?: string;
   placeholder?: string;
   /** the previewed link while the slug is empty */
   empty_url: string | null;
@@ -27,6 +33,16 @@ interface IPublicLinkField extends ILinkField {
   empty_suffix?: string;
   /** ids of notes rendered outside the field */
   describedby?: string;
+}
+
+/** the legal name as lowercase words joined by hyphens, for the empty slug's placeholder */
+export function suggest_slug(name: string): string {
+  const words = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .slice(0, 30)
+    .replace(/^-+|-+$/g, "");
+  return words || "my-nonprofit";
 }
 
 /** a url offers no break of its own; one after each slash keeps a wrap
@@ -52,7 +68,7 @@ export function LinkField(props: ILinkField) {
       {...props}
       label="Campaign link"
       required
-      subject="this campaign"
+      lead="Donors will find this campaign at"
       empty_url={props.base && `${props.base}${PLACEHOLDER_SEGMENT}`}
     />
   );
@@ -67,7 +83,9 @@ export function PublicLinkField({
   error,
   label,
   required,
-  subject,
+  lead,
+  empty_lead,
+  tail,
   placeholder,
   empty_url,
   empty_suffix,
@@ -98,7 +116,7 @@ export function PublicLinkField({
           placeholder={placeholder}
           aria-invalid={!!error}
           aria-errormessage={error_id}
-          aria-describedby={described}
+          aria-describedby={described || undefined}
           autoComplete="off"
           spellCheck={false}
           className="min-w-32 flex-1 bg-transparent py-3.5 px-4 outline-none"
@@ -109,13 +127,19 @@ export function PublicLinkField({
       </p>
       {url && (
         <p className="mt-1 text-sm text-gray-11 break-words">
-          Donors will find {subject} at{" "}
+          {segment ? lead : (empty_lead ?? lead)}{" "}
           {locked ? (
             <ExtLink href={url} className="link">
               {url_text}
             </ExtLink>
           ) : (
             url_text
+          )}
+          {tail && (
+            <>
+              /<wbr />
+              {tail}
+            </>
           )}
           {!segment && empty_suffix}
         </p>

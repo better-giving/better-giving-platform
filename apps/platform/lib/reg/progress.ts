@@ -55,6 +55,8 @@ export class Progress {
         o_hq_country: c,
         o_activity_countries: this.r.o_active_in_countries,
         o_designation: d,
+        // carried for approval, never required: the step is done without it
+        o_slug: this.r.o_slug,
         ...$,
       };
     }

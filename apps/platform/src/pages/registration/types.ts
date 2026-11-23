@@ -7,3 +7,15 @@ export type Reg$IdData = {
   /** the `STRIPE_CONNECT_ROUTING` switch, for the `Progress` the chrome draws */
   connect_routing: boolean;
 };
+
+/** a step save refused over one of its fields: the step shows each message
+ * in that field's error slot */
+export interface IStepFieldErrors {
+  field_errors: Partial<Record<"o_slug", string>>;
+}
+
+/** what a step's fetcher reads back: a field refusal, or `resp.fail`'s body
+ * for a refusal no field owns */
+export type TStepAnswer =
+  | IStepFieldErrors
+  | { status: number; message: string };

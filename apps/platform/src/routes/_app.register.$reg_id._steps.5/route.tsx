@@ -26,7 +26,7 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
       </p>
 
       <Step num={1} disabled={is_steps_disabled} />
-      <Step num={2} disabled={is_steps_disabled} />
+      <Step num={2} disabled={is_steps_disabled} slug={reg.o_slug} />
       {/* a 501(c)(3) never signed an agreement — no row to send it back to */}
       {reg.o_type === "other" && <Step num={3} disabled={is_steps_disabled} />}
       <Step num={4} disabled={is_steps_disabled} />

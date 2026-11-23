@@ -1,4 +1,4 @@
-import { $, $req, https_url, org_designation } from "../schemas";
+import { $, $req, https_url, org_designation, org_slug } from "../schemas";
 import { person_name } from "../schemas/person-name";
 
 export type { OrgDesignation as EndowDesignation, UnSdgNum } from "../schemas";
@@ -248,11 +248,20 @@ export const update_org_fv = v.object({
   o_hq_country: $req,
   o_active_in_countries: v.optional(v.array($)),
   o_designation: org_designation,
+  /** optional: an empty slug never holds an application back */
+  o_slug: v.optional(org_slug),
 });
 
 const update_org = v.object({
   update_type: v.literal("org"),
   ...v.partial(update_org_fv).entries,
+  /** cleared is stored as null */
+  o_slug: v.optional(
+    v.pipe(
+      org_slug,
+      v.transform((x) => x || null)
+    )
+  ),
   /** @deprecated */
   o_kyc_donors_only: v.optional(v.boolean()),
   /** @deprecated */
