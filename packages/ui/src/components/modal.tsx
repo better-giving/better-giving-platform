@@ -67,6 +67,25 @@ interface Props extends PropsWithChildren {
   /** element focused when the dialog opens. zag's trap uses it when trap focus is on. */
   initialFocusEl?: () => HTMLElement | null;
 }
+/**
+ * the dialog's footer, 24px under the content: its buttons at the end of the
+ * row, the secondary first and the primary last. under 640px, where the box
+ * is 90% wide (about 289px of content at 375; the sheet fills the viewport),
+ * they stack at full width in the same order, so the primary is at the bottom.
+ */
+export function ModalFoot({
+  children,
+  classes = "",
+}: PropsWithChildren<{ classes?: string }>) {
+  return (
+    <div className={`mbs-6 flex flex-wrap items-center-safe gap-3 ${classes}`}>
+      <div className="ms-auto flex items-center-safe gap-3 max-sm:inline-full max-sm:flex-col max-sm:items-stretch">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function Modal({
   size = "sm",
   busy = false,

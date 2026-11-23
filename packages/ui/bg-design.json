@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "dir": "src",
-  "registryVersion": "4.2.0",
+  "registryVersion": "4.9.0",
   "items": {
     "badge": {
       "version": "1.2.1",
@@ -19,10 +19,10 @@
       }
     },
     "card": {
-      "version": "1.1.2",
+      "version": "1.1.3",
       "files": {
         "components/card.tsx": "43a14193f91c027ca7439b4f0605a98b9284c2cde0d1b84610356f3ea70aec48",
-        "components/card.usage.md": "59420f6b36c8ddc4156c8d0d520d8e6847e2631af27db96f123eb8ff075710ac"
+        "components/card.usage.md": "4a27e0dc040d8d10973f4b2a86fe68074da93a8e53b22902849c75c3f1d86c96"
       }
     },
     "checklist": {
@@ -33,10 +33,10 @@
       }
     },
     "dialog": {
-      "version": "1.3.1",
+      "version": "1.4.0",
       "files": {
-        "components/dialog.usage.md": "d9074b0b1bba1521873df6d2ff425590b6cd66f7dfd62ebe3192ae40c2989817",
-        "components/modal.tsx": "988b89ee87c6c7b21f2cef4c0cb32c384df5a46339c979fb86ed4159c931ce1e",
+        "components/dialog.usage.md": "83d061c54da691a98c10a2f15f15d756fa70b7c5fdcdbeec2f10f3bee4b0ba0f",
+        "components/modal.tsx": "5f54741102f6e0d3bbc11535184bbaf2e356834a639b0e866bdd681847f0421f",
         "components/stripe-challenge.ts": "f12cba57903f587cd18efe896023ea5706d749cac45f78f1f69183964fe3439f",
         "helpers/dialog-name.ts": "472363b572bc28d66efbea740a9e4f609a2a67f0c2a39156296b902f8481f051",
         "helpers/ejected-focus.ts": "1f38ad0c0988da6b5c412ae9b41c76b518f5adbfdff8550e6dd4407d50eef609",
@@ -100,12 +100,12 @@
       }
     },
     "tokens": {
-      "version": "2.4.0",
+      "version": "2.5.0",
       "files": {
         "styles/base.css": "a9c6e90c3985cfef299d95891c1cce3cfbf16b7d7933cf59fbb1231275aeba92",
         "styles/components.css": "2a9c887750dbcd5e0fe64c9e2d1bfa8b3fef81582f321f02cb04c7e2867b2aa1",
         "styles/index.css": "f450924c19f01fc7b32b86af2e693aeb7e27ee1fc7e5b88da3782ef961813b93",
-        "styles/theme.css": "84d45bfe7d17b3d3ff5b1e8ee6ef4f0ae5cc476d7a0051891281cc436bc67071",
+        "styles/theme.css": "ebb9eb1d017ffea4a9bab1e7eb4a722bf8090062a79c6fabdef098f3a10986f7",
         "styles/tokens.usage.md": "b55375ade0a6c958009dabf54acaa03f9bfd0ef883e71efa4be03f4b49bff1b4",
         "styles/utilities.css": "f876ba0b69291957939cb708a848b62eab30cc0e1f471bcfd22aca62194e33bc"
       }

@@ -121,6 +121,18 @@
      variable and the reduced-motion guard at the foot of this file reaches
      it; an inline value would be baked into the utility. */
   --animate-spinner: spin 0.8s linear infinite;
+
+  /* the indeterminate progress bar: the 40% fill sweeps across the track and
+     round again, moving between two resting places, so ease-in-out. a
+     continuous loop that never reads the speed ladder, so the guard at the
+     foot of this file sets it to none and the bar holds still. its keyframes
+     are with the others below. */
+  --animate-progress-indeterminate: progress-indeterminate 1.4s
+    var(--ease-in-out) infinite;
+  /* the same sweep for a right-to-left page, where the fill starts at the
+     right: it enters from before the inline start and leaves past its end */
+  --animate-progress-indeterminate-rtl: progress-indeterminate-rtl 1.4s
+    var(--ease-in-out) infinite;
 }
 
 /* hover: only where the pointer can hover and is fine: a phone that also
@@ -633,6 +645,24 @@
       block-size: 0;
     }
   }
+  /* the fill is 40% of the track: its own width moves it from fully before the
+     track to fully past it (250% of 40% is the track's whole width) */
+  @keyframes progress-indeterminate {
+    from {
+      translate: -100%;
+    }
+    to {
+      translate: 250%;
+    }
+  }
+  @keyframes progress-indeterminate-rtl {
+    from {
+      translate: 100%;
+    }
+    to {
+      translate: -250%;
+    }
+  }
   @keyframes marqueeY {
     from {
       transform: translateY(0%);
@@ -687,5 +717,7 @@
     --animate-spin: none;
     --animate-pulse: none;
     --animate-spinner: none;
+    --animate-progress-indeterminate: none;
+    --animate-progress-indeterminate-rtl: none;
   }
 }
