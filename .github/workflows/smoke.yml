@@ -16,10 +16,11 @@ name: Smoke
 # production also migrates here (the `migrate` job), not in the build: vercel
 # builds and sends `ready` while ci.yml's `checks`/`test` may still be running,
 # so a build-time migrate would change the production database for a commit
-# whose checks then go red. this job waits for ci.yml's `gate` on main's push
-# run of the sha, then migrates, and only then lets smoke report —
-# `smoke (production)` is a required check, so the production domain stays on
-# the previous deployment until it's green. preview/staging still migrate in
+# whose checks then go red. this job waits for ci.yml's `gate` from a run on
+# main for the sha (main's push run, absent a dispatch on main), then
+# migrates, and only then lets smoke report — `smoke (production)` is a
+# required check, so the production domain stays on the previous deployment
+# until it's green. preview/staging still migrate in
 # `postbuild`.
 on:
   repository_dispatch:
@@ -58,9 +59,10 @@ jobs:
       github.event.client_payload.project.id == 'prj_xpN1ud1WKyuw84TLzlhXyAzYNo3f'
       && github.event.client_payload.environment == 'production'
     # holds DATABASE_URL_UNPOOLED as an environment secret, not a repository
-    # one: a same-repo pull_request run gets every repository secret, and
-    # this one is production ddl. the environment's deployment-branch rule
-    # admits main only, which a repository_dispatch run's ref always is.
+    # one: a run dispatched on any branch executes that branch's workflow
+    # files with every repository secret, and this one is production ddl.
+    # the environment's deployment-branch rule admits main only, which a
+    # repository_dispatch run's ref always is.
     environment: production-migrate
     runs-on: blacksmith-2vcpu-ubuntu-2404
     # the 30m ci wait, install, then migrate.ts's advisory-lock wait.
@@ -90,9 +92,10 @@ jobs:
             *) echo "::error::$SHA is $rel relative to main; not migrating production"; exit 1 ;;
           esac
 
-      # ci.yml's `gate`, from main's push run of the sha only: each
-      # pull_request run on it is a check suite of its own, whose stale red or
-      # early green says nothing about main. no main suite yet reads as
+      # ci.yml's `gate`, from runs on main only: a run dispatched on a pr
+      # branch is a check suite of its own, whose stale red or early green says
+      # nothing about main. a run dispatched on main would count here, which is
+      # why ci.yml says not to dispatch on main. no main suite yet reads as
       # pending. app 15368 is github actions, so another app's `gate` can't
       # satisfy it. a re-run's newest check run supersedes the older one in
       # its suite — after re-running a red ci job, re-run this workflow too.
