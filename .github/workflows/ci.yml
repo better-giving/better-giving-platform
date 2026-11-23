@@ -1,22 +1,31 @@
 name: CI
 
-# push (main) + pull_request only. no other events, no `paths:`/`paths-ignore:`
-# on the triggers or skipping `if:` on the jobs below (`gate`'s always() only
-# widens when it runs) — a workflow run that gets skipped produces no check run
-# at all, and vercel's own docs don't say how a missing check is treated. every
-# job here must fire on every push and every PR, so vercel always has a check
-# run to read.
+# push (main) + workflow_dispatch only. no other events.
 #
-# `staging` is deliberately NOT in the push list. it carries an open pr to main,
-# so a push to it already fires `pull_request` — listing it here too ran every
-# job twice on one commit (`checks (push)` next to `checks (pull_request)`),
-# doubling billed runner minutes for a second copy of the same result. the
-# trade is real and accepted: a push to a branch with no open pr — staging
-# included — now gets no run at all.
+# no `pull_request`: a pr gets one run, started by hand on its final head once
+# review is done (`gh workflow run ci.yml --ref <branch>`), not one per push.
+# runs on every pr push billed runner minutes for heads nobody merged — one pr
+# ran 23 times. a dispatched run's check runs land on the branch head's commit,
+# so they show on the pr like any other. a pr head nobody dispatched has no
+# checks at all, so don't merge without one green run on the final head.
+#
+# main's push run stays: smoke.yml's production migrate waits on its `gate`,
+# and vercel's deployment checks hold each production deploy on its `checks`
+# and `test`. those checks target production only, so a pr preview never waits
+# on a run. don't dispatch on main: vercel matches checks by job name, and a
+# second `checks` on the push run's commit may collide with it.
+# `staging` is not in the push list either; like any other branch it gets a run
+# when one is dispatched on it.
+#
+# no `paths:`/`paths-ignore:` on the triggers or skipping `if:` on the jobs
+# below (`gate`'s always() only widens when it runs) — a workflow run that gets
+# skipped produces no check run at all, and vercel's own docs don't say how a
+# missing check is treated. every job fires on every run, so a commit that gets
+# a run always has the full set of checks.
 on:
   push:
     branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 # no concurrency/cancel-in-progress block. whether vercel treats a cancelled
 # check as pass or fail is unverified, so a cancelled run risks reading as a
@@ -29,8 +38,7 @@ permissions:
 # turborepo remote cache (vercel-hosted). workflow-level so `checks` and `test` share it.
 # TURBO_TOKEN is a vercel access token scoped to the better-giving team; TURBO_TEAM
 # is that team's slug. neither is required for the run to succeed — with the token
-# absent or unreadable turbo silently falls back to its local cache, which is what
-# happens on a fork pr, where github withholds secrets by design. the cache is
+# absent or unreadable turbo silently falls back to its local cache. the cache is
 # keyed on task inputs, so what ci pulls here is what vercel's own build pushed
 # for the same commit: paypal/chariot/crypto/stocks `build`, which `typecheck`
 # and `test` both depend on via ^build.
@@ -48,8 +56,9 @@ env:
 # dashboard suggests one. that action exists to stamp a commit status back
 # onto the sha for workflows triggered by `repository_dispatch`, which has no
 # sha of its own; per vercel's docs it "is not required and you can depend on
-# the check directly" otherwise. this workflow is push/pull_request-triggered,
-# so each job already produces its own check run on the right commit. the
+# the check directly" otherwise. this workflow is push/workflow_dispatch-
+# triggered, both on a branch, so each job already produces its own check run
+# on the right commit. the
 # action is also actively worse here — it maps a cancelled/skipped/null
 # conclusion to success, so a job that never ran would report green.
 
