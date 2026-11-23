@@ -90,9 +90,10 @@ jobs:
             *) echo "::error::$SHA is $rel relative to main; not migrating production"; exit 1 ;;
           esac
 
-      # ci.yml's `gate`, from main's push run of the sha only: each
-      # pull_request run on it is a check suite of its own, whose stale red or
-      # early green says nothing about main. no main suite yet reads as
+      # ci.yml's `gate`, from runs on main only: a run dispatched on a pr
+      # branch is a check suite of its own, whose stale red or early green says
+      # nothing about main. a run dispatched on main would count here, which is
+      # why ci.yml says not to dispatch on main. no main suite yet reads as
       # pending. app 15368 is github actions, so another app's `gate` can't
       # satisfy it. a re-run's newest check run supersedes the older one in
       # its suite — after re-running a red ci job, re-run this workflow too.
