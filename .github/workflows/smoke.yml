@@ -17,9 +17,10 @@ name: Smoke
 # builds and sends `ready` while ci.yml's `checks`/`test` may still be running,
 # so a build-time migrate would change the production database for a commit
 # whose checks then go red. this job waits for ci.yml's `gate` from a run on
-# main for the sha (main's push run, absent a dispatch on main), then migrates, and only then lets smoke report —
-# `smoke (production)` is a required check, so the production domain stays on
-# the previous deployment until it's green. preview/staging still migrate in
+# main for the sha (main's push run, absent a dispatch on main), then
+# migrates, and only then lets smoke report — `smoke (production)` is a
+# required check, so the production domain stays on the previous deployment
+# until it's green. preview/staging still migrate in
 # `postbuild`.
 on:
   repository_dispatch:
@@ -59,8 +60,9 @@ jobs:
       && github.event.client_payload.environment == 'production'
     # holds DATABASE_URL_UNPOOLED as an environment secret, not a repository
     # one: a run dispatched on any branch executes that branch's workflow
-    # files with every repository secret, and this one is production ddl. the environment's deployment-branch rule
-    # admits main only, which a repository_dispatch run's ref always is.
+    # files with every repository secret, and this one is production ddl.
+    # the environment's deployment-branch rule admits main only, which a
+    # repository_dispatch run's ref always is.
     environment: production-migrate
     runs-on: blacksmith-2vcpu-ubuntu-2404
     # the 30m ci wait, install, then migrate.ts's advisory-lock wait.
