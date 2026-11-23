@@ -6,14 +6,19 @@ name: CI
 # review is done (`gh workflow run ci.yml --ref <branch>`), not one per push.
 # runs on every pr push billed runner minutes for heads nobody merged — one pr
 # ran 23 times. a dispatched run's check runs land on the branch head's commit,
-# so they show on the pr like any other. a pr head nobody dispatched has no
-# checks at all, so don't merge without one green run on the final head.
+# so they show on the pr like any other. a pr head nobody dispatched has none
+# of these checks, so don't merge without one green run on the final head.
+# the run checks the branch head as pushed, not its merge with main as a
+# pull_request run did: update the branch from main before dispatching. a
+# dispatch can only target a ref in this repo, so a fork's pr gets a run only
+# once its branch is pushed here.
 #
 # main's push run stays: smoke.yml's production migrate waits on its `gate`,
 # and vercel's deployment checks hold each production deploy on its `checks`
 # and `test`. those checks target production only, so a pr preview never waits
-# on a run. don't dispatch on main: vercel matches checks by job name, and a
-# second `checks` on the push run's commit may collide with it.
+# on a run. don't dispatch on main: smoke.yml's gate wait takes the newest
+# `gate` from any run on main, so a dispatched run there stands in for the
+# push run's and can hold or release the production migrate on its own.
 # `staging` is not in the push list either; like any other branch it gets a run
 # when one is dispatched on it.
 #
@@ -57,10 +62,10 @@ env:
 # onto the sha for workflows triggered by `repository_dispatch`, which has no
 # sha of its own; per vercel's docs it "is not required and you can depend on
 # the check directly" otherwise. this workflow is push/workflow_dispatch-
-# triggered, both on a branch, so each job already produces its own check run
-# on the right commit. the
-# action is also actively worse here — it maps a cancelled/skipped/null
-# conclusion to success, so a job that never ran would report green.
+# triggered, both on a ref, so each job already produces its own check run on
+# the right commit. the action is also actively worse here — it maps a
+# cancelled/skipped/null conclusion to success, so a job that never ran would
+# report green.
 
 # jobs run on blacksmith (blacksmith.sh) rather than github-hosted runners —
 # the app is installed on the org, and the label is the whole integration.
@@ -128,7 +133,7 @@ jobs:
       # apps/platform/vite.config.ts), so nothing here needs real credentials.
       - run: pnpm test
 
-  # fails a pr when a design-registry item copied into packages/ui is behind the
+  # fails the run when a design-registry item copied into packages/ui is behind the
   # registry, edited locally, or missing a file (packages/ui/bg-design.json).
   # runs the registry's own cli, fetched from the registry it checks against,
   # so the check and the published items can't drift apart. deliberately NOT
