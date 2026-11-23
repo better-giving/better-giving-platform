@@ -617,6 +617,16 @@ describe("approve, with the org slug", () => {
     await approved_with("harbor-light");
   });
 
+  // the schema allows mixed case; approval copies the stored slug untouched
+  test("stores a mixed-case slug on the nonprofit as the application holds it", async () => {
+    await set_slug("Harbor-Light");
+
+    const res = await verdict("approved");
+
+    expect(res.status).toBe(302);
+    await approved_with("Harbor-Light");
+  });
+
   test("approves an application without a slug into a nonprofit without one", async () => {
     const res = await verdict("approved");
 

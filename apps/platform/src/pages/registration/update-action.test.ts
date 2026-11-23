@@ -329,6 +329,24 @@ describe("update_action — org slug", () => {
     expect((await reg_get(RID))?.o_slug).toBe("Harbor-Light");
   });
 
+  // pairs with the refusals below: the taken check reads the slug, not the table
+  test("saves a slug when another nonprofit holds a different one", async () => {
+    await seed("01");
+    await test_db.current!.db.insert(npos).values({
+      registration_number: "EIN-OTHER",
+      name: "Other",
+      endow_designation: "Charity",
+      overview_pt: "[]",
+      hq_country: "United States",
+      slug: "other-slug",
+    });
+
+    const res = await save_org({ o_slug: "harbor-light" });
+
+    expect(res.status).toBe(302);
+    expect((await reg_get(RID))?.o_slug).toBe("harbor-light");
+  });
+
   test("stores a cleared slug as null", async () => {
     await seed("01");
     await test_db
