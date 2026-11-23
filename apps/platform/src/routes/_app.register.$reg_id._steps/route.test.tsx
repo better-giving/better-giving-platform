@@ -6,8 +6,13 @@ import { reset_viewport } from "#/__tests__/fixtures/viewport";
 
 // the outer layout's server loader: the stub supplies its own
 vi.mock("../_app.register/api", () => ({ loader: vi.fn() }));
+vi.mock("../_app.register._index/api", () => ({
+  action: vi.fn(),
+  loader: vi.fn(),
+}));
 
 import Register from "../_app.register/route";
+import Start from "../_app.register._index/route";
 import Steps from "./route";
 
 const RID = "0f8fad5b-d9cb-469f-a165-70867728950e";
@@ -60,6 +65,32 @@ describe("registration wizard card at 375", () => {
     expect(getComputedStyle(card).paddingTop).toBe("0px");
     expect(getComputedStyle(strip).paddingTop).toBe("16px");
     expect(getComputedStyle(strip).paddingBottom).toBe("16px");
+  });
+
+  // the start page sets its own 20px: the layout must not add a second
+  test("leaves the start page its own 20px gutter, not 40px", async () => {
+    await page.viewport(375, 896);
+    const Stub = createRoutesStub([
+      {
+        path: "/register",
+        Component: Register as any,
+        loader: () => ({ id: "u1", email: "jane@test.com" }),
+        children: [
+          {
+            index: true,
+            Component: Start as any,
+            loader: () => ({ reference: null }),
+          },
+        ],
+      },
+    ]);
+    const screen = await render(<Stub initialEntries={["/register"]} />);
+    await expect
+      .element(screen.getByText("Register your nonprofit"))
+      .toBeVisible();
+
+    const card = document.querySelector<HTMLElement>(".card")!;
+    expect(card.getBoundingClientRect().left).toBe(20);
   });
 
   test("keeps the desktop card's 32px top padding", async () => {

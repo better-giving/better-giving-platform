@@ -11,7 +11,7 @@ export const meta: Route.MetaFunction = () => [
 
 export default function Layout({ loaderData: user }: Route.ComponentProps) {
   return (
-    <div className="grid content-start justify-items-center px-5 py-8 md:px-0">
+    <div className="grid content-start justify-items-center py-8">
       <Outlet context={user} />
     </div>
   );

@@ -11,18 +11,20 @@ export default function Layout() {
   ) as Reg$IdData;
 
   return (
-    <div className="w-full md:w-[90%] max-w-250 md:pt-8 grid md:grid-cols-[auto_1fr] bg-card rounded-card border border-hairline">
-      <ProgressIndicator
-        step={new Progress(reg, connect_routing).step}
-        o_type={reg.o_type}
-        classes="md:min-w-48 lg:min-w-62 md:mr-14"
-      />
+    <div className="grid w-full justify-items-center px-5 md:px-0">
+      <div className="w-full md:w-[90%] max-w-250 md:pt-8 grid md:grid-cols-[auto_1fr] bg-card rounded-card border border-hairline">
+        <ProgressIndicator
+          step={new Progress(reg, connect_routing).step}
+          o_type={reg.o_type}
+          classes="md:min-w-48 lg:min-w-62 md:mr-14"
+        />
 
-      <div className="grid z-10 w-full px-6 py-8 md:p-0 md:pr-8">
-        <Outlet context={user} />
+        <div className="grid z-10 w-full px-6 py-8 md:p-0 md:pr-8">
+          <Outlet context={user} />
+        </div>
+        <IdentitySummary reg={reg} classes="col-span-full md:mt-8" />
+        <Reference id={reg.id} classes="col-span-full" />
       </div>
-      <IdentitySummary reg={reg} classes="col-span-full md:mt-8" />
-      <Reference id={reg.id} classes="col-span-full" />
     </div>
   );
 }
