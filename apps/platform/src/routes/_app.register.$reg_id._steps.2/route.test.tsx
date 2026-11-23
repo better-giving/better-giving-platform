@@ -98,6 +98,28 @@ describe("step 2 organization slug", () => {
       );
   });
 
+  test("says the slug can't change after approval, and describes the input with it", async () => {
+    const { screen, slug } = await render_step(vi.fn());
+
+    const note = screen.getByText(
+      "You can't change your org slug after your application is approved."
+    );
+    await expect.element(note).toBeVisible();
+    const id = note.element().id;
+    expect(id).not.toBe("");
+    expect(slug.element().getAttribute("aria-describedby")).toContain(id);
+    // the note comes under the field, after its link line once one shows
+    await slug.fill("harbor-light");
+    const line = screen
+      .getByText("Your org slug will be part of your campaign URLs, like")
+      .element();
+    expect(
+      line.compareDocumentPosition(note.element()) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(slug.element().getAttribute("aria-describedby")).toContain(id);
+  });
+
   test("continues with an empty slug, sending none", async () => {
     const action = vi.fn(async ({ request }: { request: Request }) => {
       expect(await request.json()).not.toHaveProperty("o_slug");

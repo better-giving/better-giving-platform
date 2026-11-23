@@ -35,6 +35,8 @@ import { use_rhf } from "./use-rhf";
 
 export { ErrorBoundary } from "#/components/error";
 
+const SLUG_NOTE_ID = "__o_slug_locks";
+
 export const loader = step_loader(2);
 export const action = update_action((reg) => after_org(reg.o_type));
 export default function Page({ loaderData: reg }: Route.ComponentProps) {
@@ -138,7 +140,11 @@ export default function Page({ loaderData: reg }: Route.ComponentProps) {
           placeholder={suggest_slug(reg.o_name ?? "")}
           empty_url={null}
           error={errors.o_slug?.message}
+          describedby={SLUG_NOTE_ID}
         />
+        <p id={SLUG_NOTE_ID} className="mt-1 text-sm text-gray-11">
+          You can't change your org slug after your application is approved.
+        </p>
       </div>
 
       <p className="text-sm mt-4">
