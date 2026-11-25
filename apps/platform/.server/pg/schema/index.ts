@@ -16,6 +16,7 @@ export * from "./match";
 export * from "./nav";
 export * from "./npo";
 export * from "./owed";
+export * from "./partner";
 export * from "./payout";
 export * from "./program";
 export * from "./rate-limit";

@@ -30,6 +30,10 @@ export const DONATION_INCREMENTS: IIncrement[] = [
   { value: "400", label: "" },
 ];
 
+/** the deductibility line every checkout's terms open with */
+export const DEDUCTIBILITY_STATEMENT =
+  "100% of your donation is tax-deductible to the extent allowed by US law.";
+
 export const logo_url = (path: string, custom = false) =>
   custom ? path : `https://nowpayments.io${path}`;
 

@@ -4,11 +4,14 @@ import { safeParse } from "valibot";
 import { paypal_currencies } from "#/constants/paypal";
 import { to_atomic_c } from "#/helpers/stripe";
 import type { ICurrencyFv } from "#/types/currency";
-import { PROCESSING_RATES } from "@/constants/common";
 import { rd } from "@/helpers/decimal";
 import { min_fee_allowance } from "@/helpers/donation";
 import type { TFrequency } from "@/schemas";
-import { type IAmountsInput, stripe_amounts } from "../../common/amounts";
+import {
+  fee_terms,
+  type IAmountsInput,
+  stripe_amounts,
+} from "../../common/amounts";
 import type { OnIncrement } from "../../common/incrementers";
 import {
   amount as amount_schema,
@@ -230,8 +233,8 @@ export function use_rhf(fv: FV) {
     const mfa = pf
       ? min_fee_allowance(
           tipv + amnt,
-          PROCESSING_RATES.paypal,
-          PROCESSING_RATES.paypal_flat * c.rate
+          fee_terms.paypal.rate,
+          fee_terms.paypal.flat * c.rate
         )
       : 0;
 

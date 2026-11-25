@@ -39,3 +39,12 @@ export const all_method_ids: DonateMethodId[] = [
 ];
 
 export const freqs_default: TFrequency[] = ["one-time", "monthly"];
+
+export const freqs_shown = (
+  freqs: TFrequency[] | undefined
+): TFrequency[] | null => {
+  if (!freqs || freqs.length === 0) return freqs_default;
+  // hide frequency selector if only one option and it's one-time
+  if (freqs.length === 1 && freqs[0] === "one-time") return null;
+  return freqs;
+};

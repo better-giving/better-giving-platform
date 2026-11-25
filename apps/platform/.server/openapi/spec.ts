@@ -12,6 +12,8 @@ import {
   type QueryParam,
 } from "../connector/inputs";
 import { PROBLEM_CODES } from "../connector/problem";
+import { PROBLEM_CODES as PARTNER_PROBLEM_CODES } from "../partner/problem";
+import { RAILS } from "../partner/readiness";
 import { wire_schema } from "./wire-schema";
 
 type Method = "get" | "post" | "patch";
@@ -749,6 +751,172 @@ const connector_ops = (): IOperation[] => [
   ),
 ];
 
+const per_rail = (schema: Json) => ({
+  type: "object",
+  additionalProperties: false,
+  required: [...RAILS],
+  properties: Object.fromEntries(RAILS.map((r) => [r, schema])),
+});
+
+const minor = (description: string) => ({
+  type: "integer",
+  minimum: 0,
+  description,
+});
+
+const PARTNER_READINESS = {
+  type: "object",
+  description:
+    "What the key's nonprofit can take right now. Money is integer minor units; rates are fractions.",
+  required: [
+    "revision",
+    "charges_enabled",
+    "currencies",
+    "sponsor",
+    "clients",
+    "rails",
+    "intervals",
+    "fee_rules",
+    "coins",
+    "contribution",
+    "wallet_hosts",
+  ],
+  properties: {
+    revision: {
+      type: "integer",
+      minimum: 0,
+      description: "Rises whenever any other field of this body changes.",
+    },
+    charges_enabled: {
+      type: "boolean",
+      description: "True when at least one rail is active.",
+    },
+    currencies: {
+      type: "array",
+      items: { type: "string", pattern: "^[A-Z]{3}$" },
+      description: "ISO 4217 codes a donation may be made in.",
+    },
+    sponsor: {
+      type: "object",
+      description:
+        "The 501(c)(3) that receives the gift and issues the receipt.",
+      required: [
+        "legal_name",
+        "ein",
+        "address",
+        "deductibility_statement",
+        "terms_url",
+        "privacy_url",
+      ],
+      properties: {
+        legal_name: { type: "string" },
+        ein: { type: "string" },
+        address: { type: "array", items: { type: "string" } },
+        deductibility_statement: { type: "string" },
+        terms_url: { type: "string", format: "uri" },
+        privacy_url: { type: "string", format: "uri" },
+      },
+    },
+    clients: {
+      type: "array",
+      description: "Publishable client ids for each provider's browser SDK.",
+      items: {
+        type: "object",
+        required: ["name", "publishable_key"],
+        properties: {
+          name: { type: "string", enum: ["stripe", "paypal", "chariot"] },
+          publishable_key: { type: "string" },
+          sdk_url: { type: "string", format: "uri" },
+        },
+      },
+    },
+    rails: per_rail({
+      type: "object",
+      required: ["state", "offered"],
+      properties: {
+        state: {
+          type: "string",
+          enum: ["active", "pending", "inactive", "unrequested"],
+        },
+        offered: { type: "boolean" },
+      },
+    }),
+    intervals: per_rail({
+      type: "array",
+      description: "Recurring intervals offered; empty means one-time only.",
+      items: { type: "string", enum: ["monthly", "yearly"] },
+    }),
+    fee_rules: per_rail({
+      type: "object",
+      description:
+        "The processing fee a donor covering fees adds: percent of the gift plus fixed_minor, at most cap_minor, rounded up to a multiple of round_up_minor.",
+      required: ["percent", "fixed_minor"],
+      properties: {
+        percent: { type: "number", minimum: 0, maximum: 1 },
+        fixed_minor: minor("USD cents."),
+        cap_minor: minor("USD cents."),
+        round_up_minor: minor("USD cents."),
+      },
+    }),
+    coins: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["coin", "ticker", "name", "network", "memo_required"],
+        properties: {
+          coin: { type: "string" },
+          ticker: { type: "string" },
+          name: { type: "string" },
+          network: { type: "string" },
+          memo_required: { type: "boolean" },
+          logo: { type: "string", format: "uri" },
+          popular: { type: "boolean" },
+          stablecoin: { type: "boolean" },
+        },
+      },
+    },
+    contribution: {
+      type: "object",
+      description:
+        "Suggested contributions to Better Giving, as fractions of the gift.",
+      required: ["options", "starts_at"],
+      properties: {
+        options: {
+          type: "array",
+          items: { type: "number", minimum: 0, maximum: 1 },
+        },
+        starts_at: { type: ["number", "null"] },
+      },
+    },
+    wallet_hosts: { type: "array", items: { type: "string" } },
+  },
+};
+
+const partner_problems = (...statuses: number[]) =>
+  Object.fromEntries(
+    statuses.map((s) => [
+      s,
+      error_response(s, "application/problem+json", "PartnerProblem"),
+    ])
+  );
+
+const partner_ops = (): IOperation[] => [
+  {
+    route: "api.partner.v1.readiness",
+    path: "/api/partner/v1/readiness",
+    method: "get",
+    op: {
+      operationId: "get_readiness",
+      summary: "Get what the nonprofit's checkout can take",
+      security: [{ partnerKey: [] }],
+      responses: {
+        200: ok("The nonprofit's readiness.", ref("PartnerReadiness")),
+        ...partner_problems(401, 429, 500),
+      },
+    },
+  },
+];
+
 let built: readonly IOperation[] | undefined;
 
 /** built on first use, not at import: [openapi.json] is imported at server
@@ -762,6 +930,10 @@ export function operations(): readonly IOperation[] {
     ...connector_ops().map((o) => ({
       ...o,
       op: { ...o.op, tags: ["connector"] },
+    })),
+    ...partner_ops().map((o) => ({
+      ...o,
+      op: { ...o.op, tags: ["partner"] },
     })),
   ];
   return built;
@@ -807,8 +979,23 @@ const CONNECTOR_PROBLEM = {
   },
 };
 
-/** the OpenAPI 3.1 document for the public read API and connector v1, with
- * `origin` as its server */
+const PARTNER_PROBLEM = {
+  type: "object",
+  description:
+    "RFC 9457 problem details, in the connector's shape. `minimum_minor` comes with `below_minimum`.",
+  required: ["code", "status", "error"],
+  properties: {
+    code: { type: "string", enum: [...PARTNER_PROBLEM_CODES] },
+    status: { type: "integer" },
+    detail: { type: "string" },
+    errors: CONNECTOR_PROBLEM.properties.errors,
+    minimum_minor: { type: "integer", minimum: 0 },
+    error: error_of(PARTNER_PROBLEM_CODES),
+  },
+};
+
+/** the OpenAPI 3.1 document for the public read API, connector v1 and
+ * partner v1, with `origin` as its server */
 export function openapi_doc(origin: string) {
   const paths: Record<string, Record<string, Json>> = {};
   for (const { path, method, op } of operations()) {
@@ -820,7 +1007,7 @@ export function openapi_doc(origin: string) {
       title: "Better Giving API",
       version: "1.0.0",
       description:
-        'Public reads need no key. Connector v1 acts for one nonprofit with a key sent as `Authorization: Bearer <key>`. Public errors are `{"error": {"code", "message"}}`; connector errors are `application/problem+json` carrying the same `error` object.',
+        'Public reads need no key. Connector v1 and partner v1 each act for one nonprofit with a key sent as `Authorization: Bearer <key>`. Public errors are `{"error": {"code", "message"}}`; connector and partner errors are `application/problem+json` carrying the same `error` object.',
       contact: { name: "Better Giving", url: `${origin}/agents` },
     },
     servers: [{ url: origin }],
@@ -829,6 +1016,11 @@ export function openapi_doc(origin: string) {
       {
         name: "connector",
         description: "Connector v1: a nonprofit's campaigns, forms and gifts.",
+      },
+      {
+        name: "partner",
+        description:
+          "Partner v1: a hosted donation site taking gifts for one nonprofit.",
       },
     ],
     paths,
@@ -839,11 +1031,19 @@ export function openapi_doc(origin: string) {
           scheme: "bearer",
           description: "A connector API key, from `/connector/v1/exchange`.",
         },
+        partnerKey: {
+          type: "http",
+          scheme: "bearer",
+          description:
+            "A partner API key (`spk_…`), minted by Better Giving staff for one nonprofit.",
+        },
       },
       schemas: {
         ErrorDetail: ERROR_DETAIL,
         ApiError: API_ERROR,
         ConnectorProblem: CONNECTOR_PROBLEM,
+        PartnerProblem: PARTNER_PROBLEM,
+        PartnerReadiness: PARTNER_READINESS,
       },
     },
   };

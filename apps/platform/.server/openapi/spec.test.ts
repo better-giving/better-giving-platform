@@ -6,6 +6,8 @@ import { npo_ref } from "@/npo/schema";
 import { CONNECTOR_ACTIONS } from "../connector/actions";
 import { BODY_KEYS, EXPECTED_VERSION, QUERY_PARAMS } from "../connector/inputs";
 import { PROBLEM_CODES } from "../connector/problem";
+import { PROBLEM_CODES as PARTNER_PROBLEM_CODES } from "../partner/problem";
+import { RAILS } from "../partner/readiness";
 import { read_only } from "../public-api";
 import { EXCLUDED, type IOperation, openapi_doc, operations } from "./spec";
 import { wire_schema } from "./wire-schema";
@@ -90,6 +92,11 @@ const op_of = (id: string) => {
 const params_in = (id: string, where: string) =>
   (op_of(id).parameters ?? []).filter((p) => p.in === where);
 
+/** the surface an operation belongs to: its one tag */
+const surface_of = (o: IOperation) => (o.op.tags as string[])[0];
+const of_surface = (surface: string) =>
+  operations().filter((o) => surface_of(o) === surface);
+
 const call = (handler: Handler, method: string, path: string) =>
   handler({
     request: new Request(`https://bg.test${path.replace(/\{id\}/, "x1")}`, {
@@ -124,8 +131,20 @@ describe("openapi drift", () => {
     expect([...connector_ids].sort()).toEqual([...CONNECTOR_ACTIONS].sort());
   });
 
+  test("every operation is on exactly one surface, and its route is under that surface's prefix", () => {
+    const prefix: Record<string, RegExp> = {
+      public: /^api\.(?!partner\.)/,
+      connector: /^connector\.v1\./,
+      partner: /^api\.partner\.v1\./,
+    };
+    for (const o of operations()) {
+      expect(o.op.tags, o.op.operationId).toHaveLength(1);
+      expect(o.route, o.op.operationId).toMatch(prefix[surface_of(o)]);
+    }
+  });
+
   test("each public operation is a GET its route's loader serves", async () => {
-    for (const o of operations().filter((x) => x.route.startsWith("api."))) {
+    for (const o of of_surface("public")) {
       const mod = await route_module(o.route);
       expect(o.method, o.route).toBe("get");
       expect(mod.loader, o.route).toBeTypeOf("function");
@@ -248,8 +267,50 @@ describe("openapi drift", () => {
     );
   });
 
+  test("a partner operation is a keyed GET, and its route refuses every other method as not_found", async () => {
+    const partner = of_surface("partner");
+    expect(partner.length).toBeGreaterThan(0);
+    for (const o of partner) {
+      const mod = await route_module(o.route);
+      expect(o.method, o.route).toBe("get");
+      expect(o.op.security, o.route).toEqual([{ partnerKey: [] }]);
+      if (!mod.loader || !mod.action) throw new Error(`${o.route} handlers`);
+      const keyless = await call(mod.loader, "get", o.path);
+      expect([keyless.status, (await keyless.json()).code]).toEqual([
+        401,
+        "key_invalid",
+      ]);
+      const post = await call(mod.action, "post", o.path);
+      expect([post.status, (await post.json()).code]).toEqual([
+        404,
+        "not_found",
+      ]);
+    }
+  });
+
+  test("the readiness response schema names every rail in each per-rail map", () => {
+    const ok = op_of("get_readiness").responses?.["200"] as {
+      content: Record<string, { schema: { $ref: string } }>;
+    };
+    const schema = ok.content["application/json"].schema;
+    expect(schema).toEqual({ $ref: "#/components/schemas/PartnerReadiness" });
+    const { properties, required } = doc.components.schemas.PartnerReadiness;
+    for (const map of ["rails", "intervals", "fee_rules"] as const) {
+      expect(properties[map].required, map).toEqual([...RAILS]);
+      expect(Object.keys(properties[map].properties), map).toEqual([...RAILS]);
+    }
+    expect(required).toEqual(Object.keys(properties));
+  });
+
   test("error code enums are the codes the routes send", () => {
-    const { ApiError, ConnectorProblem } = doc.components.schemas;
+    const { ApiError, ConnectorProblem, PartnerProblem } =
+      doc.components.schemas;
+    expect(PartnerProblem.properties.code.enum).toEqual([
+      ...PARTNER_PROBLEM_CODES,
+    ]);
+    expect(PartnerProblem.properties.error.properties.code.enum).toEqual([
+      ...PARTNER_PROBLEM_CODES,
+    ]);
     expect(ApiError.properties.error.properties.code.enum).toEqual(
       Object.keys(API_ERROR_STATUS)
     );
@@ -276,10 +337,16 @@ describe("openapi drift", () => {
     expect(schemas.ConnectorProblem.properties.error.allOf).toEqual([
       { $ref: "#/components/schemas/ErrorDetail" },
     ]);
+    expect(schemas.PartnerProblem.properties.error.allOf).toEqual([
+      { $ref: "#/components/schemas/ErrorDetail" },
+    ]);
+    const error_schema: Record<string, [string, string]> = {
+      public: ["application/json", "ApiError"],
+      connector: ["application/problem+json", "ConnectorProblem"],
+      partner: ["application/problem+json", "PartnerProblem"],
+    };
     for (const o of operations()) {
-      const [media, schema] = o.route.startsWith("api.")
-        ? ["application/json", "ApiError"]
-        : ["application/problem+json", "ConnectorProblem"];
+      const [media, schema] = error_schema[surface_of(o)];
       for (const [status, res] of Object.entries(o.op.responses as Json)) {
         if (Number(status) < 400) continue;
         expect(
@@ -293,7 +360,7 @@ describe("openapi drift", () => {
   });
 
   test("a public operation's 4xx are the api_error codes its route sends", () => {
-    for (const o of operations().filter((x) => x.route.startsWith("api."))) {
+    for (const o of of_surface("public")) {
       const source = route_source_of(`src/routes/${o.route}.ts`);
       const sent = [...source.matchAll(/api_error\(\s*"(\w+)"/g)]
         .map((m) => API_ERROR_STATUS[m[1] as keyof typeof API_ERROR_STATUS])
@@ -319,6 +386,13 @@ describe("openapi drift", () => {
       expect(source, `${o.method} ${o.route}`).toMatch(
         new RegExp(`export const ${handler} = connector_route\\(`)
       );
+    }
+  });
+
+  test("a partner operation's handler answers a throw with its documented 500", () => {
+    for (const o of of_surface("partner")) {
+      const source = route_source_of(`src/routes/${o.route}.ts`);
+      expect(source, o.route).toMatch(/export const loader = partner_route\(/);
     }
   });
 
