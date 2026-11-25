@@ -166,6 +166,21 @@ describe("open_key", () => {
 });
 
 describe("charge", () => {
+  test("open_key on read charges the read bucket: 1200 pass, the next gets 429", async () => {
+    const { key } = await seed_two();
+
+    for (let i = 0; i < 1200; i++) {
+      const live = await open_key(as_db(t.db), call(key.key), "read");
+      expect(live).not.toBeInstanceOf(Response);
+    }
+    const res = await open_key(as_db(t.db), call(key.key), "read");
+
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).status).toBe(429);
+    // list/write is its own bucket, untouched by the reads
+    expect(await charge(as_db(t.db), key.id, "list_write")).toBeNull();
+  }, 60_000);
+
   test("the list/write and read-by-id buckets are counted apart", async () => {
     const { key } = await seed_two();
     expect(LIST_WRITE_QUOTA).toEqual({ max: 120, window_s: 60 });
@@ -209,6 +224,29 @@ describe("partner_route", () => {
       status: 500,
     });
     expect(report_error).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(report_error.mock.calls)).not.toContain(key.key);
+  });
+
+  test("the report carries the error and method and path only, never the request, its headers or its query", async () => {
+    const { key } = await seed_two();
+    const boom = new Error("boom");
+    const route = partner_route(async () => {
+      throw boom;
+    });
+    const request = new Request("https://app.test/partner/v1/tenant?token=Q", {
+      method: "POST",
+      headers: { authorization: `Bearer ${key.key}` },
+    });
+
+    await route({ request });
+
+    expect(report_error).toHaveBeenCalledTimes(1);
+    const args = report_error.mock.calls[0]!;
+    expect(args).toHaveLength(2);
+    expect(args[0]).toBe(boom);
+    expect(args[1]).toStrictEqual({
+      where: "partner",
+      method: "POST",
+      path: "/partner/v1/tenant",
+    });
   });
 });

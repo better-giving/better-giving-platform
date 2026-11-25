@@ -413,6 +413,49 @@ describe("revision", () => {
     expect(fourth.revision).toBe(2);
   });
 
+  describe("rises once for a change in each input of the body", () => {
+    const rises = async (
+      npo_id: number,
+      change: () => void | Promise<void>
+    ) => {
+      const before = await read(npo_id);
+      expect((await read(npo_id)).revision).toBe(before.revision);
+      await change();
+      const after = await read(npo_id);
+      expect(after.revision).toBe(before.revision + 1);
+      expect((await read(npo_id)).revision).toBe(after.revision);
+    };
+
+    test("active", async () => {
+      const npo_id = await seed_tenant({ donate_methods: ["daf"] });
+      await rises(npo_id, async () => {
+        await t.db
+          .update(npos)
+          .set({ active: false })
+          .where(eq(npos.id, npo_id));
+      });
+    });
+
+    test("donate_frequencies", async () => {
+      const npo_id = await seed_tenant({
+        donate_frequencies: ["one-time", "monthly"],
+      });
+      await rises(npo_id, async () => {
+        await t.db
+          .update(npos)
+          .set({ donate_frequencies: ["one-time"] })
+          .where(eq(npos.id, npo_id));
+      });
+    });
+
+    test("an env credential", async () => {
+      const npo_id = await seed_tenant({ donate_methods: null });
+      await rises(npo_id, () => {
+        pub.stripe_pk = undefined;
+      });
+    });
+  });
+
   test("a nonprofit's revision moves only with its own body", async () => {
     const mine = await seed_tenant({ donate_methods: ["stripe"] });
     const staff = (await seed_user(t.db, "bo@test.com"))!;
