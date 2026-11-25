@@ -6,10 +6,17 @@ import {
   describe,
   expect,
   test,
+  vi,
 } from "vitest";
 import { reset_rate_limits } from "#/.server/auth/rate-limit";
 import { seed_npo, seed_user } from "#/__tests__/fixtures/funds";
+import {
+  donation_amounts,
+  fee_terms,
+} from "#/components/donation/common/amounts";
 import { API_ERROR_STATUS } from "@/helpers/api-error";
+import { rd } from "@/helpers/decimal";
+import { min_fee_allowance } from "@/helpers/donation";
 import { npo_ref } from "@/npo/schema";
 import { CONNECTOR_ACTIONS } from "../connector/actions";
 import { BODY_KEYS, EXPECTED_VERSION, QUERY_PARAMS } from "../connector/inputs";
@@ -17,14 +24,31 @@ import { PROBLEM_CODES } from "../connector/problem";
 import { mint_key } from "../partner/keys";
 import {
   PROBLEM_CODES as PARTNER_PROBLEM_CODES,
-  provider_error,
   rate_limited,
 } from "../partner/problem";
 import { RAIL_STATES, RAILS, readiness } from "../partner/readiness";
-import { create_test_db } from "../pg/test-utils/pglite";
+import { partner_tenants } from "../pg/schema/partner";
+import { create_test_db, type TestDb } from "../pg/test-utils/pglite";
 import { read_only } from "../public-api";
 import { EXCLUDED, type IOperation, openapi_doc, operations } from "./spec";
 import { wire_schema } from "./wire-schema";
+
+// the partner routes read the database through `$/pg/db`: a pglite one
+const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
+const report_error = vi.hoisted(() => vi.fn());
+vi.mock("$/pg/db", () => ({
+  db: new Proxy(
+    {},
+    {
+      get(_, prop) {
+        const real = test_db.current?.db;
+        if (!real) throw new Error("test_db not initialized");
+        return (real as any)[prop];
+      },
+    }
+  ),
+}));
+vi.mock("#/errors/report", () => ({ report_error }));
 
 const ROUTES_DIR = new URL("../../src/routes/", import.meta.url);
 const CONNECTOR_DIR = new URL("../connector/", import.meta.url);
@@ -122,7 +146,32 @@ const call = (handler: Handler, method: string, path: string) =>
     context: {},
   });
 
-beforeEach(() => reset_rate_limits());
+type Db = Parameters<typeof mint_key>[0];
+const as_db = (x: unknown) => x as Db;
+
+beforeAll(async () => {
+  test_db.current = await create_test_db();
+}, 30_000);
+afterAll(async () => {
+  await test_db.current?.client.close();
+});
+beforeEach(() => {
+  reset_rate_limits();
+  report_error.mockReset();
+});
+
+/** a nonprofit with a live key, its own email and registration number so a
+ * test can seed one without meeting another's rows */
+const keyed_npo = async (tag: string) => {
+  const { db } = test_db.current!;
+  const staff = (await seed_user(db, `${tag}@test.com`))!;
+  const npo = (await seed_npo(db, { registration_number: `EIN-${tag}` }))!;
+  const key = await mint_key(as_db(db), {
+    npo_id: npo.id,
+    minted_by: staff.id,
+  });
+  return { npo, key };
+};
 
 describe("openapi drift", () => {
   test("every api.* and connector.v1.* route is documented or excluded", () => {
@@ -302,47 +351,50 @@ describe("openapi drift", () => {
     }
   });
 
-  test("a partner response declares exactly the headers its route sends, each value inside its schema", async () => {
-    const declared = (status: number) => {
-      const res = op_of("get_readiness").responses?.[status] as {
-        headers?: Record<string, { schema: Json }>;
-      };
-      return Object.fromEntries(
-        Object.entries(res.headers ?? {}).map(([k, v]) => [
-          k.toLowerCase(),
-          v.schema,
-        ])
-      );
+  const declared = (status: number) => {
+    const res = op_of("get_readiness").responses?.[status] as {
+      headers?: Record<string, { schema: Json }>;
     };
-    const expect_documented = (status: number, r: Response) => {
-      expect(r.status).toBe(status);
-      const sent = [...r.headers].filter(([k]) => k !== "content-type");
-      const schemas = declared(status);
-      expect(Object.keys(schemas).sort(), `${status}`).toEqual(
-        sent.map(([k]) => k).sort()
-      );
-      for (const [k, v] of sent) {
-        const value = /^\d+$/.test(v) ? Number(v) : v;
-        expect(schema_errors(schemas[k], value, k), `${status}`).toEqual([]);
-      }
-    };
-
+    return Object.fromEntries(
+      Object.entries(res.headers ?? {}).map(([k, v]) => [
+        k.toLowerCase(),
+        v.schema,
+      ])
+    );
+  };
+  const expect_documented = (status: number, r: Response) => {
+    expect(r.status).toBe(status);
+    const sent = [...r.headers].filter(([k]) => k !== "content-type");
+    const schemas = declared(status);
+    expect(Object.keys(schemas).sort(), `${status}`).toEqual(
+      sent.map(([k]) => k).sort()
+    );
+    for (const [k, v] of sent) {
+      const value = /^\d+$/.test(v) ? Number(v) : v;
+      expect(schema_errors(schemas[k], value, k), `${status}`).toEqual([]);
+    }
+  };
+  const readiness_get = async (token?: string) => {
     const mod = await route_module("api.partner.v1.readiness");
     if (!mod.loader) throw new Error("readiness loader");
-    expect_documented(
-      401,
-      await call(mod.loader, "get", "/api/partner/v1/readiness")
-    );
-    // gate's charge and partner_route answer with these two constructors
-    expect_documented(429, rate_limited(30));
-    expect_documented(500, provider_error(500));
-
-    expect(declared(200)).toEqual({
-      "cache-control": { type: "string", enum: ["no-store"] },
+    return mod.loader({
+      request: new Request("https://bg.test/api/partner/v1/readiness", {
+        headers: token ? { authorization: `Bearer ${token}` } : {},
+      }),
+      params: {},
+      context: {},
     });
-    expect(route_source_of("src/routes/api.partner.v1.readiness.ts")).toContain(
-      'resp.json(body, 200, { "cache-control": "no-store" })'
-    );
+  };
+
+  test("a partner response declares exactly the headers its route sends, each value inside its schema", async () => {
+    const { key } = await keyed_npo("headers");
+
+    const ok = await readiness_get(key.key);
+    expect_documented(200, ok);
+    expect(await ok.json()).toHaveProperty("revision", 1);
+    expect_documented(401, await readiness_get());
+    // gate's charge answers with this constructor
+    expect_documented(429, rate_limited(30));
   });
 
   test("the readiness response schema names every rail in each per-rail map", () => {
@@ -451,11 +503,19 @@ describe("openapi drift", () => {
     }
   });
 
-  test("a partner operation's handler answers a throw with its documented 500", () => {
-    for (const o of of_surface("partner")) {
-      const source = route_source_of(`src/routes/${o.route}.ts`);
-      expect(source, o.route).toMatch(/export const loader = partner_route\(/);
-    }
+  test("a partner route that throws answers the documented 500 and reports it", async () => {
+    const { key } = await keyed_npo("throws");
+    // a live key whose tenant row is gone: readiness throws
+    await test_db.current!.db.delete(partner_tenants);
+
+    const res = await readiness_get(key.key);
+
+    expect_documented(500, res);
+    expect(await res.json()).toMatchObject({
+      code: "provider_error",
+      status: 500,
+    });
+    expect(report_error).toHaveBeenCalledOnce();
   });
 
   test("every $ref resolves inside the document", () => {
@@ -542,22 +602,12 @@ const schema_errors = (schema: Json, value: unknown, at = "$"): string[] => {
 };
 
 describe("readiness body against the published schema", () => {
-  let t: Awaited<ReturnType<typeof create_test_db>>;
-  type Db = Parameters<typeof mint_key>[0];
-  const as_db = (x: unknown) => x as Db;
-
-  beforeAll(async () => {
-    t = await create_test_db();
-  }, 30_000);
-  afterAll(async () => {
-    await t?.client.close();
-  });
-
   const real_body = async () => {
-    const staff = (await seed_user(t.db, "ada@test.com"))!;
-    const npo = (await seed_npo(t.db, { donate_methods: null }))!;
-    await mint_key(as_db(t.db), { npo_id: npo.id, minted_by: staff.id });
-    return readiness(as_db(t.db), npo.id);
+    const { db } = test_db.current!;
+    const staff = (await seed_user(db, "ada@test.com"))!;
+    const npo = (await seed_npo(db, { donate_methods: null }))!;
+    await mint_key(as_db(db), { npo_id: npo.id, minted_by: staff.id });
+    return readiness(as_db(db), npo.id);
   };
 
   test("a real body validates, and the validator refuses an added, missing or out-of-enum field", async () => {
@@ -583,6 +633,125 @@ describe("readiness body against the published schema", () => {
         rails: { ...body.rails, card: { state: "paused", offered: false } },
       })
     ).toEqual(['$.rails.card.state: "paused" not in enum']);
+  });
+});
+
+describe("fee_rules against the checkout's fee", () => {
+  let rules_seeded: Awaited<ReturnType<typeof readiness>>["fee_rules"];
+  const rule_of = async () => {
+    if (rules_seeded) return rules_seeded;
+    const { db } = test_db.current!;
+    const staff = (await seed_user(db, "fees@test.com"))!;
+    const npo = (await seed_npo(db, { registration_number: "EIN-FEES" }))!;
+    await mint_key(as_db(db), { npo_id: npo.id, minted_by: staff.id });
+    rules_seeded = (await readiness(as_db(db), npo.id)).fee_rules;
+    return rules_seeded;
+  };
+
+  /** the formula as `fee_rules`' description states it, in minor units */
+  const documented_fee = (
+    r: { percent: number; fixed_minor: number; cap_minor?: number },
+    base_minor: number
+  ) =>
+    Math.min(
+      (base_minor * r.percent + r.fixed_minor) / (1 - r.percent),
+      r.cap_minor ?? Number.POSITIVE_INFINITY
+    );
+
+  /** what checkout adds to the gift of `usd` for a donor covering fees, in
+   * cents, through the function each rail's checkout calls */
+  const checkout_fee = (rail: string, usd: number) => {
+    const none = {
+      amount: usd,
+      tip_format: "none",
+      tip: "",
+      cover_processing_fee: true,
+    } as const;
+    if (rail === "paypal" || rail === "venmo") {
+      const { rate, flat } = fee_terms.paypal;
+      return Math.round(+rd(min_fee_allowance(usd, rate, flat), 2) * 100);
+    }
+    if (rail === "crypto") {
+      return min_fee_allowance(usd, fee_terms.crypto.rate) * 100;
+    }
+    const terms = {
+      card: fee_terms.stripe,
+      apple_pay: fee_terms.stripe,
+      google_pay: fee_terms.stripe,
+      ach: fee_terms.stripe_bank,
+      daf: fee_terms.daf,
+    }[rail];
+    if (!terms) throw new Error(`no checkout fee for ${rail}`);
+    return donation_amounts(none, 2, terms).fee_allowance * 100;
+  };
+
+  test("each published rule's formula is the fee checkout adds, rounded as the rule says", async () => {
+    const rules = await rule_of();
+    for (const [rail, rule] of Object.entries(rules)) {
+      // 1000 USD reaches ach's cap
+      for (const usd of [10, 100, 1000]) {
+        const formula = documented_fee(rule, usd * 100);
+        const expected =
+          rule.round_up_minor === undefined
+            ? Math.floor(formula)
+            : Math.ceil(formula - 1e-9);
+        const sent = checkout_fee(rail, usd);
+        // crypto doesn't round
+        if (rail === "crypto")
+          expect(sent, `${rail} ${usd}`).toBeCloseTo(formula);
+        else expect(sent, `${rail} ${usd}`).toBe(expected);
+      }
+    }
+    expect(rules.ach.cap_minor).toBe(500);
+    expect(documented_fee(rules.ach, 100_000)).toBe(500);
+  });
+
+  test("the rule's rounding fields: cents on stripe's rails, whole dollars on daf, none on paypal, venmo and crypto", async () => {
+    const rules = await rule_of();
+    // whole_dollar_amounts lives in the daf checkout component and isn't
+    // importable, so daf's 100 is pinned from the published value
+    expect(
+      Object.fromEntries(
+        Object.entries(rules).map(([k, r]) => [k, r.round_up_minor])
+      )
+    ).toEqual({
+      card: 1,
+      ach: 1,
+      apple_pay: 1,
+      google_pay: 1,
+      paypal: undefined,
+      venmo: undefined,
+      daf: 100,
+      crypto: undefined,
+    });
+  });
+
+  test("the example in the description: 0.029 and 30 on a 10000-cent gift is 329.6, 330 rounded up and 329 truncated", () => {
+    const rule = { percent: 0.029, fixed_minor: 30 };
+    expect(documented_fee(rule, 10_000)).toBeCloseTo(329.6, 1);
+    const terms = { rate: 0.029, flat: 0.3 };
+    expect(
+      donation_amounts(
+        {
+          amount: 100,
+          tip_format: "none",
+          tip: "",
+          cover_processing_fee: true,
+        },
+        2,
+        terms
+      ).fee_allowance * 100
+    ).toBe(330);
+    expect(Math.round(+rd(min_fee_allowance(100, 0.029, 0.3), 2) * 100)).toBe(
+      329
+    );
+    const { description } =
+      doc.components.schemas.PartnerReadiness.properties.fee_rules.properties
+        .card;
+    expect(description).toContain("(290 + 30) / 0.971 ≈ 329.6");
+    expect(description).toContain(
+      "330 with round_up_minor 1, or 329 when truncated"
+    );
   });
 });
 

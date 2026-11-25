@@ -137,7 +137,13 @@ describe("GET /api/partner/v1/readiness", () => {
   test("an npo_id in the query, a header or a body selects nothing", async () => {
     const { theirs, key } = await seed_two();
     const id = String(theirs.id);
-    const own = await (await get(key.key)).json();
+    const baseline = await get(key.key);
+    expect(baseline.status).toBe(200);
+    const own = await baseline.json();
+    // mine offers card only and theirs crypto and daf, so a body of the wrong
+    // nonprofit reads differently from this one
+    expect(own.rails.card.state).toBe("active");
+    expect(own.rails.daf.state).toBe("unrequested");
 
     for (const res of [
       await get(key.key, { url: `${URL_}?npo_id=${id}&npo=${id}` }),
@@ -154,6 +160,7 @@ describe("GET /api/partner/v1/readiness", () => {
         context: {},
       } as never),
     ]) {
+      expect(res.status).toBe(200);
       expect(await res.json()).toEqual(own);
     }
   });
@@ -226,7 +233,15 @@ describe("GET /api/partner/v1/readiness", () => {
     const [stored] = await db().select().from(partner_keys);
     const [tenant] = await db().select().from(partner_tenants);
 
-    const text = await (await get(key.key)).text();
+    const res = await get(key.key);
+    // a 401 or 500 problem body holds no secret either: scan a real body
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(JSON.parse(text)).toMatchObject({
+      revision: 1,
+      rails: { card: { state: expect.any(String) } },
+      clients: expect.any(Array),
+    });
 
     expect(Object.keys(secrets).length).toBeGreaterThan(10);
     for (const [name, value] of Object.entries(secrets)) {

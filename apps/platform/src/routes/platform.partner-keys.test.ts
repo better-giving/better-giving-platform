@@ -184,6 +184,9 @@ describe("access", () => {
     const res = await hit("POST", { op: "mint", npo_id: npo.id });
 
     expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe(
+      `https://bg.test/signup?redirect=${encodeURIComponent("/platform/partner-keys")}`
+    );
     expect(await keys_in_db()).toHaveLength(0);
   });
 });
