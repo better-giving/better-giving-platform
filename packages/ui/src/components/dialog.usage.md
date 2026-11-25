@@ -21,6 +21,23 @@ Registry item `dialog` (files: `components/modal.tsx`, `stripe-challenge.ts`, `h
 
 Content is the children; put a `Dialog.CloseTrigger` or your own controls inside.
 
+`ModalFoot` (`import { ModalFoot } from "./components/modal"`) is the footer of the content: it sits 24px under it and holds the buttons at the end of the row, the secondary first and the primary last. Under 640px, where the box is 90% wide (about 289px of content at 375; the sheet fills the viewport), they stack at full width in the same order, so the primary is at the bottom. `classes` is appended to the footer.
+
+```tsx
+<Modal open={open} onClose={close} size="panel">
+  <div className="rounded-card bg-popover p-6 text-gray-12">
+    <h2 className="font-display text-lg font-bold">Remove this payout account?</h2>
+    <p className="text-sm text-gray-11">Payouts stop until you add another account.</p>
+    <ModalFoot>
+      <Button variant="secondary" onClick={close}>Cancel</Button>
+      <Button variant="destructive" onClick={remove}>Remove account</Button>
+    </ModalFoot>
+  </div>
+</Modal>
+```
+
+The React box is always modal, so it has none of `dialog-css`'s preview scrim: Ark's backdrop is the scrim.
+
 ## Accessibility
 
 Focus is trapped while open and returns to the opener on close (or to the fallback). Escape and outside click close it unless `busy`. Motion collapses under `prefers-reduced-motion` through the speed ladder.

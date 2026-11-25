@@ -2,6 +2,8 @@
 
 Registry item `card` (file: `components/card.tsx`). Needs the `tokens` item and `react`.
 
+A card separates a group from its siblings. A group alone on its page or section gets no card; two or more groups each get one. Never put a card inside a card: a group inside a carded group gets none. For a titled form group use `form-section` (`form-section-css`), which takes `card` and draws the card or not.
+
 ## API
 
 `import { Card, CardHeader, CardStatus, CardBody, CardFooter } from "./components/card"`.
