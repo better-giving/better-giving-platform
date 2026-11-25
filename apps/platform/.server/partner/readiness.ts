@@ -23,7 +23,7 @@ import { DEDUCTIBILITY_STATEMENT, logo_url } from "@/constants/common";
 import { to_units } from "@/helpers/decimal";
 import type { DonateMethodId, TFrequency } from "@/schemas";
 import { is_deposit_chain } from "../deposit-addr";
-import { nowpayments } from "../env";
+import { base_url, nowpayments } from "../env";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { npos } from "../pg/schema/npo";
 import { partner_tenants } from "../pg/schema/partner";
@@ -40,7 +40,8 @@ export const RAILS = [
 ] as const;
 export type Rail = (typeof RAILS)[number];
 
-type RailState = "active" | "pending" | "inactive" | "unrequested";
+export const RAIL_STATES = ["active", "inactive", "unrequested"] as const;
+type RailState = (typeof RAIL_STATES)[number];
 type Interval = "monthly" | "yearly";
 
 interface IFeeRule {
@@ -56,9 +57,12 @@ interface IRail {
   /** the platform credential checkout needs for it */
   configured: () => boolean;
   fee: IFeeTerms;
-  /** checkout rounds this rail's fee allowance up to the cent
-   * (`donation_amounts`); paypal truncates and crypto doesn't round */
-  rounds_up: boolean;
+  /** usd cents checkout rounds the gift total up to a multiple of, the
+   * difference landing on the fee allowance: the cent on stripe's rails
+   * (`donation_amounts`), the whole dollar on daf (`whole_dollar_amounts` in
+   * checkouts/daf). absent where checkout doesn't round up: paypal truncates
+   * and crypto doesn't round */
+  round_up_minor?: number;
   /** checkout offers it at the frequencies the nonprofit picked */
   recurring: boolean;
 }
@@ -70,7 +74,7 @@ const card_like: IRail = {
   method: "stripe",
   configured: has_stripe,
   fee: fee_terms.stripe,
-  rounds_up: true,
+  round_up_minor: 1,
   recurring: true,
 };
 
@@ -84,35 +88,32 @@ const RAIL: Record<Rail, IRail> = {
     method: "stripe_bank",
     configured: has_stripe,
     fee: fee_terms.stripe_bank,
-    rounds_up: true,
+    round_up_minor: 1,
     recurring: true,
   },
   paypal: {
     method: "stripe",
     configured: has_paypal,
     fee: fee_terms.paypal,
-    rounds_up: false,
     recurring: true,
   },
   venmo: {
     method: "stripe",
     configured: has_paypal,
     fee: fee_terms.paypal,
-    rounds_up: false,
     recurring: false,
   },
   daf: {
     method: "daf",
     configured: () => !!chariot_connect_id,
     fee: fee_terms.daf,
-    rounds_up: true,
+    round_up_minor: 100,
     recurring: false,
   },
   crypto: {
     method: "crypto",
     configured: () => !!nowpayments.api_key,
     fee: fee_terms.crypto,
-    rounds_up: false,
     recurring: false,
   },
 };
@@ -124,12 +125,12 @@ const INTERVAL: Partial<Record<TFrequency, Interval>> = {
 
 const usd_cents = (usd: number) => to_units(usd, 2);
 
-function fee_rule({ fee, rounds_up }: IRail): IFeeRule {
+function fee_rule({ fee, round_up_minor }: IRail): IFeeRule {
   return {
     percent: fee.rate,
     fixed_minor: usd_cents(fee.flat ?? 0),
     ...(fee.cap === undefined ? {} : { cap_minor: usd_cents(fee.cap) }),
-    ...(rounds_up ? { round_up_minor: 1 } : {}),
+    ...(round_up_minor === undefined ? {} : { round_up_minor }),
   };
 }
 
@@ -146,7 +147,9 @@ const coins = () =>
       // the token data carries no memo flag: checkout learns of one from the
       // payment's `payin_extra_id`
       memo_required: false,
-      logo: logo_url(x.logo, is_custom(x.id)),
+      // a custom token's logo is a path on this app; the integrator renders it
+      // on its own origin
+      logo: is_custom(x.id) ? `${base_url}${x.logo}` : logo_url(x.logo),
     }));
 
 const clients = () => [

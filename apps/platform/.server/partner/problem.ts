@@ -92,8 +92,13 @@ function build(
   });
 }
 
+/** RFC 9110 §11.6.1: a 401 carries the challenge for the scheme it wants */
+const HEADERS: Partial<Record<PlainCode, Record<string, string>>> = {
+  key_invalid: { "www-authenticate": "Bearer" },
+};
+
 export function problem(code: PlainCode, extra?: Extra): Response {
-  return build(STATUS[code], code, extra);
+  return build(STATUS[code], code, extra, HEADERS[code]);
 }
 
 export function below_minimum(minimum_minor: number, detail?: string) {

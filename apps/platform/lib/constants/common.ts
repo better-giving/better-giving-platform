@@ -13,7 +13,7 @@ export const default_allocation: IAllocation = {
 export const PROCESSING_RATES = {
   chariot: 0.029,
   stripe: 0.022,
-  /** $cents */
+  /** usd */
   stripe_flat: 0.3,
   stripe_bank: 0.008,
   /** $usd */

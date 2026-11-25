@@ -39,6 +39,14 @@ describe("problem", () => {
     }
   );
 
+  // RFC 9110 §11.6.1: a 401 names the scheme that would get in
+  test("key_invalid challenges for a bearer key, and no other code does", () => {
+    expect(problem("key_invalid").headers.get("www-authenticate")).toBe(
+      "Bearer"
+    );
+    expect(problem("not_found").headers.get("www-authenticate")).toBeNull();
+  });
+
   test("detail replaces the default message, and field errors ride along", async () => {
     const res = await read(
       problem("invalid_request", {

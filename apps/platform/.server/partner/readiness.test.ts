@@ -22,14 +22,28 @@ import { is_deposit_chain } from "../deposit-addr";
 import type { Rail } from "./readiness";
 
 // the publishable ids checkout reads, switchable per test
-const pub = vi.hoisted(() => ({ paypal_client_id: "" as string | undefined }));
+const pub = vi.hoisted(() => ({
+  paypal_client_id: "" as string | undefined,
+  stripe_pk: "" as string | undefined,
+  chariot_connect_id: "" as string | undefined,
+}));
 vi.mock("#/constants/env", async (orig) => {
   const real = await orig<typeof import("#/constants/env")>();
-  pub.paypal_client_id = real.paypal_client_id;
+  Object.assign(pub, {
+    paypal_client_id: real.paypal_client_id,
+    stripe_pk: real.stripe_pk,
+    chariot_connect_id: real.chariot_connect_id,
+  });
   return {
     ...real,
     get paypal_client_id() {
       return pub.paypal_client_id;
+    },
+    get stripe_pk() {
+      return pub.stripe_pk;
+    },
+    get chariot_connect_id() {
+      return pub.chariot_connect_id;
     },
   };
 });
@@ -41,17 +55,22 @@ const { create_test_db } = await import("../pg/test-utils/pglite");
 const { mint_key } = await import("./keys");
 const { readiness } = await import("./readiness");
 const env = await import("#/constants/env");
+const { base_url, nowpayments: np } = await import("../env");
+// declared read-only; the rail reads it per call, so a test swaps it
+const nowpayments = np as { api_key: string | undefined };
 
 type Db = Parameters<typeof mint_key>[0];
 // pglite's drizzle handle differs from neon's only in the result-type HKT
 const as_db = (x: unknown) => x as Db;
 
 let t: Awaited<ReturnType<typeof create_test_db>>;
-let real_paypal: string | undefined;
+let real_pub: typeof pub;
+let real_np_key: string | undefined;
 
 beforeAll(async () => {
   t = await create_test_db();
-  real_paypal = pub.paypal_client_id;
+  real_pub = { ...pub };
+  real_np_key = nowpayments.api_key;
 }, 30_000);
 
 afterAll(async () => {
@@ -59,7 +78,8 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  pub.paypal_client_id = real_paypal;
+  Object.assign(pub, real_pub);
+  nowpayments.api_key = real_np_key;
   await t.db.delete(partner_keys);
   await t.db.delete(partner_tenants);
   await t.db.delete(npos);
@@ -105,7 +125,7 @@ const accepted_coins = () =>
       ticker: x.symbol,
       name: x.name,
       network: x.network,
-      logo: logo_url(x.logo, is_custom(x.id)),
+      logo: is_custom(x.id) ? `${base_url}${x.logo}` : logo_url(x.logo),
     }));
 
 const cents = (usd: number) => to_units(usd, 2);
@@ -174,10 +194,31 @@ describe("readiness", () => {
         percent: fee_terms.paypal.rate,
         fixed_minor: cents(fee_terms.paypal.flat),
       },
-      daf: { percent: fee_terms.daf.rate, fixed_minor: 0, round_up_minor: 1 },
+      // chariot grants whole dollars, so checkout tops the total up to one
+      daf: { percent: fee_terms.daf.rate, fixed_minor: 0, round_up_minor: 100 },
       crypto: { percent: fee_terms.crypto.rate, fixed_minor: 0 },
     });
     expect(r.charges_enabled).toBe(true);
+  });
+
+  test("every coin's logo is an absolute url, custom tokens' on the app's own origin", async () => {
+    const npo_id = await seed_tenant({ donate_methods: ["crypto"] });
+
+    const { coins } = await read(npo_id);
+
+    const custom = tokens_list.filter(
+      (x) => is_custom(x.id) && is_deposit_chain(x.network)
+    );
+    expect(custom.length).toBeGreaterThan(0);
+    for (const x of custom) {
+      const coin = coins.find(
+        (c) => c.coin === x.code && c.network === x.network
+      );
+      expect(coin?.logo, x.code).toBe(`${base_url}${x.logo}`);
+    }
+    for (const c of coins) {
+      expect(new URL(c.logo).protocol, c.coin).toMatch(/^https?:$/);
+    }
   });
 
   test("donate_methods null offers every rail, at checkout's default frequencies", async () => {
@@ -241,6 +282,61 @@ describe("readiness", () => {
     expect(r.rails.card.state).toBe("active");
     expect(r.intervals.paypal).toEqual([]);
     expect(r.clients.map((c) => c.name)).toEqual(["stripe", "chariot"]);
+  });
+
+  test("without stripe's key, card, ach and the wallets are inactive and its client is not served", async () => {
+    pub.stripe_pk = undefined;
+    const npo_id = await seed_tenant({ donate_methods: null });
+
+    const r = await read(npo_id);
+
+    for (const rail of ["card", "ach", "apple_pay", "google_pay"] as const) {
+      expect(r.rails[rail], rail).toEqual({
+        state: "inactive",
+        offered: false,
+      });
+      expect(r.intervals[rail], rail).toEqual([]);
+    }
+    expect(r.rails.paypal.state).toBe("active");
+    expect(r.rails.daf.state).toBe("active");
+    expect(r.clients.map((c) => c.name)).toEqual(["paypal", "chariot"]);
+    expect(r.charges_enabled).toBe(true);
+  });
+
+  test("without chariot's connect id, daf is inactive and its client is not served", async () => {
+    pub.chariot_connect_id = undefined;
+    const npo_id = await seed_tenant({ donate_methods: null });
+
+    const r = await read(npo_id);
+
+    expect(r.rails.daf).toEqual({ state: "inactive", offered: false });
+    expect(r.rails.card.state).toBe("active");
+    expect(r.clients.map((c) => c.name)).toEqual(["stripe", "paypal"]);
+  });
+
+  test("without nowpayments' api key, crypto is inactive", async () => {
+    nowpayments.api_key = undefined;
+    const npo_id = await seed_tenant({ donate_methods: null });
+
+    const r = await read(npo_id);
+
+    expect(r.rails.crypto).toEqual({ state: "inactive", offered: false });
+    expect(r.rails.daf.state).toBe("active");
+  });
+
+  test("donate_methods [] is every rail unrequested, with no charges and no interval", async () => {
+    const npo_id = await seed_tenant({ donate_methods: [] });
+
+    const r = await read(npo_id);
+
+    for (const rail of RAIL_NAMES) {
+      expect(r.rails[rail], rail).toEqual({
+        state: "unrequested",
+        offered: false,
+      });
+    }
+    expect(r.charges_enabled).toBe(false);
+    expect(Object.values(r.intervals).flat()).toEqual([]);
   });
 
   test("clients, sponsor and contribution come from what checkout reads", async () => {

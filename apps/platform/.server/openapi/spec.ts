@@ -13,7 +13,7 @@ import {
 } from "../connector/inputs";
 import { PROBLEM_CODES } from "../connector/problem";
 import { PROBLEM_CODES as PARTNER_PROBLEM_CODES } from "../partner/problem";
-import { RAILS } from "../partner/readiness";
+import { RAIL_STATES, RAILS } from "../partner/readiness";
 import { wire_schema } from "./wire-schema";
 
 type Method = "get" | "post" | "patch";
@@ -767,7 +767,7 @@ const minor = (description: string) => ({
 const PARTNER_READINESS = {
   type: "object",
   description:
-    "What the key's nonprofit can take right now. Money is integer minor units; rates are fractions.",
+    "What the key's nonprofit can take right now. Money is integer minor units; rates are fractions. Enums here grow without a new version (a rail's `state`, `clients[].name`, `intervals`), so ignore a value you don't recognise: treat a rail in an unknown state as not offered.",
   required: [
     "revision",
     "charges_enabled",
@@ -834,10 +834,7 @@ const PARTNER_READINESS = {
       type: "object",
       required: ["state", "offered"],
       properties: {
-        state: {
-          type: "string",
-          enum: ["active", "pending", "inactive", "unrequested"],
-        },
+        state: { type: "string", enum: [...RAIL_STATES] },
         offered: { type: "boolean" },
       },
     }),
@@ -849,7 +846,7 @@ const PARTNER_READINESS = {
     fee_rules: per_rail({
       type: "object",
       description:
-        "The processing fee a donor covering fees adds: percent of the gift plus fixed_minor, at most cap_minor, rounded up to a multiple of round_up_minor.",
+        "The processing fee a donor covering fees adds, so the fee is still covered once it is itself charged: (base × percent + fixed_minor) / (1 − percent), where base is the gift plus any contribution to Better Giving; then at most cap_minor; then, when round_up_minor is present, the fee grows until gift + contribution + fee is a multiple of round_up_minor. Without round_up_minor there is no rounding up. For example percent 0.029 and fixed_minor 30 on a 10000-cent gift with no contribution: (290 + 30) / 0.971 ≈ 329.6, so 330 with round_up_minor 1.",
       required: ["percent", "fixed_minor"],
       properties: {
         percent: { type: "number", minimum: 0, maximum: 1 },
@@ -870,8 +867,6 @@ const PARTNER_READINESS = {
           network: { type: "string" },
           memo_required: { type: "boolean" },
           logo: { type: "string", format: "uri" },
-          popular: { type: "boolean" },
-          stablecoin: { type: "boolean" },
         },
       },
     },
@@ -885,7 +880,7 @@ const PARTNER_READINESS = {
           type: "array",
           items: { type: "number", minimum: 0, maximum: 1 },
         },
-        starts_at: { type: ["number", "null"] },
+        starts_at: { type: "null", description: "Reserved; always null." },
       },
     },
     wallet_hosts: { type: "array", items: { type: "string" } },
@@ -1020,7 +1015,7 @@ export function openapi_doc(origin: string) {
       {
         name: "partner",
         description:
-          "Partner v1: a hosted donation site taking gifts for one nonprofit.",
+          "Partner v1: a hosted donation site taking gifts for one nonprofit. Enum values grow within v1, error `code`s included: ignore one you don't recognise rather than failing on it.",
       },
     ],
     paths,

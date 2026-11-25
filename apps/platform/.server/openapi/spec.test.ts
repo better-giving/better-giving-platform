@@ -1,13 +1,23 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { beforeEach, describe, expect, test } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  test,
+} from "vitest";
 import { reset_rate_limits } from "#/.server/auth/rate-limit";
+import { seed_npo, seed_user } from "#/__tests__/fixtures/funds";
 import { API_ERROR_STATUS } from "@/helpers/api-error";
 import { npo_ref } from "@/npo/schema";
 import { CONNECTOR_ACTIONS } from "../connector/actions";
 import { BODY_KEYS, EXPECTED_VERSION, QUERY_PARAMS } from "../connector/inputs";
 import { PROBLEM_CODES } from "../connector/problem";
+import { mint_key } from "../partner/keys";
 import { PROBLEM_CODES as PARTNER_PROBLEM_CODES } from "../partner/problem";
-import { RAILS } from "../partner/readiness";
+import { RAIL_STATES, RAILS, readiness } from "../partner/readiness";
+import { create_test_db } from "../pg/test-utils/pglite";
 import { read_only } from "../public-api";
 import { EXCLUDED, type IOperation, openapi_doc, operations } from "./spec";
 import { wire_schema } from "./wire-schema";
@@ -300,6 +310,11 @@ describe("openapi drift", () => {
       expect(Object.keys(properties[map].properties), map).toEqual([...RAILS]);
     }
     expect(required).toEqual(Object.keys(properties));
+    expect(properties.rails).toMatchObject({
+      properties: {
+        card: { properties: { state: { enum: [...RAIL_STATES] } } },
+      },
+    });
   });
 
   test("error code enums are the codes the routes send", () => {
@@ -420,6 +435,107 @@ describe("openapi drift", () => {
         );
       expect(target, r).toBeDefined();
     }
+  });
+});
+
+/** the subset of JSON Schema the published bodies use. an object key the
+ * schema doesn't declare is a failure here (the published schema leaves
+ * `additionalProperties` open, but a body field it omits is the drift) */
+const schema_errors = (schema: Json, value: unknown, at = "$"): string[] => {
+  const s = schema as {
+    type?: string;
+    enum?: unknown[];
+    required?: string[];
+    properties?: Record<string, Json>;
+    items?: Json;
+    minimum?: number;
+    maximum?: number;
+    pattern?: string;
+    format?: string;
+  };
+  const kind = (v: unknown) =>
+    v === null
+      ? "null"
+      : Array.isArray(v)
+        ? "array"
+        : Number.isInteger(v)
+          ? "integer"
+          : typeof v;
+  const k = kind(value);
+  if (s.type && s.type !== k && !(s.type === "number" && k === "integer"))
+    return [`${at}: expected ${s.type}, got ${k}`];
+  const errs: string[] = [];
+  if (s.enum && !s.enum.includes(value))
+    errs.push(`${at}: ${JSON.stringify(value)} not in enum`);
+  if (typeof value === "number") {
+    if (s.minimum !== undefined && value < s.minimum) errs.push(`${at}: < min`);
+    if (s.maximum !== undefined && value > s.maximum) errs.push(`${at}: > max`);
+  }
+  if (typeof value === "string") {
+    if (s.pattern && !new RegExp(s.pattern).test(value))
+      errs.push(`${at}: ${value} fails pattern`);
+    if (s.format === "uri" && !URL.canParse(value))
+      errs.push(`${at}: ${value} is not a uri`);
+  }
+  if (Array.isArray(value) && s.items) {
+    for (const [i, x] of value.entries())
+      errs.push(...schema_errors(s.items, x, `${at}[${i}]`));
+  }
+  if (k === "object") {
+    const obj = value as Record<string, unknown>;
+    const props = s.properties ?? {};
+    for (const key of s.required ?? [])
+      if (!(key in obj)) errs.push(`${at}.${key}: missing`);
+    for (const [key, v] of Object.entries(obj)) {
+      if (!(key in props)) errs.push(`${at}.${key}: not in schema`);
+      else errs.push(...schema_errors(props[key], v, `${at}.${key}`));
+    }
+  }
+  return errs;
+};
+
+describe("readiness body against the published schema", () => {
+  let t: Awaited<ReturnType<typeof create_test_db>>;
+  type Db = Parameters<typeof mint_key>[0];
+  const as_db = (x: unknown) => x as Db;
+
+  beforeAll(async () => {
+    t = await create_test_db();
+  }, 30_000);
+  afterAll(async () => {
+    await t?.client.close();
+  });
+
+  const real_body = async () => {
+    const staff = (await seed_user(t.db, "ada@test.com"))!;
+    const npo = (await seed_npo(t.db, { donate_methods: null }))!;
+    await mint_key(as_db(t.db), { npo_id: npo.id, minted_by: staff.id });
+    return readiness(as_db(t.db), npo.id);
+  };
+
+  test("a real body validates, and the validator refuses an added, missing or out-of-enum field", async () => {
+    const schema = doc.components.schemas.PartnerReadiness as Json;
+    const body = await real_body();
+    expect(body.coins.length).toBeGreaterThan(0);
+    expect(body.clients.length).toBeGreaterThan(0);
+
+    expect(schema_errors(schema, body)).toEqual([]);
+
+    // proves each failure mode of the check is live
+    expect(schema_errors(schema, { ...body, added: 1 })).toEqual([
+      "$.added: not in schema",
+    ]);
+    const { revision: _, ...renamed } = body;
+    expect(schema_errors(schema, { ...renamed, rev: 1 })).toEqual([
+      "$.revision: missing",
+      "$.rev: not in schema",
+    ]);
+    expect(
+      schema_errors(schema, {
+        ...body,
+        rails: { ...body.rails, card: { state: "paused", offered: false } },
+      })
+    ).toEqual(['$.rails.card.state: "paused" not in enum']);
   });
 });
 

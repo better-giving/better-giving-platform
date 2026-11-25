@@ -13,13 +13,9 @@ import type { ICurrenciesFv } from "#/types/currency";
 import { ru } from "@/helpers/decimal";
 import { json_ok } from "@/helpers/https";
 import { btn_disp, TokenField } from "../../../token-field";
-import { usd_option } from "../../common/constants";
+import { freqs_shown, usd_option } from "../../common/constants";
 import { CpfToggle } from "../../common/cpf-toggle";
-import {
-  Frequency,
-  freqs_shown,
-  opening_frequency,
-} from "../../common/frequency";
+import { Frequency, opening_frequency } from "../../common/frequency";
 import { Incrementers } from "../../common/incrementers";
 import type { IDonationDest } from "../../common/return-url";
 import { StuckMsg, stuck_prompt } from "../../common/stuck-prompt";

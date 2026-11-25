@@ -47,14 +47,15 @@ function bearer_token(request: Request): string | null {
   return /^Bearer\s+(\S+)$/i.exec(header)?.[1] ?? null;
 }
 
-/** a live key, charged against its list/write bucket */
+/** a live key, charged against the bucket the route names */
 export async function open_key(
   db: Db,
-  request: Request
+  request: Request,
+  bucket: Bucket
 ): Promise<LiveKey | Response> {
   const live = await require_live_key(db, request);
   if (live instanceof Response) return live;
-  return (await charge(db, live.id, "list_write")) ?? live;
+  return (await charge(db, live.id, bucket)) ?? live;
 }
 
 /** a partner route's loader or action: an unexpected throw is reported and

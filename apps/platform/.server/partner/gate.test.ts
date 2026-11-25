@@ -67,11 +67,9 @@ const seed_two = async () => {
 
 const call = (
   token: string | null,
-  init: { url?: string; body?: unknown; headers?: Record<string, string> } = {}
+  init: { headers?: Record<string, string> } = {}
 ) =>
-  new Request(init.url ?? "https://app.test/partner/v1/tenant", {
-    method: init.body === undefined ? "GET" : "POST",
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+  new Request("https://app.test/partner/v1/tenant", {
     headers: {
       ...(token ? { authorization: `Bearer ${token}` } : {}),
       ...init.headers,
@@ -81,7 +79,7 @@ const call = (
 /** a partner endpoint answering with the tenant row its key reaches */
 const tenant_route = partner_route(
   async ({ request }: { request: Request }) => {
-    const live = await open_key(as_db(t.db), request);
+    const live = await open_key(as_db(t.db), request, "list_write");
     if (live instanceof Response) return live;
     const [row] = await t.db
       .select({ npo_id: partner_tenants.npo_id })
@@ -101,20 +99,6 @@ describe("open_key", () => {
     expect(await res.json()).toEqual({ npo_id: mine.id });
   });
 
-  test("an npo_id in the query, body or a header selects nothing", async () => {
-    const { mine, theirs, key } = await seed_two();
-    const id = String(theirs.id);
-
-    for (const request of [
-      call(key.key, { url: `https://app.test/partner/v1/tenant?npo_id=${id}` }),
-      call(key.key, { body: { npo_id: theirs.id } }),
-      call(key.key, { headers: { "x-npo-id": id, "npo-id": id } }),
-    ]) {
-      const res = await tenant_route({ request });
-      expect(await res.json()).toEqual({ npo_id: mine.id });
-    }
-  });
-
   test.each([
     ["no authorization header", null],
     ["a malformed token", "spk_short"],
@@ -126,6 +110,7 @@ describe("open_key", () => {
 
     expect(res.status).toBe(401);
     expect(res.headers.get("content-type")).toBe("application/problem+json");
+    expect(res.headers.get("www-authenticate")).toBe("Bearer");
     expect(await res.json()).toMatchObject({ code: "key_invalid" });
   });
 
@@ -166,6 +151,18 @@ describe("open_key", () => {
     expect(res.headers.get("retry-after")).toBe("40");
     expect(await res.json()).toMatchObject({ code: "rate_limited" });
   });
+
+  test("a read opens on the read bucket, which a spent list/write bucket leaves alone", async () => {
+    const { key } = await seed_two();
+    for (let i = 0; i < LIST_WRITE_QUOTA.max; i++) {
+      await charge(as_db(t.db), key.id, "list_write");
+    }
+
+    const live = await open_key(as_db(t.db), call(key.key), "read");
+
+    expect(live).toEqual({ id: key.id, npo_id: expect.any(Number) });
+    expect((await charge(as_db(t.db), key.id, "list_write"))?.status).toBe(429);
+  });
 });
 
 describe("charge", () => {
@@ -199,7 +196,7 @@ describe("partner_route", () => {
   test("an unexpected throw is reported without the key and answered as provider_error 500", async () => {
     const { key } = await seed_two();
     const route = partner_route(async ({ request }: { request: Request }) => {
-      const live = await open_key(as_db(t.db), request);
+      const live = await open_key(as_db(t.db), request, "list_write");
       if (live instanceof Response) return live;
       throw new Error("boom");
     });

@@ -1,5 +1,7 @@
+import { eq } from "drizzle-orm";
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -52,6 +54,7 @@ const { npos } = await import("$/pg/schema/npo");
 const { partner_keys, partner_tenants } = await import("$/pg/schema/partner");
 const { rate_limit_windows } = await import("$/pg/schema/rate-limit");
 const { mint_key, revoke_key } = await import("$/partner/keys");
+const { charge, LIST_WRITE_QUOTA } = await import("$/partner/gate");
 const { loader, action } = await import("./api.partner.v1.readiness");
 
 type Db = Parameters<typeof mint_key>[0];
@@ -67,12 +70,19 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  // mid-minute, so a run of charges never straddles a window edge
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-25T10:00:20.000Z"));
   report_error.mockReset();
   await db().delete(rate_limit_windows);
   await db().delete(partner_keys);
   await db().delete(partner_tenants);
   await db().delete(npos);
   await db().delete(user);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 const seed_two = async () => {
@@ -157,6 +167,7 @@ describe("GET /api/partner/v1/readiness", () => {
     const res = await get(token);
 
     expect(res.status).toBe(401);
+    expect(res.headers.get("www-authenticate")).toBe("Bearer");
     expect(await res.json()).toMatchObject({ code: "key_invalid" });
   });
 
@@ -172,6 +183,25 @@ describe("GET /api/partner/v1/readiness", () => {
 
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({ code: "key_invalid" });
+  });
+
+  test("a read charges the read bucket, so a key out of list/write room still reads", async () => {
+    const { key } = await seed_two();
+    for (let i = 0; i < LIST_WRITE_QUOTA.max; i++) {
+      await charge(
+        db() as unknown as Parameters<typeof charge>[0],
+        key.id,
+        "list_write"
+      );
+    }
+
+    const res = await get(key.key);
+
+    expect(res.status).toBe(200);
+    const windows = await db()
+      .select({ key: rate_limit_windows.key, count: rate_limit_windows.count })
+      .from(rate_limit_windows);
+    expect(windows).toContainEqual({ key: `partner:read:${key.id}`, count: 1 });
   });
 
   test("a live key whose nonprofit has no tenant row is a reported 500 provider_error", async () => {
@@ -212,8 +242,14 @@ describe("GET /api/partner/v1/readiness", () => {
     }
   });
 
-  test("a POST is the contract's not_found and writes nothing", async () => {
-    const { key } = await seed_two();
+  test("a POST is the contract's not_found and writes nothing: the revision a changed body is owed waits for a GET", async () => {
+    const { mine, key } = await seed_two();
+    expect((await (await get(key.key)).json()).revision).toBe(1);
+    // the body now differs from the stored fingerprint, so any read of it bumps
+    await db()
+      .update(npos)
+      .set({ donate_methods: ["stripe", "daf"] })
+      .where(eq(npos.id, mine.id));
 
     const res = await action({
       request: new Request(URL_, {
@@ -228,7 +264,12 @@ describe("GET /api/partner/v1/readiness", () => {
     expect(res.status).toBe(404);
     expect(res.headers.get("content-type")).toBe("application/problem+json");
     expect(await res.json()).toMatchObject({ code: "not_found" });
-    const [tenant] = await db().select().from(partner_tenants);
-    expect(tenant.revision).toBe(0);
+    const [tenant] = await db()
+      .select()
+      .from(partner_tenants)
+      .where(eq(partner_tenants.npo_id, mine.id));
+    expect(tenant.revision).toBe(1);
+
+    expect((await (await get(key.key)).json()).revision).toBe(2);
   });
 });

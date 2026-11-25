@@ -6,7 +6,7 @@ import { db } from "$/pg/db";
 import type { Route } from "./+types/api.partner.v1.readiness";
 
 export const loader = partner_route(async ({ request }: Route.LoaderArgs) => {
-  const live = await open_key(db, request);
+  const live = await open_key(db, request, "read");
   if (live instanceof Response) return live;
   const body = await readiness(db, live.npo_id);
   return resp.json(body, 200, { "cache-control": "no-store" });
