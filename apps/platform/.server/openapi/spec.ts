@@ -846,7 +846,7 @@ const PARTNER_READINESS = {
     fee_rules: per_rail({
       type: "object",
       description:
-        "The processing fee a donor covering fees adds, so the fee is still covered once it is itself charged: (base × percent + fixed_minor) / (1 − percent), where base is the gift plus any contribution to Better Giving; then at most cap_minor; then, when round_up_minor is present, the fee grows until gift + contribution + fee is a multiple of round_up_minor. Without round_up_minor there is no rounding up. For example percent 0.029 and fixed_minor 30 on a 10000-cent gift with no contribution: (290 + 30) / 0.971 ≈ 329.6, so 330 with round_up_minor 1.",
+        "The processing fee a donor covering fees adds, so the fee is still covered once it is itself charged: (base × percent + fixed_minor) / (1 − percent), where base is the gift plus any contribution to Better Giving; then at most cap_minor. When round_up_minor is present, the total (gift + contribution + fee) rounds up to the next multiple of round_up_minor. The difference goes on the fee when the donor covers fees, otherwise on the contribution. With neither a fee nor a contribution, the total stays as entered. PayPal and Venmo have no round_up_minor: there the fee is truncated to the minor unit, so a fraction of a cent is dropped, never rounded up. For example percent 0.029 and fixed_minor 30 on a 10000-cent gift with no contribution: (290 + 30) / 0.971 ≈ 329.6, so 330 with round_up_minor 1, or 329 when truncated.",
       required: ["percent", "fixed_minor"],
       properties: {
         percent: { type: "number", minimum: 0, maximum: 1 },
