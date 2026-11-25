@@ -97,7 +97,8 @@ const seed_tenant = async (
 
 const read = (npo_id: number) => readiness(as_db(t.db), npo_id);
 
-// the decision this endpoint is built to: which checkout method each rail is
+// which checkout method's tab offers each rail, written out apart from
+// readiness.ts so a wrong mapping there fails here
 const RAIL_METHOD: Record<Rail, DonateMethodId> = {
   card: "stripe",
   apple_pay: "stripe",

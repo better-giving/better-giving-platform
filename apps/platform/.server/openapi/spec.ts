@@ -767,7 +767,7 @@ const minor = (description: string) => ({
 const PARTNER_READINESS = {
   type: "object",
   description:
-    "What the key's nonprofit can take right now. Money is integer minor units; rates are fractions. Enums here grow without a new version (a rail's `state`, `clients[].name`, `intervals`), so ignore a value you don't recognise: treat a rail in an unknown state as not offered.",
+    "What the key's nonprofit can take right now. Money is integer minor units; rates are fractions. Enums here grow without a new version (a rail's `state`, `clients[].name`, `intervals`), so ignore a value you don't recognize: treat a rail in an unknown state as not offered.",
   required: [
     "revision",
     "charges_enabled",
@@ -1045,7 +1045,7 @@ export function openapi_doc(origin: string) {
       {
         name: "partner",
         description:
-          "Partner v1: a hosted donation site taking gifts for one nonprofit. Enum values grow within v1, error `code`s included: ignore one you don't recognise rather than failing on it.",
+          "Partner v1: a hosted donation site taking gifts for one nonprofit. Enum values grow within v1, error `code`s included: ignore one you don't recognize rather than failing on it.",
       },
     ],
     paths,
