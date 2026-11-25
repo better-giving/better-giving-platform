@@ -11,7 +11,6 @@ import type { DbOrTx } from "../pg/queries/helpers";
 import { partner_keys, partner_tenants } from "../pg/schema/partner";
 
 const KEY_RE = /^spk_[A-Za-z0-9_-]{43}$/;
-const USED_TOUCH_MS = 60_000;
 
 const sha256_hex = (value: string) =>
   createHash("sha256").update(value, "utf8").digest("hex");
@@ -138,11 +137,9 @@ export async function revoke_key(
 /** the key's id and nonprofit; null for a revoked, unknown or malformed token */
 export async function find_live_key(
   db: DbOrTx,
-  token: string,
-  now = new Date()
+  token: string
 ): Promise<{ id: string; npo_id: number } | null> {
   if (!KEY_RE.test(token)) return null;
-  const stale_before = new Date(now.getTime() - USED_TOUCH_MS).toISOString();
   const live = and(
     eq(partner_keys.key_hash, sha256_hex(token)),
     isNull(partner_keys.revoked_at)
@@ -151,13 +148,13 @@ export async function find_live_key(
   // touch at most once a minute; a fresher stamp is left as it is
   const [touched] = await db
     .update(partner_keys)
-    .set({ last_used_at: now.toISOString() })
+    .set({ last_used_at: sql`now()` })
     .where(
       and(
         live,
         or(
           isNull(partner_keys.last_used_at),
-          lt(partner_keys.last_used_at, stale_before)
+          lt(partner_keys.last_used_at, sql`now() - interval '60 seconds'`)
         )
       )
     )

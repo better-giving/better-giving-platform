@@ -144,29 +144,40 @@ describe("find_live_key", () => {
     ).toBeNull();
   });
 
-  test("touches last_used_at at most once a minute", async () => {
+  test("touches last_used_at on the database clock, at most once a minute", async () => {
     const { npo, staff } = await seed_pair();
-    const minted = await mint_key(as_db(t.db), {
-      npo_id: npo.id,
-      minted_by: staff.id,
-    });
-    const at = (iso: string) => new Date(iso);
-    const used = async () =>
-      (
-        await t.db
-          .select({ last_used_at: partner_keys.last_used_at })
-          .from(partner_keys)
-      )[0]!.last_used_at;
 
-    await find_live_key(as_db(t.db), minted.key, at("2026-11-25T10:00:00Z"));
-    await find_live_key(as_db(t.db), minted.key, at("2026-11-25T10:00:59Z"));
-    expect(new Date(String(await used())).toISOString()).toBe(
-      "2026-11-25T10:00:00.000Z"
-    );
-    await find_live_key(as_db(t.db), minted.key, at("2026-11-25T10:01:01Z"));
-    expect(new Date(String(await used())).toISOString()).toBe(
-      "2026-11-25T10:01:01.000Z"
-    );
+    // now() is fixed for a transaction, so each stamp is checked against it
+    const ages = await t.db.transaction(async (tx) => {
+      const minted = await mint_key(as_db(tx), {
+        npo_id: npo.id,
+        minted_by: staff.id,
+      });
+      const used_age = async () => {
+        const [row] = await tx
+          .select({
+            age: sql<string>`extract(epoch from now() - ${partner_keys.last_used_at})`,
+          })
+          .from(partner_keys);
+        return Number(row!.age);
+      };
+      const used_ago = (seconds: number) =>
+        tx.update(partner_keys).set({
+          last_used_at: sql`now() - make_interval(secs => ${seconds})`,
+        });
+
+      await new Promise((r) => setTimeout(r, 5));
+      await find_live_key(as_db(tx), minted.key);
+      const first = await used_age();
+      await used_ago(59);
+      await find_live_key(as_db(tx), minted.key);
+      const fresh = await used_age();
+      await used_ago(61);
+      await find_live_key(as_db(tx), minted.key);
+      return { first, fresh, stale: await used_age() };
+    });
+
+    expect(ages).toEqual({ first: 0, fresh: 59, stale: 0 });
   });
 
   test("a revoked key is not live, and revoke needs the key's own nonprofit", async () => {
