@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   afterAll,
   beforeAll,
@@ -204,6 +204,31 @@ describe("find_live_key", () => {
       })
     ).toBe(false);
   });
+
+  test("stamps revoked_at from the database clock, as created_at is", async () => {
+    const { npo, staff } = await seed_pair();
+
+    // now() is fixed for a transaction, so only a db-clock stamp can match
+    const id = await t.db.transaction(async (tx) => {
+      const minted = await mint_key(as_db(tx), {
+        npo_id: npo.id,
+        minted_by: staff.id,
+      });
+      await new Promise((r) => setTimeout(r, 5));
+      await revoke_key(as_db(tx), {
+        id: minted.id,
+        npo_id: npo.id,
+        revoked_by: staff.id,
+      });
+      return minted.id;
+    });
+
+    const [row] = await t.db
+      .select()
+      .from(partner_keys)
+      .where(eq(partner_keys.id, id));
+    expect(row!.revoked_at).toBe(row!.created_at);
+  });
 });
 
 describe("rotate_key", () => {
@@ -239,6 +264,32 @@ describe("rotate_key", () => {
     });
     expect(await find_live_key(as_db(t.db), theirs.key)).not.toBeNull();
     expect(await event_secret_get(as_db(t.db), npo.id)).toBe(secret);
+  });
+
+  test("revokes on the database clock, at the instant its replacement is created", async () => {
+    const { npo, staff } = await seed_pair();
+    const old = await mint_key(as_db(t.db), {
+      npo_id: npo.id,
+      minted_by: staff.id,
+    });
+
+    // now() is fixed at the outer transaction's start; the wall clock moves on
+    const rotated = await t.db.transaction(async (tx) => {
+      await tx.execute(sql`select now()`);
+      await new Promise((r) => setTimeout(r, 5));
+      return rotate_key(as_db(tx), { npo_id: npo.id, rotated_by: staff.id });
+    });
+
+    const row = async (id: string) => {
+      const [r] = await t.db
+        .select()
+        .from(partner_keys)
+        .where(eq(partner_keys.id, id));
+      return r!;
+    };
+    expect((await row(old.id)).revoked_at).toBe(
+      (await row(rotated!.id)).created_at
+    );
   });
 
   test("is null for a nonprofit that never minted, and creates nothing", async () => {

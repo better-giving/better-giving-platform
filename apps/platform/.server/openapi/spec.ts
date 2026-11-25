@@ -887,11 +887,38 @@ const PARTNER_READINESS = {
   },
 };
 
+/** every partner answer is `no-store` (`.server/partner/problem.ts`, and the
+ * route's own 200); a 401 and a 429 add a header of their own */
+const NO_STORE = {
+  "Cache-Control": {
+    description: "Never cached.",
+    schema: { type: "string", enum: ["no-store"] },
+  },
+};
+
+const PARTNER_HEADERS: Record<number, Json> = {
+  401: {
+    "WWW-Authenticate": {
+      description: "The scheme the key goes in.",
+      schema: { type: "string", enum: ["Bearer"] },
+    },
+  },
+  429: {
+    "Retry-After": {
+      description: "Seconds until the key's window resets.",
+      schema: { type: "integer", minimum: 0 },
+    },
+  },
+};
+
 const partner_problems = (...statuses: number[]) =>
   Object.fromEntries(
     statuses.map((s) => [
       s,
-      error_response(s, "application/problem+json", "PartnerProblem"),
+      {
+        ...error_response(s, "application/problem+json", "PartnerProblem"),
+        headers: { ...NO_STORE, ...PARTNER_HEADERS[s] },
+      },
     ])
   );
 
@@ -905,7 +932,10 @@ const partner_ops = (): IOperation[] => [
       summary: "Get what the nonprofit's checkout can take",
       security: [{ partnerKey: [] }],
       responses: {
-        200: ok("The nonprofit's readiness.", ref("PartnerReadiness")),
+        200: {
+          ...ok("The nonprofit's readiness.", ref("PartnerReadiness")),
+          headers: NO_STORE,
+        },
         ...partner_problems(401, 429, 500),
       },
     },

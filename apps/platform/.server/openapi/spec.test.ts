@@ -15,7 +15,11 @@ import { CONNECTOR_ACTIONS } from "../connector/actions";
 import { BODY_KEYS, EXPECTED_VERSION, QUERY_PARAMS } from "../connector/inputs";
 import { PROBLEM_CODES } from "../connector/problem";
 import { mint_key } from "../partner/keys";
-import { PROBLEM_CODES as PARTNER_PROBLEM_CODES } from "../partner/problem";
+import {
+  PROBLEM_CODES as PARTNER_PROBLEM_CODES,
+  provider_error,
+  rate_limited,
+} from "../partner/problem";
 import { RAIL_STATES, RAILS, readiness } from "../partner/readiness";
 import { create_test_db } from "../pg/test-utils/pglite";
 import { read_only } from "../public-api";
@@ -296,6 +300,49 @@ describe("openapi drift", () => {
         "not_found",
       ]);
     }
+  });
+
+  test("a partner response declares exactly the headers its route sends, each value inside its schema", async () => {
+    const declared = (status: number) => {
+      const res = op_of("get_readiness").responses?.[status] as {
+        headers?: Record<string, { schema: Json }>;
+      };
+      return Object.fromEntries(
+        Object.entries(res.headers ?? {}).map(([k, v]) => [
+          k.toLowerCase(),
+          v.schema,
+        ])
+      );
+    };
+    const expect_documented = (status: number, r: Response) => {
+      expect(r.status).toBe(status);
+      const sent = [...r.headers].filter(([k]) => k !== "content-type");
+      const schemas = declared(status);
+      expect(Object.keys(schemas).sort(), `${status}`).toEqual(
+        sent.map(([k]) => k).sort()
+      );
+      for (const [k, v] of sent) {
+        const value = /^\d+$/.test(v) ? Number(v) : v;
+        expect(schema_errors(schemas[k], value, k), `${status}`).toEqual([]);
+      }
+    };
+
+    const mod = await route_module("api.partner.v1.readiness");
+    if (!mod.loader) throw new Error("readiness loader");
+    expect_documented(
+      401,
+      await call(mod.loader, "get", "/api/partner/v1/readiness")
+    );
+    // gate's charge and partner_route answer with these two constructors
+    expect_documented(429, rate_limited(30));
+    expect_documented(500, provider_error(500));
+
+    expect(declared(200)).toEqual({
+      "cache-control": { type: "string", enum: ["no-store"] },
+    });
+    expect(route_source_of("src/routes/api.partner.v1.readiness.ts")).toContain(
+      'resp.json(body, 200, { "cache-control": "no-store" })'
+    );
   });
 
   test("the readiness response schema names every rail in each per-rail map", () => {

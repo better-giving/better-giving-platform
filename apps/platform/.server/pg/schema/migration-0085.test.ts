@@ -22,7 +22,7 @@ const key = (id: string) => ({
   id,
   npo_id: npo,
   key_hash: sha256_hex(id),
-  prefix: "bgp_abcd",
+  prefix: "spk_abcd",
   last4: "wxyz",
   minted_by: "u-0085",
 });
@@ -56,7 +56,7 @@ test("key_hash must be 64 lowercase hex chars, so a raw key cannot be stored", a
   await expect(
     t.db
       .insert(partner_keys)
-      .values({ ...key("raw"), key_hash: "bgp_live_raw_key" })
+      .values({ ...key("raw"), key_hash: "spk_live_raw_key" })
   ).rejects.toMatchObject({
     cause: { code: "23514", constraint: "partner_keys_key_hash_hex" },
   });
@@ -73,7 +73,7 @@ test("key_hash must be 64 lowercase hex chars, so a raw key cannot be stored", a
 
 test("prefix is exactly 8 chars and last4 exactly 4", async () => {
   await expect(
-    t.db.insert(partner_keys).values({ ...key("p"), prefix: "bgp_abc" })
+    t.db.insert(partner_keys).values({ ...key("p"), prefix: "spk_abc" })
   ).rejects.toMatchObject({
     cause: { code: "23514", constraint: "partner_keys_prefix_len" },
   });

@@ -5,7 +5,7 @@ import {
   createHash,
   randomBytes,
 } from "node:crypto";
-import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { app } from "../env";
 import type { DbOrTx } from "../pg/queries/helpers";
 import { partner_keys, partner_tenants } from "../pg/schema/partner";
@@ -103,10 +103,7 @@ export async function rotate_key(
     if (!tenant) return null;
     const revoked = await tx
       .update(partner_keys)
-      .set({
-        revoked_at: new Date().toISOString(),
-        revoked_by: args.rotated_by,
-      })
+      .set({ revoked_at: sql`now()`, revoked_by: args.rotated_by })
       .where(
         and(
           eq(partner_keys.npo_id, args.npo_id),
@@ -126,7 +123,7 @@ export async function revoke_key(
 ): Promise<boolean> {
   const rows = await db
     .update(partner_keys)
-    .set({ revoked_at: new Date().toISOString(), revoked_by: args.revoked_by })
+    .set({ revoked_at: sql`now()`, revoked_by: args.revoked_by })
     .where(
       and(
         eq(partner_keys.id, args.id),
