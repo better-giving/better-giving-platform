@@ -341,6 +341,23 @@ describe("charge.dispute.created", () => {
     });
   });
 
+  it.each(["under_review", "warning_under_review", "lost"])(
+    "asks for no response, and shows no deadline, when the dispute opens %s",
+    async (status) => {
+      const gift = await seed_card_gift(db(), PAID_GRANT);
+
+      await deliver(
+        event_of("charge.dispute.created", dispute_of(gift, { status }))
+      );
+
+      const [only] = notices();
+      expect(only.payload.alert).not.toHaveProperty("action");
+      expect(
+        only.payload.alert.fields.map((f: { name: string }) => f.name)
+      ).not.toContain("Respond by");
+    }
+  );
+
   it("links a test-mode dispute under the dashboard's /test path", async () => {
     const gift = await seed_card_gift(db(), PAID_GRANT);
 

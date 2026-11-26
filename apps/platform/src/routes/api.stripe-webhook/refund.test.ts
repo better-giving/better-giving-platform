@@ -306,13 +306,17 @@ describe("a partial refund on a gift whose grant went out", () => {
         .filter((m) => m.id === "fiat-notice")
         .map((m) => m.payload.alert.title as string);
 
-    await deliver(refund(4_000));
+    const first_event = refund(4_000);
+    await deliver(first_event);
     await deliver(refund(3_000));
+    await deliver(first_event); // stripe redelivers the first, after the second
 
-    const [first, second] = titles();
+    const [first, second, again] = titles();
     expect(first).toContain("$40.00");
     expect(second).toContain("$30.00");
     expect(second).not.toContain("$70.00");
+    // about the refund it added, not the newest
+    expect(again).toContain("$40.00");
     expect(notice_text()).toContain(
       "Total refunded so far: 70.00 USD of 100.00 USD."
     );

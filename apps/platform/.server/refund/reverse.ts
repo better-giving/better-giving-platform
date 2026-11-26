@@ -428,12 +428,21 @@ export async function reverse_charge(
   );
   if (r.source === "dispute") {
     // the fees were written after `res.owed` was read: show the rows as they stand
+    // a failed read must not lose the alert: a redelivery stops at the
+    // reversed guard, so this is its only chance. it falls back to `res.owed`
     const read = new Set(res.owed.map((o) => o.id));
-    const owed = (await owed_for_donation(don.id)).filter(
-      (o) =>
-        read.has(o.id) ||
-        (o.source === "dispute" && o.source_ref === src.source_ref)
-    );
+    const owed = await owed_for_donation(don.id)
+      .then((rows) =>
+        rows.filter(
+          (o) =>
+            read.has(o.id) ||
+            (o.source === "dispute" && o.source_ref === src.source_ref)
+        )
+      )
+      .catch((err) => {
+        report_error(err, { donation_id: r.donation_id, title: "owed rows" });
+        return res.owed;
+      });
     await notify_dispute_lost(r, don, graphs.length, { ...res, owed });
   }
 

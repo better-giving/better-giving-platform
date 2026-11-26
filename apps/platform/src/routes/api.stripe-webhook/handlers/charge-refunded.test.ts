@@ -282,7 +282,7 @@ describe("stripe charge.refunded → what a held or failed reversal does to the 
       new Set(["fiat.notice_re_1_held"])
     );
     const text = alert_text(held[0].payload.alert);
-    expect(text).toContain(`donation ${ORDER_ID.slice(0, 8)}…`);
+    expect(text).toContain(`donation ${ORDER_ID}`);
     expect(text).toContain("100.00 USD (re_1, pending)");
     expect(text).toMatch(/refund\.updated/);
   });

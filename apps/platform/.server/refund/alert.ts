@@ -94,11 +94,6 @@ export const donated_field = (don?: IAlertDonation): Field | undefined => {
   return value ? { name: "Donated", value, inline: true } : undefined;
 };
 
-/** "donation 98bc019c… · dispute X": the ids an alert footer carries, the
- * donation id cut to its first eight characters */
-export const short_id = (id: string) =>
-  id.length > 12 ? `${id.slice(0, 8)}…` : id;
-
 const usd = (n: number) => n.toFixed(2);
 
 /**

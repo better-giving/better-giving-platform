@@ -49,6 +49,8 @@ export async function handle_charge_refunded(
     alert_from: ALERT_FROM,
     seen_at: [`charge ${refunded.charge.id}`, `event ${event.id}`],
     event_id: event.id,
+    // a late or redelivered event is about the refund it added, not the newest
+    ...(added?.length === 1 && { refund: added[0] }),
     lines: [
       `New in this event: ${added ? refund_list(added, refunded.charge.currency) : "could not tell which refund is new"}.`,
     ],

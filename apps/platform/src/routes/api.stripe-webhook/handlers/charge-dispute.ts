@@ -42,6 +42,11 @@ const reason_field = (d: Stripe.Dispute) => ({
   inline: true as const,
 });
 
+const AWAITING_RESPONSE = new Set<Stripe.Dispute["status"]>([
+  "needs_response",
+  "warning_needs_response",
+]);
+
 const respond_action = (d: Stripe.Dispute) => {
   const due = d.evidence_details?.due_by;
   const by = due ? alert_deadline(new Date(due * 1000)) : undefined;
@@ -438,12 +443,15 @@ async function notify_opened(
 ) {
   const dispute = event.data.object;
   const due = dispute.evidence_details?.due_by;
+  // a response is asked for only where one is still due: evidence already
+  // submitted, or a dispute stripe closed on open, leaves nothing to answer
+  const awaiting = AWAITING_RESPONSE.has(dispute.status);
   const alert = await dispute_alert(dispute, don, event.id, {
     headline: "Stripe dispute opened",
     fields: [reason_field(dispute)],
-    respond_by: due ? new Date(due * 1000) : undefined,
+    respond_by: awaiting && due ? new Date(due * 1000) : undefined,
     ...n,
-    action: respond_action(dispute),
+    action: awaiting ? respond_action(dispute) : undefined,
   });
   await enqueue(msg("fiat-notice", { id: notice_id, alert }));
 }

@@ -45,6 +45,7 @@ import {
   owed_table,
   recipient_name,
 } from "./alert";
+import { ops_alert } from "./ops-alert";
 
 const owed = (o: Partial<IOwed>): IOwed =>
   ({
@@ -105,27 +106,40 @@ describe("owed_table", () => {
 });
 
 describe("alert helpers", () => {
+  /** runs `fn` with the process in each zone, one west and one east of UTC,
+   * so a local-time reading moves a near-midnight instant to another day */
+  const in_zones = (fn: () => void) => {
+    const zone = process.env.TZ;
+    try {
+      for (const tz of ["America/Los_Angeles", "Asia/Tokyo"]) {
+        process.env.TZ = tz;
+        fn();
+      }
+    } finally {
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    }
+  };
+
   test("alert_date reads a UTC calendar day, and nothing for no or bad dates", () => {
-    expect(alert_date("2026-11-20T23:30:00Z")).toBe("Nov 20, 2026");
+    in_zones(() => {
+      // west of UTC this is still the 20th locally; east of it, already the 21st
+      expect(alert_date("2026-11-21T00:30:00Z")).toBe("Nov 21, 2026");
+      expect(alert_date("2026-11-20T23:30:00Z")).toBe("Nov 20, 2026");
+    });
     expect(alert_date(undefined)).toBeUndefined();
     expect(alert_date("not a date")).toBeUndefined();
   });
 
   test("alert_deadline keeps the UTC time, on either side of midnight", () => {
-    // in a US zone a local-time reading moves both of these to the day before
-    const zone = process.env.TZ;
-    process.env.TZ = "America/Los_Angeles";
-    try {
+    in_zones(() => {
       expect(alert_deadline("2026-12-10T23:30:00Z")).toBe(
         "Dec 10, 2026, 23:30 UTC"
       );
       expect(alert_deadline("2026-12-11T00:30:00Z")).toBe(
         "Dec 11, 2026, 00:30 UTC"
       );
-    } finally {
-      if (zone === undefined) delete process.env.TZ;
-      else process.env.TZ = zone;
-    }
+    });
     expect(alert_deadline(new Date("2026-12-10T07:00:00Z"))).toBe(
       "Dec 10, 2026, 07:00 UTC"
     );
@@ -137,6 +151,24 @@ describe("alert helpers", () => {
     expect(amount_label("6")).toBe("$6.00");
     expect(amount_label("6", "EUR")).toBe("6.00 EUR");
     expect(amount_label(undefined)).toBe("unknown amount");
+  });
+
+  test("ops_alert's footer carries the whole donation id, to look it up by", async () => {
+    const id = "98bc019c-3f2a-4d1e-9b7c-5e0a1f2d3c4b";
+    const alert = await ops_alert({
+      from: "test",
+      headline: "Partial refund not reversed",
+      subject: "Refunded",
+      don: {
+        id,
+        to_id: "4",
+        to_name: "Save the Kids",
+        to_type: "npo",
+        created_at: "2026-11-20T10:00:00Z",
+      },
+      ids: ["charge ch_1"],
+    });
+    expect(alert.context).toEqual([`donation ${id} · charge ch_1`]);
   });
 
   test("recipient_name falls back to the id, then to unknown", () => {

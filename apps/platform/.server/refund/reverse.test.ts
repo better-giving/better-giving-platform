@@ -49,6 +49,22 @@ vi.mock("../pg/db", () => ({
   ),
 }));
 
+// the lost-dispute alert's own read of the owed rows is the one call made with
+// no transaction: `fail` makes just that one reject
+const owed_read = vi.hoisted(() => ({ fail: false }));
+vi.mock("../pg/queries/owed", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../pg/queries/owed")>();
+  return {
+    ...actual,
+    owed_for_donation: (
+      ...args: Parameters<typeof actual.owed_for_donation>
+    ) =>
+      owed_read.fail && args.length === 1
+        ? Promise.reject(new Error("owed read failed"))
+        : actual.owed_for_donation(...args),
+  };
+});
+
 const fiat_alert = vi.hoisted(() => vi.fn());
 vi.mock("../kit/slack", () => ({ fiat_monitor: { send_alert: fiat_alert } }));
 
@@ -1475,6 +1491,62 @@ describe("reverse_charge — the ops notice of a full reversal", () => {
       [`Test NPO ${counter} (#${npo_id})`, "90.00", "3.20", "15.00", "108.20"],
       ["Total", "—", "—", "—", "108.20"],
     ]);
+  });
+
+  test("a lost dispute still alerts, from the rows it already holds, when the fresh read fails", async () => {
+    const { id, npo_id } = await seed("stripe:card");
+    await grant_paid(id, npo_id);
+    owed_read.fail = true;
+    report_error.mockClear();
+
+    try {
+      const res = await reverse_charge({
+        donation_id: id,
+        rail: "stripe",
+        source: "dispute",
+        share: whole,
+        source_ref: "du_1",
+        alert_from: "charge-dispute",
+        notice,
+      });
+      expect(res.status).toBe("reversed");
+    } finally {
+      owed_read.fail = false;
+    }
+
+    const [n] = queued();
+    expect(n.alert.table.rows.at(-1)).toEqual([
+      "Total",
+      "—",
+      "—",
+      "—",
+      "93.20",
+    ]);
+    expect(report_error).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "owed read failed" }),
+      expect.objectContaining({ donation_id: id })
+    );
+  });
+
+  test("a lost dispute whose notice can't be queued is reported, and the reversal stands", async () => {
+    const { id } = await seed("stripe:card");
+    enqueue.mockRejectedValueOnce(new Error("qstash 503"));
+    report_error.mockClear();
+
+    const res = await reverse_charge({
+      donation_id: id,
+      rail: "stripe",
+      source: "dispute",
+      share: whole,
+      alert_from: "charge-dispute",
+      notice,
+    });
+
+    expect(res.status).toBe("reversed");
+    expect(report_error).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "qstash 503" }),
+      expect.objectContaining({ donation_id: id })
+    );
   });
 
   test("a full refund queues no notice of its own", async () => {
