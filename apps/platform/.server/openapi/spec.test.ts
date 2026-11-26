@@ -13,6 +13,7 @@ import { seed_npo, seed_user } from "#/__tests__/fixtures/funds";
 import {
   donation_amounts,
   fee_terms,
+  whole_dollar_amounts,
 } from "#/components/donation/common/amounts";
 import { API_ERROR_STATUS } from "@/helpers/api-error";
 import { rd } from "@/helpers/decimal";
@@ -670,7 +671,7 @@ describe("readiness body against the published schema", () => {
       /ignore a key or value you don't recognize/
     );
     expect(schema.description).toMatch(/unknown state as not offered/);
-    expect(schema.description).toMatch(/offered. alone/);
+    expect(schema.description).toMatch(/\.offered` alone/);
   });
 
   test("a body with a method the schema doesn't name validates in each map, and an unknown method of the wrong shape does not", async () => {
@@ -695,7 +696,22 @@ describe("readiness body against the published schema", () => {
         ...body,
         fee_rules: { ...body.fee_rules, wire: { percent: "1%" } },
       })
-    ).not.toEqual([]);
+    ).toEqual([
+      "$.fee_rules.wire.fixed_minor: missing",
+      "$.fee_rules.wire.percent: expected number, got string",
+    ]);
+    expect(
+      schema_errors(schema, {
+        ...body,
+        rails: { ...body.rails, wire: { state: "active" } },
+      })
+    ).toEqual(["$.rails.wire.offered: missing"]);
+    expect(
+      schema_errors(schema, {
+        ...body,
+        intervals: { ...body.intervals, wire: "monthly" },
+      })
+    ).toEqual(["$.intervals.wire: expected array, got string"]);
   });
 
   test("a rail's states include pending, and the amounts are integer USD cents", async () => {
@@ -710,8 +726,7 @@ describe("readiness body against the published schema", () => {
     };
     expect(
       schema.properties.rails.properties.card.properties.state.enum
-    ).toEqual([...RAIL_STATES]);
-    expect(RAIL_STATES).toContain("pending");
+    ).toEqual(["active", "pending", "inactive", "unrequested"]);
     const fee = schema.properties.fee_rules.properties.card.properties;
     for (const key of ["fixed_minor", "cap_minor", "round_up_minor"]) {
       expect(fee[key], key).toMatchObject({ type: "integer", minimum: 0 });
@@ -777,8 +792,23 @@ describe("fee_rules against the checkout's fee", () => {
       daf: fee_terms.daf,
     }[rail];
     if (!terms) throw new Error(`no checkout fee for ${rail}`);
-    return donation_amounts(none, 2, terms).fee_allowance * 100;
+    const amounts = donation_amounts(none, 2, terms);
+    // a daf grants whole dollars, as its checkout does
+    return (
+      (rail === "daf" ? whole_dollar_amounts(amounts) : amounts).fee_allowance *
+      100
+    );
   };
+
+  /** the published rule: the total (gift + fee) rounds up to a multiple of
+   * round_up_minor and the difference lands on the fee */
+  const rounded_fee = (
+    formula: number,
+    base_minor: number,
+    round_up_minor: number
+  ) =>
+    Math.ceil((base_minor + formula - 1e-9) / round_up_minor) * round_up_minor -
+    base_minor;
 
   test("each published rule's formula is the fee checkout adds, rounded as the rule says", async () => {
     const rules = await rule_of();
@@ -789,7 +819,7 @@ describe("fee_rules against the checkout's fee", () => {
         const expected =
           rule.round_up_minor === undefined
             ? Math.floor(formula)
-            : Math.ceil(formula - 1e-9);
+            : rounded_fee(formula, usd * 100, rule.round_up_minor);
         const sent = checkout_fee(rail, usd);
         // crypto doesn't round
         if (rail === "crypto")
@@ -803,8 +833,8 @@ describe("fee_rules against the checkout's fee", () => {
 
   test("the rule's rounding fields: cents on stripe's rails, whole dollars on daf, none on paypal, venmo and crypto", async () => {
     const rules = await rule_of();
-    // whole_dollar_amounts lives in the daf checkout component and isn't
-    // importable, so daf's 100 is pinned from the published value
+    // the daf's 100 is tied to checkout's whole_dollar_amounts by the formula
+    // test above and the worked gifts below
     expect(
       Object.fromEntries(
         Object.entries(rules).map(([k, r]) => [k, r.round_up_minor])
@@ -819,6 +849,23 @@ describe("fee_rules against the checkout's fee", () => {
       daf: 100,
       crypto: undefined,
     });
+  });
+
+  test("a daf gift's fee lands the total on a whole dollar, as the published rule of 100 says", async () => {
+    const { daf } = await rule_of();
+    expect(daf.round_up_minor).toBe(100);
+    // totals worked by hand at the daf's 0.029: 100 + 2.99 up to 103.00,
+    // 10 + 0.30 up to 11.00, 1000 + 29.87 up to 1030.00
+    expect(checkout_fee("daf", 100)).toBe(300);
+    expect(checkout_fee("daf", 10)).toBe(100);
+    expect(checkout_fee("daf", 1000)).toBe(3000);
+    for (const [usd, fee_minor] of [
+      [100, 300],
+      [10, 100],
+      [1000, 3000],
+    ]) {
+      expect((usd * 100 + fee_minor) % daf.round_up_minor!).toBe(0);
+    }
   });
 
   test("the example in the description: 0.029 and 30 on a 10000-cent gift is 329.6, 330 rounded up and 329 truncated", () => {

@@ -62,6 +62,21 @@ describe("whole_dollar_amounts", () => {
       in: { base: 10, tip: 1.5, fee_allowance: 0.62 },
       out: { base: 10, tip: 1.5, fee_allowance: 1.5 },
     },
+    {
+      name: "fee cover with the total already whole: 100 + 3 + 0.50 + 1.50 is 105.00, no top-up",
+      in: { base: 100, tip: 3.5, fee_allowance: 1.5 },
+      out: { base: 100, tip: 3.5, fee_allowance: 1.5 },
+    },
+    {
+      name: "fee cover with the total already whole and no tip: 50 + 2.00 stays",
+      in: { base: 50, tip: 0, fee_allowance: 2 },
+      out: { base: 50, tip: 0, fee_allowance: 2 },
+    },
+    {
+      name: "tip and allowance both carrying cents: 20 + 2.35 + 0.97 is 23.32, the allowance takes 0.68 to 1.65",
+      in: { base: 20, tip: 2.35, fee_allowance: 0.97 },
+      out: { base: 20, tip: 2.35, fee_allowance: 1.65 },
+    },
   ])("$name", ({ in: input, out }) => {
     expect(whole_dollar_amounts(input)).toEqual(out);
   });
