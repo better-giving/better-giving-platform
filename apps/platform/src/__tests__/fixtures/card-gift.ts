@@ -4,6 +4,7 @@ import { bal_txs } from "$/pg/schema/bal-tx";
 import { donation_disputes } from "$/pg/schema/dispute";
 import { dists } from "$/pg/schema/dist";
 import {
+  donation_donors,
   donation_recipients,
   donation_settlements,
   donations,
@@ -62,6 +63,7 @@ export async function clear_card_gifts(db: Db) {
   await db.delete(dists);
   await db.delete(donation_settlements);
   await db.delete(donation_recipients);
+  await db.delete(donation_donors);
   await db.delete(donations);
   await db.delete(npos);
   await db.delete(user);
@@ -156,6 +158,30 @@ export async function seed_card_gift(db: Db, ...ds: IDistSeed[]) {
     type: "npo",
   });
   return { id, sttl_id, npo_ids };
+}
+
+/** names the gift's first npo and its donor, and dates the gift, as an ops
+ * alert reads them */
+export async function name_card_gift(
+  db: Db,
+  gift: { id: string; npo_ids: number[] },
+  o: { npo: string; donor: string; created_at: string }
+) {
+  const npo_id = gift.npo_ids[0]!;
+  await db.update(npos).set({ name: o.npo }).where(eq(npos.id, npo_id));
+  await db
+    .update(donation_recipients)
+    .set({ name: o.npo })
+    .where(eq(donation_recipients.donation_id, gift.id));
+  await db.insert(donation_donors).values({
+    donation_id: gift.id,
+    email: "donor@test.com",
+    name: o.donor,
+  });
+  await db
+    .update(donations)
+    .set({ created_at: o.created_at })
+    .where(eq(donations.id, gift.id));
 }
 
 /** a `usd` commission on the gift's first dist, paid to the referrer with

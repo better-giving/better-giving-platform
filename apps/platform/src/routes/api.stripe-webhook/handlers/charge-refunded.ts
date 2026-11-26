@@ -47,10 +47,10 @@ export async function handle_charge_refunded(
   const added = added_by(event, refunded.refunds);
   await reverse_refunds(refunded, {
     alert_from: ALERT_FROM,
-    seen_at: `charge ${refunded.charge.id}, event ${event.id}`,
+    seen_at: [`charge ${refunded.charge.id}`, `event ${event.id}`],
     event_id: event.id,
     lines: [
-      `new in this event: ${added ? refund_list(added, refunded.charge.currency) : "could not tell which refund is new"}`,
+      `New in this event: ${added ? refund_list(added, refunded.charge.currency) : "could not tell which refund is new"}.`,
     ],
   });
 }

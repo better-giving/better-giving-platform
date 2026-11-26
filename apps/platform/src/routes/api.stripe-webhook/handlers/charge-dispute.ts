@@ -1,12 +1,16 @@
 import type Stripe from "stripe";
 import { from_stripe_amount, str_id } from "#/helpers/stripe";
+import type { IDonation } from "@/donations";
 import { msg } from "@/queue";
 import { stage } from "$/env";
 import { enqueue } from "$/kit/queue";
-import { money, refund_list } from "$/kit/stripe-money";
+import { money, money_label, refund_list } from "$/kit/stripe-money";
 import { db } from "$/pg/db";
 import { dispute_close, dispute_get, dispute_open } from "$/pg/queries/dispute";
-import { dispute_opened, dispute_won, owed_lines } from "$/refund/dispute";
+import type { IOwed } from "$/pg/queries/owed";
+import { alert_date } from "$/refund/alert";
+import { dispute_opened, dispute_won } from "$/refund/dispute";
+import { humanize_code, type IOpsAlert, ops_alert } from "$/refund/ops-alert";
 import { load_reversible, reverse_charge } from "$/refund/reverse";
 import { charge_refunds, refund_take } from "$/refund/unsent";
 import {
@@ -26,8 +30,45 @@ const ALERT_FROM = "charge-dispute";
 
 const iso = (unix: number) => new Date(unix * 1000).toISOString();
 
-const dispute_line = (d: Stripe.Dispute, don_id: string, event_id: string) =>
-  `donation ${don_id}, dispute ${d.id}, charge ${str_id(d.charge)}, event ${event_id}`;
+const dispute_ids = (d: Stripe.Dispute, event_id: string) => [
+  `dispute ${d.id}`,
+  `charge ${str_id(d.charge)}`,
+  `event ${event_id}`,
+];
+
+const reason_field = (d: Stripe.Dispute) => ({
+  name: "Reason",
+  value: humanize_code(d.reason),
+  inline: true as const,
+});
+
+const respond_action = (d: Stripe.Dispute) => {
+  const due = d.evidence_details?.due_by;
+  const by = due ? alert_date(new Date(due * 1000)) : undefined;
+  return {
+    text: `Respond in the Stripe dashboard${by ? ` by ${by}` : ""}.`,
+    url: `https://dashboard.stripe.com/disputes/${d.id}`,
+  };
+};
+
+/** an ops alert of dispute `d` on `don`, the donation its charge settled */
+const dispute_alert = (
+  d: Stripe.Dispute,
+  don: IDonation,
+  event_id: string,
+  a: Pick<
+    IOpsAlert,
+    "headline" | "fields" | "respond_by" | "owed" | "note" | "action"
+  >
+) =>
+  ops_alert({
+    from: `${ALERT_FROM}-${stage}`,
+    don,
+    amount: money_label(d.amount, d.currency),
+    subject: "Disputed",
+    ids: dispute_ids(d, event_id),
+    ...a,
+  });
 
 /** in its balance transactions' own (settlement) currency, never the dispute's */
 const fee_txns = (d: Stripe.Dispute) =>
@@ -49,7 +90,7 @@ const dispute_fee_usd = (d: Stripe.Dispute): { usd: number; line?: string } => {
   if (first.currency !== "usd") {
     return {
       usd: 0,
-      line: `dispute fee settled in ${first.currency.toUpperCase()} (${money(amount, first.currency)}): recorded as none owed, settle its share by hand.`,
+      line: `Dispute fee settled in ${first.currency.toUpperCase()} (${money(amount, first.currency)}): recorded as none owed, settle its share by hand.`,
     };
   }
   return { usd: from_stripe_amount(amount, first.currency) };
@@ -93,7 +134,7 @@ export async function handle_dispute_closed(
   const intent_id = str_id(dispute.payment_intent);
   const don = await settled_donation(intent_id);
   const at = { opened_at: iso(dispute.created), closed_at: iso(event.created) };
-  const release = () => release_closed(event, don.id, intent_id);
+  const release = () => release_closed(event, don, intent_id);
 
   if (dispute.status === "warning_closed") {
     await dispute_close(db, {
@@ -129,16 +170,13 @@ export async function handle_dispute_closed(
       await enqueue(
         msg("fiat-notice", {
           id: event.id,
-          alert: {
-            type: "NOTICE",
-            from: `${ALERT_FROM}-${stage}`,
-            title: "Dispute Outcome Changed",
-            body: [
-              dispute_line(dispute, don.id, event.id),
-              `dispute ${dispute.id} won after it was recorded ${won.prior_status}: the chargeback stays owed; credit by hand if stripe returned the money.`,
+          alert: await dispute_alert(dispute, don, event.id, {
+            headline: "Stripe dispute outcome changed",
+            note: [
+              `Won after it was recorded ${won.prior_status}. The chargeback stays owed; credit it by hand if Stripe returned the money.`,
               ...routed,
-            ].join("\n"),
-          },
+            ],
+          }),
         })
       );
       return;
@@ -149,26 +187,24 @@ export async function handle_dispute_closed(
     await enqueue(
       msg("fiat-notice", {
         id: event.id,
-        alert: {
-          type: "NOTICE",
-          from: `${ALERT_FROM}-${stage}`,
-          title: "Dispute Won on a Reversed Donation",
-          body: [
-            dispute_line(dispute, don.id, event.id),
+        alert: await dispute_alert(dispute, don, event.id, {
+          headline: "Stripe dispute won on a reversed donation",
+          note: [
             won.credited
-              ? [
-                  `stripe returned the disputed ${money(dispute.amount, dispute.currency)} after it was lost, and that loss reversed the donation (${won.donation_status}). what it recorded as owed is credited back${fee.line ? "" : ", its dispute fee included"}.`,
-                  ...(fee.line ? [fee.line] : []),
-                ].join(" ")
+              ? `Stripe returned the money after it was lost and the loss reversed the donation (${won.donation_status}); what it recorded as owed is credited back${fee.line ? "" : ", its dispute fee included"}.`
               : won.hand
-                ? [
-                    `stripe returned the disputed ${money(dispute.amount, dispute.currency)} after it was lost, and that loss reversed the donation (${won.donation_status}): credit the nonprofit by hand what the reversal took.`,
-                    ...(fee.line ? [fee.line] : []),
-                  ].join(" ")
-                : `stripe returned the disputed ${money(dispute.amount, dispute.currency)}, the platform's own withdrawal: the donation was already ${won.donation_status}, reversed by its refund or another dispute rather than this one, so nothing is owed to the nonprofit.`,
+                ? `Stripe returned the money after it was lost and the loss reversed the donation (${won.donation_status}).`
+                : `Stripe returned the money, the platform's own withdrawal: the donation was already ${won.donation_status}, reversed by its refund or another dispute, so nothing is owed to the nonprofit.`,
+            ...((won.credited || won.hand) && fee.line ? [fee.line] : []),
             ...routed,
-          ].join("\n"),
-        },
+          ],
+          ...(!won.credited &&
+            won.hand && {
+              action: {
+                text: "Credit the nonprofit by hand what the reversal took.",
+              },
+            }),
+        }),
       })
     );
     return;
@@ -215,16 +251,18 @@ export async function handle_dispute_closed(
     alert_from: ALERT_FROM,
     notice: {
       id: event.id,
+      amount: money_label(dispute.amount, dispute.currency),
+      subject: "Disputed",
+      fields: [reason_field(dispute)],
+      ids: dispute_ids(dispute, event.id),
       lines: [
-        dispute_line(dispute, don.id, event.id),
-        `disputed amount: ${money(dispute.amount, dispute.currency)}, reason: ${dispute.reason}`,
-        `earlier refunds: ${refund_list(refunds, charge.currency) || "none"}`,
+        `Earlier refunds: ${refund_list(refunds, charge.currency) || "none"}.`,
         ...(partial
           ? [
-              `taken back so far: ${money(share.taken, charge.currency)} of ${money(share.of, charge.currency)}`,
+              `Taken back so far: ${money(share.taken, charge.currency)} of ${money(share.of, charge.currency)}.`,
             ]
           : []),
-        `dispute fee: ${dispute_fees(dispute)}`,
+        `Dispute fee: ${dispute_fees(dispute)}.`,
         ...(fee.line ? [fee.line] : []),
         ...routed,
         ...released_lines(released),
@@ -255,11 +293,11 @@ export async function handle_dispute_closed(
 /** a favorable close sends the transfers the dispute held, and tells ops */
 async function release_closed(
   event: Stripe.ChargeDisputeClosedEvent,
-  donation_id: string,
+  don: IDonation,
   intent_id: string
 ) {
   const dispute = event.data.object;
-  const released = await held_transfers(donation_id);
+  const released = await held_transfers(don.id);
   if (released.length === 0) return;
   // keyed on the event: a redelivery collapses into it. ahead of the
   // transfers, so a lost notice fails the delivery with them still held and
@@ -267,19 +305,27 @@ async function release_closed(
   await enqueue(
     msg("fiat-notice", {
       id: event.id,
-      alert: {
-        type: "NOTICE",
-        from: `${ALERT_FROM}-${stage}`,
-        title: "Dispute Closed: Held Transfers Released",
-        body: [
-          dispute_line(dispute, donation_id, event.id),
-          `dispute ${dispute.id} closed ${dispute.status}: the transfers it held are sent.`,
+      alert: await dispute_alert(dispute, don, event.id, {
+        headline: "Stripe dispute closed, held transfers released",
+        fields: [
+          {
+            name: "Status",
+            value: humanize_code(dispute.status),
+            inline: true,
+          },
+        ],
+        note: [
+          "The transfers the dispute held are sent.",
           ...released_lines(released),
-        ].join("\n"),
-      },
+        ],
+      }),
     })
   );
-  await send_held(released, { donation_id, intent_id, dispute_id: dispute.id });
+  await send_held(released, {
+    donation_id: don.id,
+    intent_id,
+    dispute_id: dispute.id,
+  });
 }
 
 /** an inquiry escalating to a chargeback stays the same dispute and sends no
@@ -300,8 +346,8 @@ export async function handle_dispute_opened(event: DisputeEvent) {
   const routed = await routed_open_lines(don.id);
   if (!withdrawn) {
     const inquiry = dispute.status.startsWith("warning_");
-    return record_only(event, don.id, [
-      `${inquiry ? "an inquiry: " : ""}stripe has withdrawn no funds, so nothing recorded as owed. if it withdraws them, as when an inquiry escalates to a chargeback, what the gift's parties owe is recorded then.`,
+    return record_only(event, don, [
+      `${inquiry ? "An inquiry: Stripe" : "Stripe"} has withdrawn no funds, so nothing is recorded as owed until it does.`,
       ...routed,
     ]);
   }
@@ -317,8 +363,8 @@ export async function handle_dispute_opened(event: DisputeEvent) {
   });
   if (res.status === "closed") return;
   if (res.status === "failed") {
-    return record_only(event, don.id, [
-      `nothing recorded as owed: ${res.reason}. settle the donation by hand.`,
+    return record_only(event, don, [
+      `Nothing recorded as owed: ${res.reason}. Settle the donation by hand.`,
     ]);
   }
   // news that grows nothing owed is told on the first sighting of the funds
@@ -328,73 +374,75 @@ export async function handle_dispute_opened(event: DisputeEvent) {
     res.inserted || event.type === "charge.dispute.funds_withdrawn";
   if (res.status === "already_reversed") {
     if (!sighted) return;
-    return notify_opened(event, don.id, `${dispute.id}_reversed`, [
-      `the donation was already ${res.donation_status}, so nothing recorded as owed: the refund is the evidence to submit.`,
-    ]);
+    return notify_opened(event, don, `${dispute.id}_reversed`, {
+      note: [
+        `The donation was already ${res.donation_status}, so nothing is recorded as owed: the refund is the evidence to submit.`,
+      ],
+    });
   }
 
   if (res.owed.length === 0) {
     if (!sighted) return;
-    return notify_opened(event, don.id, `${dispute.id}_unsettled`, [
-      "nothing settled to the gift's parties yet, so nothing recorded as owed.",
-      ...routed,
-    ]);
+    return notify_opened(event, don, `${dispute.id}_unsettled`, {
+      note: [
+        "Nothing settled to the gift's parties yet, so nothing is recorded as owed.",
+        ...routed,
+      ],
+    });
   }
   if (res.prior_refs.length > 0 && sighted) {
-    await notify_opened(event, don.id, `${dispute.id}_prior`, [
-      `a second dispute on this payment: what is owed stands under ${res.prior_refs.join(", ")}, recorded before this dispute; this dispute's share is merged into it, and a win of it credits that share back.`,
-    ]);
+    await notify_opened(event, don, `${dispute.id}_prior`, {
+      note: [
+        `A second dispute on this payment: what's owed stands under ${res.prior_refs.join(", ")}, recorded before this dispute; its share is merged in and credited back if we win.`,
+      ],
+    });
   }
 
   // only the delivery that grew what is owed tells ops, however late the
   // repeat: a redelivery, or the other of `created` and `funds_withdrawn`.
   // a failed enqueue after the write is not resent
   if (!res.owed_written) return;
-  await notify_opened(event, don.id, `${dispute.id}_owed`, [
-    ...owed_lines(res.owed),
-    ...(fee.line ? [fee.line] : []),
-    `the donation stays settled while the dispute is open, and what is owed is recovered from each party's next grants. if the dispute is lost, ${partial ? "it stays owed and the donation is not reversed" : "the donation reverses without taking it twice"}; if won, what is owed is credited back.`,
-    ...routed,
-  ]);
+  await notify_opened(event, don, `${dispute.id}_owed`, {
+    owed: res.owed,
+    note: [
+      ...(fee.line ? [fee.line] : []),
+      partial
+        ? "Donation stays settled even if this part is lost; what's owed comes out of next grants and is credited back if we win."
+        : "Donation stays settled until a loss reverses it; what's owed comes out of next grants and is credited back if we win.",
+      ...routed,
+    ],
+  });
 }
 
 /** a dispute put on record with nothing owed for it. once on record, open or
  * closed, a redelivery or a late event notifies nothing again */
 async function record_only(
   event: DisputeEvent,
-  donation_id: string,
-  why: string[]
+  don: IDonation,
+  note: string[]
 ) {
   const { id, created } = event.data.object;
   if (await dispute_get(id)) return;
   // ahead of the record: a lost notice fails the delivery with nothing
   // written, so the redelivery sends it
-  await notify_opened(event, donation_id, `${id}_recorded`, why);
-  await dispute_open(db, { id, donation_id, opened_at: iso(created) });
+  await notify_opened(event, don, `${id}_recorded`, { note });
+  await dispute_open(db, { id, donation_id: don.id, opened_at: iso(created) });
 }
 
 async function notify_opened(
   event: DisputeEvent,
-  donation_id: string,
+  don: IDonation,
   notice_id: string,
-  lines: string[]
+  n: { owed?: IOwed[]; note: string[] }
 ) {
   const dispute = event.data.object;
   const due = dispute.evidence_details?.due_by;
-  await enqueue(
-    msg("fiat-notice", {
-      id: notice_id,
-      alert: {
-        type: "NOTICE",
-        from: `${ALERT_FROM}-${stage}`,
-        title: "Stripe Dispute Opened",
-        body: [
-          dispute_line(dispute, donation_id, event.id),
-          `amount: ${money(dispute.amount, dispute.currency)}, reason: ${dispute.reason}, status: ${dispute.status}`,
-          `evidence due by: ${due ? iso(due) : "n/a"}`,
-          ...lines,
-        ].join("\n"),
-      },
-    })
-  );
+  const alert = await dispute_alert(dispute, don, event.id, {
+    headline: "Stripe dispute opened",
+    fields: [reason_field(dispute)],
+    respond_by: due ? new Date(due * 1000) : undefined,
+    ...n,
+    action: respond_action(dispute),
+  });
+  await enqueue(msg("fiat-notice", { id: notice_id, alert }));
 }

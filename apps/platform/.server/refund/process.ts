@@ -34,6 +34,7 @@ import {
 import type { MatchEvent } from "../pg/schema/match";
 import { apply_refund_plan, type OwedSource, StalePayoutError } from "./apply";
 import { donation_refund_status } from "./donation-status";
+import { ops_alert } from "./ops-alert";
 import {
   calc_refund_plan,
   type RefundCtx,
@@ -54,6 +55,8 @@ export interface RefundResult {
   failures: string[];
   /** what each party now owes back, one line per row */
   owed_msgs: string[];
+  /** those rows, as they stand */
+  owed: IOwed[];
   has_loss: boolean;
   applied: number;
 }
@@ -205,6 +208,9 @@ export async function process_refund(
 ): Promise<RefundResult> {
   const failures: string[] = [];
   const owed_msgs: string[] = [];
+  // by row id: a party with several dists has one row, the last read newest
+  const owed_rows = new Map<string, IOwed>();
+  const owed_notes: string[] = [];
   const src: OwedSource = { source: ctx.source, source_ref: ctx.source_ref };
   let applied = 0;
 
@@ -277,16 +283,27 @@ export async function process_refund(
 
       const { owed, commission_in_flight: c } = res;
       for (const o of owed) {
+        owed_rows.set(o.id, o);
         const usd = owed_total(o);
         if (o.npo_id !== null) {
           owed_msgs.push(
             `$${humanize(usd)} recorded as owed by ${g.dist.to_name ?? "its npo"} (npo ${g.dist.to_id}), to recover from its future grants — ${res.reasons.join("; ")}`
           );
+          if (res.reasons.length > 0) {
+            owed_notes.push(
+              `${g.dist.to_name || `npo ${g.dist.to_id}`}: ${res.reasons.join("; ")}.`
+            );
+          }
           continue;
         }
         const in_flight = c
           ? `. claimed by the Wise transfer with customerTransactionId ${c.ref}, so owed only if that transfer pays: if it goes unfunded, the commission run credits it back when it catches that, otherwise credit it on Amounts owed (/platform/owed)`
           : "";
+        if (c) {
+          owed_notes.push(
+            `Commission ${g.dist.id} is claimed by Wise transfer ${c.ref}, so owed only if it pays; if it goes unfunded and the commission run doesn't credit it back, credit it on Amounts owed (/platform/owed).`
+          );
+        }
         owed_msgs.push(
           `$${humanize(g.commission?.amount ?? 0)} commission ${g.dist.id} recorded as owed by referrer ${o.referrer_user ?? o.referrer_npo}, to recover from its next commission; the gift's row for that referrer totals $${humanize(usd)}${in_flight}`
         );
@@ -390,19 +407,27 @@ export async function process_refund(
   }
 
   // owed amounts are finance-ops notices (not bugs) — keep slack. failures go to sentry inline at the throw site.
-  if (owed_msgs.length > 0) {
-    await fiat_monitor.send_alert({
-      type: "NOTICE",
+  const owed = [...owed_rows.values()];
+  if (owed.length > 0) {
+    const alert = await ops_alert({
       from: `${ctx.alert_from}-${stage}`,
-      title: "Refund Recorded as Owed",
-      body: ["OWED:", ...owed_msgs].join("\n"),
+      headline: "Refund recorded as owed",
+      don: await donation_get(donation_id),
+      subject: ctx.source === "dispute" ? "Disputed" : "Refunded",
+      owed,
+      note: [
+        "What's owed comes out of each party's next grants or commission.",
+        ...owed_notes,
+      ],
+      ids: [`${ctx.source} ${ctx.source_ref}`],
     });
+    await fiat_monitor.send_alert(alert);
   }
 
   const has_loss =
     (final ?? (await donation_refund_status(db, donation_id))) ===
     "refunded_loss";
-  return { failures, owed_msgs, has_loss, applied };
+  return { failures, owed_msgs, owed, has_loss, applied };
 }
 
 /**

@@ -3,14 +3,17 @@ import { type IDonation, reversed_statuses } from "@/donations";
 import { type Rail, rail_of } from "@/donations/rail";
 import { humanize } from "@/helpers/decimal";
 import { msg } from "@/queue";
+import type { Field } from "@/slack";
 import { stage } from "../env";
 import { enqueue } from "../kit/queue";
 import { db } from "../pg/db";
 import { dists_for_refund } from "../pg/queries/dist";
 import { donation_get } from "../pg/queries/donation";
 import type { DbOrTx } from "../pg/queries/helpers";
+import type { IOwed } from "../pg/queries/owed";
 import { type ITake, takes_of } from "../pg/queries/take";
 import type { OwedSource } from "./apply";
+import { type IOpsAlert, ops_alert } from "./ops-alert";
 import { record_takes } from "./partial";
 import { dist_settled_usd, type PreviewLine } from "./plan";
 import { load_refund_plan, process_refund, type RefundResult } from "./process";
@@ -145,9 +148,23 @@ export interface ChargeReversal {
   intent_id?: string;
   /** slack sender identity, e.g. `charge-refunded`; the stage is appended */
   alert_from: string;
-  /** the event's own lines for an ops notice, and its dedupe id: a redelivery
+  /** the event's own part of an ops notice, and its dedupe id: a redelivery
    * of the same event reuses it */
-  notice: { id: string; lines: string[] };
+  notice: ReversalNotice;
+}
+
+export interface ReversalNotice {
+  id: string;
+  /** what ops should know, one sentence each, in the alert's note */
+  lines: string[];
+  /** what the event takes back, e.g. "$6.00": in the title and a field */
+  amount?: string;
+  /** the amount field's name; default by `source` */
+  subject?: IOpsAlert["subject"];
+  /** the event's own fields after the amount, e.g. a reason */
+  fields?: Field[];
+  /** footer ids after the donation's, e.g. `refund re_1` */
+  ids?: string[];
 }
 
 /** a charge's refunds, as a rail reverses its routed dists' transfers by */
@@ -247,30 +264,46 @@ export const unreversible = (
 const UNSIZED_ACTION =
   "how much of the charge is taken back could not be read, so this reversal could not be sized against the charge. nothing was reversed automatically: settle it by hand.";
 
-/** what a later event does on top of a hand adjustment for these dists */
-const LATER_EVENTS =
-  "any hand adjustment made for these dists must be undone if the rest is refunded or lost to a dispute, which reverses the donation, or if, once the grant has gone out, a later refund or dispute records as owed the whole share taken back so far, this one included; otherwise they are debited twice. a dispute filed while the grant is still pending records only its own share, so the adjustment stands then.";
-
 const SHARE_OWED: Record<ReversalSource, string> = {
-  refund: "Partial Refund Recorded as Owed",
-  admin: "Partial Refund Recorded as Owed",
-  dispute: "Lost Dispute: Share Recorded as Owed",
+  refund: "Partial refund recorded as owed",
+  admin: "Partial refund recorded as owed",
+  dispute: "Lost dispute share recorded as owed",
 };
 
 /** part of the charge, and no party's row owes anything for it: a routed
  * dist's share is reversed from its transfer instead */
 const NOTHING_OWED: Record<ReversalSource, string> = {
-  refund: "Partial Refund: Nothing Owed",
-  admin: "Partial Refund: Nothing Owed",
-  dispute: "Lost Dispute: Nothing Owed",
+  refund: "Partial refund, nothing owed",
+  admin: "Partial refund, nothing owed",
+  dispute: "Lost dispute share, nothing owed",
 };
 
 /** a refund's share, which owes nothing for a dist whose grant hasn't gone
- * out; a dispute's owes for every dist */
+ * out; a dispute's owes for every dist. a dispute filed while the grant is
+ * pending records only its own share, so a hand adjustment stands then */
 const REFUND_PENDING = {
-  title: "Partial Refund Not Reversed",
-  action: `nothing was reversed automatically for these dists. ${LATER_EVENTS}`,
+  headline: "Partial refund not reversed",
+  action:
+    "Adjust these dists by hand, and undo it if a later refund or dispute reverses the donation or records the whole share as owed, or they are debited twice.",
 };
+
+/** the gift's parties and what this event took, for a reversal's alerts */
+const reversal_alert = (
+  r: ChargeReversal,
+  don: IDonation,
+  a: Pick<IOpsAlert, "headline" | "fields" | "owed" | "note" | "action">
+) =>
+  ops_alert({
+    from: `${r.alert_from}-${stage}`,
+    don,
+    amount: r.notice.amount,
+    subject:
+      r.notice.subject ?? (r.source === "dispute" ? "Disputed" : "Refunded"),
+    ids: r.notice.ids,
+    ...a,
+    fields: [...(r.notice.fields ?? []), ...(a.fields ?? [])],
+    note: [...(a.note ?? []), ...r.notice.lines],
+  });
 
 /**
  * takes a gift back after its money went back to the donor: a refund, a lost
@@ -311,7 +344,13 @@ export async function reverse_charge(
           type: "NOTICE",
           from: `${r.alert_from}-${stage}`,
           title: "Reversal Not Sized",
-          body: [...r.notice.lines, UNSIZED_ACTION].join("\n"),
+          body: [
+            ...(r.notice.ids?.length
+              ? [[`donation ${r.donation_id}`, ...r.notice.ids].join(", ")]
+              : []),
+            ...r.notice.lines,
+            UNSIZED_ACTION,
+          ].join("\n"),
         },
       })
     );
@@ -371,7 +410,7 @@ export async function reverse_charge(
   if (recorded.status === "undistributed") {
     return { status: "failed", reason: "not_distributed" };
   }
-  if (recorded.status === "share") return notify_share(r, recorded);
+  if (recorded.status === "share") return notify_share(r, don, recorded);
 
   // `r.donation_id` may be the v1 id `donation_get` also matches
   const graphs = await dists_for_refund(don.id);
@@ -391,7 +430,9 @@ export async function reverse_charge(
   console.info(
     `${r.alert_from}: reversed ${r.donation_id}, dists: ${graphs.length}, failures: ${failed}, owed: ${res.owed_msgs.length}`
   );
-  if (r.source === "dispute") await notify_dispute_lost(r, graphs.length, res);
+  if (r.source === "dispute") {
+    await notify_dispute_lost(r, don, graphs.length, res);
+  }
 
   if (failed > 0) {
     return {
@@ -474,33 +515,36 @@ const refunds_take_all = (
 /** part of the charge: each party's share recorded as owed, nothing reversed */
 async function notify_share(
   r: ChargeReversal,
-  res: { taken: number; owed_msgs: string[]; pending: string[] }
+  don: IDonation,
+  res: { taken: number; owed: IOwed[]; owed_msgs: string[]; pending: string[] }
 ): Promise<ReversalResult> {
   const { owed_msgs, pending } = res;
+  const alert = await reversal_alert(r, don, {
+    headline:
+      pending.length > 0
+        ? REFUND_PENDING.headline
+        : owed_msgs.length > 0
+          ? SHARE_OWED[r.source]
+          : NOTHING_OWED[r.source],
+    fields: [
+      {
+        name: "Taken back",
+        value: `${humanize(res.taken * 100)}% of the charge`,
+        inline: true,
+      },
+    ],
+    owed: res.owed,
+    note: [
+      res.owed.length > 0
+        ? "The donation is not reversed; what's owed comes out of next grants."
+        : "The donation is not reversed.",
+      ...pending.map((m) => `Not owed: ${m}.`),
+    ],
+    ...(pending.length > 0 && { action: { text: REFUND_PENDING.action } }),
+  });
   // awaited: a lost notice fails the delivery, so the provider redelivers it,
   // which records nothing more. keyed on the event, so it posts once
-  await enqueue(
-    msg("fiat-notice", {
-      id: r.notice.id,
-      alert: {
-        type: "NOTICE",
-        from: `${r.alert_from}-${stage}`,
-        title:
-          pending.length > 0
-            ? REFUND_PENDING.title
-            : owed_msgs.length > 0
-              ? SHARE_OWED[r.source]
-              : NOTHING_OWED[r.source],
-        body: [
-          ...r.notice.lines,
-          `${humanize(res.taken * 100)}% of the charge taken back so far; the donation is not reversed.`,
-          ...owed_msgs.map((m) => `owed: ${m}`),
-          ...pending.map((m) => `not owed: ${m}`),
-          ...(pending.length > 0 ? [REFUND_PENDING.action] : []),
-        ].join("\n"),
-      },
-    })
-  );
+  await enqueue(msg("fiat-notice", { id: r.notice.id, alert }));
   return pending.length > 0
     ? { status: "partial_pending", owed_msgs }
     : { status: "partial_owed", owed_msgs };
@@ -514,32 +558,33 @@ export async function has_settled_dists(donation_id: string) {
 
 async function notify_dispute_lost(
   r: ChargeReversal,
+  don: IDonation,
   dists: number,
   res: RefundResult
 ) {
   const failed = res.failures.length;
-  const title =
+  const headline =
     failed === 0
-      ? "Dispute Lost: Donation Reversed"
-      : "Dispute Lost: Reversal Did Not Complete";
-  const body = [
-    ...r.notice.lines,
-    failed === 0
-      ? `all ${dists} dists reversed.`
-      : `${failed} of ${dists} dists failed to reverse, and the donation stays settled.`,
-    ...res.owed_msgs.map((m) => `owed: ${m}`),
-  ].join("\n");
+      ? "Dispute lost, donation reversed"
+      : "Dispute lost, reversal did not complete";
   // queued, not sent: once reversed, a redelivery stops at the guard, so only
   // the queue's retries can land a failed send. keyed on the outcome, so a
   // redelivery failing alike collapses into this notice
-  await enqueue(
-    msg("fiat-notice", {
-      id: `${r.notice.id}_${failed}`,
-      alert: { type: "NOTICE", from: `${r.alert_from}-${stage}`, title, body },
-    })
-  ).catch((err) =>
-    report_error(err, { donation_id: r.donation_id, title, body })
-  );
+  await reversal_alert(r, don, {
+    headline,
+    owed: res.owed,
+    note: [
+      failed === 0
+        ? `All ${dists} dists reversed.`
+        : `${failed} of ${dists} dists failed to reverse, and the donation stays settled.`,
+    ],
+  })
+    .then((alert) =>
+      enqueue(msg("fiat-notice", { id: `${r.notice.id}_${failed}`, alert }))
+    )
+    .catch((err) =>
+      report_error(err, { donation_id: r.donation_id, title: headline })
+    );
 }
 
 export interface DistPreview {

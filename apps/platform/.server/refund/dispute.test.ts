@@ -1377,7 +1377,7 @@ describe("a gift whose grant transfer came back", () => {
     expect(await owed_of(id)).toEqual([]);
     expect(await balance_of(test_db.current!.db, npo_ids[0]!)).toBe(0);
     expect(JSON.stringify(vi.mocked(enqueue).mock.calls)).toMatch(
-      /not owed: dist [^"]* its grant payout is void, so nothing of it is recorded as owed/
+      /Not owed: dist [^"]* its grant payout is void, so nothing of it is recorded as owed/
     );
   });
 

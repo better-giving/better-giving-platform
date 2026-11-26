@@ -1,7 +1,7 @@
 import { humanize } from "@/helpers/decimal";
 import { db } from "../pg/db";
 import type { DbOrTx } from "../pg/queries/helpers";
-import { owed_total } from "../pg/queries/owed";
+import { type IOwed, owed_total } from "../pg/queries/owed";
 import { type ITake, takes_of } from "../pg/queries/take";
 import type { OwedSource } from "./apply";
 import { grant_went_out, settled_dists_locked } from "./share";
@@ -30,6 +30,8 @@ export type TakesRecorded =
       taken: number;
       /** what each party now owes back, one line per row */
       owed_msgs: string[];
+      /** those rows */
+      owed: IOwed[];
       /** one line per dist whose grant hasn't gone out, so nothing of this
        * refund is owed for it */
       pending: string[];
@@ -78,7 +80,8 @@ export async function record_takes(s: TakesPut): Promise<TakesRecorded> {
               `dist ${d.id} to ${d.to_name || "its npo"} (npo ${d.to_id}): ${not_out_why(d.payout_type)}, so nothing of it is recorded as owed`
           )
       : [];
-    return { status: "share", taken, owed_msgs, pending };
+    const owed = moves.flatMap(({ row }) => (row ? [row] : []));
+    return { status: "share", taken, owed_msgs, owed, pending };
   });
 }
 
