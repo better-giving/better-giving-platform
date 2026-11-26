@@ -90,6 +90,11 @@ const seed_two = async () => {
   const mine = (await seed_npo(db(), {
     registration_number: "EIN-MINE",
     donate_methods: ["stripe"],
+    // card runs on the nonprofit's connected stripe account
+    stripe_account_id: "acct_mine",
+    stripe_charges_enabled: true,
+    stripe_payouts_enabled: true,
+    stripe_details_submitted: true,
   }))!;
   const theirs = (await seed_npo(db(), {
     registration_number: "EIN-THEM",

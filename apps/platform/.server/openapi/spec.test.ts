@@ -602,10 +602,15 @@ const schema_errors = (schema: Json, value: unknown, at = "$"): string[] => {
 };
 
 describe("readiness body against the published schema", () => {
+  let bodies = 0;
   const real_body = async () => {
     const { db } = test_db.current!;
-    const staff = (await seed_user(db, "ada@test.com"))!;
-    const npo = (await seed_npo(db, { donate_methods: null }))!;
+    bodies += 1;
+    const staff = (await seed_user(db, `body-${bodies}@test.com`))!;
+    const npo = (await seed_npo(db, {
+      donate_methods: null,
+      registration_number: `EIN-B${bodies}`,
+    }))!;
     await mint_key(as_db(db), { npo_id: npo.id, minted_by: staff.id });
     return readiness(as_db(db), npo.id);
   };
@@ -633,6 +638,64 @@ describe("readiness body against the published schema", () => {
         rails: { ...body.rails, card: { state: "paused", offered: false } },
       })
     ).toEqual(['$.rails.card.state: "paused" not in enum']);
+  });
+
+  test("the per-method maps are open, with every named method required, and the description says unknown keys and values are ignored", () => {
+    const schema = doc.components.schemas.PartnerReadiness as unknown as {
+      description: string;
+      properties: Record<
+        string,
+        {
+          additionalProperties: Json;
+          required: string[];
+          properties: Record<string, Json>;
+        }
+      >;
+    };
+    for (const map of ["rails", "intervals", "fee_rules"]) {
+      const m = schema.properties[map];
+      expect(m.required, map).toEqual([...RAILS]);
+      expect(Object.keys(m.properties), map).toEqual([...RAILS]);
+      // an unknown key carries the same shape as a known one
+      expect(m.additionalProperties, map).toEqual(m.properties.card);
+    }
+    expect(schema.description).toMatch(
+      /ignore a key or value you don't recognize/
+    );
+    expect(schema.description).toMatch(/unknown state as not offered/);
+    expect(schema.description).toMatch(/offered. alone/);
+  });
+
+  test("a rail's states include pending, and the amounts are integer USD cents", async () => {
+    const schema = doc.components.schemas.PartnerReadiness as unknown as {
+      properties: {
+        currencies: Json;
+        rails: { properties: { card: { properties: { state: Json } } } };
+        fee_rules: {
+          properties: { card: { properties: Record<string, Json> } };
+        };
+      };
+    };
+    expect(
+      schema.properties.rails.properties.card.properties.state.enum
+    ).toEqual([...RAIL_STATES]);
+    expect(RAIL_STATES).toContain("pending");
+    const fee = schema.properties.fee_rules.properties.card.properties;
+    for (const key of ["fixed_minor", "cap_minor", "round_up_minor"]) {
+      expect(fee[key], key).toMatchObject({ type: "integer", minimum: 0 });
+    }
+    const body = await real_body();
+    expect(body.currencies).toEqual(["USD"]);
+    for (const rule of Object.values(body.fee_rules)) {
+      for (const key of [
+        "fixed_minor",
+        "cap_minor",
+        "round_up_minor",
+      ] as const) {
+        const v = rule[key];
+        if (v !== undefined) expect(Number.isInteger(v), key).toBe(true);
+      }
+    }
   });
 });
 

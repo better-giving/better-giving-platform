@@ -751,9 +751,14 @@ const connector_ops = (): IOperation[] => [
   ),
 ];
 
+/** a map keyed by method: every method this version names is present, and a
+ * method added within v1 arrives as one more key of the same shape, which a
+ * consumer that doesn't know it ignores */
 const per_rail = (schema: Json) => ({
   type: "object",
-  additionalProperties: false,
+  description:
+    "Keyed by method. Every method listed here is present; ignore a key you don't recognize.",
+  additionalProperties: schema,
   required: [...RAILS],
   properties: Object.fromEntries(RAILS.map((r) => [r, schema])),
 });
@@ -767,7 +772,7 @@ const minor = (description: string) => ({
 const PARTNER_READINESS = {
   type: "object",
   description:
-    "What the key's nonprofit can take right now. Money is integer minor units; rates are fractions. Enums here grow without a new version (a rail's `state`, `clients[].name`, `intervals`), so ignore a value you don't recognize: treat a rail in an unknown state as not offered.",
+    "What the key's nonprofit can take right now. Money is integer minor units in USD; rates are fractions. Maps keyed by method (`rails`, `intervals`, `fee_rules`) and enums (a rail's `state`, `clients[].name`, `intervals`) grow without a new version: ignore a key or value you don't recognize, and treat a rail in an unknown state as not offered. `rails[method].offered` alone says whether a donor may use a method.",
   required: [
     "revision",
     "charges_enabled",
@@ -819,7 +824,8 @@ const PARTNER_READINESS = {
     },
     clients: {
       type: "array",
-      description: "Publishable client ids for each provider's browser SDK.",
+      description:
+        "Publishable client ids for each provider's browser SDK, for every provider that is configured, whether or not a rail on it is offered. Availability to a donor is `rails[method].offered`, never the presence of a client.",
       items: {
         type: "object",
         required: ["name", "publishable_key"],
@@ -834,7 +840,12 @@ const PARTNER_READINESS = {
       type: "object",
       required: ["state", "offered"],
       properties: {
-        state: { type: "string", enum: [...RAIL_STATES] },
+        state: {
+          type: "string",
+          enum: [...RAIL_STATES],
+          description:
+            "`active`: chargeable. `pending`: requested and under review at the processor, not chargeable yet (`offered` is false). `inactive`: not configured, switched off, or the nonprofit is not active. `unrequested`: the nonprofit has not asked for this method. An unknown state is not offered.",
+        },
         offered: { type: "boolean" },
       },
     }),
@@ -852,7 +863,9 @@ const PARTNER_READINESS = {
         percent: { type: "number", minimum: 0, maximum: 1 },
         fixed_minor: minor("USD cents."),
         cap_minor: minor("USD cents."),
-        round_up_minor: minor("USD cents."),
+        round_up_minor: minor(
+          "USD cents the total rounds up to a multiple of: 1 on card, ACH and wallets, 100 on a DAF (a DAF grants whole dollars)."
+        ),
       },
     }),
     coins: {
@@ -865,7 +878,11 @@ const PARTNER_READINESS = {
           ticker: { type: "string" },
           name: { type: "string" },
           network: { type: "string" },
-          memo_required: { type: "boolean" },
+          memo_required: {
+            type: "boolean",
+            description:
+              "True when a deposit memo is mandatory for the coin. A coin that takes an optional memo reads false; a memo that a deposit carries is always shown to the donor.",
+          },
           logo: { type: "string", format: "uri" },
         },
       },

@@ -48,6 +48,30 @@ vi.mock("#/constants/env", async (orig) => {
   };
 });
 
+// the sponsor's name and the policy urls, switchable per test
+const swap = vi.hoisted(() => ({
+  legal_name: undefined as string | undefined,
+  privacy: undefined as string | undefined,
+}));
+vi.mock("@better-giving/brand", async (orig) => {
+  const real = await orig<typeof import("@better-giving/brand")>();
+  return {
+    ...real,
+    get LEGAL_NAME() {
+      return swap.legal_name ?? real.LEGAL_NAME;
+    },
+  };
+});
+vi.mock("#/constants/urls", async (orig) => {
+  const real = await orig<typeof import("#/constants/urls")>();
+  return {
+    ...real,
+    get PRIVACY_POLICY() {
+      return swap.privacy ?? real.PRIVACY_POLICY;
+    },
+  };
+});
+
 const { npos } = await import("../pg/schema/npo");
 const { user } = await import("../pg/schema/auth");
 const { partner_keys, partner_tenants } = await import("../pg/schema/partner");
@@ -79,6 +103,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   Object.assign(pub, real_pub);
+  Object.assign(swap, { legal_name: undefined, privacy: undefined });
   nowpayments.api_key = real_np_key;
   await t.db.delete(partner_keys);
   await t.db.delete(partner_tenants);
@@ -86,11 +111,27 @@ beforeEach(async () => {
   await t.db.delete(user);
 });
 
+/** a connected stripe account that can take charges and pay out */
+const READY_ACCOUNT = {
+  stripe_charges_enabled: true,
+  stripe_payouts_enabled: true,
+  stripe_details_submitted: true,
+  stripe_requirements_due: [] as string[],
+};
+
+let seeded = 0;
+
 const seed_tenant = async (
   over: Parameters<typeof seed_npo>[1] = {}
 ): Promise<number> => {
-  const staff = (await seed_user(t.db, "ada@test.com"))!;
-  const npo = (await seed_npo(t.db, over))!;
+  seeded += 1;
+  const staff = (await seed_user(t.db, `staff-${seeded}@test.com`))!;
+  const npo = (await seed_npo(t.db, {
+    registration_number: `EIN-T${seeded}`,
+    stripe_account_id: `acct_${seeded}`,
+    ...READY_ACCOUNT,
+    ...over,
+  }))!;
   await mint_key(as_db(t.db), { npo_id: npo.id, minted_by: staff.id });
   return npo.id;
 };
@@ -379,6 +420,163 @@ describe("readiness", () => {
   });
 });
 
+const STRIPE_RAILS = ["card", "ach", "apple_pay", "google_pay"] as const;
+const OTHER_RAILS = ["paypal", "venmo", "daf", "crypto"] as const;
+
+describe("rails on the connected stripe account", () => {
+  const states_of = async (over: Parameters<typeof seed_npo>[1]) => {
+    const r = await read(await seed_tenant({ donate_methods: null, ...over }));
+    return r.rails;
+  };
+
+  test("under review at stripe: pending, not offered, no interval and no charges from them", async () => {
+    const npo_id = await seed_tenant({
+      donate_methods: ["stripe", "stripe_bank"],
+      stripe_charges_enabled: false,
+      stripe_payouts_enabled: false,
+    });
+
+    const r = await read(npo_id);
+
+    for (const rail of STRIPE_RAILS) {
+      expect(r.rails[rail], rail).toEqual({ state: "pending", offered: false });
+      expect(r.intervals[rail], rail).toEqual([]);
+    }
+    // paypal and venmo have no connected account here
+    expect(r.rails.paypal).toEqual({ state: "active", offered: true });
+    expect(r.rails.venmo).toEqual({ state: "active", offered: true });
+    expect(r.charges_enabled).toBe(true);
+  });
+
+  test("no stripe account is never pending: it is unrequested and not offered", async () => {
+    const rails = await states_of({
+      stripe_account_id: null,
+      stripe_charges_enabled: false,
+      stripe_payouts_enabled: false,
+      stripe_details_submitted: false,
+    });
+
+    for (const rail of STRIPE_RAILS) {
+      expect(rails[rail], rail).toEqual({
+        state: "unrequested",
+        offered: false,
+      });
+    }
+    for (const rail of OTHER_RAILS) {
+      expect(rails[rail].offered, rail).toBe(true);
+    }
+  });
+
+  test("an account the nonprofit has to finish is inactive, not pending", async () => {
+    const unfinished = await states_of({
+      stripe_charges_enabled: false,
+      stripe_payouts_enabled: false,
+      stripe_details_submitted: false,
+    });
+    const owes = await states_of({
+      stripe_charges_enabled: false,
+      stripe_requirements_due: ["external_account"],
+    });
+
+    for (const rails of [unfinished, owes]) {
+      for (const rail of STRIPE_RAILS) {
+        expect(rails[rail], rail).toEqual({
+          state: "inactive",
+          offered: false,
+        });
+      }
+    }
+  });
+
+  test("a nonprofit that disconnected is inactive, even with a ready mirror", async () => {
+    const rails = await states_of({
+      stripe_deauthorized_at: "2026-11-01T00:00:00.000Z",
+    });
+
+    for (const rail of STRIPE_RAILS) {
+      expect(rails[rail], rail).toEqual({ state: "inactive", offered: false });
+    }
+  });
+
+  test("a ready account is active", async () => {
+    const rails = await states_of({});
+
+    for (const rail of STRIPE_RAILS) {
+      expect(rails[rail], rail).toEqual({ state: "active", offered: true });
+    }
+  });
+
+  test("pending never hides a stronger refusal: excluded stays unrequested, missing key or inactive nonprofit stays inactive", async () => {
+    const excluded = await states_of({
+      donate_methods: ["crypto"],
+      stripe_charges_enabled: false,
+      stripe_payouts_enabled: false,
+    });
+    expect(excluded.card).toEqual({ state: "unrequested", offered: false });
+
+    const inactive = await states_of({
+      active: false,
+      stripe_charges_enabled: false,
+      stripe_payouts_enabled: false,
+    });
+    expect(inactive.card).toEqual({ state: "inactive", offered: false });
+  });
+
+  test("without stripe's key a pending account reads inactive", async () => {
+    pub.stripe_pk = undefined;
+    const rails = await states_of({
+      stripe_charges_enabled: false,
+      stripe_payouts_enabled: false,
+    });
+
+    expect(rails.card).toEqual({ state: "inactive", offered: false });
+  });
+});
+
+describe("coins' memo flag", () => {
+  const coin_of = (r: Awaited<ReturnType<typeof read>>, x: { code: string }) =>
+    r.coins.find((c) => c.coin === x.code);
+
+  test("required, optional and absent memo", async () => {
+    const npo_id = await seed_tenant({ donate_methods: ["crypto"] });
+    const [needs, optional, none] = tokens_list.filter((x) => !is_custom(x.id));
+    const flagged = [needs, optional, none];
+    const keep = flagged.map((x) => ({ ...x }));
+    try {
+      Object.assign(needs, { extra_id_exists: true, extra_id_optional: false });
+      Object.assign(optional, {
+        extra_id_exists: true,
+        extra_id_optional: true,
+      });
+      Object.assign(none, { extra_id_exists: false });
+
+      const r = await read(npo_id);
+
+      expect(coin_of(r, needs)?.memo_required).toBe(true);
+      expect(coin_of(r, optional)?.memo_required).toBe(false);
+      expect(coin_of(r, none)?.memo_required).toBe(false);
+    } finally {
+      flagged.forEach((x, i) => {
+        for (const k of ["extra_id_exists", "extra_id_optional"]) {
+          delete (x as unknown as Record<string, unknown>)[k];
+        }
+        Object.assign(x, keep[i]);
+      });
+    }
+  });
+
+  test("a token with the flag unset, or only the optional flag, is not required", async () => {
+    const { memo_required_of } = await import("./readiness");
+    expect(memo_required_of({})).toBe(false);
+    expect(memo_required_of({ extra_id_optional: true })).toBe(false);
+    expect(memo_required_of({ extra_id_exists: true })).toBe(true);
+    expect(
+      memo_required_of({ extra_id_exists: true, extra_id_optional: true })
+    ).toBe(false);
+    expect(memo_required_of({ extra_id_exists: false })).toBe(false);
+  });
+});
+
 describe("revision", () => {
   const tenant_row = async (npo_id: number) => {
     const [row] = await t.db
@@ -454,6 +652,53 @@ describe("revision", () => {
       await rises(npo_id, () => {
         pub.stripe_pk = undefined;
       });
+    });
+
+    test("a publishable id's value, with the client still served", async () => {
+      const npo_id = await seed_tenant({ donate_methods: null });
+      await rises(npo_id, () => {
+        pub.paypal_client_id = "a-rotated-client-id";
+      });
+    });
+
+    test("a policy url", async () => {
+      const npo_id = await seed_tenant({ donate_methods: null });
+      await rises(npo_id, () => {
+        swap.privacy = "https://example.test/privacy";
+      });
+    });
+
+    test("the sponsor's identity", async () => {
+      const npo_id = await seed_tenant({ donate_methods: null });
+      await rises(npo_id, () => {
+        swap.legal_name = "A Renamed Sponsor";
+      });
+    });
+
+    test("a fee rule", async () => {
+      const npo_id = await seed_tenant({ donate_methods: null });
+      // the terms are declared read-only; the rail reads them per call
+      const terms = fee_terms.crypto as { rate: number };
+      const keep = terms.rate;
+      try {
+        await rises(npo_id, () => {
+          terms.rate = keep + 0.001;
+        });
+      } finally {
+        terms.rate = keep;
+      }
+    });
+
+    test("the coin list", async () => {
+      const npo_id = await seed_tenant({ donate_methods: null });
+      const added = { ...tokens_list[0], code: "NEWCOIN" };
+      try {
+        await rises(npo_id, () => {
+          tokens_list.push(added);
+        });
+      } finally {
+        tokens_list.splice(tokens_list.indexOf(added), 1);
+      }
     });
   });
 

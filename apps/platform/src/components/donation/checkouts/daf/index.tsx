@@ -12,10 +12,13 @@ import type {
   IDonationIntent,
   IDonorAddress,
 } from "@/donations/schema";
-import { to_units } from "@/helpers/decimal";
 import { HttpError, json_ok } from "@/helpers/https";
 import { apply_campaign } from "../../apply-campaign";
-import { donation_amounts, fee_terms } from "../../common/amounts";
+import {
+  donation_amounts,
+  fee_terms,
+  whole_dollar_amounts,
+} from "../../common/amounts";
 import { usd_option } from "../../common/constants";
 import { currency } from "../../common/currency";
 import { use_donation_redirect } from "../../common/redirect";
@@ -45,19 +48,6 @@ const PROMPT_SLOT = "daf-checkout";
  * isn't the route's and says nothing about the grant.
  */
 const PRE_GRANT_REFUSALS = new Set([400, 404, 410]);
-
-/** dafs grant whole dollars only: the total rounds up to the next dollar, the
- * difference landing on the fee allowance when the donor covers fees, else on
- * the tip. with neither, the base is the total as entered. */
-function whole_dollar_amounts({ base, tip, fee_allowance }: IAmount): IAmount {
-  if (!tip && !fee_allowance) return { base, tip, fee_allowance };
-  const cents = (x: number) => to_units(x, 2);
-  const total = cents(base) + cents(tip) + cents(fee_allowance);
-  const topup = Math.ceil(total / 100) * 100 - total;
-  return fee_allowance
-    ? { base, tip, fee_allowance: (cents(fee_allowance) + topup) / 100 }
-    : { base, tip: (cents(tip) + topup) / 100, fee_allowance };
-}
 
 /** `grant_cents` split in `amount`'s proportions, each part on whole cents and
  * the base taking the rounding so the parts still sum to the grant */

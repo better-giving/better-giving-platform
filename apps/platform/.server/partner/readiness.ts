@@ -22,6 +22,7 @@ import { PRIVACY_POLICY, TERMS_OF_USE_DONOR } from "#/constants/urls";
 import { DEDUCTIBILITY_STATEMENT, logo_url } from "@/constants/common";
 import { to_units } from "@/helpers/decimal";
 import type { DonateMethodId, TFrequency } from "@/schemas";
+import { connect_status, mirror_of } from "@/stripe-connect/readiness";
 import { is_deposit_chain } from "../deposit-addr";
 import { base_url, nowpayments } from "../env";
 import type { DbOrTx } from "../pg/queries/helpers";
@@ -40,7 +41,12 @@ export const RAILS = [
 ] as const;
 export type Rail = (typeof RAILS)[number];
 
-export const RAIL_STATES = ["active", "inactive", "unrequested"] as const;
+export const RAIL_STATES = [
+  "active",
+  "pending",
+  "inactive",
+  "unrequested",
+] as const;
 type RailState = (typeof RAIL_STATES)[number];
 type Interval = "monthly" | "yearly";
 
@@ -65,6 +71,9 @@ interface IRail {
   round_up_minor?: number;
   /** checkout offers it at the frequencies the nonprofit picked */
   recurring: boolean;
+  /** the processor capability is the nonprofit's connected stripe account
+   * (`connect_status`); paypal, daf and crypto have no such account here */
+  connected_account?: true;
 }
 
 const has_stripe = () => !!stripe_pk;
@@ -76,6 +85,7 @@ const card_like: IRail = {
   fee: fee_terms.stripe,
   round_up_minor: 1,
   recurring: true,
+  connected_account: true,
 };
 
 // paypal and venmo mount inside the card tab (methods/stripe/form.tsx), so
@@ -90,6 +100,7 @@ const RAIL: Record<Rail, IRail> = {
     fee: fee_terms.stripe_bank,
     round_up_minor: 1,
     recurring: true,
+    connected_account: true,
   },
   paypal: {
     method: "stripe",
@@ -134,6 +145,18 @@ function fee_rule({ fee, round_up_minor }: IRail): IFeeRule {
   };
 }
 
+/** the memo flags nowpayments reports per token. the committed token data
+ * (packages/crypto `generated/tokens`) does not carry them yet, so until the
+ * generator passes them through every coin reads as not requiring one */
+export interface IMemoFlags {
+  extra_id_exists?: boolean;
+  extra_id_optional?: boolean;
+}
+
+/** a deposit memo is mandatory only where the coin has one and it isn't optional */
+export const memo_required_of = (t: IMemoFlags): boolean =>
+  t.extra_id_exists === true && t.extra_id_optional !== true;
+
 /** the coins checkout's crypto intent takes: a custom token only on a chain
  * with a deposit address (api.donation-intents/crypto) */
 const coins = () =>
@@ -144,9 +167,7 @@ const coins = () =>
       ticker: x.symbol,
       name: x.name,
       network: x.network,
-      // the token data carries no memo flag: checkout learns of one from the
-      // payment's `payin_extra_id`
-      memo_required: false,
+      memo_required: memo_required_of(x as IMemoFlags),
       // a custom token's logo is a path on this app; the integrator renders it
       // on its own origin
       logo: is_custom(x.id) ? `${base_url}${x.logo}` : logo_url(x.logo),
@@ -172,6 +193,29 @@ interface INpoCheckout {
   active: boolean;
   donate_methods: DonateMethodId[] | null;
   donate_frequencies: TFrequency[] | null;
+  stripe_account_id: string | null;
+  stripe_charges_enabled: boolean;
+  stripe_payouts_enabled: boolean;
+  stripe_details_submitted: boolean;
+  stripe_requirements_due: string[];
+  stripe_deauthorized_at: string | null;
+}
+
+/** the state a rail that runs on the nonprofit's connected stripe account is in:
+ * never requested without an account, `pending` while stripe reviews it, and
+ * not chargeable (`inactive`) while the nonprofit has to finish or has left */
+function account_state(npo: INpoCheckout): RailState {
+  if (npo.stripe_account_id === null) return "unrequested";
+  switch (connect_status(mirror_of(npo), npo.stripe_deauthorized_at)) {
+    case "ready":
+      return "active";
+    case "pending":
+      return "pending";
+    case "not_connected":
+      return "unrequested";
+    default:
+      return "inactive";
+  }
 }
 
 function body_of(npo: INpoCheckout) {
@@ -183,7 +227,7 @@ function body_of(npo: INpoCheckout) {
   const state = (r: IRail): RailState => {
     if (!methods.includes(r.method)) return "unrequested";
     if (!npo.active || !r.configured()) return "inactive";
-    return "active";
+    return r.connected_account ? account_state(npo) : "active";
   };
   const per_rail = <T>(f: (rail: Rail, r: IRail) => T) =>
     Object.fromEntries(RAILS.map((x) => [x, f(x, RAIL[x])])) as Record<Rail, T>;
@@ -247,6 +291,12 @@ export async function readiness(
       active: npos.active,
       donate_methods: npos.donate_methods,
       donate_frequencies: npos.donate_frequencies,
+      stripe_account_id: npos.stripe_account_id,
+      stripe_charges_enabled: npos.stripe_charges_enabled,
+      stripe_payouts_enabled: npos.stripe_payouts_enabled,
+      stripe_details_submitted: npos.stripe_details_submitted,
+      stripe_requirements_due: npos.stripe_requirements_due,
+      stripe_deauthorized_at: npos.stripe_deauthorized_at,
     })
     .from(npos)
     .where(eq(npos.id, npo_id));

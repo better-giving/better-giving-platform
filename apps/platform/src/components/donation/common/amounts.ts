@@ -55,6 +55,23 @@ export function donation_amounts(
   return { base: i.amount, tip, fee_allowance: in_units(fee, "up") };
 }
 
+/** dafs grant whole dollars only: the total rounds up to the next dollar, the
+ * difference landing on the fee allowance when the donor covers fees, else on
+ * the tip. with neither, the base is the total as entered. */
+export function whole_dollar_amounts({
+  base,
+  tip,
+  fee_allowance,
+}: IAmount): IAmount {
+  if (!tip && !fee_allowance) return { base, tip, fee_allowance };
+  const cents = (x: number) => to_units(x, 2);
+  const total = cents(base) + cents(tip) + cents(fee_allowance);
+  const topup = Math.ceil(total / 100) * 100 - total;
+  return fee_allowance
+    ? { base, tip, fee_allowance: (cents(fee_allowance) + topup) / 100 }
+    : { base, tip: (cents(tip) + topup) / 100, fee_allowance };
+}
+
 export interface IStripeAmountsInput extends IAmountsInput {
   currency: Pick<ICurrencyFv, "code" | "rate">;
   bank_only?: boolean;
