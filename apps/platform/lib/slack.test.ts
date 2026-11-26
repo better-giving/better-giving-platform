@@ -374,3 +374,129 @@ describe("Slack.send_alert with skip_bad_credential", () => {
     );
   });
 });
+
+describe("Slack.send_alert structured content", () => {
+  type TableBlock = {
+    type: "table";
+    column_settings: { align: string; is_wrapped: boolean }[];
+    rows: { type: "raw_text"; text: string }[][];
+  };
+
+  const send = async (alert: Partial<Parameters<Slack["send_alert"]>[0]>) => {
+    mock_fetch(() => Response.json({ ok: true }));
+    await new Slack(CHANNEL, TOKEN).send_alert({
+      from: "test",
+      title: "t",
+      ...alert,
+    });
+    const blocks = posted().body.attachments[0]!.blocks as {
+      type: string;
+    }[];
+    return {
+      blocks,
+      table: blocks.find((b) => b.type === "table") as TableBlock | undefined,
+    };
+  };
+  const cols = [{ name: "Party" }, { name: "Owed", align: "right" as const }];
+
+  test("puts the table in the attachment's blocks, before the sender", async () => {
+    const { blocks, table } = await send({
+      table: { columns: cols, rows: [["Save the Kids (#4)", "4.91"]] },
+    });
+    expect(blocks.map((b) => b.type)).toEqual(["section", "table", "context"]);
+    expect(table).toEqual({
+      type: "table",
+      column_settings: [
+        { align: "left", is_wrapped: true },
+        { align: "right", is_wrapped: false },
+      ],
+      rows: [
+        [
+          { type: "raw_text", text: "Party" },
+          { type: "raw_text", text: "Owed" },
+        ],
+        [
+          { type: "raw_text", text: "Save the Kids (#4)" },
+          { type: "raw_text", text: "4.91" },
+        ],
+      ],
+    });
+  });
+
+  test("sends an empty cell as a dash and pads a short row", async () => {
+    const { table } = await send({
+      table: { columns: cols, rows: [["", "  "], ["Total"]] },
+    });
+    const texts = table!.rows.map((r) => r.map((c) => c.text));
+    expect(texts).toEqual([
+      ["Party", "Owed"],
+      ["—", "—"],
+      ["Total", "—"],
+    ]);
+  });
+
+  test("keeps table cells raw, not escaped", async () => {
+    const { table } = await send({
+      table: { columns: cols, rows: [["A & <B>", "1"]] },
+    });
+    expect(table!.rows[1]![0]!.text).toBe("A & <B>");
+  });
+
+  test("cuts rows past the row limit with a +N more row", async () => {
+    const rows = Array.from({ length: 150 }, (_, i) => [`p${i}`, "1"]);
+    const { table } = await send({ table: { columns: cols, rows } });
+    expect(table!.rows).toHaveLength(100);
+    expect(table!.rows[98]![0]!.text).toBe("p97");
+    expect(table!.rows[99]!.map((c) => c.text)).toEqual(["+52 more", "—"]);
+  });
+
+  test("cuts rows past the character limit", async () => {
+    const rows = Array.from({ length: 20 }, () => ["x".repeat(900), "1"]);
+    const { table } = await send({ table: { columns: cols, rows } });
+    const chars = table!.rows.flat().reduce((n, c) => n + c.text.length, 0);
+    expect(chars).toBeLessThanOrEqual(10_000);
+    const last = table!.rows.at(-1)![0]!.text;
+    expect(last).toMatch(/^\+\d+ more$/);
+  });
+
+  test("limits a row to 20 cells", async () => {
+    const columns = Array.from({ length: 25 }, (_, i) => ({ name: `c${i}` }));
+    const { table } = await send({ table: { columns, rows: [["a"]] } });
+    expect(table!.rows.every((r) => r.length === 20)).toBe(true);
+  });
+
+  test("escapes the note, action and context lines, and links the action", async () => {
+    const { blocks } = await send({
+      note: "a <!here> note",
+      action: { text: "Respond & win", url: "https://x.test/a?b=1" },
+      context: ["donation <!channel>"],
+    });
+    expect(blocks.slice(1, 4)).toEqual([
+      {
+        type: "section",
+        text: { type: "mrkdwn", text: "a &lt;!here&gt; note" },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: "<https://x.test/a?b=1|Respond &amp; win>",
+        },
+      },
+      {
+        type: "context",
+        elements: [{ type: "mrkdwn", text: "donation &lt;!channel&gt;" }],
+      },
+    ]);
+  });
+
+  test("uses the summary as the notification text", async () => {
+    mock_fetch(() => Response.json({ ok: true }));
+    await new Slack(CHANNEL, TOKEN).send_alert({
+      from: "test",
+      title: "Title",
+      summary: "$6.00 to <!here> Kids",
+    });
+    expect(posted().body.text).toBe("$6.00 to &lt;!here&gt; Kids");
+  });
+});
