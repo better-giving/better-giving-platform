@@ -76,25 +76,36 @@ describe("Slack.send_alert", () => {
           blocks: [
             {
               type: "section",
-              text: { type: "mrkdwn", text: "*No grants to process*" },
+              text: {
+                type: "mrkdwn",
+                verbatim: true,
+                text: "*No grants to process*",
+              },
             },
             {
               type: "section",
               text: {
                 type: "mrkdwn",
+                verbatim: true,
                 text: "No grants to process for staging",
               },
             },
             {
               type: "section",
               fields: [
-                { type: "mrkdwn", text: "*amount*\n12.5" },
-                { type: "mrkdwn", text: "*ref_id*\nref-1" },
+                { type: "mrkdwn", verbatim: true, text: "*amount*\n12.5" },
+                { type: "mrkdwn", verbatim: true, text: "*ref_id*\nref-1" },
               ],
             },
             {
               type: "context",
-              elements: [{ type: "mrkdwn", text: "grants-processor:staging" }],
+              elements: [
+                {
+                  type: "mrkdwn",
+                  verbatim: true,
+                  text: "grants-processor:staging",
+                },
+              ],
             },
           ],
         },
@@ -115,6 +126,7 @@ describe("Slack.send_alert", () => {
       type: "section",
       text: {
         type: "mrkdwn",
+        verbatim: true,
         text: "*grant for &lt;!channel&gt; stalled*",
       },
     });
@@ -137,6 +149,7 @@ describe("Slack.send_alert", () => {
       type: "section",
       text: {
         type: "mrkdwn",
+        verbatim: true,
         text: "*ERROR:Chariot Grant Without A Donation*",
       },
     });
@@ -154,7 +167,9 @@ describe("Slack.send_alert", () => {
     const fields_block = blocks.find((block) => "fields" in block);
     expect(fields_block).toEqual({
       type: "section",
-      fields: [{ type: "mrkdwn", text: "*nonprofit*\nA &amp; B" }],
+      fields: [
+        { type: "mrkdwn", verbatim: true, text: "*nonprofit*\nA &amp; B" },
+      ],
     });
   });
 
@@ -169,11 +184,15 @@ describe("Slack.send_alert", () => {
     expect(blocks).toEqual([
       {
         type: "section",
-        text: { type: "mrkdwn", text: "*No grants to process*" },
+        text: {
+          type: "mrkdwn",
+          verbatim: true,
+          text: "*No grants to process*",
+        },
       },
       {
         type: "context",
-        elements: [{ type: "mrkdwn", text: "owed notices" }],
+        elements: [{ type: "mrkdwn", verbatim: true, text: "owed notices" }],
       },
     ]);
 
@@ -252,12 +271,16 @@ describe("Slack.send_alert", () => {
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
     expect(blocks[0]).toEqual({
       type: "section",
-      text: { type: "mrkdwn", text: "*payouts claimed but not settled*" },
+      text: {
+        type: "mrkdwn",
+        verbatim: true,
+        text: "*payouts claimed but not settled*",
+      },
     });
     expect(body_sections(blocks)).toEqual([body]);
     expect(blocks.at(-1)).toEqual({
       type: "context",
-      elements: [{ type: "mrkdwn", text: "grants-processor" }],
+      elements: [{ type: "mrkdwn", verbatim: true, text: "grants-processor" }],
     });
   });
 
@@ -279,15 +302,19 @@ describe("Slack.send_alert", () => {
     expect(texts.join("")).toBe(body);
     expect(blocks[0]).toEqual({
       type: "section",
-      text: { type: "mrkdwn", text: "*payouts claimed but not settled*" },
+      text: {
+        type: "mrkdwn",
+        verbatim: true,
+        text: "*payouts claimed but not settled*",
+      },
     });
     expect(blocks.at(-2)).toEqual({
       type: "section",
-      fields: [{ type: "mrkdwn", text: "*count*\n2" }],
+      fields: [{ type: "mrkdwn", verbatim: true, text: "*count*\n2" }],
     });
     expect(blocks.at(-1)).toEqual({
       type: "context",
-      elements: [{ type: "mrkdwn", text: "grants-processor" }],
+      elements: [{ type: "mrkdwn", verbatim: true, text: "grants-processor" }],
     });
   });
 
@@ -474,18 +501,21 @@ describe("Slack.send_alert structured content", () => {
     expect(blocks.slice(1, 4)).toEqual([
       {
         type: "section",
-        text: { type: "mrkdwn", text: "a &lt;!here&gt; note" },
+        text: { type: "mrkdwn", verbatim: true, text: "a &lt;!here&gt; note" },
       },
       {
         type: "section",
         text: {
           type: "mrkdwn",
+          verbatim: true,
           text: "<https://x.test/a?b=1|Respond &amp; win>",
         },
       },
       {
         type: "context",
-        elements: [{ type: "mrkdwn", text: "donation &lt;!channel&gt;" }],
+        elements: [
+          { type: "mrkdwn", verbatim: true, text: "donation &lt;!channel&gt;" },
+        ],
       },
     ]);
   });
@@ -499,6 +529,33 @@ describe("Slack.send_alert structured content", () => {
     expect(sections).toHaveLength(2);
     expect(sections.every((s) => s.text.text.length <= 3000)).toBe(true);
     expect(sections.map((s) => s.text.text).join("")).toBe(note);
+  });
+
+  test("sends every mrkdwn text verbatim so a plain @channel is no mention", async () => {
+    const { blocks } = await send({
+      title: "@channel",
+      fields: [{ name: "Donor", value: "@here" }],
+      note: "@everyone",
+      context: ["@channel"],
+    });
+    const texts = JSON.stringify(blocks).match(/"type":"mrkdwn"[^}]*/g) ?? [];
+    expect(texts.length).toBeGreaterThanOrEqual(5);
+    expect(texts.every((t) => t.includes('"verbatim":true'))).toBe(true);
+  });
+
+  test("cuts a long title and field value inside slack's limits", async () => {
+    const long = "n".repeat(5000);
+    const { blocks } = await send({
+      title: long,
+      fields: [{ name: "Donor", value: long }],
+    });
+    const [title, fields] = blocks as unknown as {
+      text?: { text: string };
+      fields?: { text: string }[];
+    }[];
+    expect(title!.text!.text.length).toBeLessThan(3000);
+    expect(fields!.fields![0]!.text.length).toBeLessThan(2000);
+    expect(fields!.fields![0]!.text.endsWith("…")).toBe(true);
   });
 
   test("uses the summary as the notification text", async () => {

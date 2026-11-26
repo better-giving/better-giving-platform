@@ -410,7 +410,12 @@ export async function process_refund(
   const owed = [...owed_rows.values()];
   if (owed.length > 0) {
     // the reversal has committed: a failed read for the alert is reported, not thrown
+    // without the donation the alert still goes, with its names as fallbacks
     const alert = await donation_get(donation_id)
+      .catch((err) => {
+        report_error(err, { donation_id, title: "Refund recorded as owed" });
+        return undefined;
+      })
       .then((don) =>
         ops_alert({
           from: `${ctx.alert_from}-${stage}`,

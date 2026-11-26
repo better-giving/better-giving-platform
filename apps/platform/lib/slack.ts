@@ -63,6 +63,8 @@ const CREDENTIAL_ERRORS = new Set([
 ]);
 // https://docs.slack.dev/reference/block-kit/blocks/section-block
 const SECTION_TEXT_MAX = 3000;
+const TITLE_MAX = 500;
+const FIELD_MAX = 1000;
 // https://docs.slack.dev/reference/block-kit/blocks/table-block
 const TABLE_ROWS_MAX = 100;
 const TABLE_CELLS_MAX = 20;
@@ -93,9 +95,8 @@ export class Slack {
   }
 
   async send_alert({ type = "NOTICE", ...alert }: Alert) {
-    const visible = escape_mrkdwn(
-      type === "NOTICE" ? alert.title : `ERROR:${alert.title}`
-    );
+    const raw_title = type === "NOTICE" ? alert.title : `ERROR:${alert.title}`;
+    const visible = escape_mrkdwn(raw_title);
     if (!this.bot_token && this.skip_bad_credential) {
       return this.skipped("no bot token", visible);
     }
@@ -103,7 +104,7 @@ export class Slack {
     const blocks: Block[] = [
       {
         type: "section",
-        text: { type: "mrkdwn", text: `*${visible}*` },
+        text: mrkdwn(`*${escape_mrkdwn(clamp(raw_title, TITLE_MAX))}*`),
       },
     ];
     if (alert.body) {
@@ -111,42 +112,40 @@ export class Slack {
       for (const text of chunk_section_text(escape_mrkdwn(alert.body))) {
         blocks.push({
           type: "section",
-          text: { type: "mrkdwn", text },
+          text: mrkdwn(text),
         });
       }
     }
     if (alert.fields?.length) {
       blocks.push({
         type: "section",
-        fields: alert.fields.map((f) => ({
-          type: "mrkdwn",
-          text: `*${escape_mrkdwn(f.name)}*\n${link(f.value, f.url)}`,
-        })),
+        fields: alert.fields.map((f) =>
+          mrkdwn(
+            `*${escape_mrkdwn(clamp(f.name, FIELD_MAX))}*\n${link(clamp(f.value, FIELD_MAX), f.url)}`
+          )
+        ),
       });
     }
     if (alert.table?.columns.length) blocks.push(table_block(alert.table));
     // sections hold 3000 characters: a longer note is split, not refused
     for (const text of chunk_section_text(escape_mrkdwn(alert.note ?? ""))) {
-      blocks.push({ type: "section", text: { type: "mrkdwn", text } });
+      blocks.push({ type: "section", text: mrkdwn(text) });
     }
     if (alert.action) {
       blocks.push({
         type: "section",
-        text: {
-          type: "mrkdwn",
-          text: link(alert.action.text, alert.action.url),
-        },
+        text: mrkdwn(link(alert.action.text, alert.action.url)),
       });
     }
     for (const line of alert.context ?? []) {
       blocks.push({
         type: "context",
-        elements: [{ type: "mrkdwn", text: escape_mrkdwn(line) }],
+        elements: [mrkdwn(escape_mrkdwn(line))],
       });
     }
     blocks.push({
       type: "context",
-      elements: [{ type: "mrkdwn", text: escape_mrkdwn(alert.from) }],
+      elements: [mrkdwn(escape_mrkdwn(alert.from))],
     });
 
     const res = await global.fetch(POST_MESSAGE, {
@@ -206,7 +205,17 @@ function chunk_section_text(text: string): string[] {
   return chunks;
 }
 
-type Text = { type: "mrkdwn"; text: string };
+// verbatim: a plain @channel in a donor's name must not become a mention
+type Text = { type: "mrkdwn"; text: string; verbatim: true };
+const mrkdwn = (text: string): Text => ({
+  type: "mrkdwn",
+  text,
+  verbatim: true,
+});
+
+/** user input is cut inside slack's 2000-character field and 3000-character section limits */
+const clamp = (text: string, max: number) =>
+  text.length > max ? `${text.slice(0, max - 1)}…` : text;
 type Cell = { type: "raw_text"; text: string };
 type Block =
   | { type: "section"; text: Text }

@@ -611,8 +611,7 @@ const reverse_settled = async (ev: WebhookEvent, c: IReversal) => {
     return new Response(`no donation for ${c.sttl_id}`, { status: 200 });
   }
   const lines = [
-    `donation ${don.id}, charge ${c.sttl_id}, event ${ev.id}`,
-    `refunded in this event: ${c.refunded}, of a charge of ${c.charged} (paypal status ${c.status})`,
+    `Of a charge of ${c.charged} (PayPal status ${c.status}).`,
     ...(c.caveat ? [c.caveat] : []),
   ];
   const res = await reverse_charge({
@@ -627,7 +626,12 @@ const reverse_settled = async (ev: WebhookEvent, c: IReversal) => {
     source_ref: c.ref,
     alert_from: REFUND_ALERT_FROM,
     // keyed on the event, so a duplicate delivery posts one notice
-    notice: { id: `paypal-reversal_${ev.id}`, lines },
+    notice: {
+      id: `paypal-reversal_${ev.id}`,
+      amount: c.refunded,
+      ids: [`charge ${c.sttl_id}`, `event ${ev.id}`],
+      lines,
+    },
   });
   switch (res.status) {
     case "reversed":

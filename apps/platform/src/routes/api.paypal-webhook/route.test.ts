@@ -1346,7 +1346,7 @@ describe("refunds and reversals", () => {
         source_ref: "REF-1",
       });
       expect(taken_back()).toBe(1);
-      expect(reversal().notice.lines.join("\n")).toContain(CAPTURE_ID);
+      expect(reversal().notice.ids.join("\n")).toContain(CAPTURE_ID);
     }
   );
 
@@ -1438,7 +1438,7 @@ describe("refunds and reversals", () => {
     expect(res.status).toBe(200);
     expect(reversal().source).toBe("dispute");
     expect(taken_back()).toBe(0.4);
-    expect(reversal().notice.lines.join("\n")).toContain("-40.00 USD");
+    expect(reversal().notice.amount).toContain("-40.00 USD");
   });
 
   it("hands over a chargeback after a partial refund by its own part, without the order", async () => {
@@ -1537,7 +1537,7 @@ describe("refunds and reversals", () => {
     expect(res.status).toBe(200);
     expect(reversal().source).toBe("dispute");
     expect(taken_back()).toBe(0.6);
-    expect(reversal().notice.lines.join("\n")).toContain(SALE_ID);
+    expect(reversal().notice.ids.join("\n")).toContain(SALE_ID);
   });
 
   it("asks for redelivery when some dists failed to reverse", async () => {
@@ -3421,6 +3421,8 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
     const won_ev = (sttl_id: string, at?: string) =>
       resolved_ev(sttl_id, "RESOLVED_SELLER_FAVOUR", {
         ...thirty,
+        // paypal may keep sending the old deadline: only an opened alert shows it
+        seller_response_due_date: "2026-10-21T07:00:00Z",
         ...(at && { update_time: at }),
       });
     const lost_ev = (sttl_id: string, at?: string) =>
@@ -3474,6 +3476,9 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
         note: "Won after it was recorded lost. The chargeback stays owed; credit it by hand if PayPal returned the money.",
       });
       expect(alerts[0]!.alert).not.toHaveProperty("table");
+      expect(
+        alerts[0]!.alert.fields.map((f: { name: string }) => f.name)
+      ).not.toContain("Respond by");
     });
 
     it("lost on appeal after it was won, re-owes nothing, stays won, and tells ops", async () => {
