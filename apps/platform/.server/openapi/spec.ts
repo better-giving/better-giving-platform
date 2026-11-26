@@ -844,7 +844,7 @@ const PARTNER_READINESS = {
           type: "string",
           enum: [...RAIL_STATES],
           description:
-            "`active`: chargeable. `pending`: under review at the processor, not chargeable yet (`offered` is false). `inactive`: not chargeable because the platform is not configured for the rail, the nonprofit is not active, or, on card, ACH, Apple Pay and Google Pay, the nonprofit's processor account is unfinished (details or requirements outstanding) or disconnected. `unrequested`: the nonprofit has not enabled this method, or, on card, ACH, Apple Pay and Google Pay, has enabled it but has no processor account. An unknown state is not offered.",
+            "`active`: chargeable. `pending`: under review at the processor, not chargeable yet (`offered` is false). `inactive`: not chargeable because the platform is not configured for the rail, the nonprofit is not active, or, on card, ACH, Apple Pay and Google Pay, the nonprofit's processor account is unfinished (details or requirements outstanding) or disconnected. `unrequested`: the nonprofit has not enabled this method. On card, ACH, Apple Pay and Google Pay a nonprofit with no processor account of its own is `active` when the method is enabled and configured, as it is at checkout; an account it has only holds the rail back while it is under review (`pending`), unfinished or disconnected (`inactive`). An unknown state is not offered.",
         },
         offered: { type: "boolean" },
       },

@@ -71,8 +71,8 @@ interface IRail {
   round_up_minor?: number;
   /** checkout offers it at the frequencies the nonprofit picked */
   recurring: boolean;
-  /** the processor capability is the nonprofit's connected stripe account
-   * (`connect_status`); paypal, daf and crypto have no such account here */
+  /** a nonprofit's connected stripe account, when it has one, can hold the
+   * rail back (`connect_status`); paypal, daf and crypto have no such account */
   connected_account?: true;
 }
 
@@ -201,11 +201,13 @@ interface INpoCheckout {
   stripe_deauthorized_at: string | null;
 }
 
-/** the state a rail that runs on the nonprofit's connected stripe account is in:
- * `unrequested` without an account, `pending` while stripe reviews it, and
- * not chargeable (`inactive`) while the nonprofit has to finish or has left */
+/** the state a rail that runs on stripe is in. a nonprofit with no connected
+ * account is `active`: checkout charges it anyway (the account only decides
+ * where the money settles; none settles pooled, `routed_account`). once there
+ * is an account its state applies: `pending` while stripe reviews it, and not
+ * chargeable (`inactive`) while the nonprofit has to finish or has left */
 function account_state(npo: INpoCheckout): RailState {
-  if (npo.stripe_account_id === null) return "unrequested";
+  if (npo.stripe_account_id === null) return "active";
   switch (connect_status(mirror_of(npo), npo.stripe_deauthorized_at)) {
     case "ready":
       return "active";

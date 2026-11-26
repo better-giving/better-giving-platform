@@ -448,7 +448,9 @@ describe("rails on the connected stripe account", () => {
     expect(r.charges_enabled).toBe(true);
   });
 
-  test("no stripe account is never pending: it is unrequested and not offered", async () => {
+  // checkout charges card without a connected account (the account only picks
+  // where the money settles), so readiness offers it
+  test("no stripe account is never pending: the rails follow checkout and are active", async () => {
     const rails = await states_of({
       stripe_account_id: null,
       stripe_charges_enabled: false,
@@ -456,15 +458,21 @@ describe("rails on the connected stripe account", () => {
       stripe_details_submitted: false,
     });
 
-    for (const rail of STRIPE_RAILS) {
-      expect(rails[rail], rail).toEqual({
-        state: "unrequested",
-        offered: false,
-      });
+    for (const rail of [...STRIPE_RAILS, ...OTHER_RAILS]) {
+      expect(rails[rail], rail).toEqual({ state: "active", offered: true });
     }
-    for (const rail of OTHER_RAILS) {
-      expect(rails[rail].offered, rail).toBe(true);
-    }
+  });
+
+  test("no stripe account still reads unrequested where the method is not enabled, and inactive without stripe's key", async () => {
+    const not_enabled = await states_of({
+      donate_methods: ["crypto"],
+      stripe_account_id: null,
+    });
+    expect(not_enabled.card).toEqual({ state: "unrequested", offered: false });
+
+    pub.stripe_pk = undefined;
+    const no_key = await states_of({ stripe_account_id: null });
+    expect(no_key.card).toEqual({ state: "inactive", offered: false });
   });
 
   test("an account the nonprofit has to finish is inactive, not pending", async () => {
@@ -761,7 +769,12 @@ describe("revision", () => {
         expect((await read(npo_id)).revision).toBe(after.revision);
       });
 
-    rises_on_npo("account id", {}, { stripe_account_id: null });
+    // an account under review holds card back; with none it is offered again
+    rises_on_npo(
+      "account id",
+      { stripe_charges_enabled: false, stripe_payouts_enabled: false },
+      { stripe_account_id: null }
+    );
     rises_on_npo("charges enabled", {}, { stripe_charges_enabled: false });
     rises_on_npo("payouts enabled", {}, { stripe_payouts_enabled: false });
     rises_on_npo("details submitted", {}, { stripe_details_submitted: false });
