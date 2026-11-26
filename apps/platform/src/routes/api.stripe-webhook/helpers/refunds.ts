@@ -98,7 +98,7 @@ export async function reverse_refunds(
           id: `${latest.id}_held`,
           alert: await ops_alert({
             from: `${o.alert_from}-${stage}`,
-            headline: "Reversal held, refund not yet succeeded",
+            headline: "Reversal held until the refund succeeds",
             don,
             amount: money_label(taken, charge.currency),
             subject: "Refunded",

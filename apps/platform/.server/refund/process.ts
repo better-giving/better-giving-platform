@@ -55,7 +55,6 @@ export interface RefundResult {
   failures: string[];
   /** what each party now owes back, one line per row */
   owed_msgs: string[];
-  /** those rows, as they stand */
   owed: IOwed[];
   has_loss: boolean;
   applied: number;

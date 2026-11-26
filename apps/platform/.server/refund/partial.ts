@@ -30,7 +30,6 @@ export type TakesRecorded =
       taken: number;
       /** what each party now owes back, one line per row */
       owed_msgs: string[];
-      /** those rows */
       owed: IOwed[];
       /** one line per dist whose grant hasn't gone out, so nothing of this
        * refund is owed for it */

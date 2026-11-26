@@ -239,9 +239,7 @@ describe("charge.dispute.created", () => {
     expect(await owed_of(gift.id)).toMatchObject([
       { fee_dispute_usd: 0, outstanding_usd: 93.2 },
     ]);
-    expect(text(notices()[0])).toMatch(
-      /Dispute fee settled in EUR \(14\.00 EUR\)/
-    );
+    expect(text(notices()[0])).toMatch(/Dispute fee was in EUR \(14\.00 EUR\)/);
   });
 
   it("tells ops once when the gift has nothing settled to owe yet", async () => {
@@ -732,7 +730,7 @@ describe("a late win after the dispute was lost", () => {
     const [notice] = notices();
     expect(text(notice)).toMatch(/credited back/);
     expect(text(notice)).not.toMatch(/dispute fee included/);
-    expect(text(notice)).toMatch(/settled in EUR/);
+    expect(text(notice)).toMatch(/Dispute fee was in EUR/);
     expect(text(notice)).toMatch(/by hand/);
   });
 });

@@ -86,7 +86,7 @@ const usd = (n: number) => n.toFixed(2);
 /**
  * what a filing recorded as owed, one row per party and a total. a party is
  * named by its nonprofit's or user's name, with "#id" when the name is
- * missing. numbers are plain usd, the header says so in the owed column.
+ * missing. all figures are usd.
  */
 export async function owed_table(owed: IOwed[]): Promise<AlertTable> {
   const npo_ids = owed.flatMap((o) => (o.npo_id === null ? [] : [o.npo_id]));

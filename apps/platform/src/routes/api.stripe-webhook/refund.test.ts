@@ -355,7 +355,7 @@ describe("a partial bank refund that starts pending", () => {
 
     expect(while_pending).toEqual([]);
     expect(notice_text()).toMatch(
-      /^Reversal held, refund not yet succeeded · /m
+      /^Reversal held until the refund succeeds · /m
     );
     expect(res.status).toBe(200);
     expect(await owed_of(charge_of.id)).toMatchObject([
@@ -381,9 +381,9 @@ describe("a partial bank refund that starts pending", () => {
     const npo = charge_of.npo_ids[0];
     expect(notice.payload.alert).toMatchObject({
       title:
-        "Reversal held, refund not yet succeeded · $40.00 to Save the Kids",
+        "Reversal held until the refund succeeds · $40.00 to Save the Kids",
       summary:
-        "Reversal held, refund not yet succeeded: $40.00 to Save the Kids",
+        "Reversal held until the refund succeeds: $40.00 to Save the Kids",
       fields: [
         { name: "Nonprofit", value: `Save the Kids (#${npo})` },
         { name: "Donor", value: "Jane Doe" },
@@ -785,7 +785,7 @@ describe("a bank refund completing the charge", () => {
 
     expect(while_pending).toEqual({ status: "settled", taken: 0 });
     expect(notice_text()).toMatch(
-      /^Reversal held, refund not yet succeeded · [\s\S]*Waiting on: 100\.00 USD \(re_1, pending\)/m
+      /^Reversal held until the refund succeeds · [\s\S]*Waiting on: 100\.00 USD \(re_1, pending\)/m
     );
     expect((await gift_of(charge_of.id)).status).toBe("refunded_loss");
     expect(await owed_of(charge_of.id)).toMatchObject([

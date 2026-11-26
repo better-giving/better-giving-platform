@@ -611,7 +611,7 @@ const reverse_settled = async (ev: WebhookEvent, c: IReversal) => {
     return new Response(`no donation for ${c.sttl_id}`, { status: 200 });
   }
   const lines = [
-    `Of a charge of ${c.charged} (PayPal status ${c.status}).`,
+    `Charge was ${c.charged} (PayPal status ${c.status}).`,
     ...(c.caveat ? [c.caveat] : []),
   ];
   const res = await reverse_charge({

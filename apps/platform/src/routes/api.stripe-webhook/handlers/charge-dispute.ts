@@ -91,7 +91,7 @@ const dispute_fee_usd = (d: Stripe.Dispute): { usd: number; line?: string } => {
   if (first.currency !== "usd") {
     return {
       usd: 0,
-      line: `Dispute fee settled in ${first.currency.toUpperCase()} (${money(amount, first.currency)}): recorded as none owed, settle its share by hand.`,
+      line: `Dispute fee was in ${first.currency.toUpperCase()} (${money(amount, first.currency)}), so none is recorded as owed. Settle its share by hand.`,
     };
   }
   return { usd: from_stripe_amount(amount, first.currency) };
@@ -202,7 +202,7 @@ export async function handle_dispute_closed(
           ...(!won.credited &&
             won.hand && {
               action: {
-                text: "Credit the nonprofit by hand what the reversal took.",
+                text: "Credit the nonprofit by hand for what the reversal took.",
               },
             }),
         }),
