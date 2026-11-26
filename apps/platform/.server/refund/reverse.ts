@@ -10,7 +10,7 @@ import { db } from "../pg/db";
 import { dists_for_refund } from "../pg/queries/dist";
 import { donation_get } from "../pg/queries/donation";
 import type { DbOrTx } from "../pg/queries/helpers";
-import type { IOwed } from "../pg/queries/owed";
+import { type IOwed, owed_for_donation } from "../pg/queries/owed";
 import { type ITake, takes_of } from "../pg/queries/take";
 import type { OwedSource } from "./apply";
 import { type IOpsAlert, ops_alert } from "./ops-alert";
@@ -427,7 +427,14 @@ export async function reverse_charge(
     `${r.alert_from}: reversed ${r.donation_id}, dists: ${graphs.length}, failures: ${failed}, owed: ${res.owed_msgs.length}`
   );
   if (r.source === "dispute") {
-    await notify_dispute_lost(r, don, graphs.length, res);
+    // the fees were written after `res.owed` was read: show the rows as they stand
+    const read = new Set(res.owed.map((o) => o.id));
+    const owed = (await owed_for_donation(don.id)).filter(
+      (o) =>
+        read.has(o.id) ||
+        (o.source === "dispute" && o.source_ref === src.source_ref)
+    );
+    await notify_dispute_lost(r, don, graphs.length, { ...res, owed });
   }
 
   if (failed > 0) {

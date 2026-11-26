@@ -435,7 +435,15 @@ export async function process_refund(
       .catch((err) => {
         report_error(err, { donation_id, title: "Refund recorded as owed" });
       });
-    if (alert) await fiat_monitor.send_alert(alert);
+    // a refused post is reported, not thrown: the reversal is saved, and a 5xx
+    // would only make the redelivery stop at the guard, skipping what follows
+    if (alert) {
+      try {
+        await fiat_monitor.send_alert(alert);
+      } catch (err) {
+        report_error(err, { donation_id, title: "Refund recorded as owed" });
+      }
+    }
   }
 
   const has_loss =

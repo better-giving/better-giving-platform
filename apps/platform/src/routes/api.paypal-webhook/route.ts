@@ -50,7 +50,6 @@ import {
   owed_table,
   recipient_field,
   recipient_name,
-  short_id,
 } from "$/refund/alert";
 import { dispute_opened, dispute_won } from "$/refund/dispute";
 import {
@@ -528,6 +527,13 @@ const read_order = (
 const money = (value?: string, currency?: string) =>
   value ? `${value} ${currency ?? ""}`.trim() : "unknown";
 
+/** an alert title's "$6.00": what a refund or reversal took, unsigned (paypal
+ * sends a reversal's amount negative); undefined when paypal names none */
+const taken_label = (value?: string, currency?: string) => {
+  const n = Math.abs(Number(value));
+  return value && Number.isFinite(n) ? amount_label(n, currency) : undefined;
+};
+
 interface IMoney {
   value?: string;
   currency?: string;
@@ -573,7 +579,8 @@ interface IReversal {
   /** paypal's refund or reversal id, recorded on what a party owes */
   ref: string | undefined;
   status: string | undefined;
-  refunded: string;
+  /** what this event took back, "$6.00"; absent when paypal names no amount */
+  refunded: string | undefined;
   charged: string;
   /** why `share` is null, for the notice telling ops to settle it by hand */
   caveat?: string;
@@ -738,7 +745,10 @@ const dispute_explainer = (partial: boolean) =>
     ? "Donation stays settled even if PayPal charges this part back; what's owed comes out of next grants and is credited back if we win."
     : "Donation stays settled until a chargeback reverses it; what's owed comes out of next grants and is credited back if we win.";
 
-const RESOLUTION_CENTER = "https://www.paypal.com/resolutioncenter/";
+// a sandbox dispute exists only in the sandbox's own resolution center
+const RESOLUTION_CENTER = paypal_env.api_url?.includes("sandbox")
+  ? "https://www.sandbox.paypal.com/resolutioncenter/"
+  : "https://www.paypal.com/resolutioncenter/";
 
 /** the one thing ops do on an opened dispute; no "by" without paypal's date */
 const respond_action = (d: IDispute): NonNullable<Alert["action"]> => {
@@ -808,7 +818,8 @@ const notify_dispute = async (
     },
   ].filter((f): f is Field => !!f);
   const ids = [
-    don && `donation ${short_id(don.id)}`,
+    // whole: ops look it up to act by hand
+    don && `donation ${don.id}`,
     d.dispute_id && `dispute ${d.dispute_id}`,
     charges.length > 0 && `charge ${charges.join(", ")}`,
     ev.id && `event ${ev.id}`,
@@ -1512,7 +1523,7 @@ export async function action({ request }: Route.ActionArgs) {
           ref: refund.id,
           refunded_at: is_reversal ? undefined : refund.create_time,
           status: capture.status,
-          refunded: money(part?.value, part?.currency_code),
+          refunded: taken_label(part?.value, part?.currency_code),
           charged: money(gross?.value, gross?.currency_code),
           owner: async () => capture.custom_id,
         });
@@ -1555,7 +1566,11 @@ export async function action({ request }: Route.ActionArgs) {
           ref: r.id,
           refunded_at: is_reversal ? undefined : r.create_time,
           status: state,
-          refunded: money(r.amount?.total, r.amount?.currency),
+          // the sale resource itself names the whole sale, not what was taken
+          refunded:
+            is_sale && !sized.share
+              ? undefined
+              : taken_label(r.amount?.total, r.amount?.currency),
           charged: money(whole?.total, whole?.currency),
           owner: async () => {
             const subs_id = sale.billing_agreement_id;

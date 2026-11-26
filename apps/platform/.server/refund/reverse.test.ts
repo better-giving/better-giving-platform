@@ -1455,6 +1455,28 @@ describe("reverse_charge — the ops notice of a full reversal", () => {
     ]);
   });
 
+  test("a lost dispute's table includes the dispute fee written after the reversal", async () => {
+    const { id, npo_id } = await seed("stripe:card");
+    await grant_paid(id, npo_id);
+
+    await reverse_charge({
+      donation_id: id,
+      rail: "stripe",
+      source: "dispute",
+      share: whole,
+      dispute_fee_usd: 15,
+      source_ref: "du_1",
+      alert_from: "charge-dispute",
+      notice,
+    });
+
+    const [n] = queued();
+    expect(n.alert.table.rows).toEqual([
+      [`Test NPO ${counter} (#${npo_id})`, "90.00", "3.20", "15.00", "108.20"],
+      ["Total", "—", "—", "—", "108.20"],
+    ]);
+  });
+
   test("a full refund queues no notice of its own", async () => {
     const { id } = await seed("paypal");
 
@@ -1733,6 +1755,23 @@ async function cash_grant(
     ...(type === "settled" && { settled_date: "2026-07-02T00:00:00.000Z" }),
   });
 }
+
+describe("reverse_charge — a refused owed alert", () => {
+  test("is reported, not thrown: the reversal stands and the delivery succeeds", async () => {
+    const { id, npo_id } = await seed("stripe:card");
+    await cash_grant(id, npo_id, "settled");
+    fiat_alert.mockRejectedValueOnce(new Error("slack 429"));
+    report_error.mockClear();
+
+    const res = await refund_whole(id);
+
+    expect(res.status).toBe("reversed");
+    expect(report_error).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "slack 429" }),
+      expect.objectContaining({ donation_id: id })
+    );
+  });
+});
 
 describe("reverse_charge — a payout settled before the refund", () => {
   test("the ops notice says the amount was recorded as owed by the npo", async () => {

@@ -1438,7 +1438,7 @@ describe("refunds and reversals", () => {
     expect(res.status).toBe(200);
     expect(reversal().source).toBe("dispute");
     expect(taken_back()).toBe(0.4);
-    expect(reversal().notice.amount).toContain("-40.00 USD");
+    expect(reversal().notice.amount).toBe("$40.00");
   });
 
   it("hands over a chargeback after a partial refund by its own part, without the order", async () => {
@@ -1877,6 +1877,31 @@ describe("refunds and reversals", () => {
       expect(alert.action.text).toContain("by hand");
       expect(await owed_rows()).toEqual([]);
       expect((await donation_get(ORDER_ID))?.status).toBe("settled");
+    });
+
+    it("shows no amount for a sale resource it can't size: its amount is the whole sale", async () => {
+      await grant_paid("sale");
+      get_sale_mock.mockResolvedValue({
+        ...sale_copy(),
+        state: "partially_refunded",
+      });
+      enqueue_mock.mockClear();
+
+      await deliver({
+        id: "WH-REV-SALE",
+        event_type: "PAYMENT.SALE.REVERSED",
+        resource_type: "sale",
+        resource: {
+          id: SALE_ID,
+          amount: { total: "100.00", currency: "USD" },
+        },
+      });
+
+      const [notice] = enqueue_mock.mock.calls
+        .flat()
+        .filter((m: any) => m.id === "fiat-notice");
+      expect(notice.payload.alert.title).toMatch(/^Reversal not sized · /);
+      expect(notice.payload.alert.title).not.toContain("100.00");
     });
   });
 });
@@ -2717,10 +2742,11 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
           note: "PayPal reported no chargeback fee.\nDonation stays settled until a chargeback reverses it; what's owed comes out of next grants and is credited back if we win.",
           action: {
             text: "Respond in the PayPal Resolution Center by Dec 10, 2026, 23:59 UTC.",
-            url: "https://www.paypal.com/resolutioncenter/",
+            // the mocked api_url is the sandbox's
+            url: "https://www.sandbox.paypal.com/resolutioncenter/",
           },
           context: [
-            `donation 98bc019c… · dispute PP-R-YCD-654975725 · charge ${CHARGE} · event ${EV}`,
+            `donation ${DON} · dispute PP-R-YCD-654975725 · charge ${CHARGE} · event ${EV}`,
           ],
         },
       ]);

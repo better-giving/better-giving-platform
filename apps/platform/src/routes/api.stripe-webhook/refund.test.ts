@@ -318,6 +318,25 @@ describe("a partial refund on a gift whose grant went out", () => {
     );
   });
 
+  it("shows the refund that took money back when the event's own refund failed", async () => {
+    charge_of = await seed_card_gift(db(), PAID_GRANT);
+    await deliver(refund(4_000));
+    await deliver(refund(3_000, "pending"));
+    enqueue_mock.mockClear();
+
+    await deliver(settle("re_2", "failed"));
+
+    const titles = enqueue_mock.mock.calls
+      .flat()
+      .filter((m) => m.id === "fiat-notice")
+      .map((m) => m.payload.alert.title as string);
+    expect(titles.length).toBeGreaterThan(0);
+    for (const title of titles) {
+      expect(title).toContain("$40.00");
+      expect(title).not.toContain("$30.00");
+    }
+  });
+
   it("ends two $50 refunds where one full refund ends, each redelivery changing nothing", async () => {
     const full = await seed_card_gift(db(), PAID_GRANT);
     charge_of = full;

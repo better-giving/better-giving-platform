@@ -70,7 +70,10 @@ export async function reverse_refunds(
 ) {
   const don_id = don.id;
   const taken = live.reduce((sum, r) => sum + r.amount, 0);
-  const this_refund = money_label((o.refund ?? latest).amount, charge.currency);
+  // a failed or canceled refund takes nothing back: the alert shows the newest that does
+  const shown =
+    o.refund && live.some((r) => r.id === o.refund?.id) ? o.refund : latest;
+  const this_refund = money_label(shown.amount, charge.currency);
   const result = await reverse_charge({
     donation_id: don_id,
     rail: "stripe",
