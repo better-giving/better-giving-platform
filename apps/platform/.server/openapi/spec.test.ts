@@ -859,12 +859,11 @@ describe("fee_rules against the checkout's fee", () => {
     expect(checkout_fee("daf", 100)).toBe(300);
     expect(checkout_fee("daf", 10)).toBe(100);
     expect(checkout_fee("daf", 1000)).toBe(3000);
-    for (const [usd, fee_minor] of [
-      [100, 300],
-      [10, 100],
-      [1000, 3000],
-    ]) {
-      expect((usd * 100 + fee_minor) % daf.round_up_minor!).toBe(0);
+    // the rule holds for gifts the worked examples don't spell out
+    for (const usd of [1, 7, 33, 250, 999]) {
+      expect((usd * 100 + checkout_fee("daf", usd)) % daf.round_up_minor!).toBe(
+        0
+      );
     }
   });
 

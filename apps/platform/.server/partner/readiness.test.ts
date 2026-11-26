@@ -468,11 +468,18 @@ describe("rails on the connected stripe account", () => {
       donate_methods: ["crypto"],
       stripe_account_id: null,
     });
-    expect(not_enabled.card).toEqual({ state: "unrequested", offered: false });
+    for (const rail of STRIPE_RAILS) {
+      expect(not_enabled[rail], rail).toEqual({
+        state: "unrequested",
+        offered: false,
+      });
+    }
 
     pub.stripe_pk = undefined;
     const no_key = await states_of({ stripe_account_id: null });
-    expect(no_key.card).toEqual({ state: "inactive", offered: false });
+    for (const rail of STRIPE_RAILS) {
+      expect(no_key[rail], rail).toEqual({ state: "inactive", offered: false });
+    }
   });
 
   test("an account the nonprofit has to finish is inactive, not pending", async () => {
@@ -789,6 +796,20 @@ describe("revision", () => {
       {},
       { stripe_deauthorized_at: "2026-11-01T00:00:00.000Z" }
     );
+  });
+
+  // the id is not in the body, only whether an account exists; the paired
+  // rises above prove the same read does move when that state changes
+  test("swapping one connected account for another moves no revision", async () => {
+    const npo_id = await seed_tenant({ donate_methods: ["stripe"] });
+    const before = await read(npo_id);
+    await t.db
+      .update(npos)
+      .set({ stripe_account_id: "acct_swapped" })
+      .where(eq(npos.id, npo_id));
+    const after = await read(npo_id);
+    expect(after.rails.card).toEqual(before.rails.card);
+    expect(after.revision).toBe(before.revision);
   });
 
   test("a nonprofit's revision moves only with its own body", async () => {
