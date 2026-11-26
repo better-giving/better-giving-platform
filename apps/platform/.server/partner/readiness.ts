@@ -63,11 +63,11 @@ interface IRail {
   /** the platform credential checkout needs for it */
   configured: () => boolean;
   fee: IFeeTerms;
-  /** usd cents checkout rounds the gift total up to a multiple of, the
-   * difference landing on the fee allowance: the cent on stripe's rails
-   * (`donation_amounts`), the whole dollar on daf (`whole_dollar_amounts` in
-   * checkouts/daf). absent where checkout doesn't round up: paypal truncates
-   * and crypto doesn't round */
+  /** usd cents checkout rounds the gift total up to a multiple of: the cent
+   * on stripe's rails (`donation_amounts`), the whole dollar on daf
+   * (`whole_dollar_amounts`), both in common/amounts. the daf top-up lands on
+   * the fee allowance when the donor covers fees, else on the tip. absent
+   * where checkout doesn't round up: paypal truncates and crypto doesn't round */
   round_up_minor?: number;
   /** checkout offers it at the frequencies the nonprofit picked */
   recurring: boolean;
@@ -146,8 +146,8 @@ function fee_rule({ fee, round_up_minor }: IRail): IFeeRule {
 }
 
 /** the memo flags nowpayments reports per token. the committed token data
- * (packages/crypto `generated/tokens`) does not carry them yet, so until the
- * generator passes them through every coin reads as not requiring one */
+ * (packages/crypto `generated/tokens`) carries neither, so every coin reads
+ * as not requiring one */
 export interface IMemoFlags {
   extra_id_exists?: boolean;
   extra_id_optional?: boolean;
@@ -202,7 +202,7 @@ interface INpoCheckout {
 }
 
 /** the state a rail that runs on the nonprofit's connected stripe account is in:
- * never requested without an account, `pending` while stripe reviews it, and
+ * `unrequested` without an account, `pending` while stripe reviews it, and
  * not chargeable (`inactive`) while the nonprofit has to finish or has left */
 function account_state(npo: INpoCheckout): RailState {
   if (npo.stripe_account_id === null) return "unrequested";
@@ -211,8 +211,6 @@ function account_state(npo: INpoCheckout): RailState {
       return "active";
     case "pending":
       return "pending";
-    case "not_connected":
-      return "unrequested";
     default:
       return "inactive";
   }

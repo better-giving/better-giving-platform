@@ -1,34 +1,26 @@
 import { describe, expect, test } from "vitest";
-import { donation_amounts, fee_terms, whole_dollar_amounts } from "./amounts";
+import { whole_dollar_amounts } from "./amounts";
 
-const cents = (x: { base: number; tip: number; fee_allowance: number }) =>
-  Math.round((x.base + x.tip + x.fee_allowance) * 100);
-
+// the DAF form takes a whole-dollar gift only (`daf_donation_details`), so
+// every base below is whole; the tip and fee allowance are what a tip percent
+// and the fee estimate leave with cents
 describe("whole_dollar_amounts", () => {
   test("a donor covering fees takes the top-up on the fee allowance", () => {
-    const out = whole_dollar_amounts({
-      base: 100,
-      tip: 15,
-      fee_allowance: 3.43,
-    });
-    expect(out).toEqual({ base: 100, tip: 15, fee_allowance: 4 });
-    expect(cents(out) % 100).toBe(0);
+    expect(
+      whole_dollar_amounts({ base: 100, tip: 15, fee_allowance: 3.43 })
+    ).toEqual({ base: 100, tip: 15, fee_allowance: 4 });
   });
 
   test("without fee cover the top-up lands on the contribution", () => {
-    const out = whole_dollar_amounts({
-      base: 100,
-      tip: 15.4,
-      fee_allowance: 0,
-    });
-    expect(out).toEqual({ base: 100, tip: 16, fee_allowance: 0 });
-    expect(cents(out) % 100).toBe(0);
+    expect(
+      whole_dollar_amounts({ base: 100, tip: 15.4, fee_allowance: 0 })
+    ).toEqual({ base: 100, tip: 16, fee_allowance: 0 });
   });
 
-  test("with neither a contribution nor fee cover the total is the gift as entered", () => {
+  test("with neither a contribution nor fee cover the whole-dollar gift is as entered", () => {
     expect(
-      whole_dollar_amounts({ base: 25.5, tip: 0, fee_allowance: 0 })
-    ).toEqual({ base: 25.5, tip: 0, fee_allowance: 0 });
+      whole_dollar_amounts({ base: 25, tip: 0, fee_allowance: 0 })
+    ).toEqual({ base: 25, tip: 0, fee_allowance: 0 });
   });
 
   test("a total already on a whole dollar is left as it is", () => {
@@ -37,25 +29,40 @@ describe("whole_dollar_amounts", () => {
     ).toEqual({ base: 50, tip: 10, fee_allowance: 0 });
   });
 
-  test("the gift is never touched, and the top-up is under a dollar", () => {
-    for (const base of [2, 7.31, 99.99, 1000]) {
-      for (const tip_format of ["none", "10", "20"] as const) {
-        for (const cover_processing_fee of [false, true]) {
-          const raw = donation_amounts(
-            { amount: base, tip_format, tip: "", cover_processing_fee },
-            2,
-            fee_terms.daf
-          );
-          const out = whole_dollar_amounts(raw);
-          expect(out.base).toBe(base);
-          if (raw.tip || raw.fee_allowance) {
-            expect(cents(out) % 100).toBe(0);
-            expect(cents(out) - cents(raw)).toBeLessThan(100);
-          } else {
-            expect(out).toEqual(raw);
-          }
-        }
-      }
-    }
+  // totals and results written out by hand, each total a float trap in
+  // dollars (7.7, 3.3, 108.9) that must still land on an exact whole dollar
+  test.each([
+    {
+      name: "10% tip on $7: 7.70 up to 8.00",
+      in: { base: 7, tip: 0.7, fee_allowance: 0 },
+      out: { base: 7, tip: 1, fee_allowance: 0 },
+    },
+    {
+      name: "tip on $3: 3.30 up to 4.00",
+      in: { base: 3, tip: 0.3, fee_allowance: 0 },
+      out: { base: 3, tip: 1, fee_allowance: 0 },
+    },
+    {
+      name: "10% tip on $99: 108.90 up to 109.00",
+      in: { base: 99, tip: 9.9, fee_allowance: 0 },
+      out: { base: 99, tip: 10, fee_allowance: 0 },
+    },
+    {
+      name: "fee cover on $99: 102.31 up to 103.00 on the allowance",
+      in: { base: 99, tip: 0, fee_allowance: 3.31 },
+      out: { base: 99, tip: 0, fee_allowance: 4 },
+    },
+    {
+      name: "one cent over a dollar: 100.01 up to 101.00, a 99 cent top-up",
+      in: { base: 100, tip: 0.01, fee_allowance: 0 },
+      out: { base: 100, tip: 1, fee_allowance: 0 },
+    },
+    {
+      name: "tip and fee cover together: the allowance takes the top-up",
+      in: { base: 10, tip: 1.5, fee_allowance: 0.62 },
+      out: { base: 10, tip: 1.5, fee_allowance: 1.5 },
+    },
+  ])("$name", ({ in: input, out }) => {
+    expect(whole_dollar_amounts(input)).toEqual(out);
   });
 });

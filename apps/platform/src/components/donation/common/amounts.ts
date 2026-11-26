@@ -57,7 +57,9 @@ export function donation_amounts(
 
 /** dafs grant whole dollars only: the total rounds up to the next dollar, the
  * difference landing on the fee allowance when the donor covers fees, else on
- * the tip. with neither, the base is the total as entered. */
+ * the tip. with neither, the base passes through unrounded: that is whole
+ * dollars only because `daf_donation_details` in ../types.ts rejects a
+ * fractional amount, so a caller without that schema must round first. */
 export function whole_dollar_amounts({
   base,
   tip,

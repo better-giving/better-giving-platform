@@ -488,6 +488,37 @@ describe("rails on the connected stripe account", () => {
     }
   });
 
+  test("charges on but payouts off, details submitted and nothing due: pending", async () => {
+    const rails = await states_of({ stripe_payouts_enabled: false });
+
+    for (const rail of STRIPE_RAILS) {
+      expect(rails[rail], rail).toEqual({ state: "pending", offered: false });
+    }
+  });
+
+  test("charges on but payouts off with requirements due: inactive, the nonprofit's move", async () => {
+    const rails = await states_of({
+      stripe_payouts_enabled: false,
+      stripe_requirements_due: ["external_account"],
+    });
+
+    for (const rail of STRIPE_RAILS) {
+      expect(rails[rail], rail).toEqual({ state: "inactive", offered: false });
+    }
+  });
+
+  // pins connect_status as it stands: `ready` is decided before requirements
+  // are read, so a mirror with all three flags on is active whatever is due
+  test("charges, payouts and details on with requirements due still reads active", async () => {
+    const rails = await states_of({
+      stripe_requirements_due: ["individual.verification.document"],
+    });
+
+    for (const rail of STRIPE_RAILS) {
+      expect(rails[rail], rail).toEqual({ state: "active", offered: true });
+    }
+  });
+
   test("a nonprofit that disconnected is inactive, even with a ready mirror", async () => {
     const rails = await states_of({
       stripe_deauthorized_at: "2026-11-01T00:00:00.000Z",
@@ -534,8 +565,17 @@ describe("rails on the connected stripe account", () => {
 });
 
 describe("coins' memo flag", () => {
-  const coin_of = (r: Awaited<ReturnType<typeof read>>, x: { code: string }) =>
-    r.coins.find((c) => c.coin === x.code);
+  // a code can sit on several networks; id and network name the one token
+  const coin_of = (
+    r: Awaited<ReturnType<typeof read>>,
+    x: { code: string; network: string }
+  ) => {
+    const hits = r.coins.filter(
+      (c) => c.coin === x.code && c.network === x.network
+    );
+    expect(hits, `${x.code} on ${x.network}`).toHaveLength(1);
+    return hits[0];
+  };
 
   test("required, optional and absent memo", async () => {
     const npo_id = await seed_tenant({ donate_methods: ["crypto"] });
@@ -700,6 +740,42 @@ describe("revision", () => {
         tokens_list.splice(tokens_list.indexOf(added), 1);
       }
     });
+  });
+
+  describe("rises once when the connected stripe account's mirror changes", () => {
+    const rises_on_npo = (
+      name: string,
+      seed: Parameters<typeof seed_npo>[1],
+      set: Partial<typeof npos.$inferInsert>
+    ) =>
+      test(name, async () => {
+        const npo_id = await seed_tenant({
+          donate_methods: ["stripe"],
+          ...seed,
+        });
+        const before = await read(npo_id);
+        await t.db.update(npos).set(set).where(eq(npos.id, npo_id));
+        const after = await read(npo_id);
+        expect(after.rails.card.state).not.toBe(before.rails.card.state);
+        expect(after.revision).toBe(before.revision + 1);
+        expect((await read(npo_id)).revision).toBe(after.revision);
+      });
+
+    rises_on_npo("account id", {}, { stripe_account_id: null });
+    rises_on_npo("charges enabled", {}, { stripe_charges_enabled: false });
+    rises_on_npo("payouts enabled", {}, { stripe_payouts_enabled: false });
+    rises_on_npo("details submitted", {}, { stripe_details_submitted: false });
+    // charges off keeps the account out of `ready`, where requirements are read
+    rises_on_npo(
+      "requirements due",
+      { stripe_charges_enabled: false },
+      { stripe_requirements_due: ["external_account"] }
+    );
+    rises_on_npo(
+      "deauthorized",
+      {},
+      { stripe_deauthorized_at: "2026-11-01T00:00:00.000Z" }
+    );
   });
 
   test("a nonprofit's revision moves only with its own body", async () => {

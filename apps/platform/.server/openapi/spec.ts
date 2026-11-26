@@ -844,7 +844,7 @@ const PARTNER_READINESS = {
           type: "string",
           enum: [...RAIL_STATES],
           description:
-            "`active`: chargeable. `pending`: requested and under review at the processor, not chargeable yet (`offered` is false). `inactive`: not configured, switched off, or the nonprofit is not active. `unrequested`: the nonprofit has not asked for this method. An unknown state is not offered.",
+            "`active`: chargeable. `pending`: under review at the processor, not chargeable yet (`offered` is false). `inactive`: not chargeable because the platform is not configured for the rail, the nonprofit is not active, or, on card, ACH, Apple Pay and Google Pay, the nonprofit's processor account is unfinished (details or requirements outstanding) or disconnected. `unrequested`: the nonprofit has not enabled this method, or, on card, ACH, Apple Pay and Google Pay, has enabled it but has no processor account. An unknown state is not offered.",
         },
         offered: { type: "boolean" },
       },
@@ -881,7 +881,7 @@ const PARTNER_READINESS = {
           memo_required: {
             type: "boolean",
             description:
-              "True when a deposit memo is mandatory for the coin. A coin that takes an optional memo reads false; a memo that a deposit carries is always shown to the donor.",
+              "True when a deposit memo is mandatory for the coin; a coin whose memo is optional reads false. Readiness sends this flag only, never a memo value, so a memo that comes with a deposit is the integrator's to show the donor whatever this flag says. The flag currently reads false for every coin, because the coin data it is computed from carries no memo flags: false does not mean a coin takes no memo.",
           },
           logo: { type: "string", format: "uri" },
         },

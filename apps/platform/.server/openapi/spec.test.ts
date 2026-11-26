@@ -546,8 +546,9 @@ describe("openapi drift", () => {
 });
 
 /** the subset of JSON Schema the published bodies use. an object key the
- * schema doesn't declare is a failure here (the published schema leaves
- * `additionalProperties` open, but a body field it omits is the drift) */
+ * schema doesn't declare is a failure here (a body field it omits is the
+ * drift) unless the schema gives `additionalProperties` a schema: the open
+ * per-method maps, whose unknown keys are checked against it */
 const schema_errors = (schema: Json, value: unknown, at = "$"): string[] => {
   const s = schema as {
     type?: string;
@@ -559,6 +560,7 @@ const schema_errors = (schema: Json, value: unknown, at = "$"): string[] => {
     maximum?: number;
     pattern?: string;
     format?: string;
+    additionalProperties?: Json | boolean;
   };
   const kind = (v: unknown) =>
     v === null
@@ -594,8 +596,13 @@ const schema_errors = (schema: Json, value: unknown, at = "$"): string[] => {
     for (const key of s.required ?? [])
       if (!(key in obj)) errs.push(`${at}.${key}: missing`);
     for (const [key, v] of Object.entries(obj)) {
-      if (!(key in props)) errs.push(`${at}.${key}: not in schema`);
-      else errs.push(...schema_errors(props[key], v, `${at}.${key}`));
+      if (key in props) {
+        errs.push(...schema_errors(props[key], v, `${at}.${key}`));
+      } else if (typeof s.additionalProperties === "object") {
+        errs.push(...schema_errors(s.additionalProperties, v, `${at}.${key}`));
+      } else {
+        errs.push(`${at}.${key}: not in schema`);
+      }
     }
   }
   return errs;
@@ -664,6 +671,31 @@ describe("readiness body against the published schema", () => {
     );
     expect(schema.description).toMatch(/unknown state as not offered/);
     expect(schema.description).toMatch(/offered. alone/);
+  });
+
+  test("a body with a method the schema doesn't name validates in each map, and an unknown method of the wrong shape does not", async () => {
+    const schema = doc.components.schemas.PartnerReadiness as Json;
+    const body = await real_body();
+    const grown = {
+      ...body,
+      rails: { ...body.rails, wire: { state: "active", offered: true } },
+      intervals: { ...body.intervals, wire: ["monthly"] },
+      fee_rules: {
+        ...body.fee_rules,
+        wire: { percent: 0.01, fixed_minor: 25 },
+      },
+    };
+
+    expect(schema_errors(schema, grown)).toEqual([]);
+
+    // the open map still holds an unknown key to the shape of a known one,
+    // so the pass above is the schema's doing and not a validator that skips it
+    expect(
+      schema_errors(schema, {
+        ...body,
+        fee_rules: { ...body.fee_rules, wire: { percent: "1%" } },
+      })
+    ).not.toEqual([]);
   });
 
   test("a rail's states include pending, and the amounts are integer USD cents", async () => {
