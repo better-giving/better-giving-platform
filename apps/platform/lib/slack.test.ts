@@ -544,7 +544,7 @@ describe("Slack.send_alert structured content", () => {
   });
 
   test("cuts a long title and field value inside slack's limits", async () => {
-    const long = "n".repeat(5000);
+    const long = "&".repeat(5000);
     const { blocks } = await send({
       title: long,
       fields: [{ name: "Donor", value: long }],

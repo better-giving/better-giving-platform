@@ -64,7 +64,9 @@ const CREDENTIAL_ERRORS = new Set([
 // https://docs.slack.dev/reference/block-kit/blocks/section-block
 const SECTION_TEXT_MAX = 3000;
 const TITLE_MAX = 500;
-const FIELD_MAX = 1000;
+// cut before escaping, which can grow a character fivefold ("&" to "&amp;"):
+// 300 stays inside a 2000-character field, 500 inside a 3000-character section
+const FIELD_MAX = 300;
 // https://docs.slack.dev/reference/block-kit/blocks/table-block
 const TABLE_ROWS_MAX = 100;
 const TABLE_CELLS_MAX = 20;
@@ -213,7 +215,7 @@ const mrkdwn = (text: string): Text => ({
   verbatim: true,
 });
 
-/** user input is cut inside slack's 2000-character field and 3000-character section limits */
+/** user input is cut well inside slack's field and section limits (see FIELD_MAX) */
 const clamp = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
 type Cell = { type: "raw_text"; text: string };

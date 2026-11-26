@@ -47,7 +47,8 @@ const respond_action = (d: Stripe.Dispute) => {
   const by = due ? alert_date(new Date(due * 1000)) : undefined;
   return {
     text: `Respond in the Stripe dashboard${by ? ` by ${by}` : ""}.`,
-    url: `https://dashboard.stripe.com/disputes/${d.id}`,
+    // a test-mode dispute exists only under the dashboard's /test
+    url: `https://dashboard.stripe.com/${d.livemode ? "" : "test/"}disputes/${d.id}`,
   };
 };
 

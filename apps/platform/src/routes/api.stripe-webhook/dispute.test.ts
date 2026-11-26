@@ -99,6 +99,7 @@ const dispute_of = (
 ) => ({
   id,
   object: "dispute",
+  livemode: true,
   amount,
   currency: "usd",
   charge: `ch_${gift.id}`,
