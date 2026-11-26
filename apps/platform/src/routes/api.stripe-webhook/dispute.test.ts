@@ -314,15 +314,15 @@ describe("charge.dispute.created", () => {
         { name: "Disputed", value: "$100.00", inline: true },
         { name: "Reason", value: "Fraudulent", inline: true },
         { name: "Donated", value: "Jul 1, 2026", inline: true },
-        { name: "Respond by", value: "Oct 5, 2026", inline: true },
+        { name: "Respond by", value: "Oct 5, 2026, 14:13 UTC", inline: true },
       ],
       table: {
         columns: [
           { name: "Party" },
-          { name: "Received", align: "right" },
-          { name: "Card fee", align: "right" },
-          { name: "Dispute fee", align: "right" },
-          { name: "Owed", align: "right" },
+          { name: "Received (USD)", align: "right" },
+          { name: "Card fee (USD)", align: "right" },
+          { name: "Dispute fee (USD)", align: "right" },
+          { name: "Owed (USD)", align: "right" },
         ],
         rows: [
           [`Save the Kids (#${npo})`, "90.00", "3.20", "15.00", "108.20"],
@@ -331,7 +331,7 @@ describe("charge.dispute.created", () => {
       },
       note: "Donation stays settled until a loss reverses it; what's owed comes out of next grants and is credited back if we win.",
       action: {
-        text: "Respond in the Stripe dashboard by Oct 5, 2026.",
+        text: "Respond in the Stripe dashboard by Oct 5, 2026, 14:13 UTC.",
         url: `https://dashboard.stripe.com/disputes/du_${gift.id}`,
       },
       context: [

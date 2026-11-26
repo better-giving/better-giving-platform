@@ -2547,7 +2547,10 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
       }),
       expect.objectContaining({ name: "Reason", value: "Unauthorised" }),
       expect.objectContaining({ name: "Donated", value: "Sep 15, 2026" }),
-      expect.objectContaining({ name: "Respond by", value: "Oct 21, 2026" }),
+      expect.objectContaining({
+        name: "Respond by",
+        value: "Oct 21, 2026, 07:00 UTC",
+      }),
     ]);
     expect(alert.table.rows).toEqual([
       [`Save the Kids (#${npo_id})`, "90.00", "3.20", "0.00", "93.20"],
@@ -2555,7 +2558,7 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
     ]);
     expect(alert.note).toContain("PayPal reported no chargeback fee.");
     expect(alert.action.text).toBe(
-      "Respond in the PayPal Resolution Center by Oct 21, 2026."
+      "Respond in the PayPal Resolution Center by Oct 21, 2026, 07:00 UTC."
     );
     expect(alert.context).toEqual([
       `donation ${id} · dispute ${DISPUTE_ID} · charge ${sttl_id} · event WH-DSP-CREATED`,
@@ -2689,15 +2692,19 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
             { name: "Disputed", value: "6.00 of 6.00 USD", inline: true },
             { name: "Reason", value: "Unauthorised", inline: true },
             { name: "Donated", value: "Nov 20, 2026", inline: true },
-            { name: "Respond by", value: "Dec 10, 2026", inline: true },
+            {
+              name: "Respond by",
+              value: "Dec 10, 2026, 23:59 UTC",
+              inline: true,
+            },
           ],
           table: {
             columns: [
               { name: "Party" },
-              { name: "Received", align: "right" },
-              { name: "Card fee", align: "right" },
-              { name: "Dispute fee", align: "right" },
-              { name: "Owed", align: "right" },
+              { name: "Received (USD)", align: "right" },
+              { name: "Card fee (USD)", align: "right" },
+              { name: "Dispute fee (USD)", align: "right" },
+              { name: "Owed (USD)", align: "right" },
             ],
             rows: [
               ["Save the Kids (#4)", "4.40", "0.51", "0.00", "4.91"],
@@ -2706,7 +2713,7 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
           },
           note: "PayPal reported no chargeback fee.\nDonation stays settled until a chargeback reverses it; what's owed comes out of next grants and is credited back if we win.",
           action: {
-            text: "Respond in the PayPal Resolution Center by Dec 10, 2026.",
+            text: "Respond in the PayPal Resolution Center by Dec 10, 2026, 23:59 UTC.",
             url: "https://www.paypal.com/resolutioncenter/",
           },
           context: [

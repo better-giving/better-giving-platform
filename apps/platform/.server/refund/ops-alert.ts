@@ -1,7 +1,7 @@
 import type { Alert, Field } from "@/slack";
 import type { IOwed } from "../pg/queries/owed";
 import {
-  alert_date,
+  alert_deadline,
   donated_field,
   donor_field,
   type IAlertDonation,
@@ -45,7 +45,7 @@ const inline = (name: string, value: string): Field => ({
 export async function ops_alert(a: IOpsAlert): Promise<Alert> {
   const npo = recipient_name(a.don);
   const gift = a.amount ? `${a.amount} to ${npo}` : npo;
-  const respond_by = alert_date(a.respond_by);
+  const respond_by = alert_deadline(a.respond_by);
   const fields = [
     a.don && recipient_field(a.don),
     a.don && donor_field(a.don),

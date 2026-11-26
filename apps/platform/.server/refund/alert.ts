@@ -20,6 +20,24 @@ export const alert_date = (when: string | Date | null | undefined) => {
   });
 };
 
+/** "Dec 10, 2026, 07:00 UTC": a deadline keeps its time, since it can fall
+ * near midnight and a date alone reads a day off in another zone */
+export const alert_deadline = (when: string | Date | null | undefined) => {
+  if (!when) return undefined;
+  const d = new Date(when);
+  if (Number.isNaN(d.getTime())) return undefined;
+  const at = d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "UTC",
+  });
+  return `${at} UTC`;
+};
+
 /** "$6.00" for usd, else "6.00 EUR". a missing value reads "unknown amount" */
 export const amount_label = (
   value: string | number | undefined,
@@ -140,10 +158,10 @@ export async function owed_table(owed: IOwed[]): Promise<AlertTable> {
   return {
     columns: [
       { name: "Party" },
-      { name: "Received", align: right },
-      { name: "Card fee", align: right },
-      { name: "Dispute fee", align: right },
-      { name: "Owed", align: right },
+      { name: "Received (USD)", align: right },
+      { name: "Card fee (USD)", align: right },
+      { name: "Dispute fee (USD)", align: right },
+      { name: "Owed (USD)", align: right },
     ],
     rows: [
       ...owed.map((o) => [

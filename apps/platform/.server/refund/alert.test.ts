@@ -15,7 +15,13 @@ vi.mock("../pg/db", () => ({
   },
 }));
 
-import { alert_date, amount_label, owed_table, recipient_name } from "./alert";
+import {
+  alert_date,
+  alert_deadline,
+  amount_label,
+  owed_table,
+  recipient_name,
+} from "./alert";
 
 const owed = (o: Partial<IOwed>): IOwed =>
   ({
@@ -78,6 +84,28 @@ describe("alert helpers", () => {
     expect(alert_date("2026-11-20T23:30:00Z")).toBe("Nov 20, 2026");
     expect(alert_date(undefined)).toBeUndefined();
     expect(alert_date("not a date")).toBeUndefined();
+  });
+
+  test("alert_deadline keeps the UTC time, on either side of midnight", () => {
+    // in a US zone a local-time reading moves both of these to the day before
+    const zone = process.env.TZ;
+    process.env.TZ = "America/Los_Angeles";
+    try {
+      expect(alert_deadline("2026-12-10T23:30:00Z")).toBe(
+        "Dec 10, 2026, 23:30 UTC"
+      );
+      expect(alert_deadline("2026-12-11T00:30:00Z")).toBe(
+        "Dec 11, 2026, 00:30 UTC"
+      );
+    } finally {
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    }
+    expect(alert_deadline(new Date("2026-12-10T07:00:00Z"))).toBe(
+      "Dec 10, 2026, 07:00 UTC"
+    );
+    expect(alert_deadline(undefined)).toBeUndefined();
+    expect(alert_deadline("not a date")).toBeUndefined();
   });
 
   test("amount_label shows dollars for usd, a code otherwise, and unknown for none", () => {

@@ -8,7 +8,7 @@ import { money, money_label, refund_list } from "$/kit/stripe-money";
 import { db } from "$/pg/db";
 import { dispute_close, dispute_get, dispute_open } from "$/pg/queries/dispute";
 import type { IOwed } from "$/pg/queries/owed";
-import { alert_date } from "$/refund/alert";
+import { alert_deadline } from "$/refund/alert";
 import { dispute_opened, dispute_won } from "$/refund/dispute";
 import { humanize_code, type IOpsAlert, ops_alert } from "$/refund/ops-alert";
 import { load_reversible, reverse_charge } from "$/refund/reverse";
@@ -44,7 +44,7 @@ const reason_field = (d: Stripe.Dispute) => ({
 
 const respond_action = (d: Stripe.Dispute) => {
   const due = d.evidence_details?.due_by;
-  const by = due ? alert_date(new Date(due * 1000)) : undefined;
+  const by = due ? alert_deadline(new Date(due * 1000)) : undefined;
   return {
     text: `Respond in the Stripe dashboard${by ? ` by ${by}` : ""}.`,
     // a test-mode dispute exists only under the dashboard's /test

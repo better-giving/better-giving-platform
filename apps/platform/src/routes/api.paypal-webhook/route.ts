@@ -43,7 +43,7 @@ import {
   sub_update,
 } from "$/pg/queries/subscription";
 import {
-  alert_date,
+  alert_deadline,
   amount_label,
   donated_field,
   donor_field,
@@ -742,7 +742,7 @@ const RESOLUTION_CENTER = "https://www.paypal.com/resolutioncenter/";
 
 /** the one thing ops do on an opened dispute; no "by" without paypal's date */
 const respond_action = (d: IDispute): NonNullable<Alert["action"]> => {
-  const due = alert_date(d.seller_response_due_date);
+  const due = alert_deadline(d.seller_response_due_date);
   return {
     text: `Respond in the PayPal Resolution Center${due ? ` by ${due}` : ""}.`,
     url: RESOLUTION_CENTER,
@@ -790,7 +790,7 @@ const notify_dispute = async (
   const gift = `${amount_label(d.dispute_amount?.value, d.dispute_amount?.currency_code)} to ${recipient_name(don)}`;
   const disputed = disputed_value(d);
   // a deadline is news only on the alert that asks for a response
-  const respond_by = n.action && alert_date(d.seller_response_due_date);
+  const respond_by = n.action && alert_deadline(d.seller_response_due_date);
   const fields = [
     don && recipient_field(don),
     don && donor_field(don),
