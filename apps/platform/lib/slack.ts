@@ -232,7 +232,7 @@ function table_block({ columns, rows }: AlertTable): Block {
   const cols = columns.slice(0, TABLE_CELLS_MAX);
   const header = cols.map((c) => cell_text(c.name));
   const pad = (r: string[]) => cols.map((_, i) => cell_text(r[i]));
-  const all = rows.map(fit);
+  const all = rows.map(pad);
   const budget = TABLE_CHARS_MAX - cell_chars([header]);
   let kept = all.slice(0, TABLE_ROWS_MAX - 1);
   if (kept.length < all.length || cell_chars(kept) > budget) {
