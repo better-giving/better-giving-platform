@@ -56,6 +56,8 @@ export interface RefundResult {
   /** what each party now owes back, one line per row */
   owed_msgs: string[];
   owed: IOwed[];
+  /** per-party notes for ops, as the owed alert carries them */
+  owed_notes: string[];
   has_loss: boolean;
   applied: number;
 }
@@ -407,7 +409,8 @@ export async function process_refund(
 
   // owed amounts are finance-ops notices (not bugs) — keep slack. failures go to sentry inline at the throw site.
   const owed = [...owed_rows.values()];
-  if (owed.length > 0) {
+  // a lost dispute is told once, by its own alert, which carries these rows and notes
+  if (owed.length > 0 && ctx.source !== "dispute") {
     // the reversal has committed: a failed read for the alert is reported, not thrown
     // without the donation the alert still goes, with its names as fallbacks
     const alert = await donation_get(donation_id)
@@ -420,7 +423,7 @@ export async function process_refund(
           from: `${ctx.alert_from}-${stage}`,
           headline: "Refund recorded as owed",
           don,
-          subject: ctx.source === "dispute" ? "Disputed" : "Refunded",
+          subject: "Refunded",
           owed,
           note: [
             "What's owed comes out of each party's next grants or commission.",
@@ -438,7 +441,7 @@ export async function process_refund(
   const has_loss =
     (final ?? (await donation_refund_status(db, donation_id))) ===
     "refunded_loss";
-  return { failures, owed_msgs, owed, has_loss, applied };
+  return { failures, owed_msgs, owed, owed_notes, has_loss, applied };
 }
 
 /**

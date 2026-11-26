@@ -10,6 +10,7 @@ import {
 } from "vitest";
 import { alert_text } from "#/__tests__/fixtures/alert-text";
 import type { Alert } from "@/slack";
+import { fiat_monitor } from "$/kit/slack";
 import type { DbOrTx } from "$/pg/queries/helpers";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
@@ -339,6 +340,22 @@ describe("charge.dispute.created", () => {
       ],
     });
   });
+
+  it("links a test-mode dispute under the dashboard's /test path", async () => {
+    const gift = await seed_card_gift(db(), PAID_GRANT);
+
+    await deliver(
+      event_of("charge.dispute.created", {
+        ...dispute_of(gift),
+        livemode: false,
+      })
+    );
+
+    const [only] = notices();
+    expect(only.payload.alert.action.url).toBe(
+      `https://dashboard.stripe.com/test/disputes/du_${gift.id}`
+    );
+  });
 });
 
 const lost_of = (gift: Gift) =>
@@ -388,6 +405,30 @@ describe("charge.dispute.closed, lost after it opened", () => {
     const taken =
       before - (await balance_of(db(), npo_id)) + (row?.outstanding_usd ?? NaN);
     expect(taken).toBeCloseTo(108.2, 10);
+  });
+
+  it("sends exactly one Slack post, the dispute-lost alert with the owed table", async () => {
+    const gift = await seed_card_gift(db(), PAID_GRANT);
+    await deliver(event_of("charge.dispute.created", dispute_of(gift)));
+    enqueue_mock.mockClear();
+    vi.mocked(fiat_monitor.send_alert).mockClear();
+
+    await deliver(lost_of(gift));
+
+    // nothing posted directly, so the one post is the queued notice
+    expect(fiat_monitor.send_alert).not.toHaveBeenCalled();
+    const [only, ...rest] = notices();
+    expect(rest).toEqual([]);
+    expect(only.payload.alert.title).toMatch(
+      /^Dispute lost, donation reversed · /
+    );
+    expect(only.payload.alert.table.rows.at(-1)).toEqual([
+      "Total",
+      "—",
+      "—",
+      "—",
+      "108.20",
+    ]);
   });
 });
 

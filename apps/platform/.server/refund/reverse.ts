@@ -577,6 +577,12 @@ async function notify_dispute_lost(
       failed === 0
         ? `All ${dists} dists reversed.`
         : `${failed} of ${dists} dists failed to reverse, and the donation stays settled.`,
+      ...(res.owed.length > 0
+        ? [
+            "What's owed comes out of each party's next grants or commission.",
+            ...res.owed_notes,
+          ]
+        : []),
     ],
   })
     .then((alert) =>
