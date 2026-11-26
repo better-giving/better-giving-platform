@@ -28,6 +28,7 @@ vi.mock("@sentry/react-router", () => ({ captureException: vi.fn() }));
 vi.mock("$/env", () => ({
   nowpayments: { ipn_secret: "ipn-secret", is_sandbox: false },
   stage: "production",
+  base_url: "https://app.test",
 }));
 vi.mock("$/kit/slack", () => ({
   aws_monitor: { send_alert: send_alert_mock },
