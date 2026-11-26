@@ -17,6 +17,9 @@ export interface IOpsAlert {
   /** what happened, e.g. "Stripe dispute opened" */
   headline: string;
   don?: IAlertDonation;
+  /** the donation's whole id, for an alert ops settle by hand and so look up;
+   * absent, the footer shows the lookup's id cut short */
+  donation_id?: string;
   /** e.g. "$6.00"; absent, the title names the nonprofit alone */
   amount?: string;
   /** the amount field's name */
@@ -54,7 +57,8 @@ export async function ops_alert(a: IOpsAlert): Promise<Alert> {
     donated_field(a.don),
     respond_by && inline("Respond by", respond_by),
   ].filter((f): f is Field => !!f);
-  const ids = [a.don && `donation ${short_id(a.don.id)}`, ...(a.ids ?? [])]
+  const donation = a.donation_id ?? (a.don && short_id(a.don.id));
+  const ids = [donation && `donation ${donation}`, ...(a.ids ?? [])]
     .filter((id): id is string => !!id)
     .join(" · ");
   const note = a.note?.join("\n");

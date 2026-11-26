@@ -262,7 +262,7 @@ export const unreversible = (
     : u;
 
 const UNSIZED_ACTION =
-  "how much of the charge is taken back could not be read, so this reversal could not be sized against the charge. nothing was reversed automatically: settle it by hand.";
+  "Could not read how much of the charge was taken back, so nothing was reversed automatically. Settle it by hand.";
 
 const SHARE_OWED: Record<ReversalSource, string> = {
   refund: "Partial refund recorded as owed",
@@ -291,7 +291,10 @@ const REFUND_PENDING = {
 const reversal_alert = (
   r: ChargeReversal,
   don: IDonation,
-  a: Pick<IOpsAlert, "headline" | "fields" | "owed" | "note" | "action">
+  a: Pick<
+    IOpsAlert,
+    "headline" | "fields" | "owed" | "note" | "action" | "donation_id"
+  >
 ) =>
   ops_alert({
     from: `${r.alert_from}-${stage}`,
@@ -340,18 +343,11 @@ export async function reverse_charge(
     await enqueue(
       msg("fiat-notice", {
         id: r.notice.id,
-        alert: {
-          type: "NOTICE",
-          from: `${r.alert_from}-${stage}`,
-          title: "Reversal Not Sized",
-          body: [
-            ...(r.notice.ids?.length
-              ? [[`donation ${r.donation_id}`, ...r.notice.ids].join(", ")]
-              : []),
-            ...r.notice.lines,
-            UNSIZED_ACTION,
-          ].join("\n"),
-        },
+        alert: await reversal_alert(r, don, {
+          headline: "Reversal not sized",
+          donation_id: don.id,
+          action: { text: UNSIZED_ACTION },
+        }),
       })
     );
     return { status: "unsized" };

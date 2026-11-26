@@ -1,19 +1,42 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { IOwed } from "../pg/queries/owed";
 
-const { lookups, report_error } = vi.hoisted(() => ({
-  lookups: vi.fn(),
+const { store, report_error } = vi.hoisted(() => ({
+  // rows as the database holds them, by its own column names
+  store: {
+    npos: [] as Record<string, unknown>[],
+    users: [] as Record<string, unknown>[],
+    fail: false,
+  },
   report_error: vi.fn(),
 }));
 
 vi.mock("../env", () => ({ base_url: "https://app.test" }));
 vi.mock("#/errors/report", () => ({ report_error }));
-// every name lookup resolves to the next queued answer
-vi.mock("../pg/db", () => ({
-  db: {
-    select: () => ({ from: () => ({ where: () => lookups() }) }),
-  },
-}));
+// a select answers with the columns it asked for, under the keys it chose, so
+// a lookup that reads a column it never selected, or the wrong one, finds nothing
+vi.mock("../pg/db", async () => {
+  const { npos } = await import("../pg/schema/npo");
+  const { user } = await import("../pg/schema/auth");
+  return {
+    db: {
+      select: (cols: Record<string, { name: string }>) => ({
+        from: (table: unknown) => ({
+          where: async () => {
+            if (store.fail) throw new Error("db down");
+            const rows =
+              table === npos ? store.npos : table === user ? store.users : [];
+            return rows.map((row) =>
+              Object.fromEntries(
+                Object.entries(cols).map(([key, col]) => [key, row[col.name]])
+              )
+            );
+          },
+        }),
+      }),
+    },
+  };
+});
 
 import {
   alert_date,
@@ -38,16 +61,19 @@ const parties = async (rows: IOwed[]) =>
   (await owed_table(rows)).rows.map((r) => r[0]);
 
 beforeEach(() => {
-  lookups.mockReset();
+  store.npos = [];
+  store.users = [];
+  store.fail = false;
   report_error.mockReset();
 });
 
 describe("owed_table", () => {
   test("names each party and totals what is owed", async () => {
-    lookups
-      .mockResolvedValueOnce([{ id: 4, name: "Save the Kids" }])
-      .mockResolvedValueOnce([{ id: "REF-N", name: "Helpers" }])
-      .mockResolvedValueOnce([{ id: "REF-U", name: "Una User" }]);
+    store.npos = [
+      { id: 4, name: "Save the Kids", referral_id: null },
+      { id: 9, name: "Helpers", referral_id: "REF-N" },
+    ];
+    store.users = [{ referral_code: "REF-U", name: "Una User" }];
     const t = await owed_table([
       owed({ npo_id: 4 }),
       owed({ referrer_npo: "REF-N" }),
@@ -62,7 +88,6 @@ describe("owed_table", () => {
   });
 
   test("falls back to ids when a name is missing", async () => {
-    lookups.mockResolvedValue([]);
     expect(
       await parties([
         owed({ npo_id: 4 }),
@@ -73,7 +98,7 @@ describe("owed_table", () => {
   });
 
   test("keeps the table, with ids, when the name lookup fails", async () => {
-    lookups.mockRejectedValue(new Error("db down"));
+    store.fail = true;
     expect(await parties([owed({ npo_id: 4 })])).toEqual(["#4", "Total"]);
     expect(report_error).toHaveBeenCalledTimes(1);
   });

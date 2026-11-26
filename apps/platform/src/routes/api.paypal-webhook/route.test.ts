@@ -1864,14 +1864,17 @@ describe("refunds and reversals", () => {
       expect(notices).toEqual([
         expect.objectContaining({
           payload: expect.objectContaining({
-            alert: expect.objectContaining({ title: "Reversal Not Sized" }),
+            alert: expect.objectContaining({
+              title: expect.stringMatching(/^Reversal not sized · /),
+            }),
           }),
         }),
       ]);
-      const body: string = notices[0].payload.alert.body;
-      expect(body).toContain(SALE_ID);
-      expect(body).toContain("names no amount of its own");
-      expect(body).toContain("by hand");
+      const { alert } = notices[0].payload;
+      expect(alert.context.join(" ")).toContain(SALE_ID);
+      expect(alert.context.join(" ")).toContain(`donation ${ORDER_ID}`);
+      expect(alert.note).toContain("names no amount of its own");
+      expect(alert.action.text).toContain("by hand");
       expect(await owed_rows()).toEqual([]);
       expect((await donation_get(ORDER_ID))?.status).toBe("settled");
     });

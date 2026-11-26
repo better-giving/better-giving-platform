@@ -63,10 +63,14 @@ export async function reverse_refunds(
     event_id: string;
     /** the event's own sentences for ops */
     lines?: string[];
+    /** the refund the event is about, whose amount the alerts show; absent,
+     * the newest, which is what a charge.refunded was sent for */
+    refund?: Stripe.Refund;
   }
 ) {
   const don_id = don.id;
   const taken = live.reduce((sum, r) => sum + r.amount, 0);
+  const this_refund = money_label((o.refund ?? latest).amount, charge.currency);
   const result = await reverse_charge({
     donation_id: don_id,
     rail: "stripe",
@@ -79,7 +83,7 @@ export async function reverse_refunds(
     alert_from: o.alert_from,
     notice: {
       id: o.event_id,
-      amount: money_label(taken, charge.currency),
+      amount: this_refund,
       ids: o.seen_at,
       lines: [
         ...(o.lines ?? []),
@@ -100,7 +104,7 @@ export async function reverse_refunds(
             from: `${o.alert_from}-${stage}`,
             headline: "Reversal held until the refund succeeds",
             don,
-            amount: money_label(taken, charge.currency),
+            amount: this_refund,
             subject: "Refunded",
             fields: [
               {

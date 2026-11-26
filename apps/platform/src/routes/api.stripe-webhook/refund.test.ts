@@ -298,6 +298,26 @@ describe("a partial refund on a gift whose grant went out", () => {
     expect(notice_text()).not.toMatch(/undo|hand adjustment/i);
   });
 
+  it("shows each refund's own amount in its alert, with the running total in the note", async () => {
+    charge_of = await seed_card_gift(db(), PAID_GRANT);
+    const titles = () =>
+      enqueue_mock.mock.calls
+        .flat()
+        .filter((m) => m.id === "fiat-notice")
+        .map((m) => m.payload.alert.title as string);
+
+    await deliver(refund(4_000));
+    await deliver(refund(3_000));
+
+    const [first, second] = titles();
+    expect(first).toContain("$40.00");
+    expect(second).toContain("$30.00");
+    expect(second).not.toContain("$70.00");
+    expect(notice_text()).toContain(
+      "Total refunded so far: 70.00 USD of 100.00 USD."
+    );
+  });
+
   it("ends two $50 refunds where one full refund ends, each redelivery changing nothing", async () => {
     const full = await seed_card_gift(db(), PAID_GRANT);
     charge_of = full;

@@ -974,7 +974,12 @@ describe("reverse_charge — a share the provider can't size", () => {
       source: "refund",
       share,
       alert_from: "paypal-refund",
-      notice: { id: "paypal-unsized_WH-1", lines: ["donation x, charge c_1"] },
+      notice: {
+        id: "paypal-unsized_WH-1",
+        amount: "$6.00",
+        ids: ["charge c_1"],
+        lines: ["Charge was 100.00 USD."],
+      },
     });
 
   test.each([
@@ -993,10 +998,15 @@ describe("reverse_charge — a share the provider can't size", () => {
       const [m, ...rest] = enqueue.mock.calls.flat();
       expect(rest).toEqual([]);
       expect(m.payload.id).toBe("paypal-unsized_WH-1");
-      expect(m.payload.alert.title).toBe("Reversal Not Sized");
-      const body: string[] = m.payload.alert.body.split("\n");
-      expect(body[0]).toBe("donation x, charge c_1");
-      expect(body.at(-1)).toMatch(/could not be sized.*settle it by hand/);
+      expect(m.payload.alert.title).toMatch(
+        /^Reversal not sized · \$6\.00 to /
+      );
+      expect(m.payload.alert.note).toBe("Charge was 100.00 USD.");
+      expect(m.payload.alert.action.text).toMatch(
+        /Could not read how much.*Settle it by hand\.$/
+      );
+      // the whole donation id, to look it up by
+      expect(m.payload.alert.context).toEqual([`donation ${id} · charge c_1`]);
     }
   );
 
