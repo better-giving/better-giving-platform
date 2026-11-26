@@ -1,4 +1,5 @@
 import { inArray } from "drizzle-orm";
+import { report_error } from "#/errors/report";
 import type { AlertTable, Field } from "@/slack";
 import { base_url } from "../env";
 import { db } from "../pg/db";
@@ -95,6 +96,7 @@ export async function owed_table(owed: IOwed[]): Promise<AlertTable> {
   const user_ids = owed.flatMap((o) =>
     o.referrer_user === null ? [] : [o.referrer_user]
   );
+  // a failed name lookup must not lose the alert: parties fall back to ids
   const [by_id, by_referral, users] = await Promise.all([
     npo_ids.length
       ? db
@@ -114,7 +116,10 @@ export async function owed_table(owed: IOwed[]): Promise<AlertTable> {
           .from(user)
           .where(inArray(user.referral_code, user_ids))
       : [],
-  ]);
+  ]).catch((err) => {
+    report_error(err, { title: "owed table names" });
+    return [[], [], []] as const;
+  });
   const npo_name = new Map(by_id.map((n) => [n.id, n.name]));
   const referral_name = new Map(by_referral.map((n) => [n.id, n.name]));
   const user_name = new Map(users.map((u) => [u.id, u.name]));

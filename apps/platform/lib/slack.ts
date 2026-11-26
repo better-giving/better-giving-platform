@@ -125,11 +125,9 @@ export class Slack {
       });
     }
     if (alert.table?.columns.length) blocks.push(table_block(alert.table));
-    if (alert.note) {
-      blocks.push({
-        type: "section",
-        text: { type: "mrkdwn", text: escape_mrkdwn(alert.note) },
-      });
+    // sections hold 3000 characters: a longer note is split, not refused
+    for (const text of chunk_section_text(escape_mrkdwn(alert.note ?? ""))) {
+      blocks.push({ type: "section", text: { type: "mrkdwn", text } });
     }
     if (alert.action) {
       blocks.push({

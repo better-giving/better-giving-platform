@@ -785,7 +785,8 @@ const notify_dispute = async (
   );
   const gift = `${amount_label(d.dispute_amount?.value, d.dispute_amount?.currency_code)} to ${recipient_name(don)}`;
   const disputed = disputed_value(d);
-  const respond_by = alert_date(d.seller_response_due_date);
+  // a deadline is news only on the alert that asks for a response
+  const respond_by = n.action && alert_date(d.seller_response_due_date);
   const fields = [
     don && recipient_field(don),
     don && donor_field(don),

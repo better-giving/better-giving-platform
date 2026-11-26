@@ -409,19 +409,26 @@ export async function process_refund(
   // owed amounts are finance-ops notices (not bugs) — keep slack. failures go to sentry inline at the throw site.
   const owed = [...owed_rows.values()];
   if (owed.length > 0) {
-    const alert = await ops_alert({
-      from: `${ctx.alert_from}-${stage}`,
-      headline: "Refund recorded as owed",
-      don: await donation_get(donation_id),
-      subject: ctx.source === "dispute" ? "Disputed" : "Refunded",
-      owed,
-      note: [
-        "What's owed comes out of each party's next grants or commission.",
-        ...owed_notes,
-      ],
-      ids: [`${ctx.source} ${ctx.source_ref}`],
-    });
-    await fiat_monitor.send_alert(alert);
+    // the reversal has committed: a failed read for the alert is reported, not thrown
+    const alert = await donation_get(donation_id)
+      .then((don) =>
+        ops_alert({
+          from: `${ctx.alert_from}-${stage}`,
+          headline: "Refund recorded as owed",
+          don,
+          subject: ctx.source === "dispute" ? "Disputed" : "Refunded",
+          owed,
+          note: [
+            "What's owed comes out of each party's next grants or commission.",
+            ...owed_notes,
+          ],
+          ids: [`${ctx.source} ${ctx.source_ref}`],
+        })
+      )
+      .catch((err) => {
+        report_error(err, { donation_id, title: "Refund recorded as owed" });
+      });
+    if (alert) await fiat_monitor.send_alert(alert);
   }
 
   const has_loss =

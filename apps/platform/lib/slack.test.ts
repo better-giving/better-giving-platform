@@ -490,6 +490,17 @@ describe("Slack.send_alert structured content", () => {
     ]);
   });
 
+  test("splits a note past the section limit into sections", async () => {
+    const note = `${"a".repeat(2000)}\n${"b".repeat(2000)}`;
+    const { blocks } = await send({ note });
+    const sections = blocks.slice(1, -1) as unknown as {
+      text: { text: string };
+    }[];
+    expect(sections).toHaveLength(2);
+    expect(sections.every((s) => s.text.text.length <= 3000)).toBe(true);
+    expect(sections.map((s) => s.text.text).join("")).toBe(note);
+  });
+
   test("uses the summary as the notification text", async () => {
     mock_fetch(() => Response.json({ ok: true }));
     await new Slack(CHANNEL, TOKEN).send_alert({
