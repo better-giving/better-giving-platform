@@ -10,7 +10,7 @@ import { db } from "../pg/db";
 import { dists_for_refund } from "../pg/queries/dist";
 import { donation_get } from "../pg/queries/donation";
 import type { DbOrTx } from "../pg/queries/helpers";
-import { type IOwed, owed_for_donation } from "../pg/queries/owed";
+import { type IOwed, owed_for_donation, owed_total } from "../pg/queries/owed";
 import { type ITake, takes_of } from "../pg/queries/take";
 import type { OwedSource } from "./apply";
 import { type IOpsAlert, ops_alert } from "./ops-alert";
@@ -419,6 +419,8 @@ export async function reverse_charge(
     form_id: don.form_id ?? null,
     program_id: don.program?.id ?? null,
     alert_from: r.alert_from,
+    amount: r.notice.amount,
+    ids: r.notice.ids,
     ...src,
   });
   await owe_dispute_fees(don.id, src);
@@ -432,6 +434,7 @@ export async function reverse_charge(
     // a failed read must not lose the alert: a redelivery stops at the
     // reversed guard, so this is its only chance. it falls back to `res.owed`
     const read = new Set(res.owed.map((o) => o.id));
+    let fee_split = false;
     const owed = await owed_for_donation(don.id)
       .then((rows) =>
         rows.filter(
@@ -442,9 +445,16 @@ export async function reverse_charge(
       )
       .catch((err) => {
         report_error(err, { donation_id: r.donation_id, title: "owed rows" });
-        return res.owed;
+        fee_split = true;
+        return with_fee(res.owed, r.dispute_fee_usd ?? 0);
       });
-    await notify_dispute_lost(r, don, graphs.length, { ...res, owed });
+    await notify_dispute_lost(
+      r,
+      don,
+      graphs.length,
+      { ...res, owed },
+      fee_split
+    );
   }
 
   if (failed > 0) {
@@ -570,11 +580,36 @@ export async function has_settled_dists(donation_id: string) {
   return (await dists_for_refund(donation_id)).length > 0;
 }
 
+/** `rows` with the dispute fee the event names added, split across them by
+ * what each owes, in whole cents: the fee is written to the rows only after
+ * the reversal, so rows read before it lack it. unchanged without a fee */
+const with_fee = (rows: IOwed[], fee_usd: number): IOwed[] => {
+  const weight = rows.reduce((sum, o) => sum + owed_total(o), 0);
+  if (!(fee_usd > 0) || rows.length === 0 || weight <= 0) return rows;
+  let cents_left = Math.round(fee_usd * 100);
+  return rows.map((o, i) => {
+    const cents =
+      i === rows.length - 1
+        ? cents_left
+        : Math.round((Math.round(fee_usd * 100) * owed_total(o)) / weight);
+    cents_left -= cents;
+    return {
+      ...o,
+      fee_dispute_usd:
+        Math.round((o.fee_dispute_usd + cents / 100) * 100) / 100,
+      outstanding_usd:
+        Math.round(((o.outstanding_usd ?? owed_total(o)) + cents / 100) * 100) /
+        100,
+    };
+  });
+};
+
 async function notify_dispute_lost(
   r: ChargeReversal,
   don: IDonation,
   dists: number,
-  res: RefundResult
+  res: RefundResult,
+  fee_split = false
 ) {
   const failed = res.failures.length;
   const headline =
@@ -595,6 +630,11 @@ async function notify_dispute_lost(
         ? [
             "What's owed comes out of each party's next grants or commission.",
             ...res.owed_notes,
+          ]
+        : []),
+      ...(fee_split
+        ? [
+            "The owed rows could not be re-read, so the dispute fee is split across them by size.",
           ]
         : []),
     ],

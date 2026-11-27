@@ -63,17 +63,21 @@ export async function reverse_refunds(
     event_id: string;
     /** the event's own sentences for ops */
     lines?: string[];
-    /** the refund the event is about, whose amount the alerts show; absent,
-     * the newest, which is what a charge.refunded was sent for */
-    refund?: Stripe.Refund;
+    /** the refunds the event is about, whose amounts the alerts add up; absent,
+     * the newest */
+    refunds?: Stripe.Refund[];
   }
 ) {
   const don_id = don.id;
   const taken = live.reduce((sum, r) => sum + r.amount, 0);
-  // a failed or canceled refund takes nothing back: the alert shows the newest that does
-  const shown =
-    o.refund && live.some((r) => r.id === o.refund?.id) ? o.refund : latest;
-  const this_refund = money_label(shown.amount, charge.currency);
+  // a failed or canceled refund takes nothing back: the alert shows the ones
+  // that do, or the newest of them when the event's own all failed
+  const ids = new Set(live.map((r) => r.id));
+  const own = (o.refunds ?? []).filter((r) => ids.has(r.id));
+  const this_refund = money_label(
+    (own.length > 0 ? own : [latest]).reduce((sum, r) => sum + r.amount, 0),
+    charge.currency
+  );
   const result = await reverse_charge({
     donation_id: don_id,
     rail: "stripe",

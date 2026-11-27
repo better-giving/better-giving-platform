@@ -112,12 +112,26 @@ export const donated_field = (don?: IAlertDonation): Field | undefined => {
 
 const usd = (n: number) => n.toFixed(2);
 
+/** what a row still owes. the column is nullable in the row's type: a null
+ * counts as the whole of what the row owes */
+export const outstanding = (o: IOwed) => o.outstanding_usd ?? owed_total(o);
+
+/** what an alert says in place of the owed table when every row is settled */
+export const NOTHING_OUTSTANDING = "Nothing is outstanding on these rows.";
+
 /**
- * what a filing recorded as owed, one row per party and a total. a party is
- * named by its nonprofit's or user's name, with "#id" when the name is
- * missing. all figures are usd.
+ * what is still owed, one row per party and a total: the "Owed" column is
+ * the outstanding amount, and a settled row is left out. a party is named by
+ * its nonprofit's or user's name, with "#id" when the name is missing. all
+ * figures are usd. undefined when every row is settled: the caller says so
+ * with `NOTHING_OUTSTANDING` instead.
  */
-export async function owed_table(owed: IOwed[]): Promise<AlertTable> {
+export async function owed_table(
+  all: IOwed[]
+): Promise<AlertTable | undefined> {
+  // under a cent counts as settled, as the grant run floors each row
+  const owed = all.filter((o) => outstanding(o) >= 0.01);
+  if (owed.length === 0) return undefined;
   const npo_ids = owed.flatMap((o) => (o.npo_id === null ? [] : [o.npo_id]));
   const ref_npos = owed.flatMap((o) =>
     o.referrer_npo === null ? [] : [o.referrer_npo]
@@ -180,14 +194,14 @@ export async function owed_table(owed: IOwed[]): Promise<AlertTable> {
         usd(o.received_usd),
         usd(o.fee_processing_usd),
         usd(o.fee_dispute_usd),
-        usd(owed_total(o)),
+        usd(outstanding(o)),
       ]),
       [
         "Total",
         "—",
         "—",
         "—",
-        usd(owed.reduce((sum, o) => sum + owed_total(o), 0)),
+        usd(owed.reduce((sum, o) => sum + outstanding(o), 0)),
       ],
     ],
   };

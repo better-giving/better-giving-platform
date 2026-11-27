@@ -322,6 +322,21 @@ describe("a partial refund on a gift whose grant went out", () => {
     );
   });
 
+  it("adds up the refunds one charge.refunded event adds, in the title", async () => {
+    charge_of = await seed_card_gift(db(), PAID_GRANT);
+    refund(4_000); // made, but its own event is never delivered
+    const both = refund(3_000);
+    both.data.previous_attributes.amount_refunded = 0;
+
+    await deliver(both);
+
+    const [title] = enqueue_mock.mock.calls
+      .flat()
+      .filter((m) => m.id === "fiat-notice")
+      .map((m) => m.payload.alert.title as string);
+    expect(title).toContain("$70.00");
+  });
+
   it("shows the refund that took money back when the event's own refund failed", async () => {
     charge_of = await seed_card_gift(db(), PAID_GRANT);
     await deliver(refund(4_000));

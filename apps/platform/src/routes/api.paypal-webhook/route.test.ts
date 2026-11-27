@@ -2333,6 +2333,7 @@ describe("CUSTOMER.DISPUTE.CREATED", () => {
     resource_type: "dispute",
     resource: {
       dispute_id: "PP-D-1",
+      status: "WAITING_FOR_SELLER_RESPONSE",
       reason: "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
       dispute_amount: { currency_code: "USD", value: "100.00" },
       disputed_transactions: [
@@ -2445,7 +2446,7 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
       },
     ],
     reason: "UNAUTHORISED",
-    status: "OPEN",
+    status: "WAITING_FOR_SELLER_RESPONSE",
     dispute_amount: { currency_code: "USD", value: "100.00" },
     dispute_life_cycle_stage: "CHARGEBACK",
     dispute_channel: "EXTERNAL",
@@ -2554,7 +2555,7 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
       .map((m: any) => m.payload.alert);
 
   it("tells ops who the gift is from and to, what is recorded as owed, when to respond, and nothing of the payer", async () => {
-    const { id, sttl_id, npo_id } = await paypal_gift();
+    const { sttl_id, npo_id } = await paypal_gift();
     enqueue_mock.mockClear();
 
     await deliver(
@@ -2588,6 +2589,40 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
     expect(alert.action.text).toBe(
       "Respond in the PayPal Resolution Center by Oct 21, 2026, 07:00 UTC."
     );
+  });
+
+  it.each([
+    "UNDER_REVIEW",
+    "WAITING_FOR_BUYER_RESPONSE",
+    "RESOLVED",
+    undefined,
+  ])(
+    "asks for no response, and shows no deadline, while the dispute is %s",
+    async (status) => {
+      const { sttl_id } = await paypal_gift();
+      enqueue_mock.mockClear();
+
+      await deliver(
+        created_ev(sttl_id, {
+          status,
+          seller_response_due_date: "2026-10-21T07:00:00Z",
+        })
+      );
+
+      const [alert] = notices();
+      expect(alert).not.toHaveProperty("action");
+      expect(alert.fields.map((f: { name: string }) => f.name)).not.toContain(
+        "Respond by"
+      );
+    }
+  );
+
+  it("links the resolution center, lists the ids, and leaves the payer out", async () => {
+    const { id, sttl_id } = await paypal_gift();
+    enqueue_mock.mockClear();
+    await deliver(created_ev(sttl_id));
+    const [alert] = notices();
+    expect(alert.action.url).toMatch(/resolutioncenter/);
     expect(alert.context).toEqual([
       `donation ${id} · dispute ${DISPUTE_ID} · charge ${sttl_id} · event WH-DSP-CREATED`,
     ]);

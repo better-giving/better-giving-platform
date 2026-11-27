@@ -55,11 +55,12 @@ const owed = (o: Partial<IOwed>): IOwed =>
     received_usd: 4,
     fee_processing_usd: 0.5,
     fee_dispute_usd: 0,
+    outstanding_usd: 4.5,
     ...o,
   }) as IOwed;
 
 const parties = async (rows: IOwed[]) =>
-  (await owed_table(rows)).rows.map((r) => r[0]);
+  (await owed_table(rows))!.rows.map((r) => r[0]);
 
 beforeEach(() => {
   store.npos = [];
@@ -80,12 +81,37 @@ describe("owed_table", () => {
       owed({ referrer_npo: "REF-N" }),
       owed({ referrer_user: "REF-U" }),
     ]);
-    expect(t.rows).toEqual([
+    expect(t!.rows).toEqual([
       ["Save the Kids (#4)", "4.00", "0.50", "0.00", "4.50"],
       ["Helpers (referrer)", "4.00", "0.50", "0.00", "4.50"],
       ["Una User (referrer)", "4.00", "0.50", "0.00", "4.50"],
       ["Total", "—", "—", "—", "13.50"],
     ]);
+  });
+
+  test("shows what is still outstanding, and leaves a settled row out", async () => {
+    store.npos = [
+      { id: 4, name: "Save the Kids", referral_id: null },
+      { id: 9, name: "Helpers", referral_id: null },
+    ];
+    const t = await owed_table([
+      // 1.50 of its 4.50 recovered
+      owed({ npo_id: 4, outstanding_usd: 3 }),
+      // credited back in full
+      owed({ npo_id: 9, outstanding_usd: 0 }),
+      // under a cent counts as settled
+      owed({ referrer_npo: "REF-N", outstanding_usd: 0.004 }),
+    ]);
+    expect(t!.rows).toEqual([
+      ["Save the Kids (#4)", "4.00", "0.50", "0.00", "3.00"],
+      ["Total", "—", "—", "—", "3.00"],
+    ]);
+  });
+
+  test("is no table when every row is settled", async () => {
+    expect(
+      await owed_table([owed({ npo_id: 4, outstanding_usd: 0 })])
+    ).toBeUndefined();
   });
 
   test("falls back to ids when a name is missing", async () => {
@@ -173,6 +199,20 @@ describe("alert helpers", () => {
       ids: ["charge ch_1"],
     });
     expect(alert.context).toEqual([`donation ${id} · charge ch_1`]);
+  });
+
+  test("ops_alert says in one line that nothing is outstanding, in place of the table", async () => {
+    const alert = await ops_alert({
+      from: "test",
+      headline: "Lost dispute share recorded as owed",
+      subject: "Disputed",
+      owed: [owed({ npo_id: 4, outstanding_usd: 0 })],
+      note: ["The donation is not reversed."],
+    });
+    expect(alert).not.toHaveProperty("table");
+    expect(alert.note).toBe(
+      "The donation is not reversed.\nNothing is outstanding on these rows."
+    );
   });
 
   test("recipient_name falls back to the id, then to unknown", () => {

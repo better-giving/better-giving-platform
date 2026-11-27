@@ -5,6 +5,7 @@ import {
   donated_field,
   donor_field,
   type IAlertDonation,
+  NOTHING_OUTSTANDING,
   owed_table,
   recipient_field,
   recipient_name,
@@ -60,14 +61,16 @@ export async function ops_alert(a: IOpsAlert): Promise<Alert> {
   const ids = [donation && `donation ${donation}`, ...(a.ids ?? [])]
     .filter((id): id is string => !!id)
     .join(" · ");
-  const note = a.note?.join("\n");
+  const table = a.owed?.length ? await owed_table(a.owed) : undefined;
+  const settled = a.owed?.length && !table ? [NOTHING_OUTSTANDING] : [];
+  const note = [...(a.note ?? []), ...settled].join("\n");
   return {
     type: "NOTICE",
     from: a.from,
     title: `${a.headline} · ${gift}`,
     summary: `${a.headline}: ${gift}`,
     fields,
-    ...(a.owed && a.owed.length > 0 && { table: await owed_table(a.owed) }),
+    ...(table && { table }),
     ...(note && { note }),
     ...(a.action && { action: a.action }),
     ...(ids && { context: [ids] }),

@@ -47,6 +47,7 @@ import {
   amount_label,
   donated_field,
   donor_field,
+  NOTHING_OUTSTANDING,
   owed_table,
   recipient_field,
   recipient_name,
@@ -689,6 +690,8 @@ interface IDispute {
   create_time?: string;
   update_time?: string;
   reason?: string;
+  /** e.g. WAITING_FOR_SELLER_RESPONSE, UNDER_REVIEW, RESOLVED */
+  status?: string;
   dispute_outcome?: { outcome_code?: string };
   dispute_amount?: { value?: string; currency_code?: string };
   seller_response_due_date?: string;
@@ -750,8 +753,11 @@ const RESOLUTION_CENTER = paypal_env.api_url?.includes("sandbox")
   ? "https://www.sandbox.paypal.com/resolutioncenter/"
   : "https://www.paypal.com/resolutioncenter/";
 
-/** the one thing ops do on an opened dispute; no "by" without paypal's date */
-const respond_action = (d: IDispute): NonNullable<Alert["action"]> => {
+/** the one thing ops do on an opened dispute, asked only while paypal waits
+ * on the seller (a dispute under review or waiting on the buyer has nothing
+ * to answer); no "by" without paypal's date */
+const respond_action = (d: IDispute): Alert["action"] => {
+  if (d.status !== "WAITING_FOR_SELLER_RESPONSE") return undefined;
   const due = alert_deadline(d.seller_response_due_date);
   return {
     text: `Respond in the PayPal Resolution Center${due ? ` by ${due}` : ""}.`,
@@ -824,14 +830,22 @@ const notify_dispute = async (
     charges.length > 0 && `charge ${charges.join(", ")}`,
     ev.id && `event ${ev.id}`,
   ].filter((id): id is string => !!id);
+  const table = n.owed?.length ? await owed_table(n.owed) : undefined;
+  const note = [
+    n.note,
+    // every row settled: said in a line, in place of the table
+    n.owed?.length && !table ? NOTHING_OUTSTANDING : undefined,
+  ]
+    .filter(Boolean)
+    .join("\n");
   const alert: Alert = {
     type: "NOTICE",
     from: `paypal-webhook-${stage}`,
     title: `${n.headline} · ${gift}`,
     summary: `${n.headline}: ${gift}`,
     fields,
-    ...(n.owed && { table: await owed_table(n.owed) }),
-    ...(n.note && { note: n.note }),
+    ...(table && { table }),
+    ...(note && { note }),
     ...(n.action && { action: n.action }),
     ...(ids.length > 0 && { context: [ids.join(" · ")] }),
   };

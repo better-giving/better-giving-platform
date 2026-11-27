@@ -1506,6 +1506,7 @@ describe("reverse_charge — the ops notice of a full reversal", () => {
         rail: "stripe",
         source: "dispute",
         share: whole,
+        dispute_fee_usd: 15,
         source_ref: "du_1",
         alert_from: "charge-dispute",
         notice,
@@ -1515,14 +1516,13 @@ describe("reverse_charge — the ops notice of a full reversal", () => {
       owed_read.fail = false;
     }
 
+    // the dispute fee the event names is in the fallback, as it is in the rows
     const [n] = queued();
-    expect(n.alert.table.rows.at(-1)).toEqual([
-      "Total",
-      "—",
-      "—",
-      "—",
-      "93.20",
+    expect(n.alert.table.rows).toEqual([
+      [`Test NPO ${counter} (#${npo_id})`, "90.00", "3.20", "15.00", "108.20"],
+      ["Total", "—", "—", "—", "108.20"],
     ]);
+    expect(n.alert.note).toContain("dispute fee is split across them");
     expect(report_error).toHaveBeenCalledWith(
       expect.objectContaining({ message: "owed read failed" }),
       expect.objectContaining({ donation_id: id })
@@ -1679,7 +1679,11 @@ const refund_whole = (id: string) =>
     share: whole,
     source_ref: "re_1",
     alert_from: "test",
-    notice,
+    notice: {
+      ...notice,
+      amount: "$100.00",
+      ids: ["charge ch_1", "event evt_1"],
+    },
   });
 
 const as_db = (x: unknown) => x as DbOrTx;
@@ -1860,14 +1864,15 @@ describe("reverse_charge — a payout settled before the refund", () => {
     const npo = `Test NPO ${counter}`;
     expect(fiat_alert).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        title: `Refund recorded as owed · ${npo}`,
-        summary: `Refund recorded as owed: ${npo}`,
+        title: `Refund recorded as owed · $100.00 to ${npo}`,
+        summary: `Refund recorded as owed: $100.00 to ${npo}`,
         fields: [
           expect.objectContaining({
             name: "Nonprofit",
             value: `${npo} (#${npo_id})`,
           }),
           { name: "Donor", value: "Jane Doe", inline: true },
+          { name: "Refunded", value: "$100.00", inline: true },
           expect.objectContaining({ name: "Donated" }),
         ],
         table: expect.objectContaining({
@@ -1880,7 +1885,9 @@ describe("reverse_charge — a payout settled before the refund", () => {
           /^What's owed comes out of each party's next grants or commission\.\nnpo: /
         ),
         context: [
-          expect.stringMatching(new RegExp(`^donation ${id} · refund `)),
+          expect.stringMatching(
+            new RegExp(`^donation ${id} · charge ch_1 · event evt_1 · refund `)
+          ),
         ],
       })
     );

@@ -49,6 +49,10 @@ export interface ProcessRefundCtx extends OwedSource {
   program_id: string | null;
   /** slack alert sender identity, e.g. `refund-action-${stage}` */
   alert_from: string;
+  /** what the event took back, e.g. "$6.00": in the owed alert's title and a field */
+  amount?: string;
+  /** where the event was seen, e.g. [`charge ch_1`, `event evt_1`]: the owed alert's footer */
+  ids?: string[];
 }
 
 export interface RefundResult {
@@ -424,12 +428,13 @@ export async function process_refund(
           headline: "Refund recorded as owed",
           don,
           subject: "Refunded",
+          amount: ctx.amount,
           owed,
           note: [
             "What's owed comes out of each party's next grants or commission.",
             ...owed_notes,
           ],
-          ids: [`${ctx.source} ${ctx.source_ref}`],
+          ids: [...(ctx.ids ?? []), `${ctx.source} ${ctx.source_ref}`],
         })
       )
       .catch((err) => {
