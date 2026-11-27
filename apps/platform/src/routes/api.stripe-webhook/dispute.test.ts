@@ -358,6 +358,27 @@ describe("charge.dispute.created", () => {
     }
   );
 
+  it.each([
+    "needs_response",
+    "warning_needs_response",
+    "appeal_needs_response",
+  ])(
+    "asks for a response, with its deadline, when the dispute opens %s",
+    async (status) => {
+      const gift = await seed_card_gift(db(), PAID_GRANT);
+
+      await deliver(
+        event_of("charge.dispute.created", dispute_of(gift, { status }))
+      );
+
+      const [only] = notices();
+      expect(only.payload.alert.action.text).toMatch(/^Respond in the Stripe/);
+      expect(
+        only.payload.alert.fields.map((f: { name: string }) => f.name)
+      ).toContain("Respond by");
+    }
+  );
+
   it("links a test-mode dispute under the dashboard's /test path", async () => {
     const gift = await seed_card_gift(db(), PAID_GRANT);
 

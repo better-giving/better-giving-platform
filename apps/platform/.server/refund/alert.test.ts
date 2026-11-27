@@ -151,6 +151,10 @@ describe("alert helpers", () => {
     expect(amount_label("6")).toBe("$6.00");
     expect(amount_label("6", "EUR")).toBe("6.00 EUR");
     expect(amount_label(undefined)).toBe("unknown amount");
+    // the currency's own decimal places
+    expect(amount_label("1500", "JPY")).toBe("1500 JPY");
+    expect(amount_label("1.5", "KWD")).toBe("1.500 KWD");
+    expect(amount_label("5", "???")).toBe("5.00 ???");
   });
 
   test("ops_alert's footer carries the whole donation id, to look it up by", async () => {

@@ -45,6 +45,7 @@ const reason_field = (d: Stripe.Dispute) => ({
 const AWAITING_RESPONSE = new Set<Stripe.Dispute["status"]>([
   "needs_response",
   "warning_needs_response",
+  "appeal_needs_response",
 ]);
 
 const respond_action = (d: Stripe.Dispute) => {

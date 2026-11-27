@@ -38,6 +38,19 @@ export const alert_deadline = (when: string | Date | null | undefined) => {
   return `${at} UTC`;
 };
 
+/** decimal places of an ISO 4217 currency: 0 for yen, 3 for dinar; 2 when the
+ * code isn't one */
+const minor_units = (ccy: string) => {
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: ccy,
+    }).resolvedOptions().maximumFractionDigits as number;
+  } catch {
+    return 2;
+  }
+};
+
 /** "$6.00" for usd, else "6.00 EUR". a missing value reads "unknown amount" */
 export const amount_label = (
   value: string | number | undefined,
@@ -47,7 +60,10 @@ export const amount_label = (
   if (value === undefined || value === "" || !Number.isFinite(n)) {
     return "unknown amount";
   }
-  return ccy === "USD" ? `$${n.toFixed(2)}` : `${n.toFixed(2)} ${ccy}`;
+  const places = minor_units(ccy);
+  return ccy === "USD"
+    ? `$${n.toFixed(places)}`
+    : `${n.toFixed(places)} ${ccy}`;
 };
 
 /** what an alert reads off the donation lookup */
