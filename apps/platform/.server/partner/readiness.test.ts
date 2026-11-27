@@ -488,7 +488,14 @@ describe("rails on the connected stripe account", () => {
     });
 
     expect(rails.ach).toEqual({ state: "active", offered: true });
-    for (const rail of ["card", "apple_pay", "google_pay"] as const) {
+    // paypal and venmo mount in the card tab, so they follow `stripe`
+    for (const rail of [
+      "card",
+      "apple_pay",
+      "google_pay",
+      "paypal",
+      "venmo",
+    ] as const) {
       expect(rails[rail], rail).toEqual({
         state: "unrequested",
         offered: false,

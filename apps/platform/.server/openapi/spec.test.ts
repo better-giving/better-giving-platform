@@ -854,16 +854,16 @@ describe("fee_rules against the checkout's fee", () => {
   test("a daf gift's fee lands the total on a whole dollar, as the published rule of 100 says", async () => {
     const { daf } = await rule_of();
     expect(daf.round_up_minor).toBe(100);
-    // totals worked by hand at the daf's 0.029: 100 + 2.99 up to 103.00,
-    // 10 + 0.30 up to 11.00, 1000 + 29.87 up to 1030.00
+    // whole-dollar gifts (daf takes no other), totals worked by hand at the
+    // daf's 0.029: 100 + 2.99 up to 103.00, 10 + 0.30 up to 11.00,
+    // 250 + 7.47 up to 258.00, 1000 + 29.87 up to 1030.00
     expect(checkout_fee("daf", 100)).toBe(300);
     expect(checkout_fee("daf", 10)).toBe(100);
+    expect(checkout_fee("daf", 250)).toBe(800);
     expect(checkout_fee("daf", 1000)).toBe(3000);
-    // 12.50 + 0.37 up to 13.00
-    expect(checkout_fee("daf", 12.5)).toBe(50);
     // the rule holds for gifts the worked examples don't spell out: the total
     // is a whole dollar, at or above gift + formula and less than a dollar over
-    for (const usd of [1, 7, 12.5, 33, 250, 999]) {
+    for (const usd of [1, 7, 33, 250, 999]) {
       const gift_minor = Math.round(usd * 100);
       const total = gift_minor + checkout_fee("daf", usd);
       const unrounded = gift_minor + documented_fee(daf, gift_minor);
