@@ -337,10 +337,11 @@ describe("a partial refund on a gift whose grant went out", () => {
     expect(title).toContain("$70.00");
   });
 
-  it("shows the refund that took money back when the event's own refund failed", async () => {
+  it("shows what the live refunds take back in all when the event's own refund failed", async () => {
     charge_of = await seed_card_gift(db(), PAID_GRANT);
     await deliver(refund(4_000));
     await deliver(refund(3_000, "pending"));
+    await deliver(refund(2_000)); // the newest, and not what the reversal takes
     enqueue_mock.mockClear();
 
     await deliver(settle("re_2", "failed"));
@@ -351,8 +352,10 @@ describe("a partial refund on a gift whose grant went out", () => {
       .map((m) => m.payload.alert.title as string);
     expect(titles.length).toBeGreaterThan(0);
     for (const title of titles) {
-      expect(title).toContain("$40.00");
+      // $40 and $20 are live: neither the failed $30 nor the newest alone
+      expect(title).toContain("$60.00");
       expect(title).not.toContain("$30.00");
+      expect(title).not.toContain("$20.00");
     }
   });
 

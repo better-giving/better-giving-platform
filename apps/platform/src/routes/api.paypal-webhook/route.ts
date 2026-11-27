@@ -754,12 +754,14 @@ const RESOLUTION_CENTER = paypal_env.api_url?.includes("sandbox")
   ? "https://www.sandbox.paypal.com/resolutioncenter/"
   : "https://www.paypal.com/resolutioncenter/";
 
-/** the one thing ops do on an opened dispute, asked only while paypal waits
- * on the seller (a dispute under review or waiting on the buyer has nothing
- * to answer); no "by" without paypal's date */
+/** the one thing ops do on an opened dispute: asked whenever paypal names a
+ * seller deadline, whatever the status, since a dispute that opened in another
+ * state can move to waiting on the seller with no event we handle; without a
+ * deadline, only while paypal says it waits on the seller. no "by" without
+ * paypal's date */
 const respond_action = (d: IDispute): Alert["action"] => {
-  if (d.status !== "WAITING_FOR_SELLER_RESPONSE") return undefined;
   const due = alert_deadline(d.seller_response_due_date);
+  if (!due && d.status !== "WAITING_FOR_SELLER_RESPONSE") return undefined;
   return {
     text: `Respond in the PayPal Resolution Center${due ? ` by ${due}` : ""}.`,
     url: RESOLUTION_CENTER,
@@ -937,7 +939,7 @@ async function dispute_created(ev: WebhookEvent): Promise<Response> {
         return {
           owed: res.owed,
           note: [
-            "Nothing more recorded as owed for this dispute; the table is what the payment already owes.",
+            "Nothing more recorded as owed for this dispute. What the payment already owes stays as it was.",
             ...prior,
           ].join("\n"),
         };

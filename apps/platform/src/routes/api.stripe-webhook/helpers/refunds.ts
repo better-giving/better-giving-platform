@@ -70,12 +70,13 @@ export async function reverse_refunds(
 ) {
   const don_id = don.id;
   const taken = live.reduce((sum, r) => sum + r.amount, 0);
-  // a failed or canceled refund takes nothing back: the alert shows the ones
-  // that do, or the newest of them when the event's own all failed
+  // a failed or canceled refund takes nothing back: the alert shows the event's
+  // own refunds that do, or, when they all failed, what the charge's live
+  // refunds take back in all, which is what the reversal then acts on
   const ids = new Set(live.map((r) => r.id));
   const own = (o.refunds ?? []).filter((r) => ids.has(r.id));
   const this_refund = money_label(
-    (own.length > 0 ? own : [latest]).reduce((sum, r) => sum + r.amount, 0),
+    own.length > 0 ? own.reduce((sum, r) => sum + r.amount, 0) : taken,
     charge.currency
   );
   const result = await reverse_charge({

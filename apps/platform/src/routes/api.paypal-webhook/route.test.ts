@@ -2597,7 +2597,7 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
     "RESOLVED",
     undefined,
   ])(
-    "asks for no response, and shows no deadline, while the dispute is %s",
+    "asks for a response, with the deadline, whenever paypal names one, even while the dispute is %s",
     async (status) => {
       const { sttl_id } = await paypal_gift();
       enqueue_mock.mockClear();
@@ -2610,12 +2610,50 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
       );
 
       const [alert] = notices();
+      expect(alert.action.text).toBe(
+        "Respond in the PayPal Resolution Center by Oct 21, 2026, 07:00 UTC."
+      );
+      expect(alert.fields).toContainEqual(
+        expect.objectContaining({
+          name: "Respond by",
+          value: "Oct 21, 2026, 07:00 UTC",
+        })
+      );
+    }
+  );
+
+  it.each([
+    "UNDER_REVIEW",
+    "WAITING_FOR_BUYER_RESPONSE",
+    "RESOLVED",
+    undefined,
+  ])(
+    "asks for no response without a deadline while the dispute is %s",
+    async (status) => {
+      const { sttl_id } = await paypal_gift();
+      enqueue_mock.mockClear();
+
+      await deliver(created_ev(sttl_id, { status }));
+
+      const [alert] = notices();
       expect(alert).not.toHaveProperty("action");
       expect(alert.fields.map((f: { name: string }) => f.name)).not.toContain(
         "Respond by"
       );
     }
   );
+
+  it("asks for a response, with no date, while paypal waits on the seller and names none", async () => {
+    const { sttl_id } = await paypal_gift();
+    enqueue_mock.mockClear();
+
+    await deliver(
+      created_ev(sttl_id, { status: "WAITING_FOR_SELLER_RESPONSE" })
+    );
+
+    const [alert] = notices();
+    expect(alert.action.text).toBe("Respond in the PayPal Resolution Center.");
+  });
 
   it("links the resolution center, lists the ids, and leaves the payer out", async () => {
     const { id, sttl_id } = await paypal_gift();
@@ -3100,6 +3138,22 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
     expect(await owed_rows()).toMatchObject([{ outstanding_usd: 0 }]);
   });
 
+  it("a second dispute that adds nothing says so without pointing at a table", async () => {
+    const { sttl_id } = await paypal_gift();
+    await deliver(created_ev(sttl_id));
+    enqueue_mock.mockClear();
+
+    await deliver({
+      ...created_ev(sttl_id, { dispute_id: "PP-R-SECOND" }),
+      id: "WH-DSP-SECOND",
+    });
+
+    const [alert] = notices();
+    expect(alert.note).toContain("Nothing more recorded as owed");
+    // the rows may all be settled, and then there is no table to point at
+    expect(alert.note).not.toMatch(/table/i);
+  });
+
   it("resolved NONE after a refund and a dispute grew the refund's row, undoes the dispute's take and tells ops nothing", async () => {
     const { sttl_id } = await paypal_gift();
     capture_refunded(sttl_id, [["REF-30", "30.00"]]);
@@ -3455,6 +3509,25 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
       expect(alert).not.toHaveProperty("action");
     }
   );
+
+  it("resolved with no outcome tells ops nothing when every row it filed is already settled", async () => {
+    const { sttl_id } = await paypal_gift();
+    await deliver(created_ev(sttl_id));
+    // credited back in full: nothing left to credit or write off by hand
+    await db().update(owed_amounts).set({
+      credited_back_usd: 93.2,
+      credited_back_at: new Date().toISOString(),
+    });
+    enqueue_mock.mockClear();
+
+    const res = await deliver(
+      resolved_ev(sttl_id, "UNUSED", { dispute_outcome: undefined })
+    );
+
+    expect(res.status).toBe(200);
+    expect(await owed_rows()).toMatchObject([{ outstanding_usd: 0 }]);
+    expect(notices()).toEqual([]);
+  });
 
   it("reports a win it can't credit, on a charge settling a gift paid on another rail, and acknowledges it", async () => {
     const { sttl_id } = await seed_card_gift(db(), PAID_GRANT);
