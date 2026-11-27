@@ -77,7 +77,7 @@ const { user } = await import("../pg/schema/auth");
 const { partner_keys, partner_tenants } = await import("../pg/schema/partner");
 const { create_test_db } = await import("../pg/test-utils/pglite");
 const { mint_key } = await import("./keys");
-const { readiness } = await import("./readiness");
+const { fingerprint_of, readiness } = await import("./readiness");
 const env = await import("#/constants/env");
 const { base_url, nowpayments: np } = await import("../env");
 // declared read-only; the rail reads it per call, so a test swaps it
@@ -155,7 +155,13 @@ const RAIL_NAMES = Object.keys(RAIL_METHOD) as Rail[];
 /** what checkout's frequency selector offers, in the contract's words */
 const recurring_of = (freqs: TFrequency[] | null): string[] =>
   (freqs_shown(freqs ?? undefined) ?? []).flatMap((f) =>
-    f === "monthly" ? ["monthly"] : f === "annual" ? ["yearly"] : []
+    f === "weekly"
+      ? ["weekly"]
+      : f === "monthly"
+        ? ["monthly"]
+        : f === "annual"
+          ? ["yearly"]
+          : []
   );
 
 /** the coins checkout's crypto intent accepts */
@@ -297,6 +303,49 @@ describe("readiness", () => {
     const { intervals } = await read(npo_id);
 
     expect(Object.values(intervals).flat()).toEqual([]);
+  });
+
+  // the repeating rails are the stripe family and paypal; venmo, daf and
+  // crypto take one-time gifts only
+  const REPEATING = ["card", "ach", "apple_pay", "google_pay", "paypal"];
+
+  test("a weekly-only setting offers weekly on the repeating rails", async () => {
+    const npo_id = await seed_tenant({
+      donate_frequencies: ["one-time", "weekly"],
+    });
+
+    const { intervals } = await read(npo_id);
+
+    for (const rail of RAIL_NAMES) {
+      expect(intervals[rail], rail).toEqual(
+        REPEATING.includes(rail) ? ["weekly"] : []
+      );
+    }
+  });
+
+  test("weekly, monthly and annual together come back as weekly, monthly, yearly", async () => {
+    const npo_id = await seed_tenant({
+      donate_frequencies: ["one-time", "weekly", "monthly", "annual"],
+    });
+
+    const { intervals } = await read(npo_id);
+
+    for (const rail of RAIL_NAMES) {
+      expect(intervals[rail], rail).toEqual(
+        REPEATING.includes(rail) ? ["weekly", "monthly", "yearly"] : []
+      );
+    }
+  });
+
+  test("weekly alongside monthly leaves out the annual interval", async () => {
+    const npo_id = await seed_tenant({
+      donate_frequencies: ["weekly", "monthly"],
+    });
+
+    const { intervals } = await read(npo_id);
+
+    expect(intervals.card).toEqual(["weekly", "monthly"]);
+    expect(intervals.venmo).toEqual([]);
   });
 
   test("a nonprofit that is not active has every requested rail inactive, and no charges", async () => {
@@ -849,6 +898,87 @@ describe("revision", () => {
 
     expect((await read(mine)).revision).toBe(1);
     expect((await read(theirs.id)).revision).toBe(2);
+  });
+
+  describe("the body and the revision are one stored pair", () => {
+    /** the stored row the answer has to be, and the hash of the body it carries */
+    const stored = async (npo_id: number) => ({
+      row: await tenant_row(npo_id),
+    });
+    const pair_of = (r: Awaited<ReturnType<typeof read>>) => {
+      const { revision, ...body } = r;
+      return { revision, fingerprint: fingerprint_of(body) };
+    };
+
+    test("a write that lands after the tenant is locked is in the body and the revision it returns", async () => {
+      const npo_id = await seed_tenant({ donate_methods: ["stripe"] });
+      const first = await read(npo_id);
+      expect(first.revision).toBe(1);
+      expect(first.rails.daf.offered).toBe(false);
+
+      // the point a read that had already built its body would be stale: a
+      // newer write arrives. the read builds from the state it finds under
+      // the lock, so the write is in the body, and the revision is the one
+      // stored with that body
+      const late = await readiness(as_db(t.db), npo_id, async (tx) => {
+        await tx
+          .update(npos)
+          .set({ donate_methods: ["stripe", "daf"] })
+          .where(eq(npos.id, npo_id));
+      });
+
+      expect(late.rails.daf.offered).toBe(true);
+      expect(late.revision).toBe(2);
+      const { row } = await stored(npo_id);
+      expect(pair_of(late)).toEqual({
+        revision: row.revision,
+        fingerprint: row.fingerprint,
+      });
+      // and the next plain read agrees with it
+      expect(await read(npo_id)).toEqual(late);
+    });
+
+    test("every answer from interleaved reads and writes is a pair that was stored", async () => {
+      const npo_id = await seed_tenant({ donate_methods: ["stripe"] });
+      const settings: DonateMethodId[][] = [
+        ["stripe"],
+        ["stripe", "daf"],
+        ["stripe", "crypto"],
+        ["daf"],
+        ["stripe"],
+      ];
+
+      const answers: Awaited<ReturnType<typeof read>>[] = [];
+      await Promise.all([
+        ...settings.map((methods) =>
+          t.db
+            .update(npos)
+            .set({ donate_methods: methods })
+            .where(eq(npos.id, npo_id))
+        ),
+        ...settings.map(async () => {
+          answers.push(await read(npo_id));
+        }),
+      ]);
+      answers.push(await read(npo_id));
+
+      // one hash per revision, never two bodies under one number
+      const by_revision = new Map<number, string>();
+      for (const a of answers) {
+        const { revision, fingerprint } = pair_of(a);
+        expect(
+          by_revision.get(revision) ?? fingerprint,
+          `revision ${revision}`
+        ).toBe(fingerprint);
+        by_revision.set(revision, fingerprint);
+      }
+      // the last answer is what is stored
+      const { row } = await stored(npo_id);
+      expect(pair_of(answers.at(-1)!)).toEqual({
+        revision: row.revision,
+        fingerprint: row.fingerprint,
+      });
+    });
   });
 
   test("a nonprofit with no partner tenant throws, creating nothing", async () => {

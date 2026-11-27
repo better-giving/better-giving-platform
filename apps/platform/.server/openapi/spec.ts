@@ -852,7 +852,7 @@ const PARTNER_READINESS = {
     intervals: per_rail({
       type: "array",
       description: "Recurring intervals offered; empty means one-time only.",
-      items: { type: "string", enum: ["monthly", "yearly"] },
+      items: { type: "string", enum: ["weekly", "monthly", "yearly"] },
     }),
     fee_rules: per_rail({
       type: "object",
