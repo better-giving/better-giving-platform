@@ -859,11 +859,19 @@ describe("fee_rules against the checkout's fee", () => {
     expect(checkout_fee("daf", 100)).toBe(300);
     expect(checkout_fee("daf", 10)).toBe(100);
     expect(checkout_fee("daf", 1000)).toBe(3000);
-    // the rule holds for gifts the worked examples don't spell out
-    for (const usd of [1, 7, 33, 250, 999]) {
-      expect((usd * 100 + checkout_fee("daf", usd)) % daf.round_up_minor!).toBe(
-        0
+    // 12.50 + 0.37 up to 13.00
+    expect(checkout_fee("daf", 12.5)).toBe(50);
+    // the rule holds for gifts the worked examples don't spell out: the total
+    // is a whole dollar, at or above gift + formula and less than a dollar over
+    for (const usd of [1, 7, 12.5, 33, 250, 999]) {
+      const gift_minor = Math.round(usd * 100);
+      const total = gift_minor + checkout_fee("daf", usd);
+      const unrounded = gift_minor + documented_fee(daf, gift_minor);
+      expect(total % 100, `${usd} whole dollar`).toBe(0);
+      expect(total, `${usd} not below gift + fee`).toBeGreaterThanOrEqual(
+        unrounded - 1e-6
       );
+      expect(total, `${usd} under a dollar over`).toBeLessThan(unrounded + 100);
     }
   });
 

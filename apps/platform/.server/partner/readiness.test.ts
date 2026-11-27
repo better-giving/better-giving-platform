@@ -482,6 +482,20 @@ describe("rails on the connected stripe account", () => {
     }
   });
 
+  test("only ach's own method enabled: ach is offered, the card rails are not requested", async () => {
+    const rails = await states_of({
+      donate_methods: ["stripe_bank"],
+    });
+
+    expect(rails.ach).toEqual({ state: "active", offered: true });
+    for (const rail of ["card", "apple_pay", "google_pay"] as const) {
+      expect(rails[rail], rail).toEqual({
+        state: "unrequested",
+        offered: false,
+      });
+    }
+  });
+
   test("an account the nonprofit has to finish is inactive, not pending", async () => {
     const unfinished = await states_of({
       stripe_charges_enabled: false,
