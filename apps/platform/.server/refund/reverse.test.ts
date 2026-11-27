@@ -1125,6 +1125,7 @@ describe("reverse_charge — part of the charge, its grant not yet out", () => {
           `^Not owed: dist dist-${id} to ${npo}.*grant payout is still pending`
         )
       ),
+      expect.stringMatching(/^Undo that adjustment if a later refund/),
       "Refunds on this charge: 40.00 USD (re_1, succeeded).",
     ]);
   });

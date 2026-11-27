@@ -283,8 +283,9 @@ const NOTHING_OWED: Record<ReversalSource, string> = {
  * pending records only its own share, so a hand adjustment stands then */
 const REFUND_PENDING = {
   headline: "Partial refund not reversed",
-  action:
-    "Adjust these dists by hand, and undo it if a later refund or dispute reverses the donation or records the whole share as owed, or they are debited twice.",
+  action: "Adjust these dists by hand.",
+  caveat:
+    "Undo that adjustment if a later refund or dispute reverses the donation or records the whole share as owed, or the dists are debited twice.",
 };
 
 /** the gift's parties and what this event took, for a reversal's alerts */
@@ -551,6 +552,7 @@ async function notify_share(
         ? "The donation is not reversed; what's owed comes out of next grants."
         : "The donation is not reversed.",
       ...pending.map((m) => `Not owed: ${m}.`),
+      ...(pending.length > 0 ? [REFUND_PENDING.caveat] : []),
     ],
     ...(pending.length > 0 && { action: { text: REFUND_PENDING.action } }),
   });

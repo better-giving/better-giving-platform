@@ -120,9 +120,10 @@ export async function reverse_refunds(
             note: [
               `Waiting on: ${refund_list(unsent, charge.currency)}.`,
               "Nothing more is taken back until Stripe reports every refund here succeeded; then it is taken back automatically.",
+              "If they show succeeded in Stripe and nothing was taken back, the webhook may be missing refund.updated.",
             ],
             action: {
-              text: "If they show succeeded in Stripe and nothing was taken back, check the webhook endpoint subscribes to refund.updated.",
+              text: "Check the webhook endpoint subscribes to refund.updated.",
             },
             ids: [...new Set([...o.seen_at, `refund ${latest.id}`])],
           }),
