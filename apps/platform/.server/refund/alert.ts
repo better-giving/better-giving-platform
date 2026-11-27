@@ -38,9 +38,13 @@ export const alert_deadline = (when: string | Date | null | undefined) => {
   return `${at} UTC`;
 };
 
+// ISO 4217 gives these two decimals, but paypal sends and takes them whole
+const WHOLE_UNITS = new Set(["HUF", "TWD"]);
+
 /** decimal places of an ISO 4217 currency: 0 for yen, 3 for dinar; 2 when the
  * code isn't one */
 const minor_units = (ccy: string) => {
+  if (WHOLE_UNITS.has(ccy)) return 0;
   try {
     return new Intl.NumberFormat("en-US", {
       style: "currency",

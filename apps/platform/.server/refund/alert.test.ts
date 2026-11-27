@@ -180,6 +180,7 @@ describe("alert helpers", () => {
     // the currency's own decimal places
     expect(amount_label("1500", "JPY")).toBe("1500 JPY");
     expect(amount_label("1.5", "KWD")).toBe("1.500 KWD");
+    expect(amount_label("2999", "HUF")).toBe("2999 HUF");
     expect(amount_label("5", "???")).toBe("5.00 ???");
   });
 

@@ -22,7 +22,7 @@ export interface IOpsAlert {
   /** e.g. "$6.00"; absent, the title names the nonprofit alone */
   amount?: string;
   /** the amount field's name */
-  subject: "Disputed" | "Refunded";
+  subject: "Disputed" | "Refunded" | "Refunded so far";
   /** after the amount: a reason or a status */
   fields?: Field[];
   /** the provider's own deadline; never guessed */

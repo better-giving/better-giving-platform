@@ -346,16 +346,20 @@ describe("a partial refund on a gift whose grant went out", () => {
 
     await deliver(settle("re_2", "failed"));
 
-    const titles = enqueue_mock.mock.calls
+    const alerts = enqueue_mock.mock.calls
       .flat()
       .filter((m) => m.id === "fiat-notice")
-      .map((m) => m.payload.alert.title as string);
-    expect(titles.length).toBeGreaterThan(0);
-    for (const title of titles) {
+      .map((m) => m.payload.alert);
+    expect(alerts.length).toBeGreaterThan(0);
+    for (const { title, fields } of alerts) {
       // $40 and $20 are live: neither the failed $30 nor the newest alone
       expect(title).toContain("$60.00");
       expect(title).not.toContain("$30.00");
       expect(title).not.toContain("$20.00");
+      // a running total, so the field says so rather than "Refunded"
+      expect(fields).toContainEqual(
+        expect.objectContaining({ name: "Refunded so far", value: "$60.00" })
+      );
     }
   });
 

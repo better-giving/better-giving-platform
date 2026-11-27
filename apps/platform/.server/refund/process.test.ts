@@ -420,6 +420,25 @@ describe("process_refund — a payout the grants cron settles mid-refund", () =>
     expect(alert.table.rows.at(-1)).toEqual(["Total", "—", "—", "—", "100.00"]);
   });
 
+  test("a lost dispute posts no owed alert of its own: its own alert carries the rows", async () => {
+    const { id, npo_id } = await seed({ event: false });
+    await seed_cash_dist(id, npo_id);
+    const graphs = await dists_for_refund(id);
+    await test_db
+      .current!.db.update(payouts)
+      .set({ type: "settled", settled_date: "2026-07-02T00:00:00.000Z" })
+      .where(eq(payouts.id, `payout-${id}`));
+
+    const res = await process_refund(id, graphs, {
+      ...ctx,
+      source: "dispute",
+      source_ref: "du_1",
+    });
+
+    expect(res.owed).toHaveLength(1);
+    expect(fiat_alert).not.toHaveBeenCalled();
+  });
+
   test("a payout settled after the graph was read ends owed by the npo", async () => {
     const { id, npo_id } = await seed({ event: false });
     await seed_cash_dist(id, npo_id);

@@ -64,7 +64,8 @@ export async function reverse_refunds(
     /** the event's own sentences for ops */
     lines?: string[];
     /** the refunds the event is about, whose amounts the alerts add up; absent,
-     * the newest */
+     * or when none of them took money back, the alerts show what the charge's
+     * refunds took back so far */
     refunds?: Stripe.Refund[];
   }
 ) {
@@ -79,6 +80,8 @@ export async function reverse_refunds(
     own.length > 0 ? own.reduce((sum, r) => sum + r.amount, 0) : taken,
     charge.currency
   );
+  // the running total is not "this refund": the field says which it shows
+  const subject = own.length > 0 ? "Refunded" : "Refunded so far";
   const result = await reverse_charge({
     donation_id: don_id,
     rail: "stripe",
@@ -92,6 +95,7 @@ export async function reverse_refunds(
     notice: {
       id: o.event_id,
       amount: this_refund,
+      subject,
       ids: o.seen_at,
       lines: [
         ...(o.lines ?? []),
@@ -113,7 +117,7 @@ export async function reverse_refunds(
             headline: "Reversal held until the refund succeeds",
             don,
             amount: this_refund,
-            subject: "Refunded",
+            subject,
             fields: [
               {
                 name: "Status",
