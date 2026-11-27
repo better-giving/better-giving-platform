@@ -48,6 +48,7 @@ import {
   donated_field,
   donor_field,
   NOTHING_OUTSTANDING,
+  outstanding,
   owed_table,
   recipient_field,
   recipient_name,
@@ -1054,7 +1055,10 @@ async function dispute_resolved(ev: WebhookEvent): Promise<Response> {
     // its own share on record: its filing recorded what is owed, into
     // whatever row a refund or an earlier dispute wrote first
     const filed = (await dispute_get(record.id))?.share != null;
-    const owing = filed ? await owed_for_donation(don.id) : [];
+    // only what is still outstanding: ops are told to credit or write off
+    const owing = filed
+      ? (await owed_for_donation(don.id)).filter((o) => outstanding(o) >= 0.01)
+      : [];
     if (owing.length > 0) {
       // keyed on the dispute: a redelivery collapses into it in the queue's
       // dedupe window

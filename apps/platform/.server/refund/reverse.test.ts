@@ -1845,7 +1845,10 @@ describe("reverse_charge — a refused owed alert", () => {
     expect(res.status).toBe("reversed");
     expect(report_error).toHaveBeenCalledWith(
       expect.objectContaining({ message: "slack 429" }),
-      expect.objectContaining({ donation_id: id })
+      expect.objectContaining({
+        donation_id: id,
+        title: "Refund recorded as owed",
+      })
     );
   });
 });

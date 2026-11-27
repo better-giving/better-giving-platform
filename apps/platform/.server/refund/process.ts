@@ -427,6 +427,8 @@ export async function process_refund(
           from: `${ctx.alert_from}-${stage}`,
           headline: "Refund recorded as owed",
           don,
+          // the footer keeps the id when the donation read failed
+          donation_id,
           subject: "Refunded",
           amount: ctx.amount,
           owed,
