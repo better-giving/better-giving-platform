@@ -746,12 +746,38 @@ describe("POST /api/partner/v1/payments", () => {
     expect(pi_create.mock.calls[1]![0].customer).toBe("cus_1");
   });
 
-  test("a stripe api error is a retryable 503 and keeps the claim", async () => {
+  test("a stripe 5xx releases the claim and closes its row, so the retry runs under new keys, not the cached failure's", async () => {
     const { key } = await seed();
     pi_create.mockRejectedValueOnce(
       new Stripe.errors.StripeAPIError({
         message: "slow",
         type: "api_error",
+        statusCode: 500,
+      } as never)
+    );
+
+    const res = await post(key.key, body());
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get("retry-after")).toBe("5");
+    expect(await db().select().from(partner_payments)).toHaveLength(0);
+    const [failed] = await donation_rows();
+    expect(failed!.status).toBe("failed");
+
+    const retry = await (await post(key.key, body())).json();
+
+    expect(retry.id).not.toBe(failed!.id);
+    expect(pi_create.mock.calls[1]![1]).toEqual({
+      idempotencyKey: `partner-pi-${retry.id}`,
+    });
+  });
+
+  test("a stripe connection error keeps the claim and the retry reuses its keys", async () => {
+    const { key } = await seed();
+    pi_create.mockRejectedValueOnce(
+      new Stripe.errors.StripeConnectionError({
+        message: "reset",
+        type: "api_connection_error",
       } as never)
     );
 
@@ -759,7 +785,13 @@ describe("POST /api/partner/v1/payments", () => {
 
     expect(res.status).toBe(503);
     expect(res.headers.get("retry-after")).toBe("120");
-    expect(await db().select().from(partner_payments)).toHaveLength(1);
+    const [held] = await db().select().from(partner_payments);
+    await stale();
+
+    const retry = await (await post(key.key, body())).json();
+
+    expect(retry.id).toBe(held!.donation_id);
+    expect(pi_create.mock.calls[1]![1]).toEqual(pi_create.mock.calls[0]![1]);
   });
 
   test("a stripe idempotency error is ours: 502, reported, and the gift id is free", async () => {

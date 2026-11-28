@@ -19,8 +19,8 @@ export async function put_or_reuse(
   } catch (err) {
     if (!minted || !is_unique_violation(err, "donations_pkey")) throw err;
     const prior = await donation_get(row.id);
-    // only a row still in the state this request writes: one paid or closed
-    // meanwhile is not a retry's to reuse
+    // unless `any_state`, only a row still in the state this request writes:
+    // one paid or closed meanwhile is not a retry's to reuse
     if (!prior || (!any_state && prior.status !== row.status)) throw err;
     return prior;
   }

@@ -168,6 +168,8 @@ const send = (answer: IPartnerPaymentAnswer) =>
 /** the same request is being made right now, or lost its claim to a retry: not
  * a conflict, so a 503 the site retries as it would any provider answer */
 const RETRY_AFTER_S = CLAIM_STALE_MS / 1000;
+/** for a failure whose claim is already released: the retry can go at once */
+const SHORT_RETRY_AFTER_S = 5;
 const still_being_made = () =>
   provider_error(
     503,
@@ -759,9 +761,22 @@ function provider_failure(
   if (err instanceof Stripe.errors.StripeError) {
     // a key reused with other params is ours to fix, not Stripe's to retry
     const t = err.type;
-    return t === "StripeAPIError" ||
-      t === "StripeConnectionError" ||
-      t === "StripeRateLimitError"
+    // stripe stores a 5xx under the idempotency key and replays it for a day,
+    // so a retry under the same key would answer the same failure. the claim
+    // is released: the retry gets a new payment id and new keys, at worst
+    // leaving an unused intent. a dropped connection or a rate limit executed
+    // nothing, so those keep the claim and its keys
+    if (t === "StripeAPIError") {
+      return {
+        response: provider_error(
+          503,
+          "Stripe could not complete this request. Retry the same request.",
+          SHORT_RETRY_AFTER_S
+        ),
+        keep_claim: false,
+      };
+    }
+    return t === "StripeConnectionError" || t === "StripeRateLimitError"
       ? retry("Stripe is not answering. Retry the same request.")
       : refused("Stripe");
   }
