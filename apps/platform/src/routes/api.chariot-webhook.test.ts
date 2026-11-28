@@ -230,6 +230,7 @@ describe("chariot webhook partner grant", () => {
   };
   const grant = (status: string, extra: Record<string, unknown> = {}) => ({
     id: "grant-pg",
+    workflowSessionId: "wf-pg",
     status,
     amount: 10_000,
     feeDetail: { total: 300 },
@@ -255,7 +256,8 @@ describe("chariot webhook partner grant", () => {
     expect(res.status).toBe(200);
     expect(partner_grant_mock).toHaveBeenCalledWith(
       expect.anything(),
-      "grant-pg"
+      "grant-pg",
+      "wf-pg"
     );
     expect(donation_mocks.update).toHaveBeenCalledExactlyOnceWith(
       expect.anything(),

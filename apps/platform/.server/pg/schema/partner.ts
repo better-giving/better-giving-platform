@@ -112,6 +112,9 @@ export const partner_payments = pgTable(
     donation_id: text("donation_id"),
     // a DAF payment's Chariot grant: its webhook finds the donation by it
     grant_id: text("grant_id"),
+    // the Connect session a DAF payment was authorized by: one payment each,
+    // and the webhook's way back when the grant was made but never linked
+    authorized_session_id: text("authorized_session_id"),
     response: jsonb("response").$type<IPartnerPaymentAnswer>(),
     created_at: timestamptz_now("created_at"),
     claimed_at: timestamptz_now("claimed_at"),
@@ -119,6 +122,13 @@ export const partner_payments = pgTable(
   (t) => [
     primaryKey({ columns: [t.npo_id, t.gift_id] }),
     uniqueIndex("partner_payments_donation_id_idx").on(t.donation_id),
+    uniqueIndex("partner_payments_session_id_idx")
+      .on(t.authorized_session_id)
+      .where(sql`${t.authorized_session_id} is not null`),
+    check(
+      "partner_payments_response_has_donation",
+      sql`${t.response} is null or ${t.donation_id} is not null`
+    ),
     uniqueIndex("partner_payments_grant_id_idx")
       .on(t.grant_id)
       .where(sql`${t.grant_id} is not null`),

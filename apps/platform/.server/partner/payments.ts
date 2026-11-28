@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { ChariotError } from "@better-giving/chariot";
+import { PayPalApiError } from "@better-giving/paypal";
 import { and, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { limit_shared, type Quota } from "#/.server/auth/rate-limit";
 import { to_fn } from "#/.server/donation-recipient";
@@ -132,8 +133,13 @@ async function order_voided(
   if (Date.now() - new Date(created_at).getTime() < ORDER_CHECK_AFTER_MS) {
     return false;
   }
-  const order = await paypal.get_order(answer.client.token).catch(() => null);
-  return order?.status === "VOIDED";
+  const order = await paypal
+    .get_order(answer.client.token)
+    // a 404 is an order paypal no longer has: it expired unapproved
+    .catch((err) =>
+      err instanceof PayPalApiError && err.http_status === 404 ? "gone" : null
+    );
+  return order === "gone" || (order !== null && order.status === "VOIDED");
 }
 
 const send = (answer: IPartnerPaymentAnswer) =>
@@ -159,7 +165,8 @@ async function claim(
   db: Db,
   npo_id: number,
   req: PaymentRequest,
-  fingerprint: string
+  fingerprint: string,
+  again = false
 ): Promise<Claim> {
   const attribution: IPartnerAttribution = {
     form: req.form,
@@ -170,24 +177,47 @@ async function claim(
     deployment_origin: req.deployment_origin,
     ...(req.page_origin && { page_origin: req.page_origin }),
   };
-  const [mine] = await db
-    .insert(partner_payments)
-    .values({
-      npo_id,
-      gift_id: req.gift_id,
-      fingerprint,
-      method: req.method,
-      currency: req.currency,
-      amount: req.amount,
-      attribution,
-      claim_id: crypto.randomUUID(),
-      donation_id: req.method === "daf" ? crypto.randomUUID() : null,
-    })
-    .onConflictDoNothing()
-    .returning({
-      claim_id: partner_payments.claim_id,
-      donation_id: partner_payments.donation_id,
-    });
+  let mine: { claim_id: string; donation_id: string | null } | undefined;
+  try {
+    [mine] = await db
+      .insert(partner_payments)
+      .values({
+        npo_id,
+        gift_id: req.gift_id,
+        fingerprint,
+        method: req.method,
+        currency: req.currency,
+        amount: req.amount,
+        attribution,
+        claim_id: crypto.randomUUID(),
+        // minted here so a retry of a request that died finds its own
+        // donation and processor objects
+        donation_id: crypto.randomUUID(),
+        authorized_session_id:
+          req.method === "daf" ? req.authorized_session_id : undefined,
+      })
+      // the primary key only: any other conflict is not a repeat
+      .onConflictDoNothing({
+        target: [partner_payments.npo_id, partner_payments.gift_id],
+      })
+      .returning({
+        claim_id: partner_payments.claim_id,
+        donation_id: partner_payments.donation_id,
+      });
+  } catch (err) {
+    if (!is_unique_violation(err, "partner_payments_session_id_idx")) throw err;
+    return {
+      kind: "refused",
+      response: problem("invalid_request", {
+        errors: [
+          {
+            path: "authorized_session_id",
+            message: "This authorization already made a payment.",
+          },
+        ],
+      }),
+    };
+  }
   if (mine) return { kind: "mine", ...mine };
 
   const [held] = await db
@@ -202,8 +232,16 @@ async function claim(
         eq(partner_payments.gift_id, req.gift_id)
       )
     );
-  // released between the insert and this read: the caller may go again
-  if (!held) return claim(db, npo_id, req, fingerprint);
+  // released between the insert and this read: the caller goes again, once
+  if (!held) {
+    if (!again) return claim(db, npo_id, req, fingerprint, true);
+    return {
+      kind: "refused",
+      response: problem("idempotency_conflict", {
+        detail: "This gift_id is being created by another request. Retry.",
+      }),
+    };
+  }
   if (held.fingerprint !== fingerprint) {
     return {
       kind: "refused",
@@ -374,9 +412,7 @@ export async function create_payment(
     donor,
     via,
     via_extra: method === "venmo" ? "venmo" : (req.authorized_session_id ?? ""),
-    ...(via === "chariot" && {
-      don_id: hold.donation_id ?? crypto.randomUUID(),
-    }),
+    ...(hold.donation_id && { don_id: hold.donation_id }),
     intent: {
       amount: to_checkout_amount(req.amount),
       currency: req.currency,
@@ -394,7 +430,13 @@ export async function create_payment(
           ? await paypal_create(ctx)
           : await stripe_create(ctx);
   } catch (err) {
-    await release(db, npo_id, req.gift_id, hold.claim_id).catch(() => {});
+    // an error after a grant may have been made leaves the outcome unknown: the
+    // claim stays, so a retry (after the stale window) takes it over with the
+    // same minted id and finds that grant. stripe and paypal mark their row
+    // failed before they throw, so theirs is released for a fresh start
+    if (via !== "chariot") {
+      await release(db, npo_id, req.gift_id, hold.claim_id).catch(() => {});
+    }
     // chariot answers 409 while this authorization's grant is still being
     // made: a retry of the same request finds it, so it is a 503, not a 500
     if (err instanceof ChariotError && err.http_status === 409) {

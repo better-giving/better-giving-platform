@@ -1,3 +1,4 @@
+import type Stripe from "stripe";
 import { to_atomic_c } from "#/helpers/stripe";
 import type { IAmount } from "@/donations";
 import type { IMetadata } from "@/stripe";
@@ -7,6 +8,8 @@ export interface IInput extends IAmount {
   order_id: string;
   currency: string;
   customer_id: string;
+  /** a retry with the same key answers the same intent */
+  idempotency_key?: string;
   bank_only?: boolean;
   /** `statement_descriptor_suffix`; absent, the intent sets none */
   descriptor_suffix?: string;
@@ -14,7 +17,7 @@ export interface IInput extends IAmount {
 
 export async function payment_intent(i: IInput): Promise<string> {
   const to_pay = i.base + i.fee_allowance + i.tip;
-  const { client_secret } = await stripe.paymentIntents.create({
+  const params: Stripe.PaymentIntentCreateParams = {
     amount: to_atomic_c(i.currency)(to_pay),
     // stripe's default is automatic_async, which leaves the charge's
     // balance_transaction null at confirmation — the value settled.ts polls
@@ -40,6 +43,11 @@ export async function payment_intent(i: IInput): Promise<string> {
     ...(i.descriptor_suffix && {
       statement_descriptor_suffix: i.descriptor_suffix,
     }),
-  });
+  };
+  const { client_secret } = i.idempotency_key
+    ? await stripe.paymentIntents.create(params, {
+        idempotencyKey: i.idempotency_key,
+      })
+    : await stripe.paymentIntents.create(params);
   return client_secret || "invalid client secret";
 }

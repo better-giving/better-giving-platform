@@ -86,7 +86,6 @@ const STATUS_TEXT: Record<number, string> = {
   422: "The request failed validation; `errors` names each field.",
   429: "Too many requests. Wait, then retry.",
   500: "Better Giving hit an error.",
-  503: "A payment provider is still working on this request. Retry the same request shortly.",
 };
 
 /** an error response carrying `schema` as `media`, inline so a reader of one
@@ -930,12 +929,27 @@ const PARTNER_HEADERS: Record<number, Json> = {
   },
 };
 
+/** what each status means on the partner surface, where 400 is a request to
+ * fix and 422 one this nonprofit or amount can't take */
+const PARTNER_STATUS_TEXT: Record<number, string> = {
+  400: "The request is invalid; `errors` names each field.",
+  401: "The API key is missing, malformed or revoked.",
+  404: "Nothing matches this request.",
+  409: "The `gift_id` was used with a different request, or is still being created.",
+  410: "The DAF authorization has expired.",
+  422: "The nonprofit or amount can't take this: `unsupported`, `below_minimum` (with `minimum_minor`) or `above_maximum`.",
+  429: "Too many requests. Wait for `Retry-After`, then retry.",
+  500: "Better Giving hit an error.",
+  503: "A payment provider is still working on this request. Retry the same request shortly.",
+};
+
 const partner_problems = (...statuses: number[]) =>
   Object.fromEntries(
     statuses.map((s) => [
       s,
       {
         ...error_response(s, "application/problem+json", "PartnerProblem"),
+        description: PARTNER_STATUS_TEXT[s],
         headers: { ...NO_STORE, ...PARTNER_HEADERS[s] },
       },
     ])

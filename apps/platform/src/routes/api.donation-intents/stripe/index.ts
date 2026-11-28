@@ -2,9 +2,10 @@ import { unit_per_usd } from "#/.server/unit-per-usd";
 import { MIN_DONATION_USD } from "@/constants/common";
 import type { IDonation, IStripeIntentReturn } from "@/donations";
 import { rd2num } from "@/helpers/decimal";
+import { put_or_reuse } from "$/donation-intents/put-once";
 import { type Refusal, refuse, to_response } from "$/donation-intents/refusal";
 import { db } from "$/pg/db";
-import { donation_put, donation_update } from "$/pg/queries/donation";
+import { donation_update } from "$/pg/queries/donation";
 import type { Ctx, IntentResult, Provider } from "../types";
 import { customer_with_currency } from "./customer-with-currency";
 import { npo_descriptor_suffix } from "./descriptor-suffix";
@@ -19,6 +20,7 @@ export const stripe_create = async ({
   from,
   donor,
   via,
+  don_id,
   intent,
 }: Ctx): Promise<Refusal | IntentResult> => {
   const upusd = await unit_per_usd(intent.currency);
@@ -49,7 +51,7 @@ export const stripe_create = async ({
     donor.email
   );
 
-  const r_id = crypto.randomUUID();
+  const r_id = don_id ?? crypto.randomUUID();
   const now = new Date().toISOString();
   const r: IDonation = {
     id: r_id,
@@ -62,7 +64,7 @@ export const stripe_create = async ({
     ...from,
     ...intent,
   };
-  const don = await donation_put(db, r);
+  const don = await put_or_reuse(db, r, !!don_id);
 
   // a suffix shows on card charges only, and a subscription's charges take
   // none (they're stripe-created)
@@ -80,6 +82,9 @@ export const stripe_create = async ({
             currency: don.currency,
             customer_id,
             order_id: don.id,
+            // a minted id means a caller that may retry: the same key finds
+            // the same intent
+            ...(don_id && { idempotency_key: `partner-pi-${don.id}` }),
             bank_only,
             descriptor_suffix,
           })

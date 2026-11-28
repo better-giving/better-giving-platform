@@ -1,4 +1,5 @@
 import { ChariotError } from "@better-giving/chariot";
+import { PayPalApiError } from "@better-giving/paypal";
 import { eq } from "drizzle-orm";
 import {
   afterAll,
@@ -74,6 +75,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  get_order.mockReset();
   pi_create.mockResolvedValue({ client_secret: "pi_1_secret_x" });
   create_order.mockResolvedValue({ id: "ORDER-1" });
   create_grant.mockImplementation(async () => ({
@@ -254,22 +256,37 @@ describe("POST /api/partner/v1/payments", () => {
     expect(await partner_donation_of_grant(db() as never, "grant_1")).toBe(id);
   });
 
-  test("a second gift on an authorization that already paid is refused and leaves nothing payable", async () => {
+  test("a second gift on an authorization that already paid is refused before any grant is made", async () => {
     const { key } = await seed();
     const first = await (await post(key.key, daf("g-1", "wf_1"))).json();
+    create_grant.mockClear();
 
     const res = await post(key.key, daf("g-2", "wf_1"));
 
     expect(res.status).toBe(400);
     expect((await res.json()).code).toBe("invalid_request");
+    expect(create_grant).not.toHaveBeenCalled();
+    expect(await donation_rows()).toHaveLength(1);
     expect(await partner_donation_of_grant(db() as never, "grant_1")).toBe(
       first.id
     );
-    const rows = await donation_rows();
-    expect(rows.filter((r) => r.status === "failed")).toHaveLength(1);
     // the refused gift id stays free
     create_grant.mockResolvedValue({ id: "grant_2" });
     expect((await post(key.key, daf("g-2", "wf_2"))).status).toBe(200);
+  });
+
+  test("the webhook's way back also finds a payment by its authorization when the grant was never linked", async () => {
+    const { key } = await seed();
+    await post(key.key, daf("g-1", "wf_1"));
+    await db().update(partner_payments).set({ grant_id: null });
+    const [row] = await db().select().from(partner_payments);
+
+    expect(
+      await partner_donation_of_grant(db() as never, "grant_1", "wf_1")
+    ).toBe(row!.donation_id);
+    expect(
+      await partner_donation_of_grant(db() as never, "grant_1", "wf_other")
+    ).toBeNull();
   });
 
   test("a repeat is answered from the record after the nonprofit turned the rail off", async () => {
@@ -294,7 +311,14 @@ describe("POST /api/partner/v1/payments", () => {
 
     expect(res.status).toBe(503);
     expect((await res.json()).code).toBe("provider_error");
-    expect((await post(key.key, daf("g-1", "wf_1"))).status).toBe(200);
+    // the outcome is unknown, so the claim holds until it goes stale; the
+    // retry then takes it over under the same payment id
+    const [held] = await db().select().from(partner_payments);
+    expect((await post(key.key, daf("g-1", "wf_1"))).status).toBe(409);
+    await stale("g-1");
+    const retry = await post(key.key, daf("g-1", "wf_1"));
+    expect(retry.status).toBe(200);
+    expect((await retry.json()).id).toBe(held!.donation_id);
   });
 
   const stale = (gift_id = "gift-1") =>
@@ -390,6 +414,92 @@ describe("POST /api/partner/v1/payments", () => {
       await (await post(key.key, body({ method: "paypal" }))).json()
     ).toEqual(first);
     expect(create_order).toHaveBeenCalledTimes(1);
+  });
+
+  test("a paypal order paypal no longer has is replaced under the same gift_id", async () => {
+    const { key } = await seed();
+    await post(key.key, body({ method: "paypal" }));
+    await db()
+      .update(partner_payments)
+      .set({ created_at: new Date(Date.now() - 2 * 3600_000).toISOString() });
+    get_order.mockRejectedValue(new PayPalApiError("get order", 404, "{}"));
+    create_order.mockResolvedValue({ id: "ORDER-2" });
+
+    const again = await (
+      await post(key.key, body({ method: "paypal" }))
+    ).json();
+
+    expect(again.client.token).toBe("ORDER-2");
+  });
+
+  test("a young paypal order is replayed without asking paypal", async () => {
+    const { key } = await seed();
+    const first = await (
+      await post(key.key, body({ method: "paypal" }))
+    ).json();
+    get_order.mockResolvedValue({ status: "VOIDED" });
+
+    expect(
+      await (await post(key.key, body({ method: "paypal" }))).json()
+    ).toEqual(first);
+    expect(get_order).not.toHaveBeenCalled();
+  });
+
+  test("an old stripe payment is replayed without asking paypal, even if paypal would say voided", async () => {
+    const { key } = await seed();
+    const first = await (await post(key.key, body())).json();
+    await db()
+      .update(partner_payments)
+      .set({ created_at: new Date(Date.now() - 2 * 3600_000).toISOString() });
+    get_order.mockResolvedValue({ status: "VOIDED" });
+
+    expect(await (await post(key.key, body())).json()).toEqual(first);
+    expect(get_order).not.toHaveBeenCalled();
+  });
+
+  test("a stripe intent is made under a key from the payment id, so a retry finds the same intent", async () => {
+    const { key } = await seed();
+
+    const { id } = await (await post(key.key, body())).json();
+
+    expect(pi_create.mock.calls[0]![1]).toEqual({
+      idempotencyKey: `partner-pi-${id}`,
+    });
+  });
+
+  test("a request that is still young holds its gift_id: the same request is told to retry", async () => {
+    const { key, mine } = await seed();
+    const payload = body();
+    await db()
+      .insert(partner_payments)
+      .values({
+        npo_id: mine.id,
+        gift_id: "gift-1",
+        fingerprint: fingerprint_of(payload as never),
+        method: "card",
+        currency: "USD",
+        amount: payload.amount,
+        attribution: {} as never,
+        claim_id: "live",
+        donation_id: crypto.randomUUID(),
+      });
+
+    const res = await post(key.key, payload);
+
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("idempotency_conflict");
+    expect(pi_create).not.toHaveBeenCalled();
+  });
+
+  test("a daf repeat is answered from the record", async () => {
+    const { key } = await seed();
+    const first = await (await post(key.key, daf("g-1", "wf_1"))).json();
+    create_grant.mockClear();
+
+    expect(await (await post(key.key, daf("g-1", "wf_1"))).json()).toEqual(
+      first
+    );
+    expect(create_grant).not.toHaveBeenCalled();
   });
 
   test("a daf payment without an authorized session is invalid_request", async () => {

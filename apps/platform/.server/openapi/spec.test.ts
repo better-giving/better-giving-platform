@@ -443,6 +443,17 @@ describe("openapi drift", () => {
     ]);
   });
 
+  test("every response of every operation has a description", () => {
+    for (const o of operations()) {
+      for (const [status, res] of Object.entries(o.op.responses as Json)) {
+        expect(
+          (res as { description?: string }).description,
+          `${o.op.operationId} ${status}`
+        ).toBeTruthy();
+      }
+    }
+  });
+
   test("every operation documents a 4xx and a 5xx, unless its route refuses nothing", () => {
     for (const o of operations()) {
       const id = o.op.operationId;

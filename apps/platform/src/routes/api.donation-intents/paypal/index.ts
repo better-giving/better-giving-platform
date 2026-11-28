@@ -4,9 +4,10 @@ import { report_error } from "#/errors/report";
 import { MIN_DONATION_USD } from "@/constants/common";
 import type { IDonation } from "@/donations";
 import { rd2num } from "@/helpers/decimal";
+import { put_or_reuse } from "$/donation-intents/put-once";
 import { type Refusal, refuse, to_response } from "$/donation-intents/refusal";
 import { db } from "$/pg/db";
-import { donation_put, donation_update } from "$/pg/queries/donation";
+import { donation_update } from "$/pg/queries/donation";
 import {
   type Ctx,
   type IntentResult,
@@ -22,6 +23,7 @@ export const paypal_create = async ({
   to,
   from,
   via_extra,
+  don_id,
   intent,
 }: Ctx): Promise<Refusal | IntentResult> => {
   // venmo rides paypal's rail: its donor reads the method they clicked
@@ -59,7 +61,7 @@ export const paypal_create = async ({
     );
   }
 
-  const r_id = crypto.randomUUID();
+  const r_id = don_id ?? crypto.randomUUID();
   const now = new Date().toISOString();
   const r: IDonation = {
     id: r_id,
@@ -73,7 +75,7 @@ export const paypal_create = async ({
     ...intent,
     amount: charge.amount,
   };
-  const don = await donation_put(db, r);
+  const don = await put_or_reuse(db, r, !!don_id);
 
   let tx_id: string;
   try {

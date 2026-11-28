@@ -1,5 +1,5 @@
 {
-  "id": "55aeb842-2e41-4c85-b482-cb2b0247a6a4",
+  "id": "b7476820-7d10-4e29-9a4a-25cb3c13fe3d",
   "prevId": "97f6314a-3121-4c49-8fa2-0f5137bb1a92",
   "version": "7",
   "dialect": "postgresql",
@@ -6044,6 +6044,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "authorized_session_id": {
+          "name": "authorized_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "response": {
           "name": "response",
           "type": "jsonb",
@@ -6077,6 +6083,22 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "partner_payments_session_id_idx": {
+          "name": "partner_payments_session_id_idx",
+          "columns": [
+            {
+              "expression": "authorized_session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"partner_payments\".\"authorized_session_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -6124,7 +6146,12 @@
       },
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "partner_payments_response_has_donation": {
+          "name": "partner_payments_response_has_donation",
+          "value": "\"partner_payments\".\"response\" is null or \"partner_payments\".\"donation_id\" is not null"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.partner_tenants": {
