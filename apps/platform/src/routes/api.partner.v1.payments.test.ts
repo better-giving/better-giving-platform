@@ -34,8 +34,9 @@ vi.mock("$/pg/db", () => ({
     }
   ),
 }));
+const report_error = vi.hoisted(() => vi.fn());
 vi.mock("#/errors/report", () => ({
-  report_error: vi.fn(),
+  report_error,
   report_degraded: vi.fn(),
 }));
 vi.mock("$/kit/stripe", () => ({
@@ -745,12 +746,12 @@ describe("POST /api/partner/v1/payments", () => {
     expect(pi_create.mock.calls[1]![0].customer).toBe("cus_1");
   });
 
-  test("a stripe idempotency error is a retryable 503", async () => {
+  test("a stripe api error is a retryable 503 and keeps the claim", async () => {
     const { key } = await seed();
     pi_create.mockRejectedValueOnce(
-      new Stripe.errors.StripeIdempotencyError({
-        message: "in use",
-        type: "idempotency_error",
+      new Stripe.errors.StripeAPIError({
+        message: "slow",
+        type: "api_error",
       } as never)
     );
 
@@ -758,6 +759,23 @@ describe("POST /api/partner/v1/payments", () => {
 
     expect(res.status).toBe(503);
     expect(res.headers.get("retry-after")).toBe("120");
+    expect(await db().select().from(partner_payments)).toHaveLength(1);
+  });
+
+  test("a stripe idempotency error is ours: 502, reported, and the gift id is free", async () => {
+    const { key } = await seed();
+    pi_create.mockRejectedValueOnce(
+      new Stripe.errors.StripeIdempotencyError({
+        message: "other params",
+        type: "idempotency_error",
+      } as never)
+    );
+
+    const res = await post(key.key, body());
+
+    expect(res.status).toBe(502);
+    expect(report_error).toHaveBeenCalled();
+    expect(await db().select().from(partner_payments)).toHaveLength(0);
   });
 
   test.each([
@@ -818,7 +836,7 @@ describe("POST /api/partner/v1/payments", () => {
     );
   });
 
-  test("a paypal failure after a reissue keeps the old payment readable and the gift id free", async () => {
+  test("a paypal failure after a reissue keeps the old payment readable, and its retry finds the same order", async () => {
     const { key } = await seed();
     const first = await (
       await post(key.key, body({ method: "paypal" }))
@@ -836,24 +854,100 @@ describe("POST /api/partner/v1/payments", () => {
     expect((await (await get(key.key, first.id)).json()).status).toBe(
       "cancelled"
     );
+    await stale();
     create_order.mockResolvedValue({ id: "ORDER-3" });
-    expect((await post(key.key, body({ method: "paypal" }))).status).toBe(200);
+    const retry = await post(key.key, body({ method: "paypal" }));
+    expect(retry.status).toBe(200);
+    expect(create_order.mock.calls.at(-1)![1]).toBe(
+      `order-${(await retry.json()).id}`
+    );
   });
 
-  test("a paypal order still CREATED past its approval window is replaced", async () => {
+  test("a paypal timeout keeps the claim, so the retry reuses the donation and its request id", async () => {
     const { key } = await seed();
-    await post(key.key, body({ method: "paypal" }));
-    await db()
-      .update(partner_payments)
-      .set({ created_at: new Date(Date.now() - 4 * 3600_000).toISOString() });
-    get_order.mockResolvedValue({ status: "CREATED" });
-    create_order.mockResolvedValue({ id: "ORDER-2" });
+    create_order.mockRejectedValueOnce(
+      Object.assign(new Error("timed out"), { name: "TimeoutError" })
+    );
+    expect((await post(key.key, body({ method: "paypal" }))).status).toBe(503);
+    const [held] = await db().select().from(partner_payments);
+    await stale();
 
-    const again = await (
+    const retry = await (
       await post(key.key, body({ method: "paypal" }))
     ).json();
 
-    expect(again.client.token).toBe("ORDER-2");
+    expect(retry.id).toBe(held!.donation_id);
+    expect(await donation_rows()).toHaveLength(1);
+  });
+
+  test("a replaced order the donor paid anyway reads as paid, not cancelled", async () => {
+    const { key } = await seed();
+    const first = await (
+      await post(key.key, body({ method: "paypal" }))
+    ).json();
+    await db()
+      .update(partner_payments)
+      .set({ created_at: new Date(Date.now() - 2 * 3600_000).toISOString() });
+    get_order.mockResolvedValue({ status: "VOIDED" });
+    create_order.mockResolvedValue({ id: "ORDER-2" });
+    await post(key.key, body({ method: "paypal" }));
+    await db()
+      .update(donations)
+      .set({ status: "settled" })
+      .where(eq(donations.id, first.id));
+
+    expect((await (await get(key.key, first.id)).json()).status).toBe(
+      "succeeded"
+    );
+  });
+
+  test("a takeover by a new gift must be the same request, or it is a conflict", async () => {
+    const { key } = await seed();
+    create_grant.mockRejectedValueOnce(new Error("lost the reply"));
+    await post(key.key, daf("g-1", "wf_1"));
+    await stale("g-1");
+    const other_amount = daf("g-2", "wf_1");
+    other_amount.amount.gift = 6000;
+
+    const res = await post(key.key, other_amount);
+
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("idempotency_conflict");
+    expect((await db().select().from(partner_payments))[0]!.gift_id).toBe(
+      "g-1"
+    );
+  });
+
+  test("a chariot rate limit is a retryable 503, and a chariot refusal is a 502 that closes its row", async () => {
+    const { key } = await seed();
+    create_grant.mockRejectedValueOnce(new ChariotError(429, "{}", null));
+    expect((await post(key.key, daf("g-1", "wf_1"))).status).toBe(503);
+
+    create_grant.mockRejectedValueOnce(new ChariotError(422, "{}", null));
+    const res = await post(key.key, daf("g-2", "wf_2"));
+
+    expect(res.status).toBe(502);
+    expect(report_error).toHaveBeenCalled();
+    expect(await db().select().from(partner_payments)).toHaveLength(1);
+    expect(
+      (await donation_rows()).filter((r) => r.status === "failed")
+    ).toHaveLength(1);
+  });
+
+  test("a paypal order still CREATED is replayed whatever its age: only paypal's word that it is void replaces it", async () => {
+    const { key } = await seed();
+    const first = await (
+      await post(key.key, body({ method: "paypal" }))
+    ).json();
+    await db()
+      .update(partner_payments)
+      .set({ created_at: new Date(Date.now() - 5 * 3600_000).toISOString() });
+    get_order.mockResolvedValue({ status: "CREATED" });
+
+    expect(
+      await (await post(key.key, body({ method: "paypal" }))).json()
+    ).toEqual(first);
+    expect(create_order).toHaveBeenCalledTimes(1);
   });
 
   test("a partner gift with a tribute notification gets the tribute notice checkout gifts get", async () => {

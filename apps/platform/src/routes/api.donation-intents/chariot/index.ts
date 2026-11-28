@@ -64,7 +64,7 @@ export const chariot_create = async ({
   // a caller that mints its own id writes the row before the grant, under the
   // authorization's session, so a grant is never made without a row for it
   // (the grant id replaces the session once it exists). a retry finds its row
-  if (minted_id) await put_or_reuse(db, row(minted_id, via_extra), true);
+  if (minted_id) await put_or_reuse(db, row(minted_id, via_extra), true, true);
 
   const grant = await chariot
     .create_grant({ workflowSessionId: via_extra, amount: cents })

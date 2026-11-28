@@ -5,6 +5,7 @@ import { and, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import Stripe from "stripe";
 import { limit_shared, type Quota } from "#/.server/auth/rate-limit";
 import { to_fn } from "#/.server/donation-recipient";
+import { report_error } from "#/errors/report";
 import { chariot_create } from "#/routes/api.donation-intents/chariot";
 import { paypal_create } from "#/routes/api.donation-intents/paypal";
 import { stripe_create } from "#/routes/api.donation-intents/stripe";
@@ -130,7 +131,6 @@ const answer_of = (
  * voided. any other answer, or a lookup that fails, leaves the order as is: an
  * order still open may yet be approved */
 const ORDER_CHECK_AFTER_MS = 60 * 60 * 1000;
-const ORDER_APPROVAL_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 async function order_voided(
   db: Db,
@@ -154,14 +154,9 @@ async function order_voided(
       err instanceof PayPalApiError && err.http_status === 404 ? "gone" : null
     );
   if (order === "gone") return true;
-  if (order === null) return false;
-  // paypal voids an order the payer hasn't approved after its window: one
-  // still `CREATED` past it can't be approved either
-  return (
-    order.status === "VOIDED" ||
-    (order.status === "CREATED" &&
-      Date.now() - new Date(created_at).getTime() > ORDER_APPROVAL_WINDOW_MS)
-  );
+  // an order still `CREATED` may yet be approved, whatever its age: only
+  // paypal's own word that it is void releases the gift id
+  return order !== null && order.status === "VOIDED";
 }
 
 /** joins a replaced payment's gift id to its payment id in the renamed row */
@@ -343,10 +338,29 @@ async function takeover_by_session(
 ): Promise<Claim | null> {
   const session = req.authorized_session_id ?? "";
   const [holder] = await db
-    .select({ response: partner_payments.response })
+    .select({
+      response: partner_payments.response,
+      fingerprint: partner_payments.fingerprint,
+    })
     .from(partner_payments)
-    .where(eq(partner_payments.authorized_session_id, session));
+    .where(
+      and(
+        eq(partner_payments.npo_id, npo_id),
+        eq(partner_payments.authorized_session_id, session)
+      )
+    );
   if (!holder || holder.response) return null;
+  // the grant, and the donation row written for it, are the first gift's: a
+  // gift that differs in amount, donor or method can't inherit them
+  if (holder.fingerprint !== fingerprint) {
+    return {
+      kind: "refused",
+      response: problem("idempotency_conflict", {
+        detail:
+          "This authorization was used with a different amount, donor or method.",
+      }),
+    };
+  }
   try {
     const [taken] = await db
       .update(partner_payments)
@@ -363,6 +377,7 @@ async function takeover_by_session(
         and(
           eq(partner_payments.npo_id, npo_id),
           eq(partner_payments.authorized_session_id, session),
+          eq(partner_payments.fingerprint, fingerprint),
           isNull(partner_payments.response),
           lt(
             partner_payments.claimed_at,
@@ -613,21 +628,25 @@ export async function create_payment(
           ? await paypal_create(ctx)
           : await stripe_create(ctx);
   } catch (err) {
-    // an error after a grant may have been made leaves the outcome unknown: the
-    // claim stays, so a retry (after the stale window) takes it over with the
-    // same minted id and finds that grant. stripe and paypal have no such
-    // object to find: theirs is released, closing its unpaid row, for a fresh
-    // start
-    if (via !== "chariot") {
+    // an error that may have left a made object (a grant, an order, an intent)
+    // keeps the claim, so a retry after the stale window takes it over under
+    // the same minted id and keys and finds that object. a definite refusal
+    // gives the gift id back and closes its unpaid row. an error that isn't a
+    // processor's is unknown on the DAF rail (a grant may exist) and released
+    // elsewhere
+    const failure = provider_failure(err);
+    const keep = failure ? failure.keep_claim : via === "chariot";
+    if (!keep) {
       await release(
         db,
         npo_id,
         req.gift_id,
         hold.claim_id,
         hold.donation_id
-      ).catch(() => {});
+      ).catch((e) => report_error(e, { where: "partner release" }));
     }
-    return provider_failure(err);
+    if (failure) return failure.response;
+    throw err;
   }
   if (is_refusal(made)) {
     await release(db, npo_id, req.gift_id, hold.claim_id, hold.donation_id);
@@ -704,33 +723,55 @@ async function write_tribute(
   });
 }
 
-/** a processor's own failure, answered so the site retries it: 503 where
- * trying again can help (a timeout, a 5xx, a request still being made, a key
- * in use), 502 where the processor refused it */
-function provider_failure(err: unknown): Response {
-  const retry = (detail: string) => provider_error(503, detail, RETRY_AFTER_S);
+/** what a processor's own failure becomes: 503 where trying again can help (a
+ * timeout, a 5xx, a rate limit, a request still being made), 502 where it
+ * refused, which is also ours to look at (a key, a permission, our own
+ * params). `keep_claim` is true when the outcome may be a made object, so a
+ * retry must find it under the same ids. null: not a processor's error */
+function provider_failure(
+  err: unknown
+): { response: Response; keep_claim: boolean } | null {
+  const retry = (detail: string) => ({
+    response: provider_error(503, detail, RETRY_AFTER_S),
+    keep_claim: true,
+  });
+  const refused = (who: string) => {
+    report_error(err, { where: "partner", provider: who });
+    return {
+      response: provider_error(502, `${who} refused this request.`),
+      keep_claim: false,
+    };
+  };
   if (err instanceof ChariotError) {
-    return err.http_status === 409 || err.http_status >= 500
+    return err.http_status === 409 ||
+      err.http_status === 429 ||
+      err.http_status >= 500
       ? retry(
           "The DAF provider is still working on this authorization. Retry the same request."
         )
-      : provider_error(502, "The DAF provider refused this request.");
+      : refused("The DAF provider");
   }
   if (err instanceof PayPalApiError) {
-    return err.http_status >= 500 || err.http_status === 429
+    return err.http_status === 429 || err.http_status >= 500
       ? retry("PayPal is not answering. Retry the same request.")
-      : provider_error(502, "PayPal refused this request.");
+      : refused("PayPal");
   }
   if (err instanceof Stripe.errors.StripeError) {
+    // a key reused with other params is ours to fix, not Stripe's to retry
     const t = err.type;
     return t === "StripeAPIError" ||
       t === "StripeConnectionError" ||
-      t === "StripeRateLimitError" ||
-      t === "StripeIdempotencyError"
+      t === "StripeRateLimitError"
       ? retry("Stripe is not answering. Retry the same request.")
-      : provider_error(502, "Stripe refused this request.");
+      : refused("Stripe");
   }
-  throw err;
+  if (
+    err instanceof Error &&
+    (err.name === "TimeoutError" || err.name === "AbortError")
+  ) {
+    return retry("The payment provider timed out. Retry the same request.");
+  }
+  return null;
 }
 
 /** one charge against the donor address's bucket, null when it had room */
@@ -746,6 +787,8 @@ async function charge_donor_ip(
   );
   return r.ok ? null : rate_limited(r.retry_after_s);
 }
+
+const PAID = new Set(["settled", "refunded", "refunded_loss"]);
 
 const STATUS = {
   created: "pending",
@@ -792,9 +835,12 @@ export async function read_payment(
       gift_id: row.superseded_at
         ? row.gift_id.slice(0, row.gift_id.lastIndexOf(SUPERSEDED))
         : row.gift_id,
-      status: row.superseded_at
-        ? "cancelled"
-        : (STATUS[row.status as keyof typeof STATUS] ?? "pending"),
+      // a replaced order is cancelled, unless the donor paid it anyway: money
+      // moved wins over the tombstone
+      status:
+        row.superseded_at && !PAID.has(row.status)
+          ? "cancelled"
+          : (STATUS[row.status as keyof typeof STATUS] ?? "pending"),
       method: row.method,
       amount: row.amount,
       currency: row.currency,
