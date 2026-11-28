@@ -82,6 +82,12 @@ export interface IPartnerAttribution {
   page_origin?: string;
 }
 
+export interface IPartnerProviderState {
+  customer_id?: string;
+  /** null when the first attempt chose none */
+  descriptor_suffix?: string | null;
+}
+
 /** the answer to `POST /payments`, kept to replay */
 export interface IPartnerPaymentAnswer {
   id: string;
@@ -119,6 +125,12 @@ export const partner_payments = pgTable(
     response: jsonb("response").$type<IPartnerPaymentAnswer>(),
     created_at: timestamptz_now("created_at"),
     claimed_at: timestamptz_now("claimed_at"),
+    // what a Stripe payment chose on its first attempt (customer, descriptor
+    // suffix), so a retry under the same idempotency keys sends the same params
+    provider_state: jsonb("provider_state").$type<IPartnerProviderState>(),
+    // set when a voided PayPal order was replaced under its gift id: the row
+    // stays, under a renamed gift id, so the old payment id still reads
+    superseded_at: timestamptz("superseded_at"),
   },
   (t) => [
     primaryKey({ columns: [t.npo_id, t.gift_id] }),

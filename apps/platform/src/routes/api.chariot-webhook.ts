@@ -81,6 +81,7 @@ const on_grant_completed: Record<TStatus, "settle" | "duplicate" | "alert"> = {
 interface IGrantRef {
   id: string;
   amount: number;
+  workflowSessionId?: string;
   createdAt?: string;
   statuses?: readonly { createdAt?: string }[];
 }
@@ -208,7 +209,13 @@ async function grant_donation(
   if (!prior) return missing_donation(grant, don_id);
   // `don_id` rides in connect metadata the browser writes, so it can name any
   // row; the intent route records the grant it made as `via_extra`
-  if (prior.via !== "chariot" || prior.via_extra !== grant.id)
+  // a partner's row names the authorization until its create call links the
+  // grant, so a delivery in between finds it under that
+  if (
+    prior.via !== "chariot" ||
+    (prior.via_extra !== grant.id &&
+      prior.via_extra !== grant.workflowSessionId)
+  )
     return ack_unfixable(
       grant,
       prior.id,

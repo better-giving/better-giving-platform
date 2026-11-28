@@ -617,6 +617,13 @@
       "when": 1795854598906,
       "tag": "0087_partner_payments_claims",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1795857496232,
+      "tag": "0088_partner_payments_state",
+      "breakpoints": true
     }
   ]
 }

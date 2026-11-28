@@ -1,14 +1,17 @@
 import { ChariotError } from "@better-giving/chariot";
+import { and, eq, ne } from "drizzle-orm";
 import { report_degraded } from "#/errors/report";
 import { MIN_DONATION_USD } from "@/constants/common";
 import type { ChariotMetadata, IDonation } from "@/donations";
 import { amnt_sum } from "@/donations/helpers";
 import { snap } from "@/helpers/decimal";
+import { put_or_reuse } from "$/donation-intents/put-once";
 import { type Refusal, refuse, to_response } from "$/donation-intents/refusal";
 import { chariot } from "$/kit/chariot";
 import { db } from "$/pg/db";
 import { is_unique_violation } from "$/pg/errors";
 import { donation_get, donation_put } from "$/pg/queries/donation";
+import { donations } from "$/pg/schema/donation";
 import type { Ctx, IntentResult, Provider } from "../types";
 
 /** create grant answers these having made no grant, so the donor can go again.
@@ -44,6 +47,25 @@ export const chariot_create = async ({
     return refuse("invalid", "DAF grants must be a whole dollar amount", 400);
 
   const cents = dollars * 100;
+  const now = new Date().toISOString();
+  const row = (id: string, via_extra: string): IDonation => ({
+    id,
+    status: "intent",
+    via,
+    via_extra,
+    upusd: 1, // chariot only supports usd
+    created_at: now,
+    updated_at: now,
+    ...to,
+    ...from,
+    ...intent,
+  });
+
+  // a caller that mints its own id writes the row before the grant, under the
+  // authorization's session, so a grant is never made without a row for it
+  // (the grant id replaces the session once it exists). a retry finds its row
+  if (minted_id) await put_or_reuse(db, row(minted_id, via_extra), true);
+
   const grant = await chariot
     .create_grant({ workflowSessionId: via_extra, amount: cents })
     .catch((err) => {
@@ -64,35 +86,44 @@ export const chariot_create = async ({
     );
   }
 
-  // a repeat create for a session answers the grant it first made. a caller
-  // that mints its own ids must not record it at an amount it wasn't made for
-  if (minted_id && grant.amount !== cents) {
-    return refuse(
-      "invalid",
-      "This authorization was made for a different amount.",
-      400
-    );
+  if (minted_id) {
+    // a repeat create for a session answers the grant it first made. it must
+    // not be recorded at an amount it wasn't made for, or a second time
+    if (grant.amount !== cents) {
+      return refuse(
+        "invalid",
+        "This authorization was made for a different amount.",
+        400
+      );
+    }
+    const [recorded] = await db
+      .select({ id: donations.id })
+      .from(donations)
+      .where(
+        and(
+          eq(donations.via, "chariot"),
+          eq(donations.via_extra, grant.id),
+          ne(donations.id, minted_id)
+        )
+      );
+    if (recorded) {
+      return refuse(
+        "invalid",
+        "This authorization already made a payment.",
+        400
+      );
+    }
+    await db
+      .update(donations)
+      .set({ via_extra: grant.id })
+      .where(eq(donations.id, minted_id));
+    return { don_id: minted_id, body: { id: minted_id } };
   }
 
   const meta = grant.metadata as Partial<ChariotMetadata> | undefined;
-  // a minted id is the server's: connect metadata is the browser's and can't
-  // replace it
-  const don_id = minted_id ?? meta?.don_id;
+  const don_id = meta?.don_id;
   if (!don_id) throw new Error(`chariot grant ${grant.id} carries no don_id`);
-  const now = new Date().toISOString();
-
-  const r: IDonation = {
-    id: don_id,
-    status: "intent",
-    via,
-    via_extra: grant.id,
-    upusd: 1, // chariot only supports usd
-    created_at: now,
-    updated_at: now,
-    ...to,
-    ...from,
-    ...intent,
-  };
+  const r = row(don_id, grant.id);
 
   const don = await db
     .transaction((tx) => donation_put(tx, r))

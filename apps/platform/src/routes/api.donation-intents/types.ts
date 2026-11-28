@@ -11,6 +11,17 @@ export interface Ctx {
    * finds its own row and processor objects. a DAF grant takes it over its
    * connect metadata, which a partner's page writes before any payment exists */
   don_id?: string;
+  /** what a Stripe payment chose on an earlier attempt, to send again, and
+   * where to keep what this attempt chose before any Stripe object depends on
+   * it. both come from a caller that retries under idempotency keys */
+  provider_state?: {
+    customer_id?: string;
+    descriptor_suffix?: string | null;
+  };
+  on_provider_state?: (state: {
+    customer_id: string;
+    descriptor_suffix: string | null;
+  }) => Promise<void>;
   intent: Omit<
     IDonationIntent,
     "via" | "via_extra" | "to_id" | "donor" | "source"

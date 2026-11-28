@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { ChariotError } from "@better-giving/chariot";
 import { PayPalApiError } from "@better-giving/paypal";
 import { and, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import Stripe from "stripe";
 import { limit_shared, type Quota } from "#/.server/auth/rate-limit";
 import { to_fn } from "#/.server/donation-recipient";
 import { chariot_create } from "#/routes/api.donation-intents/chariot";
@@ -19,11 +20,13 @@ import {
 import { paypal } from "../kit/paypal";
 import type { Db } from "../pg/db";
 import { is_unique_violation } from "../pg/errors";
+import { donation_tribute_upsert } from "../pg/queries/donation";
 import { donations } from "../pg/schema/donation";
 import {
   type IPartnerAmount,
   type IPartnerAttribution,
   type IPartnerPaymentAnswer,
+  type IPartnerProviderState,
   partner_payments,
 } from "../pg/schema/partner";
 import type { Method, PaymentRequest } from "./payment-schema";
@@ -127,6 +130,7 @@ const answer_of = (
  * voided. any other answer, or a lookup that fails, leaves the order as is: an
  * order still open may yet be approved */
 const ORDER_CHECK_AFTER_MS = 60 * 60 * 1000;
+const ORDER_APPROVAL_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 async function order_voided(
   db: Db,
@@ -149,15 +153,26 @@ async function order_voided(
     .catch((err) =>
       err instanceof PayPalApiError && err.http_status === 404 ? "gone" : null
     );
-  return order === "gone" || (order !== null && order.status === "VOIDED");
+  if (order === "gone") return true;
+  if (order === null) return false;
+  // paypal voids an order the payer hasn't approved after its window: one
+  // still `CREATED` past it can't be approved either
+  return (
+    order.status === "VOIDED" ||
+    (order.status === "CREATED" &&
+      Date.now() - new Date(created_at).getTime() > ORDER_APPROVAL_WINDOW_MS)
+  );
 }
+
+/** joins a replaced payment's gift id to its payment id in the renamed row */
+const SUPERSEDED = "#superseded#";
 
 const send = (answer: IPartnerPaymentAnswer) =>
   resp.json(answer, 200, { "cache-control": "no-store" });
 
 /** the same request is being made right now, or lost its claim to a retry: not
  * a conflict, so a 503 the site retries as it would any provider answer */
-const RETRY_AFTER_S = 30;
+const RETRY_AFTER_S = CLAIM_STALE_MS / 1000;
 const still_being_made = () =>
   provider_error(
     503,
@@ -174,6 +189,8 @@ type Claim =
       /** a DAF payment's id, minted before its grant so a retry of a request
        * that died after making the grant finds the same donation */
       donation_id: string | null;
+      /** what an earlier attempt of this payment chose with its processor */
+      provider_state: IPartnerProviderState | null;
     }
   | { kind: "replay"; answer: IPartnerPaymentAnswer }
   | { kind: "refused"; response: Response };
@@ -197,7 +214,13 @@ async function claim(
     deployment_origin: req.deployment_origin,
     ...(req.page_origin && { page_origin: req.page_origin }),
   };
-  let mine: { claim_id: string; donation_id: string | null } | undefined;
+  let mine:
+    | {
+        claim_id: string;
+        donation_id: string | null;
+        provider_state: IPartnerProviderState | null;
+      }
+    | undefined;
   try {
     [mine] = await db
       .insert(partner_payments)
@@ -223,6 +246,7 @@ async function claim(
       .returning({
         claim_id: partner_payments.claim_id,
         donation_id: partner_payments.donation_id,
+        provider_state: partner_payments.provider_state,
       });
   } catch (err) {
     if (!is_unique_violation(err, "partner_payments_session_id_idx")) throw err;
@@ -230,20 +254,11 @@ async function claim(
     // winner's row answers it, before the authorization is called used
     if (!again) return claim(db, npo_id, req, fingerprint, true);
     // a payment that isn't recorded yet may have made no grant at all (its
-    // request failed or is still running): its own retry settles that, so the
-    // site is told to wait, not that the authorization is used
-    const [holder] = await db
-      .select({ response: partner_payments.response })
-      .from(partner_payments)
-      .where(
-        eq(
-          partner_payments.authorized_session_id,
-          req.authorized_session_id ?? ""
-        )
-      );
-    if (holder && !holder.response) {
-      return { kind: "refused", response: still_being_made() };
-    }
+    // request failed or is still running). once its claim is stale the
+    // authorization passes to this gift, which finds the grant if there is one
+    // and keeps the donation the first attempt wrote
+    const moved = await takeover_by_session(db, npo_id, req, fingerprint);
+    if (moved) return moved;
     return {
       kind: "refused",
       response: problem("invalid_request", {
@@ -308,12 +323,72 @@ async function claim(
     .returning({
       claim_id: partner_payments.claim_id,
       donation_id: partner_payments.donation_id,
+      provider_state: partner_payments.provider_state,
     });
   if (taken) return { kind: "mine", ...taken };
   return {
     kind: "refused",
     response: still_being_made(),
   };
+}
+
+/** the authorization's stale, unrecorded holder (any gift id of this
+ * nonprofit) becomes this gift: one statement, so one request wins. null when
+ * the holder is recorded, or still young (the site is told to wait) */
+async function takeover_by_session(
+  db: Db,
+  npo_id: number,
+  req: PaymentRequest,
+  fingerprint: string
+): Promise<Claim | null> {
+  const session = req.authorized_session_id ?? "";
+  const [holder] = await db
+    .select({ response: partner_payments.response })
+    .from(partner_payments)
+    .where(eq(partner_payments.authorized_session_id, session));
+  if (!holder || holder.response) return null;
+  try {
+    const [taken] = await db
+      .update(partner_payments)
+      .set({
+        gift_id: req.gift_id,
+        fingerprint,
+        method: req.method,
+        currency: req.currency,
+        amount: req.amount,
+        claimed_at: sql`now()`,
+        claim_id: crypto.randomUUID(),
+      })
+      .where(
+        and(
+          eq(partner_payments.npo_id, npo_id),
+          eq(partner_payments.authorized_session_id, session),
+          isNull(partner_payments.response),
+          lt(
+            partner_payments.claimed_at,
+            sql`now() - make_interval(secs => ${CLAIM_STALE_MS / 1000})`
+          )
+        )
+      )
+      .returning({
+        claim_id: partner_payments.claim_id,
+        donation_id: partner_payments.donation_id,
+        provider_state: partner_payments.provider_state,
+      });
+    if (taken) return { kind: "mine", ...taken };
+  } catch (err) {
+    // the new gift id is already a row of its own
+    if (!is_unique_violation(err, "partner_payments_npo_id_gift_id_pk")) {
+      throw err;
+    }
+    return {
+      kind: "refused",
+      response: problem("idempotency_conflict", {
+        detail: "This gift_id was already used with a different request.",
+      }),
+    };
+  }
+  return { kind: "refused", response: still_being_made() };
 }
 
 /** gives the gift id back, if this request still holds it. `donation_id` is
@@ -343,7 +418,10 @@ const release = (
         .update(donations)
         .set({ status: "failed" })
         .where(
-          and(eq(donations.id, donation_id), eq(donations.status, "created"))
+          and(
+            eq(donations.id, donation_id),
+            inArray(donations.status, ["created", "intent"])
+          )
         );
     }
   });
@@ -464,8 +542,14 @@ export async function create_payment(
           .where(eq(donations.id, voided.id));
         return now?.status === "expired" ? "raced" : false;
       }
+      // the row stays, under a gift id of its own, so the old payment id still
+      // reads (as cancelled) and a failure after this loses nothing
       await tx
-        .delete(partner_payments)
+        .update(partner_payments)
+        .set({
+          gift_id: `${req.gift_id}${SUPERSEDED}${voided.id}`,
+          superseded_at: sql`now()`,
+        })
         .where(
           and(
             eq(partner_payments.npo_id, npo_id),
@@ -495,6 +579,23 @@ export async function create_payment(
     via,
     via_extra: method === "venmo" ? "venmo" : (req.authorized_session_id ?? ""),
     ...(hold.donation_id && { don_id: hold.donation_id }),
+    ...(via === "card" || via === "bank"
+      ? {
+          provider_state: hold.provider_state ?? undefined,
+          on_provider_state: async (state: IPartnerProviderState) => {
+            await db
+              .update(partner_payments)
+              .set({ provider_state: state })
+              .where(
+                and(
+                  eq(partner_payments.npo_id, npo_id),
+                  eq(partner_payments.gift_id, req.gift_id),
+                  eq(partner_payments.claim_id, hold.claim_id)
+                )
+              );
+          },
+        }
+      : {}),
     intent: {
       amount: to_checkout_amount(req.amount),
       currency: req.currency,
@@ -526,29 +627,17 @@ export async function create_payment(
         hold.donation_id
       ).catch(() => {});
     }
-    // chariot answers 409 while this authorization's grant is still being
-    // made: a retry of the same request finds it, so it is a 503, not a 500
-    if (err instanceof ChariotError && err.http_status === 409) {
-      return provider_error(
-        503,
-        "This authorization is still being processed. Retry the same request shortly.",
-        RETRY_AFTER_S
-      );
-    }
-    throw err;
+    return provider_failure(err);
   }
   if (is_refusal(made)) {
-    await release(
-      db,
-      npo_id,
-      req.gift_id,
-      hold.claim_id,
-      via === "chariot" ? null : hold.donation_id
-    );
+    await release(db, npo_id, req.gift_id, hold.claim_id, hold.donation_id);
     return refusal_response(made);
   }
 
   const answer = answer_of(method, made);
+  // the tribute notice goes out with the receipt, from the donation's tribute
+  // row, as it does for a checkout gift
+  if (req.tribute) await write_tribute(db, answer.id, req.tribute);
   // the intent route records the grant it made as the row's `via_extra`
   const [granted] =
     via === "chariot"
@@ -601,6 +690,49 @@ export async function create_payment(
   return send(answer);
 }
 
+async function write_tribute(
+  db: Db,
+  donation_id: string,
+  tribute: NonNullable<PaymentRequest["tribute"]>
+) {
+  await donation_tribute_upsert(db, {
+    donation_id,
+    name: tribute.honoree,
+    notif_email: tribute.notify?.email ?? null,
+    notif_fullname: tribute.notify?.name ?? null,
+    notif_msg: null,
+  });
+}
+
+/** a processor's own failure, answered so the site retries it: 503 where
+ * trying again can help (a timeout, a 5xx, a request still being made, a key
+ * in use), 502 where the processor refused it */
+function provider_failure(err: unknown): Response {
+  const retry = (detail: string) => provider_error(503, detail, RETRY_AFTER_S);
+  if (err instanceof ChariotError) {
+    return err.http_status === 409 || err.http_status >= 500
+      ? retry(
+          "The DAF provider is still working on this authorization. Retry the same request."
+        )
+      : provider_error(502, "The DAF provider refused this request.");
+  }
+  if (err instanceof PayPalApiError) {
+    return err.http_status >= 500 || err.http_status === 429
+      ? retry("PayPal is not answering. Retry the same request.")
+      : provider_error(502, "PayPal refused this request.");
+  }
+  if (err instanceof Stripe.errors.StripeError) {
+    const t = err.type;
+    return t === "StripeAPIError" ||
+      t === "StripeConnectionError" ||
+      t === "StripeRateLimitError" ||
+      t === "StripeIdempotencyError"
+      ? retry("Stripe is not answering. Retry the same request.")
+      : provider_error(502, "Stripe refused this request.");
+  }
+  throw err;
+}
+
 /** one charge against the donor address's bucket, null when it had room */
 async function charge_donor_ip(
   db: Db,
@@ -637,6 +769,7 @@ export async function read_payment(
   const [row] = await db
     .select({
       gift_id: partner_payments.gift_id,
+      superseded_at: partner_payments.superseded_at,
       method: partner_payments.method,
       currency: partner_payments.currency,
       amount: partner_payments.amount,
@@ -655,8 +788,13 @@ export async function read_payment(
   return resp.json(
     {
       id,
-      gift_id: row.gift_id,
-      status: STATUS[row.status as keyof typeof STATUS] ?? "pending",
+      // a replaced payment's row carries its gift id and its own id joined
+      gift_id: row.superseded_at
+        ? row.gift_id.slice(0, row.gift_id.lastIndexOf(SUPERSEDED))
+        : row.gift_id,
+      status: row.superseded_at
+        ? "cancelled"
+        : (STATUS[row.status as keyof typeof STATUS] ?? "pending"),
       method: row.method,
       amount: row.amount,
       currency: row.currency,

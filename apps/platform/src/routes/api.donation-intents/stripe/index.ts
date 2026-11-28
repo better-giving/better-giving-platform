@@ -21,6 +21,8 @@ export const stripe_create = async ({
   donor,
   via,
   don_id,
+  provider_state,
+  on_provider_state,
   intent,
 }: Ctx): Promise<Refusal | IntentResult> => {
   const upusd = await unit_per_usd(intent.currency);
@@ -48,13 +50,15 @@ export const stripe_create = async ({
 
   // a caller that minted the id may retry: every object made for it is keyed
   // by it, so the retry's params match the first attempt's
-  const customer_id = don_id
-    ? await customer_with_currency(
-        intent.currency,
-        donor.email,
-        `partner-cus-${don_id}`
-      )
-    : await customer_with_currency(intent.currency, donor.email);
+  const customer_id =
+    provider_state?.customer_id ??
+    (don_id
+      ? await customer_with_currency(
+          intent.currency,
+          donor.email,
+          `partner-cus-${don_id}`
+        )
+      : await customer_with_currency(intent.currency, donor.email));
 
   const r_id = don_id ?? crypto.randomUUID();
   const now = new Date().toISOString();
@@ -74,9 +78,17 @@ export const stripe_create = async ({
   // a suffix shows on card charges only, and a subscription's charges take
   // none (they're stripe-created)
   const descriptor_suffix =
-    intent.frequency === "one-time" && !bank_only
-      ? await npo_descriptor_suffix(to)
-      : undefined;
+    provider_state && "descriptor_suffix" in provider_state
+      ? (provider_state.descriptor_suffix ?? undefined)
+      : intent.frequency === "one-time" && !bank_only
+        ? await npo_descriptor_suffix(to)
+        : undefined;
+  // kept before the intent exists, so a retry under the same key sends the
+  // same customer and suffix whatever changed in between
+  await on_provider_state?.({
+    customer_id,
+    descriptor_suffix: descriptor_suffix ?? null,
+  });
 
   let client_secret: string;
   try {
