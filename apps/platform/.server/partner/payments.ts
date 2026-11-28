@@ -271,7 +271,7 @@ async function claim(
   }
   if (held.response) return { kind: "replay", answer: held.response };
 
-  // the same request, still being made — or its maker died. a stale claim is
+  // the same request, still being made, or its maker died. a stale claim is
   // taken over by one request only: the update names the claim it saw
   const [taken] = await db
     .update(partner_payments)
