@@ -18,7 +18,7 @@ export function opening_frequency(
 ): TFrequency {
   const shown = freqs_shown(freq_opts) ?? ["one-time"];
   if (requested && shown.includes(requested)) return requested;
-  return "one-time";
+  return shown[0];
 }
 
 interface Props {

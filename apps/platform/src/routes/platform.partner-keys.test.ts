@@ -152,7 +152,10 @@ const seed = async () =>
 
 const keys_in_db = () => test_db.current!.db.select().from(partner_keys);
 
-/** the response, the report_error calls and console must not hold `secret` */
+/** the report_error calls and console output must not hold `secret`. the route
+ * reports and logs nothing today and has no catch to reach an error path, so
+ * this guards a log or report added later; the response is the caller's
+ * secret to read and is asserted on by each test */
 const expect_unleaked = (secret: string) => {
   expect(JSON.stringify(report_error.mock.calls)).not.toContain(secret);
   expect(console_out.join("\n")).not.toContain(secret);
@@ -226,7 +229,7 @@ describe("mint", () => {
     ).json();
 
     expect(body.key).toMatch(/^spk_/);
-    expect(body).not.toHaveProperty("event_secret");
+    expect(body).toHaveProperty("event_secret", null);
   });
 
   test("an unknown nonprofit is 404 and creates nothing", async () => {
@@ -324,15 +327,20 @@ describe("revoke", () => {
 });
 
 describe("refusals", () => {
+  // a real nonprofit, so a refusal that let a request through would mint
   test.each([
-    ["an unknown op", { op: "delete", npo_id: 1 }],
-    ["a missing npo_id", { op: "mint" }],
-    ["a string npo_id", { op: "mint", npo_id: "1" }],
-    ["revoke without key_id", { op: "revoke", npo_id: 1 }],
-  ])("%s is 400", async (_, body) => {
-    const res = await hit("POST", body);
+    ["an unknown op", (id: number) => ({ op: "delete", npo_id: id })],
+    ["a missing npo_id", () => ({ op: "mint" })],
+    ["a string npo_id", (id: number) => ({ op: "mint", npo_id: String(id) })],
+    ["revoke without key_id", (id: number) => ({ op: "revoke", npo_id: id })],
+  ])("%s is 400 and nothing is written", async (_, body) => {
+    const npo = await seed();
+
+    const res = await hit("POST", body(npo.id));
+
     expect(res.status).toBe(400);
     expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(await keys_in_db()).toHaveLength(0);
   });
 
   test("a body that is not json is 400", async () => {
@@ -342,6 +350,7 @@ describe("refusals", () => {
       generateMiddlewareResponse: (query) => query(request),
     })) as Response;
     expect(res.status).toBe(400);
+    expect(await keys_in_db()).toHaveLength(0);
   });
 
   test("GET is 405", async () => {

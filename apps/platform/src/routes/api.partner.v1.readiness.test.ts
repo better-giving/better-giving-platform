@@ -128,14 +128,87 @@ describe("GET /api/partner/v1/readiness", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("no-store");
-    const body = await res.json();
-    expect(body.revision).toBe(1);
-    expect(body.rails.card.state).toBe("active");
-    expect(body.rails.crypto.state).toBe("unrequested");
+    // the coin list is the committed token catalog, too long to spell out: it
+    // is pinned by one entry, the rest of the body whole
+    const { coins, ...body } = await res.json();
+    expect(coins).toContainEqual({
+      coin: "BTC",
+      ticker: "BTC",
+      name: "Bitcoin",
+      network: "btc",
+      memo_required: false,
+      logo: "https://nowpayments.io/images/coins/btc.svg",
+    });
+    expect(body).toEqual({
+      revision: 1,
+      charges_enabled: true,
+      currencies: ["USD"],
+      sponsor: {
+        legal_name: "Better Giving, Inc.",
+        ein: "87-3758939",
+        address: ["18 Cottekill Rd", "Rosendale, NY 12472"],
+        deductibility_statement:
+          "100% of your donation is tax-deductible to the extent allowed by US law.",
+        terms_url: "http://localhost:4200/terms-of-use/",
+        privacy_url: "http://localhost:4200/privacy-policy/",
+      },
+      clients: [
+        {
+          name: "stripe",
+          publishable_key: "pk_test_test-only-not-a-real-stripe-publishable",
+        },
+        {
+          name: "paypal",
+          publishable_key: "test-only-not-a-real-paypal-public-client-id",
+        },
+        {
+          name: "chariot",
+          publishable_key: "test_test-only-not-a-real-chariot-connect-id",
+          sdk_url: "https://cdn.givechariot.com/chariot-connect.umd.js",
+        },
+      ],
+      rails: {
+        card: { state: "active", offered: true },
+        ach: { state: "unrequested", offered: false },
+        apple_pay: { state: "active", offered: true },
+        google_pay: { state: "active", offered: true },
+        paypal: { state: "active", offered: true },
+        venmo: { state: "active", offered: true },
+        daf: { state: "unrequested", offered: false },
+        crypto: { state: "unrequested", offered: false },
+      },
+      intervals: {
+        card: ["monthly"],
+        ach: [],
+        apple_pay: ["monthly"],
+        google_pay: ["monthly"],
+        paypal: ["monthly"],
+        venmo: [],
+        daf: [],
+        crypto: [],
+      },
+      fee_rules: {
+        card: { percent: 0.022, fixed_minor: 30, round_up_minor: 1 },
+        ach: {
+          percent: 0.008,
+          fixed_minor: 0,
+          cap_minor: 500,
+          round_up_minor: 1,
+        },
+        apple_pay: { percent: 0.022, fixed_minor: 30, round_up_minor: 1 },
+        google_pay: { percent: 0.022, fixed_minor: 30, round_up_minor: 1 },
+        paypal: { percent: 0.0199, fixed_minor: 49 },
+        venmo: { percent: 0.0199, fixed_minor: 49 },
+        daf: { percent: 0.029, fixed_minor: 0, round_up_minor: 100 },
+        crypto: { percent: 0.01, fixed_minor: 0 },
+      },
+      contribution: { options: [0.1, 0.15, 0.2], starts_at: null },
+      wallet_hosts: [],
+    });
   });
 
   test("an npo_id in the query, a header or a body selects nothing", async () => {
-    const { theirs, key } = await seed_two();
+    const { theirs, staff, key } = await seed_two();
     const id = String(theirs.id);
     const baseline = await get(key.key);
     expect(baseline.status).toBe(200);
@@ -144,6 +217,17 @@ describe("GET /api/partner/v1/readiness", () => {
     // nonprofit reads differently from this one
     expect(own.rails.card.state).toBe("active");
     expect(own.rails.daf.state).toBe("unrequested");
+    expect(own.rails.crypto.state).toBe("unrequested");
+    // the other nonprofit's own key reads differently, so equality with `own`
+    // below can only hold if the selector was ignored
+    const theirs_key = await mint_key(as_db(db()), {
+      npo_id: theirs.id,
+      minted_by: staff.id,
+    });
+    const other = await get(theirs_key.key);
+    const theirs_body = await other.json();
+    expect(theirs_body.rails.card.state).not.toBe("active");
+    expect(theirs_body.rails.daf.state).toBe("active");
 
     for (const res of [
       await get(key.key, { url: `${URL_}?npo_id=${id}&npo=${id}` }),
@@ -202,13 +286,32 @@ describe("GET /api/partner/v1/readiness", () => {
       );
     }
 
+    const windows_of = () =>
+      db()
+        .select({
+          key: rate_limit_windows.key,
+          count: rate_limit_windows.count,
+        })
+        .from(rate_limit_windows);
+    expect(await windows_of()).toContainEqual({
+      key: `partner:list_write:${key.id}`,
+      count: LIST_WRITE_QUOTA.max,
+    });
+    // the bucket is full: one more list/write charge is refused
+    const refused = await charge(
+      db() as unknown as Parameters<typeof charge>[0],
+      key.id,
+      "list_write"
+    );
+    expect(refused?.status).toBe(429);
+
     const res = await get(key.key);
 
     expect(res.status).toBe(200);
-    const windows = await db()
-      .select({ key: rate_limit_windows.key, count: rate_limit_windows.count })
-      .from(rate_limit_windows);
-    expect(windows).toContainEqual({ key: `partner:read:${key.id}`, count: 1 });
+    expect(await windows_of()).toContainEqual({
+      key: `partner:read:${key.id}`,
+      count: 1,
+    });
   });
 
   test("a live key whose nonprofit has no tenant row is a reported 500 provider_error", async () => {

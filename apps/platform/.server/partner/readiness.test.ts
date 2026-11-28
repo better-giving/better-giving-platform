@@ -138,6 +138,23 @@ const seed_tenant = async (
 
 const read = (npo_id: number) => readiness(as_db(t.db), npo_id);
 
+/** the test db, running `before` ahead of every transaction it opens and
+ * counting them */
+const watched = (before: () => Promise<unknown> = async () => {}) => {
+  const seen = { transactions: 0 };
+  const db = new Proxy(t.db, {
+    get(target, prop, receiver) {
+      if (prop !== "transaction") return Reflect.get(target, prop, receiver);
+      return async (...args: Parameters<typeof target.transaction>) => {
+        seen.transactions += 1;
+        await before();
+        return target.transaction(...args);
+      };
+    },
+  });
+  return { db: as_db(db), seen };
+};
+
 // which checkout method's tab offers each rail, written out apart from
 // readiness.ts so a wrong mapping there fails here
 const RAIL_METHOD: Record<Rail, DonateMethodId> = {
@@ -714,6 +731,17 @@ describe("revision", () => {
     return row;
   };
 
+  test("a read whose body matches the stored fingerprint returns the stored revision without opening a transaction", async () => {
+    const npo_id = await seed_tenant({ donate_methods: ["stripe"] });
+    const first = await read(npo_id);
+    const stored = await tenant_row(npo_id);
+
+    const { db, seen } = watched();
+    expect(await readiness(db, npo_id)).toEqual(first);
+    expect(seen.transactions).toBe(0);
+    expect(await tenant_row(npo_id)).toEqual(stored);
+  });
+
   test("stays put on a second read of the same body, and rises once when donate_methods changes", async () => {
     const npo_id = await seed_tenant({ donate_methods: ["stripe"] });
 
@@ -868,8 +896,8 @@ describe("revision", () => {
     );
   });
 
-  // the id is not in the body, only whether an account exists; the paired
-  // rises above prove the same read does move when that state changes
+  // the id is not in the body, only whether an account exists; the tests
+  // above prove the same read does move when that state changes
   test("swapping one connected account for another moves no revision", async () => {
     const npo_id = await seed_tenant({ donate_methods: ["stripe"] });
     const before = await read(npo_id);
@@ -910,24 +938,29 @@ describe("revision", () => {
       return { revision, fingerprint: fingerprint_of(body) };
     };
 
-    test("a write that lands after the tenant is locked is in the body and the revision it returns", async () => {
+    test("a write that lands after the plain reads saw a changed body is in the body and the revision it returns", async () => {
       const npo_id = await seed_tenant({ donate_methods: ["stripe"] });
       const first = await read(npo_id);
       expect(first.revision).toBe(1);
-      expect(first.rails.daf.offered).toBe(false);
+      await t.db
+        .update(npos)
+        .set({ donate_methods: ["stripe", "crypto"] })
+        .where(eq(npos.id, npo_id));
 
-      // the point a read that had already built its body would be stale: a
-      // newer write arrives. the read builds from the state it finds under
-      // the lock, so the write is in the body, and the revision is the one
-      // stored with that body
-      const late = await readiness(as_db(t.db), npo_id, async (tx) => {
-        await tx
+      // the plain reads built a crypto body; a newer write lands before the
+      // locked settle. the settle re-reads the nonprofit, so the newer write
+      // is in the body, and the revision is the one stored with that body
+      const { db, seen } = watched(() =>
+        t.db
           .update(npos)
           .set({ donate_methods: ["stripe", "daf"] })
-          .where(eq(npos.id, npo_id));
-      });
+          .where(eq(npos.id, npo_id))
+      );
+      const late = await readiness(db, npo_id);
 
+      expect(seen.transactions).toBe(1);
       expect(late.rails.daf.offered).toBe(true);
+      expect(late.rails.crypto.offered).toBe(false);
       expect(late.revision).toBe(2);
       const { row } = await stored(npo_id);
       expect(pair_of(late)).toEqual({

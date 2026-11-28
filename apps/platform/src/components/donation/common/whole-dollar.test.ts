@@ -23,6 +23,26 @@ describe("whole_dollar_amounts", () => {
     ).toEqual({ base: 25, tip: 0, fee_allowance: 0 });
   });
 
+  // pins today's pass-through: the function does not round a fractional base,
+  // `daf_donation_details` is what keeps one out
+  test("with neither a contribution nor fee cover a fractional base comes back unchanged", () => {
+    expect(
+      whole_dollar_amounts({ base: 10.5, tip: 0, fee_allowance: 0 })
+    ).toEqual({ base: 10.5, tip: 0, fee_allowance: 0 });
+  });
+
+  test("a fractional base is counted in the total and left unrounded: 10.50 + 0.30 tops the tip up to 0.50", () => {
+    expect(
+      whole_dollar_amounts({ base: 10.5, tip: 0.3, fee_allowance: 0 })
+    ).toEqual({ base: 10.5, tip: 0.5, fee_allowance: 0 });
+  });
+
+  test("a fractional base with fee cover: 10.50 + 0.62 tops the allowance up to 1.50", () => {
+    expect(
+      whole_dollar_amounts({ base: 10.5, tip: 0, fee_allowance: 0.62 })
+    ).toEqual({ base: 10.5, tip: 0, fee_allowance: 1.5 });
+  });
+
   test("a total already on a whole dollar is left as it is", () => {
     expect(
       whole_dollar_amounts({ base: 50, tip: 10, fee_allowance: 0 })

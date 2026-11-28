@@ -43,15 +43,11 @@ export const action = async ({ request, context }: Route.ActionArgs) => {
 
   switch (body.op) {
     case "mint": {
-      const { event_secret, ...minted } = await mint_key(db, {
+      const minted = await mint_key(db, {
         npo_id: npo.id,
         minted_by: staff.id,
       });
-      return resp.json(
-        event_secret ? { ...minted, event_secret } : minted,
-        200,
-        NO_STORE
-      );
+      return resp.json(minted, 200, NO_STORE);
     }
     case "rotate": {
       const rotated = await rotate_key(db, {

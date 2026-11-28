@@ -71,7 +71,32 @@ test("key_hash must be 64 lowercase hex chars, so a raw key cannot be stored", a
   expect(await t.db.select().from(partner_keys)).toHaveLength(1);
 });
 
+test("key_hash is exactly 64 chars, not 63 or 65", async () => {
+  const hash = sha256_hex("len");
+  for (const [id, key_hash] of [
+    ["short", hash.slice(0, 63)],
+    ["long", `${hash}a`],
+  ]) {
+    await expect(
+      t.db.insert(partner_keys).values({ ...key(id), key_hash })
+    ).rejects.toMatchObject({
+      cause: { code: "23514", constraint: "partner_keys_key_hash_hex" },
+    });
+  }
+  expect(await t.db.select().from(partner_keys)).toHaveLength(0);
+});
+
 test("prefix is exactly 8 chars and last4 exactly 4", async () => {
+  await expect(
+    t.db.insert(partner_keys).values({ ...key("p9"), prefix: "spk_abcde" })
+  ).rejects.toMatchObject({
+    cause: { code: "23514", constraint: "partner_keys_prefix_len" },
+  });
+  await expect(
+    t.db.insert(partner_keys).values({ ...key("l3"), last4: "wxy" })
+  ).rejects.toMatchObject({
+    cause: { code: "23514", constraint: "partner_keys_last4_len" },
+  });
   await expect(
     t.db.insert(partner_keys).values({ ...key("p"), prefix: "spk_abc" })
   ).rejects.toMatchObject({
@@ -132,4 +157,74 @@ test("deleting the minting user keeps the key with minted_by nulled", async () =
 
   const rows = await t.db.select().from(partner_keys);
   expect(rows.map((r) => [r.id, r.minted_by])).toEqual([["minted", null]]);
+});
+
+test("deleting the revoking user keeps the revoked key with revoked_by nulled", async () => {
+  const revoked_at = "2026-01-02T03:04:05.000Z";
+  await t.db.insert(user).values({
+    id: "u-0085-revoker",
+    name: "R",
+    email: "u-0085-revoker@test.com",
+    emailVerified: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    first_name: "R",
+    last_name: "R",
+  });
+  await t.db
+    .insert(partner_keys)
+    .values({ ...key("revoked"), revoked_at, revoked_by: "u-0085-revoker" });
+
+  await t.db.delete(user).where(eq(user.id, "u-0085-revoker"));
+
+  const rows = await t.db.select().from(partner_keys);
+  expect(rows.map((r) => [r.id, r.revoked_by, r.revoked_at])).toEqual([
+    ["revoked", null, revoked_at],
+  ]);
+});
+
+test("a tenant row starts at revision 0 with no fingerprint", async () => {
+  await t.db
+    .insert(partner_tenants)
+    .values({ npo_id: npo, event_secret: "envelope" });
+
+  const rows = await t.db.select().from(partner_tenants);
+  expect(rows).toEqual([
+    {
+      npo_id: npo,
+      event_secret: "envelope",
+      revision: 0,
+      fingerprint: null,
+      created_at: expect.stringMatching(
+        /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d+Z$/
+      ),
+    },
+  ]);
+});
+
+test("an org has one tenant row", async () => {
+  await t.db
+    .insert(partner_tenants)
+    .values({ npo_id: npo, event_secret: "first" });
+  await expect(
+    t.db.insert(partner_tenants).values({ npo_id: npo, event_secret: "second" })
+  ).rejects.toMatchObject({ cause: { code: "23505" } });
+  const rows = await t.db.select().from(partner_tenants);
+  expect(rows.map((r) => r.event_secret)).toEqual(["first"]);
+});
+
+test("a tenant row requires its event secret", async () => {
+  await expect(
+    t.db
+      .insert(partner_tenants)
+      .values({ npo_id: npo, event_secret: null as unknown as string })
+  ).rejects.toMatchObject({
+    cause: { code: "23502", column: "event_secret" },
+  });
+});
+
+test("a key cannot be minted for an org that does not exist", async () => {
+  await expect(
+    t.db.insert(partner_keys).values({ ...key("orphan"), npo_id: npo + 9999 })
+  ).rejects.toMatchObject({ cause: { code: "23503" } });
 });

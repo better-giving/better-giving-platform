@@ -81,6 +81,13 @@ export async function mint_key(
       .values({ npo_id: args.npo_id, event_secret: seal(secret) })
       .onConflictDoNothing()
       .returning({ npo_id: partner_tenants.npo_id });
+    // DO NOTHING locks no conflicting row; without this a key minted beside a
+    // rotate_key can commit after rotate's revoke and stay live
+    await tx
+      .select({ npo_id: partner_tenants.npo_id })
+      .from(partner_tenants)
+      .where(eq(partner_tenants.npo_id, args.npo_id))
+      .for("update");
     const minted = await insert_key(tx, args.npo_id, args.minted_by);
     return { ...minted, event_secret: created.length > 0 ? secret : null };
   });
