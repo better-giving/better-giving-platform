@@ -772,27 +772,52 @@ describe("POST /api/partner/v1/payments", () => {
     });
   });
 
-  test("a stripe connection error keeps the claim and the retry reuses its keys", async () => {
-    const { key } = await seed();
-    pi_create.mockRejectedValueOnce(
-      new Stripe.errors.StripeConnectionError({
-        message: "reset",
-        type: "api_connection_error",
-      } as never)
-    );
+  test.each([
+    [
+      "connection error",
+      () =>
+        new Stripe.errors.StripeConnectionError({
+          message: "reset",
+          type: "api_connection_error",
+        } as never),
+    ],
+    [
+      "rate limit",
+      () =>
+        new Stripe.errors.StripeRateLimitError({
+          message: "slow down",
+          type: "rate_limit_error",
+          statusCode: 429,
+        } as never),
+    ],
+    [
+      "409 key in use",
+      () =>
+        new Stripe.errors.StripeAPIError({
+          message: "in use",
+          type: "api_error",
+          statusCode: 409,
+        } as never),
+    ],
+  ])(
+    "a stripe %s keeps the claim and the retry reuses its keys",
+    async (_, err) => {
+      const { key } = await seed();
+      pi_create.mockRejectedValueOnce(err());
 
-    const res = await post(key.key, body());
+      const res = await post(key.key, body());
 
-    expect(res.status).toBe(503);
-    expect(res.headers.get("retry-after")).toBe("120");
-    const [held] = await db().select().from(partner_payments);
-    await stale();
+      expect(res.status).toBe(503);
+      expect(res.headers.get("retry-after")).toBe("120");
+      const [held] = await db().select().from(partner_payments);
+      await stale();
 
-    const retry = await (await post(key.key, body())).json();
+      const retry = await (await post(key.key, body())).json();
 
-    expect(retry.id).toBe(held!.donation_id);
-    expect(pi_create.mock.calls[1]![1]).toEqual(pi_create.mock.calls[0]![1]);
-  });
+      expect(retry.id).toBe(held!.donation_id);
+      expect(pi_create.mock.calls[1]![1]).toEqual(pi_create.mock.calls[0]![1]);
+    }
+  );
 
   test("a stripe idempotency error is ours: 502, reported, and the gift id is free", async () => {
     const { key } = await seed();

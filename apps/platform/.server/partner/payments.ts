@@ -759,14 +759,16 @@ function provider_failure(
       : refused("PayPal");
   }
   if (err instanceof Stripe.errors.StripeError) {
-    // a key reused with other params is ours to fix, not Stripe's to retry
     const t = err.type;
     // stripe stores a 5xx under the idempotency key and replays it for a day,
     // so a retry under the same key would answer the same failure. the claim
     // is released: the retry gets a new payment id and new keys, at worst
-    // leaving an unused intent. a dropped connection or a rate limit executed
-    // nothing, so those keep the claim and its keys
-    if (t === "StripeAPIError") {
+    // leaving an unused intent or customer. only a real 5xx: the SDK also
+    // raises this class for a 409 (the key is in use by a request still
+    // running) and for an unreadable body, where the request may have run, so
+    // those keep the claim and its keys, as do a dropped connection (which can
+    // come after stripe processed the request) and a rate limit
+    if (t === "StripeAPIError" && (err.statusCode ?? 0) >= 500) {
       return {
         response: provider_error(
           503,
@@ -776,9 +778,12 @@ function provider_failure(
         keep_claim: false,
       };
     }
-    return t === "StripeConnectionError" || t === "StripeRateLimitError"
+    return t === "StripeAPIError" ||
+      t === "StripeConnectionError" ||
+      t === "StripeRateLimitError"
       ? retry("Stripe is not answering. Retry the same request.")
-      : refused("Stripe");
+      : // a key reused with other params is ours to fix, not Stripe's to retry
+        refused("Stripe");
   }
   if (
     err instanceof Error &&
