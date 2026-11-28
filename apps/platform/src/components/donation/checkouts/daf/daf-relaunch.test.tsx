@@ -2,7 +2,8 @@ import { HttpResponse, http } from "msw";
 import { href } from "react-router";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
-import { CDN_SRC, fv, stb, success_detail } from "#/__tests__/fixtures/daf";
+import { fv, stb, success_detail } from "#/__tests__/fixtures/daf";
+import { CHARIOT_CONNECT_SDK } from "#/constants/chariot";
 import { mswWorker } from "#/setup-tests-browser";
 import { resp } from "@/helpers/https";
 import type { Config } from "../../types";
@@ -51,7 +52,9 @@ describe("daf checkout: a second launch while the first intent is in flight", ()
   afterEach(() => {
     connect.detail = success_detail;
     redirect_mock.mockReset();
-    for (const s of document.querySelectorAll(`script[src="${CDN_SRC}"]`)) {
+    for (const s of document.querySelectorAll(
+      `script[src="${CHARIOT_CONNECT_SDK}"]`
+    )) {
       s.remove();
     }
   });
@@ -72,7 +75,7 @@ describe("daf checkout: a second launch while the first intent is in flight", ()
     redirect_mock.mockImplementation(() => {});
     const s = document.createElement("script");
     s.type = "text/plain";
-    s.src = CDN_SRC;
+    s.src = CHARIOT_CONNECT_SDK;
     document.head.appendChild(s);
 
     const Stub = stb(<ChariotCheckout {...fv} />);
@@ -116,7 +119,7 @@ describe("daf checkout: a second launch while the first intent is in flight", ()
     redirect_mock.mockImplementation(() => {});
     const s = document.createElement("script");
     s.type = "text/plain";
-    s.src = CDN_SRC;
+    s.src = CHARIOT_CONNECT_SDK;
     document.head.appendChild(s);
 
     const Stub = stb(<ChariotCheckout {...fv} />);

@@ -1,6 +1,6 @@
 import { RadioGroup } from "@ark-ui/react/radio-group";
 import type { TFrequency } from "@/schemas";
-import { freqs_default } from "./constants";
+import { freqs_default, freqs_shown } from "./constants";
 
 const opt_style =
   "group text-sm rounded px-4 py-2 border border-gray-7 hover:not-data-[state=checked]:border-gray-8 flex items-center justify-center @md/frequency:justify-start hover:not-data-[state=checked]:bg-(--form-secondary) data-[state=checked]:bg-(--form-primary) data-[state=checked]:text-primary-fg data-[state=checked]:border-none data-focus-visible:outline-2 data-focus-visible:outline-ring data-focus-visible:outline-offset-2 select-none";
@@ -18,17 +18,8 @@ export function opening_frequency(
 ): TFrequency {
   const shown = freqs_shown(freq_opts) ?? ["one-time"];
   if (requested && shown.includes(requested)) return requested;
-  return "one-time";
+  return shown[0];
 }
-
-export const freqs_shown = (
-  freqs: TFrequency[] | undefined
-): TFrequency[] | null => {
-  if (!freqs || freqs.length === 0) return freqs_default;
-  // hide frequency selector if only one option and it's one-time
-  if (freqs.length === 1 && freqs[0] === "one-time") return null;
-  return freqs;
-};
 
 interface Props {
   opts: TFrequency[] | undefined;

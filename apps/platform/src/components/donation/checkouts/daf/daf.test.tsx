@@ -2,7 +2,8 @@ import { HttpResponse, http } from "msw";
 import { href } from "react-router";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
-import { CDN_SRC, fv, stb, success_detail } from "#/__tests__/fixtures/daf";
+import { fv, stb, success_detail } from "#/__tests__/fixtures/daf";
+import { CHARIOT_CONNECT_SDK } from "#/constants/chariot";
 import { mswWorker } from "#/setup-tests-browser";
 import { resp } from "@/helpers/https";
 import type { Config, DafDonationDetails } from "../../types";
@@ -38,7 +39,9 @@ describe("daf checkout: a grant that goes through but never lands", () => {
     });
     don_set_mock.mockClear();
     redirect_mock.mockReset();
-    for (const s of document.querySelectorAll(`script[src="${CDN_SRC}"]`)) {
+    for (const s of document.querySelectorAll(
+      `script[src="${CHARIOT_CONNECT_SDK}"]`
+    )) {
       s.remove();
     }
   });
@@ -49,7 +52,7 @@ describe("daf checkout: a grant that goes through but never lands", () => {
   const seed_script = () => {
     const s = document.createElement("script");
     s.type = "text/plain";
-    s.src = CDN_SRC;
+    s.src = CHARIOT_CONNECT_SDK;
     document.head.appendChild(s);
   };
 
@@ -230,7 +233,9 @@ describe("daf checkout: a grant that goes through but never lands", () => {
 
 describe("daf checkout: the launcher comes back only on a refusal it can read", () => {
   afterEach(() => {
-    for (const s of document.querySelectorAll(`script[src="${CDN_SRC}"]`)) {
+    for (const s of document.querySelectorAll(
+      `script[src="${CHARIOT_CONNECT_SDK}"]`
+    )) {
       s.remove();
     }
   });
@@ -241,7 +246,7 @@ describe("daf checkout: the launcher comes back only on a refusal it can read", 
     mswWorker.use(http.post(href("/api/donation-intents"), answer));
     const s = document.createElement("script");
     s.type = "text/plain";
-    s.src = CDN_SRC;
+    s.src = CHARIOT_CONNECT_SDK;
     document.head.appendChild(s);
 
     const Stub = stb(<ChariotCheckout {...fv} />);
@@ -334,7 +339,9 @@ describe("daf checkout: the launcher comes back only on a refusal it can read", 
 
 describe("daf checkout: the grant is what the summary shows, in whole dollars", () => {
   afterEach(() => {
-    for (const s of document.querySelectorAll(`script[src="${CDN_SRC}"]`)) {
+    for (const s of document.querySelectorAll(
+      `script[src="${CHARIOT_CONNECT_SDK}"]`
+    )) {
       s.remove();
     }
   });
@@ -351,7 +358,7 @@ describe("daf checkout: the grant is what the summary shows, in whole dollars", 
   const open_connect = async (details: DafDonationDetails) => {
     const s = document.createElement("script");
     s.type = "text/plain";
-    s.src = CDN_SRC;
+    s.src = CHARIOT_CONNECT_SDK;
     document.head.appendChild(s);
 
     const Stub = stb(<ChariotCheckout {...details} />);

@@ -13,7 +13,7 @@ export const default_allocation: IAllocation = {
 export const PROCESSING_RATES = {
   chariot: 0.029,
   stripe: 0.022,
-  /** $cents */
+  /** usd */
   stripe_flat: 0.3,
   stripe_bank: 0.008,
   /** $usd */
@@ -29,6 +29,10 @@ export const DONATION_INCREMENTS: IIncrement[] = [
   { value: "200", label: "" },
   { value: "400", label: "" },
 ];
+
+/** the deductibility line every checkout's terms open with */
+export const DEDUCTIBILITY_STATEMENT =
+  "100% of your donation is tax-deductible to the extent allowed by US law.";
 
 export const logo_url = (path: string, custom = false) =>
   custom ? path : `https://nowpayments.io${path}`;

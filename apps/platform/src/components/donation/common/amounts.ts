@@ -19,6 +19,19 @@ export interface IFeeTerms {
   cap?: number;
 }
 
+/** each rail's fee terms, `flat` and `cap` in usd: a checkout in another
+ * currency scales them by its rate */
+export const fee_terms = {
+  stripe: { rate: PROCESSING_RATES.stripe, flat: PROCESSING_RATES.stripe_flat },
+  stripe_bank: {
+    rate: PROCESSING_RATES.stripe_bank,
+    cap: PROCESSING_RATES.stripe_bank_cap,
+  },
+  paypal: { rate: PROCESSING_RATES.paypal, flat: PROCESSING_RATES.paypal_flat },
+  daf: { rate: PROCESSING_RATES.chariot },
+  crypto: { rate: PROCESSING_RATES.crypto },
+} as const satisfies Record<string, IFeeTerms>;
+
 /** the parts a checkout shows and charges. tip and fee allowance land on the
  * currency's smallest unit (cents for usd), so with a base already at that
  * precision the summary and the charge total the same. the fee allowance
@@ -42,6 +55,25 @@ export function donation_amounts(
   return { base: i.amount, tip, fee_allowance: in_units(fee, "up") };
 }
 
+/** dafs grant whole dollars only: the total rounds up to the next dollar, the
+ * difference landing on the fee allowance when the donor covers fees, else on
+ * the tip. with neither, the base passes through unrounded: that is whole
+ * dollars only because `daf_donation_details` in ../types.ts rejects a
+ * fractional amount, so a caller without that schema must round first. */
+export function whole_dollar_amounts({
+  base,
+  tip,
+  fee_allowance,
+}: IAmount): IAmount {
+  if (!tip && !fee_allowance) return { base, tip, fee_allowance };
+  const cents = (x: number) => to_units(x, 2);
+  const total = cents(base) + cents(tip) + cents(fee_allowance);
+  const topup = Math.ceil(total / 100) * 100 - total;
+  return fee_allowance
+    ? { base, tip, fee_allowance: (cents(fee_allowance) + topup) / 100 }
+    : { base, tip: (cents(tip) + topup) / 100, fee_allowance };
+}
+
 export interface IStripeAmountsInput extends IAmountsInput {
   currency: Pick<ICurrencyFv, "code" | "rate">;
   bank_only?: boolean;
@@ -49,15 +81,10 @@ export interface IStripeAmountsInput extends IAmountsInput {
 
 export function stripe_amounts(i: IStripeAmountsInput): IAmount {
   const { rate: fx } = i.currency;
+  const { stripe, stripe_bank } = fee_terms;
   const fee: IFeeTerms = i.bank_only
     ? // bank fee capped at $5 converted to donor currency
-      {
-        rate: PROCESSING_RATES.stripe_bank,
-        cap: PROCESSING_RATES.stripe_bank_cap * fx,
-      }
-    : {
-        rate: PROCESSING_RATES.stripe,
-        flat: PROCESSING_RATES.stripe_flat * fx,
-      };
+      { rate: stripe_bank.rate, cap: stripe_bank.cap * fx }
+    : { rate: stripe.rate, flat: stripe.flat * fx };
   return donation_amounts(i, currency_precision(i.currency.code), fee);
 }

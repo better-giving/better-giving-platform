@@ -3,8 +3,6 @@ import type { ReactNode } from "react";
 import { createRoutesStub } from "react-router";
 import type { DafDonationDetails } from "#/components/donation/types";
 
-export const CDN_SRC = "https://cdn.givechariot.com/chariot-connect.umd.js";
-
 export const fv: DafDonationDetails = {
   amount: "100",
   tip: "",

@@ -1,7 +1,8 @@
 import { chains, is_custom } from "@better-giving/crypto";
 import { Image } from "@better-giving/ui";
-import { logo_url, PROCESSING_RATES } from "@/constants/common";
+import { logo_url } from "@/constants/common";
 import { min_fee_allowance } from "@/helpers/donation";
+import { fee_terms } from "../../common/amounts";
 import { Summary } from "../../common/summary";
 import { token } from "../../common/token";
 import { use_donation } from "../../context";
@@ -15,7 +16,7 @@ export function Crypto(props: CryptoDonationDetails) {
 
   const tipv = tip_val(tip_format, tip, +t.amount);
   const mfa = cover_processing_fee
-    ? min_fee_allowance(tipv + +t.amount, PROCESSING_RATES.crypto)
+    ? min_fee_allowance(tipv + +t.amount, fee_terms.crypto.rate)
     : 0;
   const Amount = token(t.usdpu, t.precision);
   return (

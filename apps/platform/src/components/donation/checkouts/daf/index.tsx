@@ -1,10 +1,10 @@
 import { ContentLoader, use_ask_prompt } from "@better-giving/ui";
 import { useEffect, useRef, useState } from "react";
 import { href } from "react-router";
+import { CHARIOT_CONNECT_SDK } from "#/constants/chariot";
 import { chariot_connect_id } from "#/constants/env";
 import { error_prompt, user_error_prompt } from "#/helpers/error-prompt";
 import { currency_precision, to_atomic } from "#/helpers/stripe";
-import { PROCESSING_RATES } from "@/constants/common";
 import type { ChariotMetadata } from "@/donations";
 import { partition } from "@/donations/helpers";
 import type {
@@ -12,10 +12,13 @@ import type {
   IDonationIntent,
   IDonorAddress,
 } from "@/donations/schema";
-import { to_units } from "@/helpers/decimal";
 import { HttpError, json_ok } from "@/helpers/https";
 import { apply_campaign } from "../../apply-campaign";
-import { donation_amounts } from "../../common/amounts";
+import {
+  donation_amounts,
+  fee_terms,
+  whole_dollar_amounts,
+} from "../../common/amounts";
 import { usd_option } from "../../common/constants";
 import { currency } from "../../common/currency";
 import { use_donation_redirect } from "../../common/redirect";
@@ -30,7 +33,6 @@ import { type DafDonationDetails, tip_from_val, to_step } from "../../types";
 import { use_pay_hold } from "../../use-pay-hold";
 import { DonationTerms } from "../donation-terms";
 
-const CDN_SRC = "https://cdn.givechariot.com/chariot-connect.umd.js";
 /**
  * one prompt slot for the whole checkout, so "processing payment" becomes the
  * stuck message or the error in place rather than gaining a dialog on top of
@@ -46,19 +48,6 @@ const PROMPT_SLOT = "daf-checkout";
  * isn't the route's and says nothing about the grant.
  */
 const PRE_GRANT_REFUSALS = new Set([400, 404, 410]);
-
-/** dafs grant whole dollars only: the total rounds up to the next dollar, the
- * difference landing on the fee allowance when the donor covers fees, else on
- * the tip. with neither, the base is the total as entered. */
-function whole_dollar_amounts({ base, tip, fee_allowance }: IAmount): IAmount {
-  if (!tip && !fee_allowance) return { base, tip, fee_allowance };
-  const cents = (x: number) => to_units(x, 2);
-  const total = cents(base) + cents(tip) + cents(fee_allowance);
-  const topup = Math.ceil(total / 100) * 100 - total;
-  return fee_allowance
-    ? { base, tip, fee_allowance: (cents(fee_allowance) + topup) / 100 }
-    : { base, tip: (cents(tip) + topup) / 100, fee_allowance };
-}
 
 /** `grant_cents` split in `amount`'s proportions, each part on whole cents and
  * the base taking the rounding so the parts still sum to the grant */
@@ -103,7 +92,7 @@ export function ChariotCheckout(props: DafDonationDetails) {
         cover_processing_fee: props.cover_processing_fee,
       },
       currency_precision(usd_option.code),
-      { rate: PROCESSING_RATES.chariot }
+      fee_terms.daf
     )
   );
 
@@ -124,12 +113,12 @@ export function ChariotCheckout(props: DafDonationDetails) {
 
   // load chariot CDN script
   useEffect(() => {
-    if (document.querySelector(`script[src="${CDN_SRC}"]`)) {
+    if (document.querySelector(`script[src="${CHARIOT_CONNECT_SDK}"]`)) {
       set_script_ready(true);
       return;
     }
     const script = document.createElement("script");
-    script.src = CDN_SRC;
+    script.src = CHARIOT_CONNECT_SDK;
     script.onload = () => set_script_ready(true);
     document.head.appendChild(script);
     return () => {

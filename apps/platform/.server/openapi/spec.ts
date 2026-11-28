@@ -12,6 +12,8 @@ import {
   type QueryParam,
 } from "../connector/inputs";
 import { PROBLEM_CODES } from "../connector/problem";
+import { PROBLEM_CODES as PARTNER_PROBLEM_CODES } from "../partner/problem";
+import { RAIL_STATES, RAILS } from "../partner/readiness";
 import { wire_schema } from "./wire-schema";
 
 type Method = "get" | "post" | "patch";
@@ -749,6 +751,214 @@ const connector_ops = (): IOperation[] => [
   ),
 ];
 
+/** a map keyed by method: every method this version names is present, and a
+ * method added within v1 arrives as one more key of the same shape, which a
+ * consumer that doesn't know it ignores */
+const per_rail = (schema: Json) => ({
+  type: "object",
+  description:
+    "Keyed by method. Every method listed here is present; ignore a key you don't recognize.",
+  additionalProperties: schema,
+  required: [...RAILS],
+  properties: Object.fromEntries(RAILS.map((r) => [r, schema])),
+});
+
+const minor = (description: string) => ({
+  type: "integer",
+  minimum: 0,
+  description,
+});
+
+const PARTNER_READINESS = {
+  type: "object",
+  description:
+    "What the key's nonprofit can take right now. Money is integer minor units in USD; rates are fractions. Maps keyed by method (`rails`, `intervals`, `fee_rules`) and enums (a rail's `state`, `clients[].name`, `intervals`) grow without a new version: ignore a key or value you don't recognize, and treat a rail in an unknown state as not offered. `rails[method].offered` alone says whether a donor may use a method.",
+  required: [
+    "revision",
+    "charges_enabled",
+    "currencies",
+    "sponsor",
+    "clients",
+    "rails",
+    "intervals",
+    "fee_rules",
+    "coins",
+    "contribution",
+    "wallet_hosts",
+  ],
+  properties: {
+    revision: {
+      type: "integer",
+      minimum: 0,
+      description: "Rises whenever any other field of this body changes.",
+    },
+    charges_enabled: {
+      type: "boolean",
+      description: "True when at least one rail is active.",
+    },
+    currencies: {
+      type: "array",
+      items: { type: "string", pattern: "^[A-Z]{3}$" },
+      description: "ISO 4217 codes a donation may be made in.",
+    },
+    sponsor: {
+      type: "object",
+      description:
+        "The 501(c)(3) that receives the gift and issues the receipt.",
+      required: [
+        "legal_name",
+        "ein",
+        "address",
+        "deductibility_statement",
+        "terms_url",
+        "privacy_url",
+      ],
+      properties: {
+        legal_name: { type: "string" },
+        ein: { type: "string" },
+        address: { type: "array", items: { type: "string" } },
+        deductibility_statement: { type: "string" },
+        terms_url: { type: "string", format: "uri" },
+        privacy_url: { type: "string", format: "uri" },
+      },
+    },
+    clients: {
+      type: "array",
+      description:
+        "Publishable client ids for each provider's browser SDK, for every provider that is configured, whether or not a rail on it is offered. Availability to a donor is `rails[method].offered`, never the presence of a client.",
+      items: {
+        type: "object",
+        required: ["name", "publishable_key"],
+        properties: {
+          name: { type: "string", enum: ["stripe", "paypal", "chariot"] },
+          publishable_key: { type: "string" },
+          sdk_url: { type: "string", format: "uri" },
+        },
+      },
+    },
+    rails: per_rail({
+      type: "object",
+      required: ["state", "offered"],
+      properties: {
+        state: {
+          type: "string",
+          enum: [...RAIL_STATES],
+          description:
+            "`active`: chargeable. `pending`: under review at the processor, not chargeable yet (`offered` is false). `inactive`: not chargeable because the platform is not configured for the rail, the nonprofit is not active, or, on card, ACH, Apple Pay and Google Pay, the nonprofit's processor account is unfinished (details or requirements outstanding) or disconnected. `unrequested`: the nonprofit has not enabled this method. On card, ACH, Apple Pay and Google Pay a nonprofit with no processor account of its own is `active` when the method is enabled and configured, as it is at checkout; an account it has only holds the rail back while it is under review (`pending`), unfinished or disconnected (`inactive`). An unknown state is not offered.",
+        },
+        offered: { type: "boolean" },
+      },
+    }),
+    intervals: per_rail({
+      type: "array",
+      description: "Recurring intervals offered; empty means one-time only.",
+      items: { type: "string", enum: ["weekly", "monthly", "yearly"] },
+    }),
+    fee_rules: per_rail({
+      type: "object",
+      description:
+        "The processing fee a donor covering fees adds, so the fee is still covered once it is itself charged: (base × percent + fixed_minor) / (1 − percent), where base is the gift plus any contribution to Better Giving; then at most cap_minor. When round_up_minor is present, the total (gift + contribution + fee) rounds up to the next multiple of round_up_minor. The difference goes on the fee when the donor covers fees, otherwise on the contribution. With neither a fee nor a contribution, the total stays as entered. PayPal and Venmo have no round_up_minor: there the fee is truncated to the minor unit, so a fraction of a cent is dropped, never rounded up. For example percent 0.029 and fixed_minor 30 on a 10000-cent gift with no contribution: (290 + 30) / 0.971 ≈ 329.6, so 330 with round_up_minor 1, or 329 when truncated.",
+      required: ["percent", "fixed_minor"],
+      properties: {
+        percent: { type: "number", minimum: 0, maximum: 1 },
+        fixed_minor: minor("USD cents."),
+        cap_minor: minor("USD cents."),
+        round_up_minor: minor(
+          "USD cents the total rounds up to a multiple of: 1 on card, ACH and wallets, 100 on a DAF (a DAF grants whole dollars)."
+        ),
+      },
+    }),
+    coins: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["coin", "ticker", "name", "network", "memo_required"],
+        properties: {
+          coin: { type: "string" },
+          ticker: { type: "string" },
+          name: { type: "string" },
+          network: { type: "string" },
+          memo_required: {
+            type: "boolean",
+            description:
+              "True when a deposit memo is mandatory for the coin; a coin whose memo is optional reads false. Readiness sends this flag only, never a memo value, so a memo that comes with a deposit is the integrator's to show the donor whatever this flag says. The flag currently reads false for every coin, because the coin data it is computed from carries no memo flags: false does not mean a coin takes no memo.",
+          },
+          logo: { type: "string", format: "uri" },
+        },
+      },
+    },
+    contribution: {
+      type: "object",
+      description:
+        "Suggested contributions to Better Giving, as fractions of the gift.",
+      required: ["options", "starts_at"],
+      properties: {
+        options: {
+          type: "array",
+          items: { type: "number", minimum: 0, maximum: 1 },
+        },
+        starts_at: { type: "null", description: "Reserved; always null." },
+      },
+    },
+    wallet_hosts: { type: "array", items: { type: "string" } },
+  },
+};
+
+/** every partner answer is `no-store` (`.server/partner/problem.ts`, and the
+ * route's own 200); a 401 and a 429 add a header of their own */
+const NO_STORE = {
+  "Cache-Control": {
+    description: "Never cached.",
+    schema: { type: "string", enum: ["no-store"] },
+  },
+};
+
+const PARTNER_HEADERS: Record<number, Json> = {
+  401: {
+    "WWW-Authenticate": {
+      description: "The scheme the key goes in.",
+      schema: { type: "string", enum: ["Bearer"] },
+    },
+  },
+  429: {
+    "Retry-After": {
+      description: "Seconds until the key's window resets.",
+      schema: { type: "integer", minimum: 0 },
+    },
+  },
+};
+
+const partner_problems = (...statuses: number[]) =>
+  Object.fromEntries(
+    statuses.map((s) => [
+      s,
+      {
+        ...error_response(s, "application/problem+json", "PartnerProblem"),
+        headers: { ...NO_STORE, ...PARTNER_HEADERS[s] },
+      },
+    ])
+  );
+
+const partner_ops = (): IOperation[] => [
+  {
+    route: "api.partner.v1.readiness",
+    path: "/api/partner/v1/readiness",
+    method: "get",
+    op: {
+      operationId: "get_readiness",
+      summary: "Get what the nonprofit's checkout can take",
+      security: [{ partnerKey: [] }],
+      responses: {
+        200: {
+          ...ok("The nonprofit's readiness.", ref("PartnerReadiness")),
+          headers: NO_STORE,
+        },
+        ...partner_problems(401, 429, 500),
+      },
+    },
+  },
+];
+
 let built: readonly IOperation[] | undefined;
 
 /** built on first use, not at import: [openapi.json] is imported at server
@@ -762,6 +972,10 @@ export function operations(): readonly IOperation[] {
     ...connector_ops().map((o) => ({
       ...o,
       op: { ...o.op, tags: ["connector"] },
+    })),
+    ...partner_ops().map((o) => ({
+      ...o,
+      op: { ...o.op, tags: ["partner"] },
     })),
   ];
   return built;
@@ -807,8 +1021,23 @@ const CONNECTOR_PROBLEM = {
   },
 };
 
-/** the OpenAPI 3.1 document for the public read API and connector v1, with
- * `origin` as its server */
+const PARTNER_PROBLEM = {
+  type: "object",
+  description:
+    "RFC 9457 problem details, in the connector's shape. `minimum_minor` comes with `below_minimum`.",
+  required: ["code", "status", "error"],
+  properties: {
+    code: { type: "string", enum: [...PARTNER_PROBLEM_CODES] },
+    status: { type: "integer" },
+    detail: { type: "string" },
+    errors: CONNECTOR_PROBLEM.properties.errors,
+    minimum_minor: { type: "integer", minimum: 0 },
+    error: error_of(PARTNER_PROBLEM_CODES),
+  },
+};
+
+/** the OpenAPI 3.1 document for the public read API, connector v1 and
+ * partner v1, with `origin` as its server */
 export function openapi_doc(origin: string) {
   const paths: Record<string, Record<string, Json>> = {};
   for (const { path, method, op } of operations()) {
@@ -820,7 +1049,7 @@ export function openapi_doc(origin: string) {
       title: "Better Giving API",
       version: "1.0.0",
       description:
-        'Public reads need no key. Connector v1 acts for one nonprofit with a key sent as `Authorization: Bearer <key>`. Public errors are `{"error": {"code", "message"}}`; connector errors are `application/problem+json` carrying the same `error` object.',
+        'Public reads need no key. Connector v1 and partner v1 each act for one nonprofit with a key sent as `Authorization: Bearer <key>`. Public errors are `{"error": {"code", "message"}}`; connector and partner errors are `application/problem+json` carrying the same `error` object.',
       contact: { name: "Better Giving", url: `${origin}/agents` },
     },
     servers: [{ url: origin }],
@@ -829,6 +1058,11 @@ export function openapi_doc(origin: string) {
       {
         name: "connector",
         description: "Connector v1: a nonprofit's campaigns, forms and gifts.",
+      },
+      {
+        name: "partner",
+        description:
+          "Partner v1: a hosted donation site taking gifts for one nonprofit. Enum values grow within v1, error `code`s included: ignore one you don't recognize rather than failing on it.",
       },
     ],
     paths,
@@ -839,11 +1073,19 @@ export function openapi_doc(origin: string) {
           scheme: "bearer",
           description: "A connector API key, from `/connector/v1/exchange`.",
         },
+        partnerKey: {
+          type: "http",
+          scheme: "bearer",
+          description:
+            "A partner API key (`spk_…`), minted by Better Giving staff for one nonprofit.",
+        },
       },
       schemas: {
         ErrorDetail: ERROR_DETAIL,
         ApiError: API_ERROR,
         ConnectorProblem: CONNECTOR_PROBLEM,
+        PartnerProblem: PARTNER_PROBLEM,
+        PartnerReadiness: PARTNER_READINESS,
       },
     },
   };
