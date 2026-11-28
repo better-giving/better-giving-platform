@@ -670,9 +670,8 @@ export async function create_payment(
 
   const answer = answer_of(method, made);
   // the tribute notice goes out with the receipt, from the donation's tribute
-  // row, as it does for a checkout gift
-  // (a DAF gift's goes in with its row, ahead of the grant, which can settle
-  // before this point)
+  // row, as it does for a checkout gift. a DAF gift's is written with its row,
+  // ahead of the grant, which can settle before this point
   if (req.tribute && via !== "chariot") {
     await write_tribute(db, answer.id, req.tribute);
   }
