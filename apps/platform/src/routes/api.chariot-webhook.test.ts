@@ -320,19 +320,34 @@ describe("chariot webhook partner grant", () => {
     );
   });
 
-  it("does not look a checkout grant up by its grant id", async () => {
+  it("a checkout grant no payment holds is handled by its metadata, as before", async () => {
     quiet_console();
     get_grant_mock.mockResolvedValue(
-      grant("Initiated", { metadata: { don_id: "don-1" } })
+      grant("Completed", { metadata: { don_id: "don-1" } })
     );
     donation_mocks.get.mockResolvedValue({
       ...recorded_by("grant-pg"),
       id: "don-1",
       status: "intent",
     });
+    donation_mocks.locked.mockResolvedValue({ status: "intent" });
 
-    expect((await deliver(event)).status).toBe(203);
-    expect(partner_grant_mock).not.toHaveBeenCalled();
+    expect((await deliver(event)).status).toBe(200);
+    expect(donation_mocks.get).toHaveBeenCalledWith("don-1");
+  });
+
+  it("the payment's donation wins over metadata the partner's page wrote", async () => {
+    quiet_console();
+    get_grant_mock.mockResolvedValue(
+      grant("Completed", { metadata: { don_id: "junk" } })
+    );
+    held("intent");
+
+    const res = await deliver(event);
+
+    expect(res.status).toBe(200);
+    expect(donation_mocks.get).toHaveBeenCalledWith("don-pg");
+    expect(donation_mocks.get).not.toHaveBeenCalledWith("junk");
   });
 });
 

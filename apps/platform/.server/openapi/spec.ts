@@ -86,6 +86,7 @@ const STATUS_TEXT: Record<number, string> = {
   422: "The request failed validation; `errors` names each field.",
   429: "Too many requests. Wait, then retry.",
   500: "Better Giving hit an error.",
+  503: "A payment provider is still working on this request. Retry the same request shortly.",
 };
 
 /** an error response carrying `schema` as `media`, inline so a reader of one
@@ -996,7 +997,7 @@ const partner_ops = (): IOperation[] => [
           }),
           headers: NO_STORE,
         },
-        ...partner_problems(400, 401, 409, 410, 422, 429, 500),
+        ...partner_problems(400, 401, 409, 410, 422, 429, 500, 503),
       },
     },
   },

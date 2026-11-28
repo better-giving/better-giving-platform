@@ -6,6 +6,7 @@ CREATE TABLE "partner_payments" (
 	"currency" text NOT NULL,
 	"amount" jsonb NOT NULL,
 	"attribution" jsonb NOT NULL,
+	"claim_id" text NOT NULL,
 	"donation_id" text,
 	"grant_id" text,
 	"response" jsonb,

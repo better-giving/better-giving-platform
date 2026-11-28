@@ -105,6 +105,9 @@ export const partner_payments = pgTable(
     currency: text("currency").notNull(),
     amount: jsonb("amount").$type<IPartnerAmount>().notNull(),
     attribution: jsonb("attribution").$type<IPartnerAttribution>().notNull(),
+    // names the request holding the gift id; a takeover replaces it, and every
+    // write by the holder is made under it
+    claim_id: text("claim_id").notNull(),
     // the donation row the session was made for; null until it exists
     donation_id: text("donation_id"),
     // a DAF payment's Chariot grant: its webhook finds the donation by it

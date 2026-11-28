@@ -15,6 +15,7 @@ import type { TestDb } from "$/pg/test-utils/pglite";
 const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
 const pi_create = vi.hoisted(() => vi.fn());
 const create_order = vi.hoisted(() => vi.fn());
+const get_order = vi.hoisted(() => vi.fn());
 const create_grant = vi.hoisted(() => vi.fn());
 
 vi.mock("$/pg/db", () => ({
@@ -36,7 +37,7 @@ vi.mock("#/errors/report", () => ({
 vi.mock("$/kit/stripe", () => ({
   stripe: { paymentIntents: { create: pi_create } },
 }));
-vi.mock("$/kit/paypal", () => ({ paypal: { create_order } }));
+vi.mock("$/kit/paypal", () => ({ paypal: { create_order, get_order } }));
 vi.mock("$/kit/chariot", () => ({ chariot: { create_grant } }));
 vi.mock("#/.server/unit-per-usd", () => ({ unit_per_usd: async () => 1 }));
 vi.mock("#/routes/api.donation-intents/stripe/customer-with-currency", () => ({
@@ -55,7 +56,7 @@ const { partner_keys, partner_payments, partner_tenants } = await import(
 );
 const { rate_limit_windows } = await import("$/pg/schema/rate-limit");
 const { mint_key } = await import("$/partner/keys");
-const { DONOR_IP_QUOTA } = await import("$/partner/payments");
+const { DONOR_IP_QUOTA, fingerprint_of } = await import("$/partner/payments");
 const { partner_donation_of_grant } = await import("$/partner/grant-donation");
 const { action } = await import("./api.partner.v1.payments");
 const { loader: read } = await import("./api.partner.v1.payments_.$id");
@@ -294,6 +295,101 @@ describe("POST /api/partner/v1/payments", () => {
     expect(res.status).toBe(503);
     expect((await res.json()).code).toBe("provider_error");
     expect((await post(key.key, daf("g-1", "wf_1"))).status).toBe(200);
+  });
+
+  const stale = (gift_id = "gift-1") =>
+    db()
+      .update(partner_payments)
+      .set({ claimed_at: new Date(Date.now() - 3 * 60_000).toISOString() })
+      .where(eq(partner_payments.gift_id, gift_id));
+
+  test("a request that lost its claim to a takeover can't release or overwrite the winner's row", async () => {
+    const { key } = await seed();
+    let fail!: (e: Error) => void;
+    pi_create.mockImplementationOnce(
+      () => new Promise((_, reject) => (fail = reject))
+    );
+    const first = post(key.key, body());
+    await vi.waitFor(async () => {
+      expect(await db().select().from(partner_payments)).toHaveLength(1);
+      expect(pi_create).toHaveBeenCalledTimes(1);
+    });
+    await stale();
+
+    const second = await post(key.key, body());
+    expect(second.status).toBe(200);
+    const winner = await second.json();
+    fail(new Error("processor down"));
+    expect((await first).status).toBe(500);
+
+    const [row] = await db().select().from(partner_payments);
+    expect(row!.donation_id).toBe(winner.id);
+    expect(row!.response).toEqual(winner);
+  });
+
+  test("a daf retry after a request died takes over its claim and keeps its payment id", async () => {
+    const { key, mine } = await seed();
+    const payload = daf("g-1", "wf_1");
+    const minted = crypto.randomUUID();
+    await db()
+      .insert(partner_payments)
+      .values({
+        npo_id: mine.id,
+        gift_id: "g-1",
+        fingerprint: fingerprint_of(payload as never),
+        method: "daf",
+        currency: "USD",
+        amount: payload.amount,
+        attribution: {} as never,
+        claim_id: "dead",
+        donation_id: minted,
+      });
+    await stale("g-1");
+
+    const res = await post(key.key, payload);
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).id).toBe(minted);
+  });
+
+  test("a paypal order voided after an hour is replaced under the same gift_id", async () => {
+    const { key } = await seed();
+    const first = await (
+      await post(key.key, body({ method: "paypal" }))
+    ).json();
+    await db()
+      .update(partner_payments)
+      .set({ created_at: new Date(Date.now() - 2 * 3600_000).toISOString() });
+    get_order.mockResolvedValue({ status: "VOIDED" });
+    create_order.mockResolvedValue({ id: "ORDER-2" });
+
+    const again = await (
+      await post(key.key, body({ method: "paypal" }))
+    ).json();
+
+    expect(again.client.token).toBe("ORDER-2");
+    expect(again.id).not.toBe(first.id);
+    const old = await db()
+      .select()
+      .from(donations)
+      .where(eq(donations.id, first.id));
+    expect(old[0]!.status).toBe("expired");
+  });
+
+  test("a paypal order still open after an hour is replayed", async () => {
+    const { key } = await seed();
+    const first = await (
+      await post(key.key, body({ method: "paypal" }))
+    ).json();
+    await db()
+      .update(partner_payments)
+      .set({ created_at: new Date(Date.now() - 2 * 3600_000).toISOString() });
+    get_order.mockResolvedValue({ status: "CREATED" });
+
+    expect(
+      await (await post(key.key, body({ method: "paypal" }))).json()
+    ).toEqual(first);
+    expect(create_order).toHaveBeenCalledTimes(1);
   });
 
   test("a daf payment without an authorized session is invalid_request", async () => {

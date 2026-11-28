@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { ChariotError } from "@better-giving/chariot";
-import { and, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { limit_shared, type Quota } from "#/.server/auth/rate-limit";
 import { to_fn } from "#/.server/donation-recipient";
 import { chariot_create } from "#/routes/api.donation-intents/chariot";
@@ -15,6 +15,7 @@ import {
   is_refusal,
   type Refusal,
 } from "../donation-intents/refusal";
+import { paypal } from "../kit/paypal";
 import type { Db } from "../pg/db";
 import { is_unique_violation } from "../pg/errors";
 import { donations } from "../pg/schema/donation";
@@ -118,11 +119,36 @@ const answer_of = (
   }
 };
 
+/** a PayPal order the donor has had for over an hour that PayPal has since
+ * voided. any other answer, or a lookup that fails, leaves the order as is: an
+ * order still open may yet be approved */
+const ORDER_CHECK_AFTER_MS = 60 * 60 * 1000;
+
+async function order_voided(
+  answer: IPartnerPaymentAnswer,
+  created_at: string | Date
+): Promise<boolean> {
+  if (answer.client.provider !== "paypal") return false;
+  if (Date.now() - new Date(created_at).getTime() < ORDER_CHECK_AFTER_MS) {
+    return false;
+  }
+  const order = await paypal.get_order(answer.client.token).catch(() => null);
+  return order?.status === "VOIDED";
+}
+
 const send = (answer: IPartnerPaymentAnswer) =>
   resp.json(answer, 200, { "cache-control": "no-store" });
 
 type Claim =
-  | { kind: "mine" }
+  | {
+      kind: "mine";
+      /** names this request's hold on the gift id: a takeover changes it, so
+       * a request that lost the claim can't release or write the winner's row */
+      claim_id: string;
+      /** a DAF payment's id, minted before its grant so a retry of a request
+       * that died after making the grant finds the same donation */
+      donation_id: string | null;
+    }
   | { kind: "replay"; answer: IPartnerPaymentAnswer }
   | { kind: "refused"; response: Response };
 
@@ -154,10 +180,15 @@ async function claim(
       currency: req.currency,
       amount: req.amount,
       attribution,
+      claim_id: crypto.randomUUID(),
+      donation_id: req.method === "daf" ? crypto.randomUUID() : null,
     })
     .onConflictDoNothing()
-    .returning({ gift_id: partner_payments.gift_id });
-  if (mine) return { kind: "mine" };
+    .returning({
+      claim_id: partner_payments.claim_id,
+      donation_id: partner_payments.donation_id,
+    });
+  if (mine) return { kind: "mine", ...mine };
 
   const [held] = await db
     .select({
@@ -188,7 +219,7 @@ async function claim(
   // taken over by one request only: the update names the claim it saw
   const [taken] = await db
     .update(partner_payments)
-    .set({ claimed_at: sql`now()` })
+    .set({ claimed_at: sql`now()`, claim_id: crypto.randomUUID() })
     .where(
       and(
         eq(partner_payments.npo_id, npo_id),
@@ -200,8 +231,11 @@ async function claim(
         )
       )
     )
-    .returning({ gift_id: partner_payments.gift_id });
-  if (taken) return { kind: "mine" };
+    .returning({
+      claim_id: partner_payments.claim_id,
+      donation_id: partner_payments.donation_id,
+    });
+  if (taken) return { kind: "mine", ...taken };
   return {
     kind: "refused",
     response: problem("idempotency_conflict", {
@@ -210,13 +244,14 @@ async function claim(
   };
 }
 
-const release = (db: Db, npo_id: number, gift_id: string) =>
+const release = (db: Db, npo_id: number, gift_id: string, claim_id: string) =>
   db
     .delete(partner_payments)
     .where(
       and(
         eq(partner_payments.npo_id, npo_id),
         eq(partner_payments.gift_id, gift_id),
+        eq(partner_payments.claim_id, claim_id),
         isNull(partner_payments.response)
       )
     );
@@ -244,6 +279,7 @@ export async function create_payment(
     .select({
       fingerprint: partner_payments.fingerprint,
       response: partner_payments.response,
+      created_at: partner_payments.created_at,
     })
     .from(partner_payments)
     .where(
@@ -253,7 +289,29 @@ export async function create_payment(
       )
     );
   if (held?.response && held.fingerprint === fingerprint) {
-    return send(held.response);
+    if (!(await order_voided(held.response, held.created_at))) {
+      return send(held.response);
+    }
+    // the donor can no longer approve the order it names: the gift id gets a
+    // new one, and the old donation is closed
+    await db
+      .update(donations)
+      .set({ status: "expired" })
+      .where(
+        and(
+          eq(donations.id, held.response.id),
+          inArray(donations.status, ["created", "intent"])
+        )
+      );
+    await db
+      .delete(partner_payments)
+      .where(
+        and(
+          eq(partner_payments.npo_id, npo_id),
+          eq(partner_payments.gift_id, req.gift_id),
+          eq(partner_payments.donation_id, held.response.id)
+        )
+      );
   }
 
   const ready = await readiness(db, npo_id);
@@ -303,6 +361,7 @@ export async function create_payment(
   const claimed = await claim(db, npo_id, req, fingerprint);
   if (claimed.kind === "replay") return send(claimed.answer);
   if (claimed.kind === "refused") return claimed.response;
+  const hold = claimed;
 
   const donor = {
     email: req.donor.email.toLowerCase(),
@@ -315,7 +374,9 @@ export async function create_payment(
     donor,
     via,
     via_extra: method === "venmo" ? "venmo" : (req.authorized_session_id ?? ""),
-    ...(via === "chariot" && { don_id: crypto.randomUUID() }),
+    ...(via === "chariot" && {
+      don_id: hold.donation_id ?? crypto.randomUUID(),
+    }),
     intent: {
       amount: to_checkout_amount(req.amount),
       currency: req.currency,
@@ -333,7 +394,7 @@ export async function create_payment(
           ? await paypal_create(ctx)
           : await stripe_create(ctx);
   } catch (err) {
-    await release(db, npo_id, req.gift_id).catch(() => {});
+    await release(db, npo_id, req.gift_id, hold.claim_id).catch(() => {});
     // chariot answers 409 while this authorization's grant is still being
     // made: a retry of the same request finds it, so it is a 503, not a 500
     if (err instanceof ChariotError && err.http_status === 409) {
@@ -345,7 +406,7 @@ export async function create_payment(
     throw err;
   }
   if (is_refusal(made)) {
-    await release(db, npo_id, req.gift_id);
+    await release(db, npo_id, req.gift_id, hold.claim_id);
     return refusal_response(made);
   }
 
@@ -358,8 +419,9 @@ export async function create_payment(
           .from(donations)
           .where(eq(donations.id, answer.id))
       : [];
+  let recorded: unknown[];
   try {
-    await db
+    recorded = await db
       .update(partner_payments)
       .set({
         donation_id: answer.id,
@@ -369,9 +431,12 @@ export async function create_payment(
       .where(
         and(
           eq(partner_payments.npo_id, npo_id),
-          eq(partner_payments.gift_id, req.gift_id)
+          eq(partner_payments.gift_id, req.gift_id),
+          eq(partner_payments.claim_id, hold.claim_id),
+          isNull(partner_payments.response)
         )
-      );
+      )
+      .returning({ gift_id: partner_payments.gift_id });
   } catch (err) {
     if (!is_unique_violation(err, "partner_payments_grant_id_idx")) throw err;
     // a second gift on an authorization that already made a payment: its
@@ -380,7 +445,7 @@ export async function create_payment(
       .update(donations)
       .set({ status: "failed" })
       .where(eq(donations.id, answer.id));
-    await release(db, npo_id, req.gift_id);
+    await release(db, npo_id, req.gift_id, hold.claim_id);
     return problem("invalid_request", {
       errors: [
         {
@@ -388,6 +453,13 @@ export async function create_payment(
           message: "This authorization already made a payment.",
         },
       ],
+    });
+  }
+  // the claim went to a later request while this one ran: its row is its own,
+  // and this session is never recorded
+  if (recorded.length === 0) {
+    return problem("idempotency_conflict", {
+      detail: "This gift_id is being created by another request. Retry.",
     });
   }
   return send(answer);

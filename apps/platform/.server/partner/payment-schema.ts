@@ -29,7 +29,7 @@ export const payment_request = v.object({
     contribution: minor,
     contribution_fee_cover: minor,
   }),
-  // upper-cased by the route: the wire schema cannot express a transform
+  // upper-cased by `create_payment`: the wire schema cannot express a transform
   currency: $req,
   method: v.picklist(METHODS),
   coin: v.optional($req),

@@ -320,11 +320,11 @@ export async function action({ request }: Route.ActionArgs) {
     // grant carries donor name, email, phone, address — log ids/status only
     console.info(`[chariot webhook] grant ${grant.id} status ${grant.status}`);
     const meta = (grant.metadata ?? {}) as Partial<ChariotMetadata>;
-    // a partner's grant carries no `don_id`: its payment holds the grant id
+    // a partner's payment holds its grant id, and that wins over connect
+    // metadata, which the partner's page writes and may be absent or junk
     const don_id =
-      typeof meta.don_id === "string" && meta.don_id
-        ? meta.don_id
-        : await partner_donation_of_grant(db, grant.id);
+      (await partner_donation_of_grant(db, grant.id)) ??
+      (typeof meta.don_id === "string" && meta.don_id ? meta.don_id : null);
     // a young grant may be a partner's whose create call has not written its
     // row yet: a redelivery finds it, so it is asked for rather than lost
     if (!don_id && is_young(grant)) {

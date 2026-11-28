@@ -1,5 +1,5 @@
 {
-  "id": "5b0c6b73-0177-480d-8933-51e9c2dba127",
+  "id": "55aeb842-2e41-4c85-b482-cb2b0247a6a4",
   "prevId": "97f6314a-3121-4c49-8fa2-0f5137bb1a92",
   "version": "7",
   "dialect": "postgresql",
@@ -6023,6 +6023,12 @@
         "attribution": {
           "name": "attribution",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "claim_id": {
+          "name": "claim_id",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
