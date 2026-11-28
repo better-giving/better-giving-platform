@@ -12,7 +12,7 @@ import {
 } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { IBalanceTx } from "@/balance-txs";
-import type { IDonationsSearch, IPageOpts } from "@/donations";
+import type { IDonation, IDonationsSearch, IPageOpts } from "@/donations";
 import type { IAddr } from "@/types/donation";
 import { db } from "../db";
 import { bal_txs } from "../schema/bal-tx";
@@ -37,6 +37,9 @@ type DistInsert = typeof dists.$inferInsert;
 /** dist joined with parent donation + donor + settlement */
 export interface INpoDonation extends DistRow {
   // from donations
+  /** the parent donation's own status; a cancelled duplicate's dist reads
+   * `refunded` though nothing was refunded, and this tells the two apart */
+  donation_status: IDonation["status"];
   frequency: string;
   via: string;
   source: string;
@@ -64,6 +67,7 @@ export interface INpoDonation extends DistRow {
 const dist_joined = {
   dist: dists,
   don: {
+    status: donations.status,
     frequency: donations.frequency,
     via: donations.via,
     source: donations.source,
@@ -94,6 +98,7 @@ const dist_joined = {
 type JoinedRow = {
   dist: DistRow;
   don: {
+    status: IDonation["status"];
     frequency: string;
     via: string;
     source: string;
@@ -123,6 +128,7 @@ type JoinedRow = {
 function to_npo_donation(r: JoinedRow): INpoDonation {
   return {
     ...r.dist,
+    donation_status: r.don.status,
     frequency: r.don.frequency,
     via: r.don.via,
     source: r.don.source,

@@ -3,7 +3,9 @@ import { Arrow, Content, Tooltip } from "@better-giving/ui/tooltip";
 import { format } from "date-fns";
 import { InfoIcon } from "lucide-react";
 import { href, Link } from "react-router";
+import { cancelled_note } from "#/components/cancelled-note";
 import type { IPaginator } from "#/types/components";
+import { is_cancelled_duplicate } from "@/donations";
 import { humanize } from "@/helpers/decimal";
 import type { INpoDonation } from "$/pg/queries/dist";
 
@@ -35,6 +37,10 @@ export function EarningsHistory({
               // TODO: join referrer_commissions to get actual commission amount
               const amount = 0;
 
+              const cancelled = is_cancelled_duplicate(
+                p.donation_status,
+                p.status
+              );
               const status: "pending" | "paid" | "refunded" =
                 p.status === "refunded" ? "refunded" : "pending";
               return (
@@ -65,7 +71,9 @@ export function EarningsHistory({
                         tip={
                           <Content className="max-w-xs text-xs">
                             <Arrow />
-                            Refunded
+                            {cancelled
+                              ? cancelled_note("referrer")
+                              : "Refunded"}
                           </Content>
                         }
                       >
