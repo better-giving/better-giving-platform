@@ -2,28 +2,33 @@ import { unit_per_usd } from "#/.server/unit-per-usd";
 import { MIN_DONATION_USD } from "@/constants/common";
 import type { IDonation, IStripeIntentReturn } from "@/donations";
 import { rd2num } from "@/helpers/decimal";
-import { resp } from "@/helpers/https";
+import { type Refusal, refuse, to_response } from "$/donation-intents/refusal";
 import { db } from "$/pg/db";
 import { donation_put, donation_update } from "$/pg/queries/donation";
-import type { Provider } from "../types";
+import type { Ctx, IntentResult, Provider } from "../types";
 import { customer_with_currency } from "./customer-with-currency";
 import { npo_descriptor_suffix } from "./descriptor-suffix";
 import { donor_refusal } from "./donor-refusal";
 import { payment_intent } from "./payment-intent";
 import { recurring_bank_methods, setup_intent } from "./setup-intent";
 
-export const stripe_intent: Provider = async ({
+/** the intent for card, wallets and bank, refusals as data: checkout words
+ * them as a response (`stripe_intent`), the partner API as problem codes */
+export const stripe_create = async ({
   to,
   from,
   donor,
   via,
   intent,
-}) => {
+}: Ctx): Promise<Refusal | IntentResult> => {
   const upusd = await unit_per_usd(intent.currency);
   const base_usd = rd2num(intent.amount.base / upusd, 1);
   if (base_usd < MIN_DONATION_USD) {
-    return resp.refuse(
-      `The minimum donation is $${MIN_DONATION_USD}. Try a larger amount.`
+    return refuse(
+      "below_minimum",
+      `The minimum donation is $${MIN_DONATION_USD}. Try a larger amount.`,
+      400,
+      { minimum_usd: MIN_DONATION_USD, upusd }
     );
   }
 
@@ -33,7 +38,8 @@ export const stripe_intent: Provider = async ({
     intent.frequency !== "one-time" &&
     recurring_bank_methods(intent.currency).length === 0
   ) {
-    return resp.refuse(
+    return refuse(
+      "unsupported",
       "Recurring bank payments are available in USD and CAD. Choose one of those currencies or pay by card."
     );
   }
@@ -89,7 +95,10 @@ export const stripe_intent: Provider = async ({
     console.info(
       `[stripe-intent] 400 - ${refusal.code} - don ${don.id} - ${refusal.message}`
     );
-    return resp.refuse(refusal.reason);
+    return refuse(
+      refusal.code === "amount_too_small" ? "below_minimum" : "above_maximum",
+      refusal.reason
+    );
   }
 
   const body: IStripeIntentReturn = {
@@ -98,3 +107,6 @@ export const stripe_intent: Provider = async ({
   };
   return { don_id: don.id, body };
 };
+
+export const stripe_intent: Provider = async (ctx) =>
+  to_response(await stripe_create(ctx));

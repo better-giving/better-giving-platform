@@ -12,6 +12,7 @@ import {
   type QueryParam,
 } from "../connector/inputs";
 import { PROBLEM_CODES } from "../connector/problem";
+import { payment_request } from "../partner/payment-schema";
 import { PROBLEM_CODES as PARTNER_PROBLEM_CODES } from "../partner/problem";
 import { RAIL_STATES, RAILS } from "../partner/readiness";
 import { wire_schema } from "./wire-schema";
@@ -954,6 +955,113 @@ const partner_ops = (): IOperation[] => [
           headers: NO_STORE,
         },
         ...partner_problems(401, 429, 500),
+      },
+    },
+  },
+  {
+    route: "api.partner.v1.payments",
+    path: "/api/partner/v1/payments",
+    method: "post",
+    op: {
+      operationId: "create_payment",
+      summary: "Create a payment for the nonprofit's hosted site",
+      description:
+        "Makes one payment on Better Giving's own processor accounts, payable only by `method`. The four `amount` parts are integer minor units and are charged as sent, never repriced. `gift_id` is the site's own id for the gift and is unique per nonprofit: the same request again answers the same payment and makes no second one, and the same `gift_id` with another amount, currency or method is a 409 `idempotency_conflict`. A refused request leaves the `gift_id` free. `crypto` answers `unsupported` for now. `token` is what the method's browser half confirms with: a Stripe client secret, a PayPal order id, or for a DAF the payment id.",
+      security: [{ partnerKey: [] }],
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": { schema: wire_schema(payment_request) },
+        },
+      },
+      responses: {
+        200: {
+          ...ok("The payment, new or replayed.", {
+            type: "object",
+            required: ["id", "client"],
+            properties: {
+              id: { type: "string" },
+              client: {
+                type: "object",
+                required: ["provider", "token"],
+                properties: {
+                  provider: {
+                    type: "string",
+                    enum: ["stripe", "paypal", "chariot"],
+                  },
+                  token: { type: "string" },
+                },
+              },
+            },
+          }),
+          headers: NO_STORE,
+        },
+        ...partner_problems(400, 401, 409, 410, 422, 429, 500),
+      },
+    },
+  },
+  {
+    route: "api.partner.v1.payments_.$id",
+    path: "/api/partner/v1/payments/{id}",
+    method: "get",
+    op: {
+      operationId: "get_payment",
+      summary: "Get a payment as Better Giving holds it",
+      description:
+        "A read of Better Giving's own record: it never contacts a processor and never captures. Another nonprofit's payment is `not_found`.",
+      security: [{ partnerKey: [] }],
+      parameters: [
+        path_param(
+          "id",
+          { type: "string" },
+          "The id `POST /payments` answered."
+        ),
+      ],
+      responses: {
+        200: {
+          ...ok("The payment.", {
+            type: "object",
+            required: [
+              "id",
+              "gift_id",
+              "status",
+              "method",
+              "amount",
+              "currency",
+              "fee",
+              "occurred_at",
+            ],
+            properties: {
+              id: { type: "string" },
+              gift_id: { type: "string" },
+              status: {
+                type: "string",
+                enum: ["pending", "succeeded", "failed", "cancelled"],
+              },
+              method: { type: "string" },
+              amount: {
+                type: "object",
+                required: [
+                  "gift",
+                  "gift_fee_cover",
+                  "contribution",
+                  "contribution_fee_cover",
+                ],
+                properties: {
+                  gift: { type: "integer", minimum: 0 },
+                  gift_fee_cover: { type: "integer", minimum: 0 },
+                  contribution: { type: "integer", minimum: 0 },
+                  contribution_fee_cover: { type: "integer", minimum: 0 },
+                },
+              },
+              currency: { type: "string" },
+              fee: { type: ["integer", "null"] },
+              occurred_at: { type: "string", format: "date-time" },
+            },
+          }),
+          headers: NO_STORE,
+        },
+        ...partner_problems(401, 404, 429, 500),
       },
     },
   },

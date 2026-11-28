@@ -4,25 +4,32 @@ import { report_error } from "#/errors/report";
 import { MIN_DONATION_USD } from "@/constants/common";
 import type { IDonation } from "@/donations";
 import { rd2num } from "@/helpers/decimal";
-import { resp } from "@/helpers/https";
+import { type Refusal, refuse, to_response } from "$/donation-intents/refusal";
 import { db } from "$/pg/db";
 import { donation_put, donation_update } from "$/pg/queries/donation";
-import { type Provider, REFUSED_COPY } from "../types";
+import {
+  type Ctx,
+  type IntentResult,
+  type Provider,
+  REFUSED_COPY,
+} from "../types";
 import { paypal_charge } from "./charge";
 import { create_order } from "./create-order";
 import { create_subs, subscription_quantity } from "./create-subs";
 
-export const paypal_intent: Provider = async ({
+/** the order or subscription, refusals as data (see `stripe_create`) */
+export const paypal_create = async ({
   to,
   from,
   via_extra,
   intent,
-}) => {
+}: Ctx): Promise<Refusal | IntentResult> => {
   // venmo rides paypal's rail: its donor reads the method they clicked
   const method = via_extra === "venmo" ? "Venmo" : "PayPal";
   const scale = paypal_currencies[intent.currency];
   if (scale === undefined) {
-    return resp.refuse(
+    return refuse(
+      "unsupported",
       `${method} doesn't accept ${intent.currency}. Try another payment method.`
     );
   }
@@ -35,17 +42,20 @@ export const paypal_intent: Provider = async ({
     subscription_quantity(charge.total) === null
   ) {
     console.info(`[resp] 400 - paypal quantity: ${charge.total}`);
-    return resp.refuse(REFUSED_COPY);
+    return refuse("invalid", REFUSED_COPY);
   }
 
   const upusd = await unit_per_usd(intent.currency);
   const base_usd = rd2num(charge.amount.base / upusd, 1);
   if (base_usd < MIN_DONATION_USD) {
     const usd = `${MIN_DONATION_USD} USD`;
-    return resp.refuse(
+    return refuse(
+      "below_minimum",
       intent.currency === "USD"
         ? `The minimum ${method} donation is ${usd}.`
-        : `The minimum ${method} donation is ${usd}, or its equivalent in ${intent.currency}.`
+        : `The minimum ${method} donation is ${usd}, or its equivalent in ${intent.currency}.`,
+      400,
+      { minimum_usd: MIN_DONATION_USD, upusd }
     );
   }
 
@@ -95,3 +105,6 @@ export const paypal_intent: Provider = async ({
     body: { tx_id, don_id: don.id, amount: charge.total },
   };
 };
+
+export const paypal_intent: Provider = async (ctx) =>
+  to_response(await paypal_create(ctx));

@@ -4,12 +4,12 @@ import { MIN_DONATION_USD } from "@/constants/common";
 import type { ChariotMetadata, IDonation } from "@/donations";
 import { amnt_sum } from "@/donations/helpers";
 import { snap } from "@/helpers/decimal";
-import { resp } from "@/helpers/https";
+import { type Refusal, refuse, to_response } from "$/donation-intents/refusal";
 import { chariot } from "$/kit/chariot";
 import { db } from "$/pg/db";
 import { is_unique_violation } from "$/pg/errors";
 import { donation_get, donation_put } from "$/pg/queries/donation";
-import type { Provider } from "../types";
+import type { Ctx, IntentResult, Provider } from "../types";
 
 /** create grant answers these having made no grant, so the donor can go again.
  * not 409: that's this session's grant already processing, so one may exist */
@@ -18,25 +18,29 @@ const NO_GRANT = new Set([400, 404, 410]);
 const NO_GRANT_MSG =
   "Your fund couldn't make this grant. Please check the amount and try again.";
 
-export const chariot_intent: Provider = async ({
+/** the grant's row, refusals as data (see `stripe_create`). a grant answered
+ * 410 is an authorization that ran out */
+export const chariot_create = async ({
   to,
   from,
   via,
   via_extra,
   intent,
-}) => {
+}: Ctx): Promise<Refusal | IntentResult> => {
   // chariot is usd-only; upusd = 1 so base_usd === intent.amount.base
   if (intent.amount.base < MIN_DONATION_USD)
-    return resp.refuse(
+    return refuse(
+      "below_minimum",
       `The minimum DAF donation is ${MIN_DONATION_USD} USD.`,
-      400
+      400,
+      { minimum_usd: MIN_DONATION_USD, upusd: 1 }
     );
 
   // dafs grant whole dollars only; chariot 400s anything else after the donor
   // has already authorized, so it's refused here with a message they can read
   const dollars = snap(amnt_sum(intent.amount));
   if (!Number.isInteger(dollars))
-    return resp.refuse("DAF grants must be a whole dollar amount", 400);
+    return refuse("invalid", "DAF grants must be a whole dollar amount", 400);
 
   const grant = await chariot
     .create_grant({ workflowSessionId: via_extra, amount: dollars * 100 })
@@ -51,7 +55,11 @@ export const chariot_intent: Provider = async ({
       request_id: grant.request_id,
       reason: grant.reason,
     });
-    return resp.refuse(NO_GRANT_MSG, grant.http_status);
+    return refuse(
+      grant.http_status === 410 ? "authorization_expired" : "invalid",
+      NO_GRANT_MSG,
+      grant.http_status
+    );
   }
 
   const { don_id } = grant.metadata as unknown as ChariotMetadata;
@@ -82,3 +90,6 @@ export const chariot_intent: Provider = async ({
     });
   return { don_id: don.id, body: { id: don.id } };
 };
+
+export const chariot_intent: Provider = async (ctx) =>
+  to_response(await chariot_create(ctx));

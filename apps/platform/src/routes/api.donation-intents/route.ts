@@ -9,6 +9,7 @@ import { to_from } from "@/donations/helpers";
 import { intent as schema } from "@/donations/schema";
 import { resp } from "@/helpers/https";
 import { $req } from "@/schemas";
+import { currency_refusal } from "$/donation-intents/refusal";
 import { campaign_accepts, campaign_by_id } from "$/pg/queries/campaign";
 import { form_get } from "$/pg/queries/form";
 import { npo_program_get } from "$/pg/queries/program";
@@ -102,10 +103,8 @@ export const action: ActionFunction = async ({ request }) => {
     ...rest
   } = parsed.output;
 
-  // the chariot row is stored at upusd 1, which is only true of usd
-  if (via === "chariot" && rest.currency !== "USD") {
-    return refused(`chariot is usd-only, got ${rest.currency}`);
-  }
+  const wrong_currency = currency_refusal(via, rest.currency);
+  if (wrong_currency) return refused(wrong_currency.copy);
 
   const to = await to_fn(to_id, { open_at: new Date() });
   if (!to) {

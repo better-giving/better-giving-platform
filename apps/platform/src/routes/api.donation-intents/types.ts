@@ -1,4 +1,4 @@
-import type { IDonor, IFrom, ITo } from "@/donations";
+import type { IDonation, IDonor, IFrom, ITo } from "@/donations";
 import type { IDonationIntent } from "@/donations/schema";
 
 export interface Ctx {
@@ -7,7 +7,13 @@ export interface Ctx {
   donor: IDonor;
   via: IDonationIntent["via"];
   via_extra: IDonationIntent["via_extra"];
-  intent: Omit<IDonationIntent, "via" | "via_extra" | "to_id" | "donor">;
+  intent: Omit<
+    IDonationIntent,
+    "via" | "via_extra" | "to_id" | "donor" | "source"
+  > & {
+    /** checkout's own sources, or a partner's (`partner-api`) */
+    source: IDonation["source"];
+  };
 }
 
 export interface IntentResult {
