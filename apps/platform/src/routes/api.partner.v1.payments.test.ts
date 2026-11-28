@@ -285,6 +285,17 @@ describe("POST /api/partner/v1/payments", () => {
     expect(await again.json()).toEqual(first);
   });
 
+  test("a grant chariot is still processing is a retryable 503 provider_error, and the gift_id stays free", async () => {
+    const { key } = await seed();
+    create_grant.mockRejectedValueOnce(new ChariotError(409, "{}", null));
+
+    const res = await post(key.key, daf("g-1", "wf_1"));
+
+    expect(res.status).toBe(503);
+    expect((await res.json()).code).toBe("provider_error");
+    expect((await post(key.key, daf("g-1", "wf_1"))).status).toBe(200);
+  });
+
   test("a daf payment without an authorized session is invalid_request", async () => {
     const { key } = await seed();
 

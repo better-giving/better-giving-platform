@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { ChariotError } from "@better-giving/chariot";
 import { and, eq, isNull, lt, sql } from "drizzle-orm";
 import { limit_shared, type Quota } from "#/.server/auth/rate-limit";
 import { to_fn } from "#/.server/donation-recipient";
@@ -24,7 +25,12 @@ import {
   partner_payments,
 } from "../pg/schema/partner";
 import type { Method, PaymentRequest } from "./payment-schema";
-import { below_minimum, problem, rate_limited } from "./problem";
+import {
+  below_minimum,
+  problem,
+  provider_error,
+  rate_limited,
+} from "./problem";
 import { readiness } from "./readiness";
 
 /** per donor address, so one donor can't spend a site's whole key quota */
@@ -328,6 +334,14 @@ export async function create_payment(
           : await stripe_create(ctx);
   } catch (err) {
     await release(db, npo_id, req.gift_id).catch(() => {});
+    // chariot answers 409 while this authorization's grant is still being
+    // made: a retry of the same request finds it, so it is a 503, not a 500
+    if (err instanceof ChariotError && err.http_status === 409) {
+      return provider_error(
+        503,
+        "This authorization is still being processed. Retry the same request shortly."
+      );
+    }
     throw err;
   }
   if (is_refusal(made)) {
