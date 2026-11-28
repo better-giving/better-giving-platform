@@ -33,7 +33,7 @@ export const DONOR_IP_QUOTA: Quota = { max: 20, window_s: 60 };
 const CLAIM_STALE_MS = 2 * 60 * 1000;
 
 /** the checkout rail each method rides: wallets are card payments, venmo is
- * paypal's. `daf` and `crypto` have no card-style intent here */
+ * paypal's, a DAF gift rides chariot. `crypto` has no rail here */
 const VIA: Record<Exclude<Method, "crypto">, Ctx["via"]> = {
   card: "card",
   apple_pay: "card",
