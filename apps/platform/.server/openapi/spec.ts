@@ -946,7 +946,8 @@ const PARTNER_STATUS_TEXT: Record<number, string> = {
   422: "The nonprofit or amount can't take this: `unsupported`, `below_minimum` (with `minimum_minor`) or `above_maximum`.",
   429: "Too many requests. Wait for `Retry-After`, then retry.",
   500: "Better Giving hit an error.",
-  503: "This request is still being made, or a payment provider is still working on it. Retry the same request after `Retry-After` seconds.",
+  502: "A payment provider (Stripe, PayPal or the DAF provider) refused this request, for a reason a retry will not change. Better Giving has been told. Do not repeat it unchanged.",
+  503: "Retry the same request after `Retry-After` seconds. The request is still being made (by an earlier attempt of the same `gift_id`, or of the same DAF authorization), or a payment provider timed out, dropped the connection, was rate limited, answered 5xx or reported the request still running. A provider 5xx gives the `gift_id` back after 5 seconds; every other cause holds it for up to 120.",
 };
 
 const partner_problems = (...statuses: number[]) =>
@@ -1017,7 +1018,7 @@ const partner_ops = (): IOperation[] => [
           }),
           headers: NO_STORE,
         },
-        ...partner_problems(400, 401, 409, 410, 422, 429, 500, 503),
+        ...partner_problems(400, 401, 409, 410, 422, 429, 500, 502, 503),
       },
     },
   },

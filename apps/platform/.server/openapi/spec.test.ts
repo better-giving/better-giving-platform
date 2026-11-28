@@ -454,6 +454,32 @@ describe("openapi drift", () => {
     }
   });
 
+  test("create_payment documents every status its route sends, the provider answers with their headers", () => {
+    const res = op_of("create_payment").responses as Record<
+      string,
+      { description: string; headers?: Record<string, unknown> }
+    >;
+    expect(Object.keys(res)).toEqual(
+      [
+        "200",
+        "400",
+        "401",
+        "409",
+        "410",
+        "422",
+        "429",
+        "500",
+        "502",
+        "503",
+      ].sort()
+    );
+    // a provider's refusal (502) is not retried; a busy one (503) is, after Retry-After
+    expect(res["502"]!.description).toMatch(/refused/);
+    expect(res["502"]!.headers).not.toHaveProperty("Retry-After");
+    expect(res["503"]!.description).toMatch(/Retry-After/);
+    expect(res["503"]!.headers).toHaveProperty("Retry-After");
+  });
+
   test("every operation documents a 4xx and a 5xx, unless its route refuses nothing", () => {
     for (const o of operations()) {
       const id = o.op.operationId;
