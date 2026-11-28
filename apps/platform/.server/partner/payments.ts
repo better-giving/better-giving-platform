@@ -226,6 +226,9 @@ async function claim(
       });
   } catch (err) {
     if (!is_unique_violation(err, "partner_payments_session_id_idx")) throw err;
+    // the same request racing itself also lands here: once more, so its
+    // winner's row answers it, before the authorization is called used
+    if (!again) return claim(db, npo_id, req, fingerprint, true);
     return {
       kind: "refused",
       response: problem("invalid_request", {
@@ -362,44 +365,12 @@ export async function create_payment(
         eq(partner_payments.gift_id, req.gift_id)
       )
     );
+  let voided: IPartnerPaymentAnswer | null = null;
   if (held?.response && held.fingerprint === fingerprint) {
     if (!(await order_voided(db, held.response, held.created_at))) {
       return send(held.response);
     }
-    // the donor can no longer approve the order it names: the gift id gets a
-    // new one, and the old donation is closed. only if still unpaid, and the
-    // claim goes only when it was: a donation paid meanwhile keeps its answer,
-    // and one a racing repeat just closed leaves the new answer to the claim
-    const closed = await db.transaction(async (tx) => {
-      const [expired] = await tx
-        .update(donations)
-        .set({ status: "expired" })
-        .where(
-          and(
-            eq(donations.id, held.response!.id),
-            inArray(donations.status, ["created", "intent"])
-          )
-        )
-        .returning({ id: donations.id });
-      if (!expired) {
-        const [now] = await tx
-          .select({ status: donations.status })
-          .from(donations)
-          .where(eq(donations.id, held.response!.id));
-        return now?.status === "expired" ? "raced" : false;
-      }
-      await tx
-        .delete(partner_payments)
-        .where(
-          and(
-            eq(partner_payments.npo_id, npo_id),
-            eq(partner_payments.gift_id, req.gift_id),
-            eq(partner_payments.donation_id, held.response!.id)
-          )
-        );
-      return true;
-    });
-    if (closed === false) return send(held.response);
+    voided = held.response;
   }
 
   // limited per donor address as well as per key, after a repeat is answered
@@ -453,6 +424,45 @@ export async function create_payment(
     });
   }
 
+  // the donor can no longer approve the order the repeat names: the gift id
+  // gets a new one, and the old donation is closed, after every check above
+  // has passed so a refusal leaves the old payment as it was
+  if (voided) {
+    // new one, and the old donation is closed. only if still unpaid, and the
+    // claim goes only when it was: a donation paid meanwhile keeps its answer,
+    // and one a racing repeat just closed leaves the new answer to the claim
+    const closed = await db.transaction(async (tx) => {
+      const [expired] = await tx
+        .update(donations)
+        .set({ status: "expired" })
+        .where(
+          and(
+            eq(donations.id, voided.id),
+            inArray(donations.status, ["created", "intent"])
+          )
+        )
+        .returning({ id: donations.id });
+      if (!expired) {
+        const [now] = await tx
+          .select({ status: donations.status })
+          .from(donations)
+          .where(eq(donations.id, voided.id));
+        return now?.status === "expired" ? "raced" : false;
+      }
+      await tx
+        .delete(partner_payments)
+        .where(
+          and(
+            eq(partner_payments.npo_id, npo_id),
+            eq(partner_payments.gift_id, req.gift_id),
+            eq(partner_payments.donation_id, voided.id)
+          )
+        );
+      return true;
+    });
+    if (closed === false) return send(voided);
+  }
+
   const claimed = await claim(db, npo_id, req, fingerprint);
   if (claimed.kind === "replay") return send(claimed.answer);
   if (claimed.kind === "refused") return claimed.response;
@@ -489,8 +499,9 @@ export async function create_payment(
   } catch (err) {
     // an error after a grant may have been made leaves the outcome unknown: the
     // claim stays, so a retry (after the stale window) takes it over with the
-    // same minted id and finds that grant. stripe and paypal mark their row
-    // failed before they throw, so theirs is released for a fresh start
+    // same minted id and finds that grant. stripe and paypal have no such
+    // object to find: theirs is released, closing its unpaid row, for a fresh
+    // start
     if (via !== "chariot") {
       await release(
         db,

@@ -107,10 +107,10 @@ export const partner_payments = pgTable(
     attribution: jsonb("attribution").$type<IPartnerAttribution>().notNull(),
     // names the request holding the gift id; a takeover replaces it, and every
     // write by the holder is made under it
-    claim_id: text("claim_id").notNull(),
+    claim_id: text("claim_id").notNull().default(sql`gen_random_uuid()::text`),
     // the donation the payment is for, minted with the claim: its row is
     // written once the session is made
-    donation_id: text("donation_id").notNull(),
+    donation_id: text("donation_id"),
     // a DAF payment's Chariot grant: its webhook finds the donation by it
     grant_id: text("grant_id"),
     // the Connect session a DAF payment was authorized by: one payment each,

@@ -412,6 +412,32 @@ describe("POST /api/partner/v1/payments", () => {
     expect(old[0]!.status).toBe("expired");
   });
 
+  test("a refused repeat leaves a voided paypal order's payment as it was", async () => {
+    const { key } = await seed();
+    const first = await (
+      await post(key.key, body({ method: "paypal" }))
+    ).json();
+    await db()
+      .update(partner_payments)
+      .set({ created_at: new Date(Date.now() - 2 * 3600_000).toISOString() });
+    get_order.mockResolvedValue({ status: "VOIDED" });
+    await db()
+      .update(npos)
+      .set({ donate_methods: ["daf"] })
+      .where(eq(npos.registration_number, "EIN-MINE"));
+
+    const res = await post(key.key, body({ method: "paypal" }));
+
+    expect(res.status).toBe(422);
+    const [row] = await db().select().from(partner_payments);
+    expect(row!.donation_id).toBe(first.id);
+    const [don] = await db()
+      .select()
+      .from(donations)
+      .where(eq(donations.id, first.id));
+    expect(don!.status).toBe("created");
+  });
+
   test("a paypal order still open after an hour is replayed", async () => {
     const { key } = await seed();
     const first = await (

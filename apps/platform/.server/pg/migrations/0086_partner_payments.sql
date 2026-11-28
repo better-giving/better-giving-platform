@@ -6,10 +6,8 @@ CREATE TABLE "partner_payments" (
 	"currency" text NOT NULL,
 	"amount" jsonb NOT NULL,
 	"attribution" jsonb NOT NULL,
-	"claim_id" text NOT NULL,
-	"donation_id" text NOT NULL,
+	"donation_id" text,
 	"grant_id" text,
-	"authorized_session_id" text,
 	"response" jsonb,
 	"created_at" timestamptz DEFAULT now() NOT NULL,
 	"claimed_at" timestamptz DEFAULT now() NOT NULL,
@@ -18,5 +16,4 @@ CREATE TABLE "partner_payments" (
 --> statement-breakpoint
 ALTER TABLE "partner_payments" ADD CONSTRAINT "partner_payments_npo_id_npos_id_fk" FOREIGN KEY ("npo_id") REFERENCES "public"."npos"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "partner_payments_donation_id_idx" ON "partner_payments" USING btree ("donation_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "partner_payments_session_id_idx" ON "partner_payments" USING btree ("authorized_session_id") WHERE "partner_payments"."authorized_session_id" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "partner_payments_grant_id_idx" ON "partner_payments" USING btree ("grant_id") WHERE "partner_payments"."grant_id" is not null;

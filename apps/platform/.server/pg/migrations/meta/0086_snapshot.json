@@ -1,5 +1,5 @@
 {
-  "id": "2184c6fa-67b0-4996-844e-344385afd300",
+  "id": "5b0c6b73-0177-480d-8933-51e9c2dba127",
   "prevId": "97f6314a-3121-4c49-8fa2-0f5137bb1a92",
   "version": "7",
   "dialect": "postgresql",
@@ -6026,26 +6026,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "claim_id": {
-          "name": "claim_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "donation_id": {
           "name": "donation_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "grant_id": {
           "name": "grant_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "authorized_session_id": {
-          "name": "authorized_session_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -6083,22 +6071,6 @@
             }
           ],
           "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "partner_payments_session_id_idx": {
-          "name": "partner_payments_session_id_idx",
-          "columns": [
-            {
-              "expression": "authorized_session_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"partner_payments\".\"authorized_session_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
