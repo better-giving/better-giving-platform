@@ -23,6 +23,7 @@ export const stripe_create = async ({
   don_id,
   provider_state,
   on_provider_state,
+  card_only,
   intent,
 }: Ctx): Promise<Refusal | IntentResult> => {
   const upusd = await unit_per_usd(intent.currency);
@@ -103,6 +104,7 @@ export const stripe_create = async ({
             // the same intent
             ...(don_id && { idempotency_key: `partner-pi-${don.id}` }),
             bank_only,
+            ...(card_only && { card_only }),
             descriptor_suffix,
           })
         : await setup_intent(don.id, customer_id, don.currency, bank_only);

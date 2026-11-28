@@ -1,4 +1,4 @@
-import type { IDonation, IDonor, IFrom, ITo } from "@/donations";
+import type { IDonation, IDonor, IFrom, ITo, ITribute } from "@/donations";
 import type { IDonationIntent } from "@/donations/schema";
 
 export interface Ctx {
@@ -11,6 +11,11 @@ export interface Ctx {
    * finds its own row and processor objects. a DAF grant takes it over its
    * connect metadata, which a partner's page writes before any payment exists */
   don_id?: string;
+  /** a tribute to write with the row, for a rail whose payment can settle
+   * before the caller could write it afterwards (a DAF grant) */
+  tribute?: ITribute;
+  /** a partner's card intent: cards only, not every method the account has on */
+  card_only?: boolean;
   /** what a Stripe payment chose on an earlier attempt, to send again, and
    * where to keep what this attempt chose before any Stripe object depends on
    * it. both come from a caller that retries under idempotency keys */

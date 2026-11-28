@@ -10,7 +10,11 @@ import { type Refusal, refuse, to_response } from "$/donation-intents/refusal";
 import { chariot } from "$/kit/chariot";
 import { db } from "$/pg/db";
 import { is_unique_violation } from "$/pg/errors";
-import { donation_get, donation_put } from "$/pg/queries/donation";
+import {
+  donation_get,
+  donation_put,
+  donation_tribute_upsert,
+} from "$/pg/queries/donation";
 import { donations } from "$/pg/schema/donation";
 import type { Ctx, IntentResult, Provider } from "../types";
 
@@ -29,6 +33,7 @@ export const chariot_create = async ({
   via,
   via_extra,
   don_id: minted_id,
+  tribute,
   intent,
 }: Ctx): Promise<Refusal | IntentResult> => {
   // chariot is usd-only; upusd = 1 so base_usd === intent.amount.base
@@ -64,7 +69,21 @@ export const chariot_create = async ({
   // a caller that mints its own id writes the row before the grant, under the
   // authorization's session, so a grant is never made without a row for it
   // (the grant id replaces the session once it exists). a retry finds its row
-  if (minted_id) await put_or_reuse(db, row(minted_id, via_extra), true, true);
+  if (minted_id) {
+    await put_or_reuse(db, row(minted_id, via_extra), true, true);
+    // written before the grant exists, so a grant that settles at once finds
+    // it, and on a retry of a request that died, whether or not its first
+    // attempt wrote one
+    if (tribute) {
+      await donation_tribute_upsert(db, {
+        donation_id: minted_id,
+        name: tribute.full_name,
+        notif_email: tribute.notif?.to_email ?? null,
+        notif_fullname: tribute.notif?.to_fullname ?? null,
+        notif_msg: tribute.notif?.from_msg || null,
+      });
+    }
+  }
 
   const grant = await chariot
     .create_grant({ workflowSessionId: via_extra, amount: cents })

@@ -479,6 +479,7 @@ describe("openapi drift", () => {
     // the claim, as their order or grant may exist
     expect(res["503"]!.description).toMatch(/Stripe 5xx.*Retry-After: 5/);
     expect(res["503"]!.description).toMatch(/up to 120/);
+    expect(res["503"]!.description).toMatch(/dropped the connection/);
     expect(res["502"]!.headers).not.toHaveProperty("Retry-After");
     expect(res["503"]!.description).toMatch(/Retry-After/);
     expect(res["503"]!.headers).toHaveProperty("Retry-After");

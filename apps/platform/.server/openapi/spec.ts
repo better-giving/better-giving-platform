@@ -947,7 +947,7 @@ const PARTNER_STATUS_TEXT: Record<number, string> = {
   429: "Too many requests. Wait for `Retry-After`, then retry.",
   500: "Better Giving hit an error.",
   502: "A payment provider (Stripe, PayPal or the DAF provider) refused this request, and Better Giving has been told. The `gift_id` is free. The refusal is usually Better Giving's to fix (its provider credentials or settings), so repeating the same request can succeed once it has, but not before.",
-  503: "Retry the same request after `Retry-After` seconds. The request is still being made (by another attempt of the same `gift_id` or of the same DAF authorization), or a payment provider timed out, was rate limited, answered 5xx or reported the request still running. A Stripe 5xx gives the `gift_id` back and answers `Retry-After: 5`; every other cause holds it, with `Retry-After` of up to 120 seconds.",
+  503: "Retry the same request after `Retry-After` seconds. The request is still being made (by another attempt of the same `gift_id` or of the same DAF authorization), or a payment provider timed out, dropped the connection or sent a reply that could not be read (the request may have run: send the same one again to find it), was rate limited, answered 5xx or reported the request still running. A Stripe 5xx gives the `gift_id` back and answers `Retry-After: 5`; every other cause holds it, with `Retry-After` of up to 120 seconds.",
 };
 
 const partner_problems = (...statuses: number[]) =>

@@ -61,7 +61,9 @@ vi.mock("#/routes/api.donation-intents/stripe/descriptor-suffix", () => ({
 }));
 
 const { create_test_db } = await import("$/pg/test-utils/pglite");
-const { donation_recipients, donations } = await import("$/pg/schema/donation");
+const { donation_recipients, donation_tributes, donations } = await import(
+  "$/pg/schema/donation"
+);
 const { user } = await import("$/pg/schema/auth");
 const { npos } = await import("$/pg/schema/npo");
 const { partner_keys, partner_payments, partner_tenants } = await import(
@@ -1052,6 +1054,134 @@ describe("POST /api/partner/v1/payments", () => {
     await handle_don_receipt((await donation_get(id))!);
 
     expect(send_email).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ["a dropped connection", () => new TypeError("fetch failed")],
+    [
+      "an unreadable reply",
+      () => new SyntaxError("Unexpected end of JSON input"),
+    ],
+  ])(
+    "%s on paypal keeps the claim, and the retry finds the same order identity",
+    async (_, err) => {
+      const { key } = await seed();
+      create_order.mockRejectedValueOnce(err());
+
+      const res = await post(key.key, body({ method: "paypal" }));
+
+      expect(res.status).toBe(503);
+      expect(res.headers.get("retry-after")).toBe("120");
+      const [held] = await db().select().from(partner_payments);
+      expect(held).toBeDefined();
+      expect((await donation_rows())[0]!.status).toBe("created");
+      await stale();
+
+      const retry = await (
+        await post(key.key, body({ method: "paypal" }))
+      ).json();
+
+      expect(retry.id).toBe(held!.donation_id);
+      expect(create_order.mock.calls[1]![1]).toBe(
+        create_order.mock.calls[0]![1]
+      );
+      expect(create_order.mock.calls[0]![1]).toBe(`order-${held!.donation_id}`);
+    }
+  );
+
+  test("a dropped connection on the daf rail is a retryable 503, not a bare 500, and keeps the claim", async () => {
+    const { key } = await seed();
+    create_grant.mockRejectedValueOnce(new TypeError("fetch failed"));
+
+    const res = await post(key.key, daf("g-1", "wf_1"));
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get("retry-after")).toBe("120");
+    const [held] = await db().select().from(partner_payments);
+    await stale("g-1");
+    const retry = await (await post(key.key, daf("g-1", "wf_1"))).json();
+    expect(retry.id).toBe(held!.donation_id);
+  });
+
+  test.each(["card", "apple_pay", "google_pay"])(
+    "a partner %s intent is cards only, with no other method and none of the bank options",
+    async (method) => {
+      const { key } = await seed();
+
+      await post(key.key, body({ method }));
+
+      const params = pi_create.mock.calls[0]![0];
+      expect(params.payment_method_types).toEqual(["card"]);
+      expect(params).not.toHaveProperty("automatic_payment_methods");
+      expect(params).not.toHaveProperty("payment_method_options");
+    }
+  );
+
+  test("a partner ach intent stays bank only", async () => {
+    const { key } = await seed();
+
+    await post(key.key, body({ method: "ach" }));
+
+    const params = pi_create.mock.calls[0]![0];
+    expect(params.payment_method_types).toEqual([
+      "us_bank_account",
+      "acss_debit",
+    ]);
+    expect(params).not.toHaveProperty("automatic_payment_methods");
+  });
+
+  test("a daf tribute is saved before the grant exists, and on a recovered request too", async () => {
+    const { key } = await seed();
+    const tribute = {
+      kind: "honor",
+      honoree: "Rose Alvarez",
+      notify: { name: "Mary Johnson", email: "mary@example.org" },
+    };
+    let at_grant: { name: string }[] = [];
+    create_grant.mockImplementationOnce(async () => {
+      at_grant = await db().select().from(donation_tributes);
+      throw new TypeError("fetch failed");
+    });
+    // the first attempt carried the tribute and died with the grant maybe made
+    expect(
+      (await post(key.key, { ...daf("g-1", "wf_1"), tribute })).status
+    ).toBe(503);
+    expect(at_grant.map((t) => t.name)).toEqual(["Rose Alvarez"]);
+
+    // a recovery whose first attempt wrote none gets it before its grant too
+    await db().delete(donation_tributes);
+    await stale("g-1");
+    let at_retry: { name: string }[] = [];
+    create_grant.mockImplementationOnce(async () => {
+      at_retry = await db().select().from(donation_tributes);
+      return { id: "grant_1", amount: 5000 };
+    });
+    expect(
+      (await post(key.key, { ...daf("g-1", "wf_1"), tribute })).status
+    ).toBe(200);
+    expect(at_retry.map((t) => t.name)).toEqual(["Rose Alvarez"]);
+  });
+
+  test("a mismatched retry of a gift id is a 409 before any current setting is read", async () => {
+    const { key } = await seed();
+    await post(key.key, body());
+    await db()
+      .update(npos)
+      .set({ donate_methods: ["daf"] })
+      .where(eq(npos.registration_number, "EIN-MINE"));
+
+    for (const patch of [
+      { currency: "EUR" },
+      { method: "ach" },
+      { method: "paypal" },
+    ]) {
+      const res = await post(key.key, body(patch));
+      expect([res.status, (await res.json()).code]).toEqual([
+        409,
+        "idempotency_conflict",
+      ]);
+    }
+    expect(pi_create).toHaveBeenCalledTimes(1);
   });
 
   test("a daf repeat is answered from the record", async () => {

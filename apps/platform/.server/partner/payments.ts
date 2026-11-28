@@ -475,8 +475,16 @@ export async function create_payment(
         eq(partner_payments.gift_id, req.gift_id)
       )
     );
+  // a gift id already used for another request is a conflict whatever the
+  // nonprofit's settings say now, so it is answered before any of them is read
+  if (held && held.fingerprint !== fingerprint) {
+    return problem("idempotency_conflict", {
+      detail:
+        "This gift_id was already used with a different amount, currency, method, donor or authorization.",
+    });
+  }
   let voided: IPartnerPaymentAnswer | null = null;
-  if (held?.response && held.fingerprint === fingerprint) {
+  if (held?.response) {
     if (!(await order_voided(db, held.response, held.created_at))) {
       return send(held.response);
     }
@@ -596,6 +604,11 @@ export async function create_payment(
     via,
     via_extra: method === "venmo" ? "venmo" : (req.authorized_session_id ?? ""),
     ...(hold.donation_id && { don_id: hold.donation_id }),
+    ...(via === "chariot" &&
+      req.tribute && { tribute: to_ctx_tribute(req.tribute) }),
+    // the partner's intents take cards only: the wallets are cards, and the
+    // other payment methods readiness would refuse must not confirm
+    ...(via === "card" && { card_only: true }),
     ...(via === "card" || via === "bank"
       ? {
           provider_state: hold.provider_state ?? undefined,
@@ -658,7 +671,11 @@ export async function create_payment(
   const answer = answer_of(method, made);
   // the tribute notice goes out with the receipt, from the donation's tribute
   // row, as it does for a checkout gift
-  if (req.tribute) await write_tribute(db, answer.id, req.tribute);
+  // (a DAF gift's goes in with its row, ahead of the grant, which can settle
+  // before this point)
+  if (req.tribute && via !== "chariot") {
+    await write_tribute(db, answer.id, req.tribute);
+  }
   // the intent route records the grant it made as the row's `via_extra`
   const [granted] =
     via === "chariot"
@@ -711,6 +728,19 @@ export async function create_payment(
   return send(answer);
 }
 
+const to_ctx_tribute = (
+  t: NonNullable<PaymentRequest["tribute"]>
+): NonNullable<Ctx["tribute"]> => ({
+  full_name: t.honoree,
+  ...(t.notify && {
+    notif: {
+      to_email: t.notify.email,
+      to_fullname: t.notify.name,
+      from_msg: "",
+    },
+  }),
+});
+
 async function write_tribute(
   db: Db,
   donation_id: string,
@@ -723,6 +753,23 @@ async function write_tribute(
     notif_fullname: tribute.notify?.name ?? null,
     notif_msg: null,
   });
+}
+
+function is_unknown_outcome(err: unknown): boolean {
+  if (err instanceof SyntaxError) return true;
+  if (err instanceof TypeError && /fetch failed|network/i.test(err.message)) {
+    return true;
+  }
+  const cause =
+    err instanceof Error
+      ? (err.cause as { code?: string } | undefined)
+      : undefined;
+  return (
+    cause?.code !== undefined &&
+    /^(ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|ENOTFOUND|EAI_AGAIN|UND_ERR_)/.test(
+      cause.code
+    )
+  );
 }
 
 /** what a processor's own failure becomes: 503 where trying again can help (a
@@ -790,6 +837,14 @@ function provider_failure(
     (err.name === "TimeoutError" || err.name === "AbortError")
   ) {
     return retry("The payment provider timed out. Retry the same request.");
+  }
+  // a dropped connection or a reply that can't be read (fetch's `TypeError`,
+  // a `SyntaxError` from the body): the request may have run, so the claim
+  // stays and a retry finds the same order or grant under the same ids
+  if (is_unknown_outcome(err)) {
+    return retry(
+      "The payment provider's answer was lost. Retry the same request."
+    );
   }
   return null;
 }
