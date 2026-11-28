@@ -35,9 +35,10 @@ vi.mock("$/pg/db", () => ({
   ),
 }));
 const report_error = vi.hoisted(() => vi.fn());
+const report_degraded = vi.hoisted(() => vi.fn());
 vi.mock("#/errors/report", () => ({
   report_error,
-  report_degraded: vi.fn(),
+  report_degraded,
 }));
 vi.mock("$/kit/stripe", () => ({
   stripe: { paymentIntents: { create: pi_create } },
@@ -1114,16 +1115,20 @@ describe("POST /api/partner/v1/payments", () => {
 
     await post(key.key, body({ method: "paypal" }));
 
-    expect(report_error).toHaveBeenCalledWith(
+    // a degradation (a provider outage reads as a rate), not one of our bugs
+    expect(report_degraded).toHaveBeenCalledWith(
       expect.any(TypeError),
-      expect.objectContaining({ provider: "lost answer" })
+      expect.objectContaining({ where: "partner", provider: "lost answer" })
     );
+    expect(report_error).not.toHaveBeenCalled();
   });
 
   test("an undici socket error with an errno cause is a lost answer too", async () => {
     const { key } = await seed();
     create_order.mockRejectedValueOnce(
-      Object.assign(new TypeError("terminated"), {
+      // a message the text match does not know: only the cause's code makes
+      // this a lost answer
+      Object.assign(new TypeError("other side closed"), {
         cause: Object.assign(new Error("closed"), { code: "UND_ERR_SOCKET" }),
       })
     );
@@ -1134,8 +1139,19 @@ describe("POST /api/partner/v1/payments", () => {
     expect(await db().select().from(partner_payments)).toHaveLength(1);
   });
 
+  test("undici's bare `terminated` is a lost answer on the text alone", async () => {
+    const { key } = await seed();
+    create_order.mockRejectedValueOnce(new TypeError("terminated"));
+
+    expect((await post(key.key, body({ method: "paypal" }))).status).toBe(503);
+  });
+
   test.each([
     ["a TypeError of our own", () => new TypeError("x is undefined")],
+    [
+      "a TypeError that only mentions the network",
+      () => new TypeError("network is not a function"),
+    ],
     ["a plain Error", () => new Error("boom")],
   ])(
     "%s is not a lost answer: a plain 500, and the gift id is free",

@@ -5,7 +5,7 @@ import { and, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import Stripe from "stripe";
 import { limit_shared, type Quota } from "#/.server/auth/rate-limit";
 import { to_fn } from "#/.server/donation-recipient";
-import { report_error } from "#/errors/report";
+import { report_degraded, report_error } from "#/errors/report";
 import { chariot_create } from "#/routes/api.donation-intents/chariot";
 import { paypal_create } from "#/routes/api.donation-intents/paypal";
 import { stripe_create } from "#/routes/api.donation-intents/stripe";
@@ -844,9 +844,11 @@ function provider_failure(
   // a `SyntaxError` from the body): the request may have run, so the claim
   // stays and a retry finds the same order or grant under the same ids
   if (is_unknown_outcome(err)) {
-    // a lasting cause (a wrong api url, a tls failure) would loop here with
-    // every request answered 503, so each is reported
-    report_error(err, { where: "partner", provider: "lost answer" });
+    // a lasting cause (a wrong api host, a tls failure) would loop here with
+    // every request answered 503, so each is reported, as a degradation: the
+    // caller is answered to retry, and an outage shows as a rate, not as one
+    // of our bugs
+    report_degraded(err, { where: "partner", provider: "lost answer" });
     return retry(
       "The payment provider's answer was lost. Retry the same request."
     );
