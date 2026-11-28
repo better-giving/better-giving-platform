@@ -25,6 +25,7 @@ export const chariot_create = async ({
   from,
   via,
   via_extra,
+  don_id: minted_id,
   intent,
 }: Ctx): Promise<Refusal | IntentResult> => {
   // chariot is usd-only; upusd = 1 so base_usd === intent.amount.base
@@ -62,7 +63,9 @@ export const chariot_create = async ({
     );
   }
 
-  const { don_id } = grant.metadata as unknown as ChariotMetadata;
+  const meta = grant.metadata as Partial<ChariotMetadata> | undefined;
+  const don_id = meta?.don_id ?? minted_id;
+  if (!don_id) throw new Error(`chariot grant ${grant.id} carries no don_id`);
   const now = new Date().toISOString();
 
   const r: IDonation = {

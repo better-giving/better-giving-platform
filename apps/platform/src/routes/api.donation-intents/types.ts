@@ -7,6 +7,9 @@ export interface Ctx {
   donor: IDonor;
   via: IDonationIntent["via"];
   via_extra: IDonationIntent["via_extra"];
+  /** the donation id for a DAF grant whose connect metadata carries none: a
+   * partner's connect element is mounted before any payment exists */
+  don_id?: string;
   intent: Omit<
     IDonationIntent,
     "via" | "via_extra" | "to_id" | "donor" | "source"

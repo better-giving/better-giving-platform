@@ -76,7 +76,7 @@ beforeEach(async () => {
   create_order.mockResolvedValue({ id: "ORDER-1" });
   create_grant.mockImplementation(async () => ({
     id: "grant_1",
-    metadata: { don_id: crypto.randomUUID() },
+    // a partner's connect element carries no metadata: no payment exists yet
   }));
   await db().delete(partner_payments);
   await db().delete(donations);

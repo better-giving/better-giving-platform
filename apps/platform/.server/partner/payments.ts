@@ -189,7 +189,7 @@ async function claim(
         isNull(partner_payments.response),
         lt(
           partner_payments.claimed_at,
-          new Date(Date.now() - CLAIM_STALE_MS).toISOString()
+          sql`now() - make_interval(secs => ${CLAIM_STALE_MS / 1000})`
         )
       )
     )
@@ -290,6 +290,7 @@ export async function create_payment(
     donor,
     via,
     via_extra: method === "venmo" ? "venmo" : (req.authorized_session_id ?? ""),
+    ...(via === "chariot" && { don_id: crypto.randomUUID() }),
     intent: {
       amount: to_checkout_amount(req.amount),
       currency: req.currency,
