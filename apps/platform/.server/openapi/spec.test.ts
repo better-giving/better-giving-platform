@@ -475,6 +475,10 @@ describe("openapi drift", () => {
     );
     // a provider's refusal (502) is not retried; a busy one (503) is, after Retry-After
     expect(res["502"]!.description).toMatch(/refused/);
+    // the 5-second release is Stripe's alone: PayPal and the DAF provider hold
+    // the claim, as their order or grant may exist
+    expect(res["503"]!.description).toMatch(/Stripe 5xx.*Retry-After: 5/);
+    expect(res["503"]!.description).toMatch(/up to 120/);
     expect(res["502"]!.headers).not.toHaveProperty("Retry-After");
     expect(res["503"]!.description).toMatch(/Retry-After/);
     expect(res["503"]!.headers).toHaveProperty("Retry-After");
