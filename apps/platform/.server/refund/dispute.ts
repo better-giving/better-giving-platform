@@ -380,18 +380,3 @@ async function credit_reversed_loss(
     return settled;
   });
 }
-
-const usd = (n: number) => `${n.toFixed(2)} USD`;
-
-/** what a dispute's open recorded, for an ops notice: the total, then each
- * party's row as it breaks down */
-export const owed_lines = (owed: IOwed[]): string[] => [
-  `recorded as owed: ${usd(owed.reduce((s, o) => s + owed_total(o), 0))}`,
-  ...owed.map((o) => {
-    const party =
-      o.npo_id !== null
-        ? `npo ${o.npo_id}`
-        : `referrer ${o.referrer_user ?? `npo ${o.referrer_npo}`}`;
-    return `- ${party}: ${usd(owed_total(o))} (received ${usd(o.received_usd)}, card fee ${usd(o.fee_processing_usd)}, dispute fee ${usd(o.fee_dispute_usd)})`;
-  }),
-];

@@ -76,25 +76,36 @@ describe("Slack.send_alert", () => {
           blocks: [
             {
               type: "section",
-              text: { type: "mrkdwn", text: "*No grants to process*" },
+              text: {
+                type: "mrkdwn",
+                verbatim: true,
+                text: "*No grants to process*",
+              },
             },
             {
               type: "section",
               text: {
                 type: "mrkdwn",
+                verbatim: true,
                 text: "No grants to process for staging",
               },
             },
             {
               type: "section",
               fields: [
-                { type: "mrkdwn", text: "*amount*\n12.5" },
-                { type: "mrkdwn", text: "*ref_id*\nref-1" },
+                { type: "mrkdwn", verbatim: true, text: "*amount*\n12.5" },
+                { type: "mrkdwn", verbatim: true, text: "*ref_id*\nref-1" },
               ],
             },
             {
               type: "context",
-              elements: [{ type: "mrkdwn", text: "grants-processor:staging" }],
+              elements: [
+                {
+                  type: "mrkdwn",
+                  verbatim: true,
+                  text: "grants-processor:staging",
+                },
+              ],
             },
           ],
         },
@@ -115,6 +126,7 @@ describe("Slack.send_alert", () => {
       type: "section",
       text: {
         type: "mrkdwn",
+        verbatim: true,
         text: "*grant for &lt;!channel&gt; stalled*",
       },
     });
@@ -137,6 +149,7 @@ describe("Slack.send_alert", () => {
       type: "section",
       text: {
         type: "mrkdwn",
+        verbatim: true,
         text: "*ERROR:Chariot Grant Without A Donation*",
       },
     });
@@ -154,7 +167,9 @@ describe("Slack.send_alert", () => {
     const fields_block = blocks.find((block) => "fields" in block);
     expect(fields_block).toEqual({
       type: "section",
-      fields: [{ type: "mrkdwn", text: "*nonprofit*\nA &amp; B" }],
+      fields: [
+        { type: "mrkdwn", verbatim: true, text: "*nonprofit*\nA &amp; B" },
+      ],
     });
   });
 
@@ -169,11 +184,15 @@ describe("Slack.send_alert", () => {
     expect(blocks).toEqual([
       {
         type: "section",
-        text: { type: "mrkdwn", text: "*No grants to process*" },
+        text: {
+          type: "mrkdwn",
+          verbatim: true,
+          text: "*No grants to process*",
+        },
       },
       {
         type: "context",
-        elements: [{ type: "mrkdwn", text: "owed notices" }],
+        elements: [{ type: "mrkdwn", verbatim: true, text: "owed notices" }],
       },
     ]);
 
@@ -252,12 +271,16 @@ describe("Slack.send_alert", () => {
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
     expect(blocks[0]).toEqual({
       type: "section",
-      text: { type: "mrkdwn", text: "*payouts claimed but not settled*" },
+      text: {
+        type: "mrkdwn",
+        verbatim: true,
+        text: "*payouts claimed but not settled*",
+      },
     });
     expect(body_sections(blocks)).toEqual([body]);
     expect(blocks.at(-1)).toEqual({
       type: "context",
-      elements: [{ type: "mrkdwn", text: "grants-processor" }],
+      elements: [{ type: "mrkdwn", verbatim: true, text: "grants-processor" }],
     });
   });
 
@@ -279,15 +302,19 @@ describe("Slack.send_alert", () => {
     expect(texts.join("")).toBe(body);
     expect(blocks[0]).toEqual({
       type: "section",
-      text: { type: "mrkdwn", text: "*payouts claimed but not settled*" },
+      text: {
+        type: "mrkdwn",
+        verbatim: true,
+        text: "*payouts claimed but not settled*",
+      },
     });
     expect(blocks.at(-2)).toEqual({
       type: "section",
-      fields: [{ type: "mrkdwn", text: "*count*\n2" }],
+      fields: [{ type: "mrkdwn", verbatim: true, text: "*count*\n2" }],
     });
     expect(blocks.at(-1)).toEqual({
       type: "context",
-      elements: [{ type: "mrkdwn", text: "grants-processor" }],
+      elements: [{ type: "mrkdwn", verbatim: true, text: "grants-processor" }],
     });
   });
 
@@ -372,5 +399,172 @@ describe("Slack.send_alert with skip_bad_credential", () => {
     await expect(new Slack(CHANNEL, TOKEN).send_alert(alert)).rejects.toThrow(
       "slack invalid_auth"
     );
+  });
+});
+
+describe("Slack.send_alert structured content", () => {
+  type TableBlock = {
+    type: "table";
+    column_settings: { align: string; is_wrapped: boolean }[];
+    rows: { type: "raw_text"; text: string }[][];
+  };
+
+  const send = async (alert: Partial<Parameters<Slack["send_alert"]>[0]>) => {
+    mock_fetch(() => Response.json({ ok: true }));
+    await new Slack(CHANNEL, TOKEN).send_alert({
+      from: "test",
+      title: "t",
+      ...alert,
+    });
+    const blocks = posted().body.attachments[0]!.blocks as {
+      type: string;
+    }[];
+    return {
+      blocks,
+      table: blocks.find((b) => b.type === "table") as TableBlock | undefined,
+    };
+  };
+  const cols = [{ name: "Party" }, { name: "Owed", align: "right" as const }];
+
+  test("puts the table in the attachment's blocks, before the sender", async () => {
+    const { blocks, table } = await send({
+      table: { columns: cols, rows: [["Save the Kids (#4)", "4.91"]] },
+    });
+    expect(blocks.map((b) => b.type)).toEqual(["section", "table", "context"]);
+    expect(table).toEqual({
+      type: "table",
+      column_settings: [
+        { align: "left", is_wrapped: true },
+        { align: "right", is_wrapped: false },
+      ],
+      rows: [
+        [
+          { type: "raw_text", text: "Party" },
+          { type: "raw_text", text: "Owed" },
+        ],
+        [
+          { type: "raw_text", text: "Save the Kids (#4)" },
+          { type: "raw_text", text: "4.91" },
+        ],
+      ],
+    });
+  });
+
+  test("sends an empty cell as a dash and pads a short row", async () => {
+    const { table } = await send({
+      table: { columns: cols, rows: [["", "  "], ["Total"]] },
+    });
+    const texts = table!.rows.map((r) => r.map((c) => c.text));
+    expect(texts).toEqual([
+      ["Party", "Owed"],
+      ["—", "—"],
+      ["Total", "—"],
+    ]);
+  });
+
+  test("keeps table cells raw, not escaped", async () => {
+    const { table } = await send({
+      table: { columns: cols, rows: [["A & <B>", "1"]] },
+    });
+    expect(table!.rows[1]![0]!.text).toBe("A & <B>");
+  });
+
+  test("cuts rows past the row limit with a +N more row", async () => {
+    const rows = Array.from({ length: 150 }, (_, i) => [`p${i}`, "1"]);
+    const { table } = await send({ table: { columns: cols, rows } });
+    expect(table!.rows).toHaveLength(100);
+    expect(table!.rows[98]![0]!.text).toBe("p97");
+    expect(table!.rows[99]!.map((c) => c.text)).toEqual(["+52 more", "—"]);
+  });
+
+  test("cuts rows past the character limit", async () => {
+    const rows = Array.from({ length: 20 }, () => ["x".repeat(900), "1"]);
+    const { table } = await send({ table: { columns: cols, rows } });
+    const chars = table!.rows.flat().reduce((n, c) => n + c.text.length, 0);
+    expect(chars).toBeLessThanOrEqual(10_000);
+    const last = table!.rows.at(-1)![0]!.text;
+    expect(last).toMatch(/^\+\d+ more$/);
+  });
+
+  test("limits a row to 20 cells", async () => {
+    const columns = Array.from({ length: 25 }, (_, i) => ({ name: `c${i}` }));
+    const { table } = await send({ table: { columns, rows: [["a"]] } });
+    expect(table!.rows.every((r) => r.length === 20)).toBe(true);
+  });
+
+  test("escapes the note, action and context lines, and links the action", async () => {
+    const { blocks } = await send({
+      note: "a <!here> note",
+      action: { text: "Respond & win", url: "https://x.test/a?b=1" },
+      context: ["donation <!channel>"],
+    });
+    expect(blocks.slice(1, 4)).toEqual([
+      {
+        type: "section",
+        text: { type: "mrkdwn", verbatim: true, text: "a &lt;!here&gt; note" },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          verbatim: true,
+          text: "<https://x.test/a?b=1|Respond &amp; win>",
+        },
+      },
+      {
+        type: "context",
+        elements: [
+          { type: "mrkdwn", verbatim: true, text: "donation &lt;!channel&gt;" },
+        ],
+      },
+    ]);
+  });
+
+  test("splits a note past the section limit into sections", async () => {
+    const note = `${"a".repeat(2000)}\n${"b".repeat(2000)}`;
+    const { blocks } = await send({ note });
+    const sections = blocks.slice(1, -1) as unknown as {
+      text: { text: string };
+    }[];
+    expect(sections).toHaveLength(2);
+    expect(sections.every((s) => s.text.text.length <= 3000)).toBe(true);
+    expect(sections.map((s) => s.text.text).join("")).toBe(note);
+  });
+
+  test("sends every mrkdwn text verbatim so a plain @channel is no mention", async () => {
+    const { blocks } = await send({
+      title: "@channel",
+      fields: [{ name: "Donor", value: "@here" }],
+      note: "@everyone",
+      context: ["@channel"],
+    });
+    const texts = JSON.stringify(blocks).match(/"type":"mrkdwn"[^}]*/g) ?? [];
+    expect(texts.length).toBeGreaterThanOrEqual(5);
+    expect(texts.every((t) => t.includes('"verbatim":true'))).toBe(true);
+  });
+
+  test("cuts a long title and field value inside slack's limits", async () => {
+    const long = "&".repeat(5000);
+    const { blocks } = await send({
+      title: long,
+      fields: [{ name: "Donor", value: long }],
+    });
+    const [title, fields] = blocks as unknown as {
+      text?: { text: string };
+      fields?: { text: string }[];
+    }[];
+    expect(title!.text!.text.length).toBeLessThan(3000);
+    expect(fields!.fields![0]!.text.length).toBeLessThan(2000);
+    expect(fields!.fields![0]!.text.endsWith("…")).toBe(true);
+  });
+
+  test("uses the summary as the notification text", async () => {
+    mock_fetch(() => Response.json({ ok: true }));
+    await new Slack(CHANNEL, TOKEN).send_alert({
+      from: "test",
+      title: "Title",
+      summary: "$6.00 to <!here> Kids",
+    });
+    expect(posted().body.text).toBe("$6.00 to &lt;!here&gt; Kids");
   });
 });

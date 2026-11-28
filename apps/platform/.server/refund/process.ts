@@ -28,12 +28,14 @@ import { npo_get } from "../pg/queries/npo";
 import {
   credit_owed,
   type IOwed,
+  type OwedParty,
   owed_for_party,
   owed_total,
 } from "../pg/queries/owed";
 import type { MatchEvent } from "../pg/schema/match";
 import { apply_refund_plan, type OwedSource, StalePayoutError } from "./apply";
 import { donation_refund_status } from "./donation-status";
+import { ops_alert } from "./ops-alert";
 import {
   calc_refund_plan,
   type RefundCtx,
@@ -48,12 +50,19 @@ export interface ProcessRefundCtx extends OwedSource {
   program_id: string | null;
   /** slack alert sender identity, e.g. `refund-action-${stage}` */
   alert_from: string;
+  /** what the event took back, e.g. "$6.00": in the owed alert's title and a field */
+  amount?: string;
+  /** where the event was seen, e.g. [`charge ch_1`, `event evt_1`]: the owed alert's footer */
+  ids?: string[];
 }
 
 export interface RefundResult {
   failures: string[];
   /** what each party now owes back, one line per row */
   owed_msgs: string[];
+  owed: IOwed[];
+  /** per-party notes for ops, as the owed alert carries them */
+  owed_notes: string[];
   has_loss: boolean;
   applied: number;
 }
@@ -205,6 +214,9 @@ export async function process_refund(
 ): Promise<RefundResult> {
   const failures: string[] = [];
   const owed_msgs: string[] = [];
+  // by row id: a party with several dists has one row, the last read newest
+  const owed_rows = new Map<string, IOwed>();
+  const owed_notes: string[] = [];
   const src: OwedSource = { source: ctx.source, source_ref: ctx.source_ref };
   let applied = 0;
 
@@ -241,12 +253,27 @@ export async function process_refund(
           now: new Date().toISOString(),
         });
       }
+      // apply and the credit leave the rows stale: the alert reads them as
+      // they stand after the credit
+      const owed = applied.owed.length
+        ? await Promise.all(
+            applied.owed.map(async (o) => {
+              const other = (row: IOwed): OwedParty =>
+                row.referrer_user == null && row.referrer_npo == null
+                  ? { npo_id: row.npo_id! }
+                  : referrer_of(row);
+              const row = await owed_for_party(donation_id, other(o), tx);
+              return row ?? o;
+            })
+          )
+        : applied.owed;
       await dist_refund_update(tx, g.dist.id, {
         refund_status: plan.is_loss ? "loss" : "completed",
       });
       return {
         skipped: false,
         ...applied,
+        owed,
         reasons: plan.loss_reasons,
       } as const;
     });
@@ -277,16 +304,27 @@ export async function process_refund(
 
       const { owed, commission_in_flight: c } = res;
       for (const o of owed) {
+        owed_rows.set(o.id, o);
         const usd = owed_total(o);
         if (o.npo_id !== null) {
           owed_msgs.push(
             `$${humanize(usd)} recorded as owed by ${g.dist.to_name ?? "its npo"} (npo ${g.dist.to_id}), to recover from its future grants — ${res.reasons.join("; ")}`
           );
+          if (res.reasons.length > 0) {
+            owed_notes.push(
+              `${g.dist.to_name || `npo ${g.dist.to_id}`}: ${res.reasons.join("; ")}.`
+            );
+          }
           continue;
         }
         const in_flight = c
           ? `. claimed by the Wise transfer with customerTransactionId ${c.ref}, so owed only if that transfer pays: if it goes unfunded, the commission run credits it back when it catches that, otherwise credit it on Amounts owed (/platform/owed)`
           : "";
+        if (c) {
+          owed_notes.push(
+            `Commission ${g.dist.id} is claimed by Wise transfer ${c.ref}, so owed only if it pays; if it goes unfunded and the commission run doesn't credit it back, credit it on Amounts owed (/platform/owed).`
+          );
+        }
         owed_msgs.push(
           `$${humanize(g.commission?.amount ?? 0)} commission ${g.dist.id} recorded as owed by referrer ${o.referrer_user ?? o.referrer_npo}, to recover from its next commission; the gift's row for that referrer totals $${humanize(usd)}${in_flight}`
         );
@@ -390,19 +428,51 @@ export async function process_refund(
   }
 
   // owed amounts are finance-ops notices (not bugs) — keep slack. failures go to sentry inline at the throw site.
-  if (owed_msgs.length > 0) {
-    await fiat_monitor.send_alert({
-      type: "NOTICE",
-      from: `${ctx.alert_from}-${stage}`,
-      title: "Refund Recorded as Owed",
-      body: ["OWED:", ...owed_msgs].join("\n"),
-    });
+  const owed = [...owed_rows.values()];
+  // a lost dispute is told once, by its own alert, which carries these rows and notes
+  if (owed.length > 0 && ctx.source !== "dispute") {
+    // the reversal has committed: a failed read for the alert is reported, not thrown
+    // without the donation the alert still goes, with its names as fallbacks
+    const alert = await donation_get(donation_id)
+      .catch((err) => {
+        report_error(err, { donation_id, title: "Refund recorded as owed" });
+        return undefined;
+      })
+      .then((don) =>
+        ops_alert({
+          from: `${ctx.alert_from}-${stage}`,
+          headline: "Refund recorded as owed",
+          don,
+          // the footer keeps the id when the donation read failed
+          donation_id,
+          subject: "Refunded",
+          amount: ctx.amount,
+          owed,
+          note: [
+            "What's owed comes out of each party's next grants or commission.",
+            ...owed_notes,
+          ],
+          ids: [...(ctx.ids ?? []), `${ctx.source} ${ctx.source_ref}`],
+        })
+      )
+      .catch((err) => {
+        report_error(err, { donation_id, title: "Refund recorded as owed" });
+      });
+    // a refused post is reported, not thrown: the reversal is saved, and a 5xx
+    // would only make the redelivery stop at the guard, skipping what follows
+    if (alert) {
+      try {
+        await fiat_monitor.send_alert(alert);
+      } catch (err) {
+        report_error(err, { donation_id, title: "Refund recorded as owed" });
+      }
+    }
   }
 
   const has_loss =
     (final ?? (await donation_refund_status(db, donation_id))) ===
     "refunded_loss";
-  return { failures, owed_msgs, has_loss, applied };
+  return { failures, owed_msgs, owed, owed_notes, has_loss, applied };
 }
 
 /**

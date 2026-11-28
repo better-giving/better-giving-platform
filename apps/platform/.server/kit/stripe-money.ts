@@ -9,3 +9,9 @@ export const refund_list = (refunds: Stripe.Refund[], currency: string) =>
   refunds
     .map((r) => `${money(r.amount, currency)} (${r.id}, ${r.status})`)
     .join(", ");
+
+/** for an alert's title and fields: `$6.00` in usd, else as `money` */
+export const money_label = (atomic: number, currency: string) =>
+  currency.toLowerCase() === "usd"
+    ? `$${from_stripe_amount(atomic, currency).toFixed(2)}`
+    : money(atomic, currency);

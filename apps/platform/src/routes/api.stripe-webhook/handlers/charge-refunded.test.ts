@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { alert_text } from "#/__tests__/fixtures/alert-text";
 import type { ChargeReversal } from "$/refund/reverse";
 
 const intent_retrieve_mock = vi.hoisted(() => vi.fn());
@@ -113,8 +114,6 @@ const settle = (id: string, status: string) => {
 /** notices the handler queues itself, for retried delivery */
 const queued = () =>
   enqueue_mock.mock.calls.flat().filter((m) => m.id === "fiat-notice");
-const text_of = (a: { title: string; body?: string }) =>
-  `${a.title}\n${a.body ?? ""}`;
 
 /** what each reversal was handed, in order */
 const reversals = (): ChargeReversal[] =>
@@ -282,8 +281,8 @@ describe("stripe charge.refunded → what a held or failed reversal does to the 
     expect(new Set(held.map((m) => m.dedupe))).toEqual(
       new Set(["fiat.notice_re_1_held"])
     );
-    const text = text_of(held[0].payload.alert);
-    expect(text).toContain(ORDER_ID);
+    const text = alert_text(held[0].payload.alert);
+    expect(text).toContain(`donation ${ORDER_ID}`);
     expect(text).toContain("100.00 USD (re_1, pending)");
     expect(text).toMatch(/refund\.updated/);
   });

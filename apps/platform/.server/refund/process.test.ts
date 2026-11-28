@@ -49,6 +49,24 @@ vi.mock("../kit/slack", () => ({ fiat_monitor: { send_alert: fiat_alert } }));
 const report_error = vi.hoisted(() => vi.fn());
 vi.mock("#/errors/report", () => ({ report_error }));
 
+// the owed alert's read of the donation is the one made after the owed rows
+// are written: `fail` makes just that one reject
+const donation_read = vi.hoisted(() => ({ fail: false }));
+vi.mock("../pg/queries/donation", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../pg/queries/donation")>();
+  const { owed_amounts } = await import("../pg/schema/owed");
+  return {
+    ...orig,
+    donation_get: async (...args: Parameters<typeof orig.donation_get>) => {
+      if (donation_read.fail) {
+        const rows = await test_db.current!.db.select().from(owed_amounts);
+        if (rows.length > 0) throw new Error("donation read failed");
+      }
+      return orig.donation_get(...args);
+    },
+  };
+});
+
 // the heads-up's only side effect. mocked at the module rather than at the
 // transport, so a test can make the send throw as well as refuse.
 const send_email = vi.hoisted(() => vi.fn());
@@ -373,6 +391,53 @@ describe("process_refund — a payout the grants cron settles mid-refund", () =>
       type: "pending",
     });
   }
+
+  test("the owed alert still goes, with the donation id and names as fallbacks, when the donation read fails", async () => {
+    const { id, npo_id } = await seed({ event: false });
+    await seed_cash_dist(id, npo_id);
+    const graphs = await dists_for_refund(id);
+    await test_db
+      .current!.db.update(payouts)
+      .set({ type: "settled", settled_date: "2026-07-02T00:00:00.000Z" })
+      .where(eq(payouts.id, `payout-${id}`));
+    donation_read.fail = true;
+    report_error.mockClear();
+
+    try {
+      const res = await process_refund(id, graphs, ctx);
+      expect(res.failures).toEqual([]);
+    } finally {
+      donation_read.fail = false;
+    }
+
+    expect(report_error).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "donation read failed" }),
+      expect.objectContaining({ donation_id: id })
+    );
+    const alert = fiat_alert.mock.calls[0]![0];
+    expect(alert.title).toBe("Refund recorded as owed · unknown nonprofit");
+    expect(alert.context).toEqual([`donation ${id} · refund re_1`]);
+    expect(alert.table.rows.at(-1)).toEqual(["Total", "—", "—", "—", "100.00"]);
+  });
+
+  test("a lost dispute posts no owed alert of its own: its own alert carries the rows", async () => {
+    const { id, npo_id } = await seed({ event: false });
+    await seed_cash_dist(id, npo_id);
+    const graphs = await dists_for_refund(id);
+    await test_db
+      .current!.db.update(payouts)
+      .set({ type: "settled", settled_date: "2026-07-02T00:00:00.000Z" })
+      .where(eq(payouts.id, `payout-${id}`));
+
+    const res = await process_refund(id, graphs, {
+      ...ctx,
+      source: "dispute",
+      source_ref: "du_1",
+    });
+
+    expect(res.owed).toHaveLength(1);
+    expect(fiat_alert).not.toHaveBeenCalled();
+  });
 
   test("a payout settled after the graph was read ends owed by the npo", async () => {
     const { id, npo_id } = await seed({ event: false });

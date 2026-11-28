@@ -8,6 +8,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { alert_text } from "#/__tests__/fixtures/alert-text";
 import type { DbOrTx } from "$/pg/queries/helpers";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
@@ -312,12 +313,12 @@ const answered_of = (tr: string) =>
     for: r.metadata.refund_id ?? r.metadata.dispute_id,
   }));
 
-/** every ops notice queued so far, title and body */
+/** every ops notice queued so far, as ops read them */
 const notice_text = () =>
   enqueue_mock.mock.calls
     .flat()
     .filter((m) => m.id === "fiat-notice")
-    .map((m) => `${m.payload.alert.title}\n${m.payload.alert.body}`)
+    .map((m) => alert_text(m.payload.alert))
     .join("\n");
 
 const status_of = async (donation_id: string) => {
@@ -469,8 +470,8 @@ describe("partial dashboard refunds of a routed gift", () => {
     expect(await status_of(charge_of.id)).toBe("settled");
     expect(await owed_of(charge_of.id)).toEqual([]);
     expect(notice_text()).not.toMatch(/still in the npo's balances|pending/);
-    expect(notice_text()).toMatch(/^Partial Refund: Nothing Owed$/m);
-    expect(notice_text()).not.toMatch(/Recorded as Owed/);
+    expect(notice_text()).toMatch(/^Partial refund, nothing owed · /m);
+    expect(notice_text()).not.toMatch(/recorded as owed/);
 
     await deliver(refund(6_000));
 
@@ -871,7 +872,7 @@ describe("a dispute on a routed gift already transferred", () => {
 
     expect(answered_of(tr)).toHaveLength(1);
     expect(transfers_enqueued()).toEqual([]);
-    const changed = notice_text().split("Dispute Outcome Changed\n")[1];
+    const changed = notice_text().split("Stripe dispute outcome changed · ")[1];
     expect(changed).toContain(
       `$36.00 reversed from transfer ${tr} for this dispute; re-pay it to the nonprofit by hand`
     );
@@ -916,7 +917,7 @@ describe("a dispute on a routed gift before its transfer ran", () => {
     expect(transfers.createReversal).not.toHaveBeenCalled();
     expect(notice_text()).toMatch(
       new RegExp(
-        `Dispute Closed: Held Transfers Released\n(.*\n)*.*dist ${job.dist_id}`
+        `Stripe dispute closed, held transfers released · (.*\n)*.*dist ${job.dist_id}`
       )
     );
   });
@@ -1009,7 +1010,7 @@ describe("a dispute on a routed gift before its transfer ran", () => {
 
     await deliver(closed("won", 4_000));
 
-    const changed = notice_text().split("Dispute Outcome Changed\n")[1];
+    const changed = notice_text().split("Stripe dispute outcome changed · ")[1];
     expect(changed).toContain(
       `dist ${job.dist_id} to NPO ${charge_of.id.slice(4)}-0 (npo ${charge_of.npo_ids[0]}): $36.00 of its share was withheld for this dispute when stripe refused its transfer and it was booked pooled less the lost cut; pay it to the nonprofit by hand`
     );

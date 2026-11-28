@@ -8,6 +8,7 @@ import {
   test,
   vi,
 } from "vitest";
+import { alert_text } from "#/__tests__/fixtures/alert-text";
 import { lock_order, logged_db } from "#/__tests__/fixtures/locks";
 import { user } from "../pg/schema/auth";
 import { bal_txs } from "../pg/schema/bal-tx";
@@ -47,6 +48,22 @@ vi.mock("../pg/db", () => ({
     }
   ),
 }));
+
+// the lost-dispute alert's own read of the owed rows is the one call made with
+// no transaction: `fail` makes just that one reject
+const owed_read = vi.hoisted(() => ({ fail: false }));
+vi.mock("../pg/queries/owed", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../pg/queries/owed")>();
+  return {
+    ...actual,
+    owed_for_donation: (
+      ...args: Parameters<typeof actual.owed_for_donation>
+    ) =>
+      owed_read.fail && args.length === 1
+        ? Promise.reject(new Error("owed read failed"))
+        : actual.owed_for_donation(...args),
+  };
+});
 
 const fiat_alert = vi.hoisted(() => vi.fn());
 vi.mock("../kit/slack", () => ({ fiat_monitor: { send_alert: fiat_alert } }));
@@ -620,7 +637,9 @@ describe("reverse_charge — part of the charge, its grant paid", () => {
       .flat()
       .filter((m) => m.id === "fiat-notice")
       .map((m) => m.payload.alert.title);
-    expect(titles).toEqual(["Partial Refund Recorded as Owed"]);
+    expect(titles).toEqual([
+      expect.stringMatching(/^Partial refund recorded as owed · /),
+    ]);
   });
 
   test("two refunds of $50 end as one full refund does", async () => {
@@ -971,7 +990,12 @@ describe("reverse_charge — a share the provider can't size", () => {
       source: "refund",
       share,
       alert_from: "paypal-refund",
-      notice: { id: "paypal-unsized_WH-1", lines: ["donation x, charge c_1"] },
+      notice: {
+        id: "paypal-unsized_WH-1",
+        amount: "$6.00",
+        ids: ["charge c_1"],
+        lines: ["Charge was 100.00 USD."],
+      },
     });
 
   test.each([
@@ -990,10 +1014,15 @@ describe("reverse_charge — a share the provider can't size", () => {
       const [m, ...rest] = enqueue.mock.calls.flat();
       expect(rest).toEqual([]);
       expect(m.payload.id).toBe("paypal-unsized_WH-1");
-      expect(m.payload.alert.title).toBe("Reversal Not Sized");
-      const body: string[] = m.payload.alert.body.split("\n");
-      expect(body[0]).toBe("donation x, charge c_1");
-      expect(body.at(-1)).toMatch(/could not be sized.*settle it by hand/);
+      expect(m.payload.alert.title).toMatch(
+        /^Reversal not sized · \$6\.00 to /
+      );
+      expect(m.payload.alert.note).toBe("Charge was 100.00 USD.");
+      expect(m.payload.alert.action.text).toMatch(
+        /Could not read how much.*Settle it by hand\.$/
+      );
+      // the whole donation id, to look it up by
+      expect(m.payload.alert.context).toEqual([`donation ${id} · charge c_1`]);
     }
   );
 
@@ -1042,43 +1071,64 @@ describe("reverse_charge — part of the charge, its grant not yet out", () => {
     ]);
   });
 
-  test.each([["refund", "Partial Refund Not Reversed"]] as const)(
-    "a %s of part of a gift whose payout is pending records nothing and tells ops a pending grant is why",
-    async (source, title) => {
-      const { id, npo_id } = await seed("stripe:card");
-      await grant_paid(id, npo_id);
-      await test_db
-        .current!.db.update(payouts)
-        .set({ type: "pending", settled_date: null })
-        .where(eq(payouts.id, `payout-${id}`));
+  test("a refund of part of a gift whose payout is pending records nothing and tells ops a pending grant is why", async () => {
+    const { id, npo_id } = await seed("stripe:card");
+    await grant_paid(id, npo_id);
+    await test_db
+      .current!.db.update(payouts)
+      .set({ type: "pending", settled_date: null })
+      .where(eq(payouts.id, `payout-${id}`));
+    await test_db
+      .current!.db.update(donation_donors)
+      .set({ name: "Jane Doe" })
+      .where(eq(donation_donors.donation_id, id));
 
-      const res = await reverse_charge({
-        donation_id: id,
-        rail: "stripe",
-        source,
-        share: { taken: 40, of: 100 },
-        alert_from: "charge-refunded",
-        notice: {
-          id: "evt_9",
-          lines: ["donation x, charge ch_1, event evt_9"],
-        },
-      });
+    const res = await reverse_charge({
+      donation_id: id,
+      rail: "stripe",
+      source: "refund",
+      share: { taken: 40, of: 100 },
+      alert_from: "charge-refunded",
+      notice: {
+        id: "evt_9",
+        amount: "$40.00",
+        ids: ["charge ch_1", "event evt_9"],
+        lines: ["Refunds on this charge: 40.00 USD (re_1, succeeded)."],
+      },
+    });
 
-      expect(res).toEqual({ status: "partial_pending", owed_msgs: [] });
-      expect(await owed_rows()).toEqual([]);
-      expect((await state(id, npo_id)).don).toBe("settled");
-      const [n, ...rest] = notices();
-      expect(rest).toEqual([]);
-      expect(n.id).toBe("evt_9");
-      expect(n.alert.title).toBe(title);
-      const body: string[] = n.alert.body.split("\n");
-      expect(body[0]).toBe("donation x, charge ch_1, event evt_9");
-      expect(body).toContainEqual(
-        expect.stringMatching(/its grant payout is still pending/)
-      );
-      expect(body.at(-1)).toMatch(/^nothing was reversed automatically/);
-    }
-  );
+    expect(res).toEqual({ status: "partial_pending", owed_msgs: [] });
+    expect(await owed_rows()).toEqual([]);
+    expect((await state(id, npo_id)).don).toBe("settled");
+    const [n, ...rest] = notices();
+    expect(rest).toEqual([]);
+    expect(n.id).toBe("evt_9");
+    const npo = `Test NPO ${counter}`;
+    expect(n.alert).toMatchObject({
+      title: `Partial refund not reversed · $40.00 to ${npo}`,
+      summary: `Partial refund not reversed: $40.00 to ${npo}`,
+      fields: [
+        { name: "Nonprofit", value: `${npo} (#${npo_id})` },
+        { name: "Donor", value: "Jane Doe" },
+        { name: "Refunded", value: "$40.00" },
+        { name: "Taken back", value: "40.00% of the charge" },
+        { name: "Donated", value: expect.any(String) },
+      ],
+      action: { text: expect.stringMatching(/^Adjust these dists by hand/) },
+      context: [`donation ${id} · charge ch_1 · event evt_9`],
+    });
+    expect(n.alert.table).toBeUndefined();
+    expect(n.alert.note.split("\n")).toEqual([
+      "The donation is not reversed.",
+      expect.stringMatching(
+        new RegExp(
+          `^Not owed: dist dist-${id} to ${npo}.*grant payout is still pending`
+        )
+      ),
+      expect.stringMatching(/^Undo that adjustment if a later refund/),
+      "Refunds on this charge: 40.00 USD (re_1, succeeded).",
+    ]);
+  });
 });
 
 describe("reverse_charge — a reversal that can't finish", () => {
@@ -1370,10 +1420,12 @@ describe("reverse_charge — the ops notice of a full reversal", () => {
     const [n, ...rest] = queued();
     expect(rest).toEqual([]);
     expect(n.id).toBe("evt_1_0");
-    expect(n.alert.title).toBe("Dispute Lost: Donation Reversed");
-    expect(n.alert.body.split("\n")).toEqual([
+    expect(n.alert.title).toBe(
+      `Dispute lost, donation reversed · Test NPO ${counter}`
+    );
+    expect(n.alert.note.split("\n")).toEqual([
+      "All 1 dists reversed.",
       ...notice.lines,
-      "all 1 dists reversed.",
     ]);
   });
 
@@ -1392,8 +1444,10 @@ describe("reverse_charge — the ops notice of a full reversal", () => {
 
     const [n] = queued();
     expect(n.id).toBe("evt_1_1");
-    expect(n.alert.title).toBe("Dispute Lost: Reversal Did Not Complete");
-    expect(n.alert.body.split("\n").at(-1)).toBe(
+    expect(n.alert.title).toMatch(
+      /^Dispute lost, reversal did not complete · /
+    );
+    expect(n.alert.note.split("\n")[0]).toBe(
       "1 of 2 dists failed to reverse, and the donation stays settled."
     );
   });
@@ -1412,10 +1466,89 @@ describe("reverse_charge — the ops notice of a full reversal", () => {
     });
 
     const [n] = queued();
-    expect(n.alert.body.split("\n").at(-1)).toMatch(
-      new RegExp(
-        `^owed: \\$93\\.20 recorded as owed by Test NPO ${counter} \\(npo ${npo_id}\\)`
-      )
+    expect(n.alert.table.rows).toEqual([
+      [`Test NPO ${counter} (#${npo_id})`, "90.00", "3.20", "0.00", "93.20"],
+      ["Total", "—", "—", "—", "93.20"],
+    ]);
+  });
+
+  test("a lost dispute's table includes the dispute fee written after the reversal", async () => {
+    const { id, npo_id } = await seed("stripe:card");
+    await grant_paid(id, npo_id);
+
+    await reverse_charge({
+      donation_id: id,
+      rail: "stripe",
+      source: "dispute",
+      share: whole,
+      dispute_fee_usd: 15,
+      source_ref: "du_1",
+      alert_from: "charge-dispute",
+      notice,
+    });
+
+    const [n] = queued();
+    expect(n.alert.table.rows).toEqual([
+      [`Test NPO ${counter} (#${npo_id})`, "90.00", "3.20", "15.00", "108.20"],
+      ["Total", "—", "—", "—", "108.20"],
+    ]);
+  });
+
+  test("a lost dispute still alerts, from the rows it already holds, when the fresh read fails", async () => {
+    const { id, npo_id } = await seed("stripe:card");
+    await grant_paid(id, npo_id);
+    owed_read.fail = true;
+    report_error.mockClear();
+
+    try {
+      const res = await reverse_charge({
+        donation_id: id,
+        rail: "stripe",
+        source: "dispute",
+        share: whole,
+        dispute_fee_usd: 15,
+        source_ref: "du_1",
+        alert_from: "charge-dispute",
+        notice,
+      });
+      expect(res.status).toBe("reversed");
+    } finally {
+      owed_read.fail = false;
+    }
+
+    // the rows the reversal read, with no estimate of the fee: it is written
+    // against the npo after this, at whatever it split to, and guessed here a
+    // fee the open had already recorded would show twice
+    const [n] = queued();
+    expect(n.alert.table.rows).toEqual([
+      [`Test NPO ${counter} (#${npo_id})`, "90.00", "3.20", "0.00", "93.20"],
+      ["Total", "—", "—", "—", "93.20"],
+    ]);
+    expect(n.alert.note).toContain("recorded separately against the nonprofit");
+    expect(report_error).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "owed read failed" }),
+      expect.objectContaining({ donation_id: id })
+    );
+  });
+
+  test("a lost dispute whose notice can't be queued is reported, and the reversal stands", async () => {
+    const { id } = await seed("stripe:card");
+    enqueue.mockRejectedValueOnce(new Error("qstash 503"));
+    report_error.mockClear();
+
+    const res = await reverse_charge({
+      donation_id: id,
+      rail: "stripe",
+      source: "dispute",
+      share: whole,
+      alert_from: "charge-dispute",
+      notice,
+    });
+
+    expect(res.status).toBe("reversed");
+    expect(report_error).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "qstash 503" }),
+      expect.objectContaining({ donation_id: id })
     );
   });
 
@@ -1548,7 +1681,11 @@ const refund_whole = (id: string) =>
     share: whole,
     source_ref: "re_1",
     alert_from: "test",
-    notice,
+    notice: {
+      ...notice,
+      amount: "$100.00",
+      ids: ["charge ch_1", "event evt_1"],
+    },
   });
 
 const as_db = (x: unknown) => x as DbOrTx;
@@ -1698,19 +1835,65 @@ async function cash_grant(
   });
 }
 
+describe("reverse_charge — a refused owed alert", () => {
+  test("is reported, not thrown: the reversal stands and the delivery succeeds", async () => {
+    const { id, npo_id } = await seed("stripe:card");
+    await cash_grant(id, npo_id, "settled");
+    fiat_alert.mockRejectedValueOnce(new Error("slack 429"));
+    report_error.mockClear();
+
+    const res = await refund_whole(id);
+
+    expect(res.status).toBe("reversed");
+    expect(report_error).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "slack 429" }),
+      expect.objectContaining({
+        donation_id: id,
+        title: "Refund recorded as owed",
+      })
+    );
+  });
+});
+
 describe("reverse_charge — a payout settled before the refund", () => {
   test("the ops notice says the amount was recorded as owed by the npo", async () => {
     const { id, npo_id } = await seed("stripe:card");
     await cash_grant(id, npo_id, "settled");
+    await test_db
+      .current!.db.update(donation_donors)
+      .set({ name: "Jane Doe" })
+      .where(eq(donation_donors.donation_id, id));
 
     await refund_whole(id);
 
+    const npo = `Test NPO ${counter}`;
     expect(fiat_alert).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        title: "Refund Recorded as Owed",
-        body: expect.stringContaining(
-          `$100.00 recorded as owed by npo (npo ${npo_id})`
+        title: `Refund recorded as owed · $100.00 to ${npo}`,
+        summary: `Refund recorded as owed: $100.00 to ${npo}`,
+        fields: [
+          expect.objectContaining({
+            name: "Nonprofit",
+            value: `${npo} (#${npo_id})`,
+          }),
+          { name: "Donor", value: "Jane Doe", inline: true },
+          { name: "Refunded", value: "$100.00", inline: true },
+          expect.objectContaining({ name: "Donated" }),
+        ],
+        table: expect.objectContaining({
+          rows: [
+            [`${npo} (#${npo_id})`, "100.00", "0.00", "0.00", "100.00"],
+            ["Total", "—", "—", "—", "100.00"],
+          ],
+        }),
+        note: expect.stringMatching(
+          /^What's owed comes out of each party's next grants or commission\.\nnpo: /
         ),
+        context: [
+          expect.stringMatching(
+            new RegExp(`^donation ${id} · charge ch_1 · event evt_1 · refund `)
+          ),
+        ],
       })
     );
   });
@@ -1915,13 +2098,22 @@ describe("reverse_charge — a gift's referral commission", () => {
     expect((await dons())[0]!.status).toBe("refunded");
     expect(fiat_alert).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        title: "Refund Recorded as Owed",
-        body: expect.stringContaining(
-          `$5.00 commission dist-${id} recorded as owed by referrer NPO-REF, to recover from its next commission; the gift's row for that referrer totals $5.00`
-        ),
+        title: expect.stringMatching(/^Refund recorded as owed · /),
+        table: expect.objectContaining({
+          rows: [
+            [
+              expect.stringMatching(/\(referrer\)$/),
+              "5.00",
+              "0.00",
+              "0.00",
+              "5.00",
+            ],
+            ["Total", "—", "—", "—", "5.00"],
+          ],
+        }),
       })
     );
-    expect(fiat_alert.mock.calls[0]![0].body).not.toContain("loss");
+    expect(alert_text(fiat_alert.mock.calls[0]![0])).not.toContain("loss");
   });
 
   // one row per gift per party, so the row carries the gift's whole figure

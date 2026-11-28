@@ -8,6 +8,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { alert_text } from "#/__tests__/fixtures/alert-text";
 import type { DbOrTx } from "$/pg/queries/helpers";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
@@ -51,8 +52,13 @@ const { donations } = await import("$/pg/schema/donation");
 const { owed_amounts } = await import("$/pg/schema/owed");
 const { takes_of } = await import("$/pg/queries/take");
 const { taken_of } = await import("$/refund/takes");
-const { PAID_GRANT, clear_card_gifts, seed_card_gift, seed_paid_commission } =
-  await import("#/__tests__/fixtures/card-gift");
+const {
+  PAID_GRANT,
+  clear_card_gifts,
+  name_card_gift,
+  seed_card_gift,
+  seed_paid_commission,
+} = await import("#/__tests__/fixtures/card-gift");
 
 const db = () => test_db.current!.db;
 
@@ -201,12 +207,12 @@ const deliver = async (event: object) => {
   return (await action({ request } as any)) as Response;
 };
 
-/** every ops notice queued so far, title and body */
+/** every ops notice queued so far, as ops read them */
 const notice_text = () =>
   enqueue_mock.mock.calls
     .flat()
     .filter((m) => m.id === "fiat-notice")
-    .map((m) => `${m.payload.alert.title}\n${m.payload.alert.body}`)
+    .map((m) => alert_text(m.payload.alert))
     .join("\n");
 
 /** the gift's status, and what its active takes take back */
@@ -273,7 +279,9 @@ describe("a partial refund on a gift whose grant went out", () => {
       status: "settled",
       taken: 0.4,
     });
-    expect(notice_text()).toMatch(/Partial Refund Recorded as Owed/);
+    expect(notice_text()).toMatch(
+      /^Partial refund recorded as owed · \$40\.00 to /m
+    );
   });
 
   it("reverses the gift once a later refund completes the charge, the row ending at the full-refund figure", async () => {
@@ -288,6 +296,71 @@ describe("a partial refund on a gift whose grant went out", () => {
     ]);
     expect((await gift_of(charge_of.id))?.status).toBe("refunded_loss");
     expect(notice_text()).not.toMatch(/undo|hand adjustment/i);
+  });
+
+  it("shows each refund's own amount in its alert, with the running total in the note", async () => {
+    charge_of = await seed_card_gift(db(), PAID_GRANT);
+    const titles = () =>
+      enqueue_mock.mock.calls
+        .flat()
+        .filter((m) => m.id === "fiat-notice")
+        .map((m) => m.payload.alert.title as string);
+
+    const first_event = refund(4_000);
+    await deliver(first_event);
+    await deliver(refund(3_000));
+    await deliver(first_event); // stripe redelivers the first, after the second
+
+    const [first, second, again] = titles();
+    expect(first).toContain("$40.00");
+    expect(second).toContain("$30.00");
+    expect(second).not.toContain("$70.00");
+    // about the refund it added, not the newest
+    expect(again).toContain("$40.00");
+    expect(notice_text()).toContain(
+      "Total refunded so far: 70.00 USD of 100.00 USD."
+    );
+  });
+
+  it("adds up the refunds one charge.refunded event adds, in the title", async () => {
+    charge_of = await seed_card_gift(db(), PAID_GRANT);
+    refund(4_000); // made, but its own event is never delivered
+    const both = refund(3_000);
+    both.data.previous_attributes.amount_refunded = 0;
+
+    await deliver(both);
+
+    const [title] = enqueue_mock.mock.calls
+      .flat()
+      .filter((m) => m.id === "fiat-notice")
+      .map((m) => m.payload.alert.title as string);
+    expect(title).toContain("$70.00");
+  });
+
+  it("shows what the live refunds take back in all when the event's own refund failed", async () => {
+    charge_of = await seed_card_gift(db(), PAID_GRANT);
+    await deliver(refund(4_000));
+    await deliver(refund(3_000, "pending"));
+    await deliver(refund(2_000)); // the newest, and not what the reversal takes
+    enqueue_mock.mockClear();
+
+    await deliver(settle("re_2", "failed"));
+
+    const alerts = enqueue_mock.mock.calls
+      .flat()
+      .filter((m) => m.id === "fiat-notice")
+      .map((m) => m.payload.alert);
+    expect(alerts.length).toBeGreaterThan(0);
+    for (const { title, fields } of alerts) {
+      // $40 and $20 are live: neither the failed $30 nor the newest alone
+      expect(title).toContain("$60.00");
+      expect(title).not.toContain("$30.00");
+      expect(title).not.toContain("$20.00");
+      // a running total, so the field says so rather than "Refunded"
+      expect(fields).toContainEqual(
+        expect.objectContaining({ name: "Refunded so far", value: "$60.00" })
+      );
+    }
   });
 
   it("ends two $50 refunds where one full refund ends, each redelivery changing nothing", async () => {
@@ -332,7 +405,7 @@ describe("a partial refund on a gift whose payout is still pending", () => {
     expect(await owed_of(charge_of.id)).toEqual([]);
     expect((await gift_of(charge_of.id))?.status).toBe("settled");
     expect(notice_text()).toMatch(
-      /Partial Refund Not Reversed[\s\S]*grant payout is still pending/
+      /^Partial refund not reversed · [\s\S]*grant payout is still pending/m
     );
   });
 });
@@ -346,12 +419,52 @@ describe("a partial bank refund that starts pending", () => {
     const res = await deliver(settle("re_1", "succeeded"));
 
     expect(while_pending).toEqual([]);
-    expect(notice_text()).toMatch(/Reversal Held/);
+    expect(notice_text()).toMatch(
+      /^Reversal held until the refund succeeds · /m
+    );
     expect(res.status).toBe(200);
     expect(await owed_of(charge_of.id)).toMatchObject([
       { source_ref: "re_1", outstanding_usd: 37.28 },
     ]);
     expect((await gift_of(charge_of.id))?.status).toBe("settled");
+  });
+
+  it("names the nonprofit and donor of a held reversal, and what it waits on", async () => {
+    charge_of = await seed_card_gift(db(), PAID_GRANT);
+    await name_card_gift(db(), charge_of, {
+      npo: "Save the Kids",
+      donor: "Jane Doe",
+      created_at: "2026-07-01T12:00:00.000Z",
+    });
+    const held = refund(4_000, "pending");
+
+    await deliver(held);
+
+    const [notice] = enqueue_mock.mock.calls
+      .flat()
+      .filter((m) => m.id === "fiat-notice");
+    const npo = charge_of.npo_ids[0];
+    expect(notice.payload.alert).toMatchObject({
+      title:
+        "Reversal held until the refund succeeds · $40.00 to Save the Kids",
+      summary:
+        "Reversal held until the refund succeeds: $40.00 to Save the Kids",
+      fields: [
+        { name: "Nonprofit", value: `Save the Kids (#${npo})` },
+        { name: "Donor", value: "Jane Doe" },
+        { name: "Refunded", value: "$40.00" },
+        { name: "Status", value: "Pending" },
+        { name: "Donated", value: "Jul 1, 2026" },
+      ],
+      note: expect.stringMatching(
+        /^Waiting on: 40\.00 USD \(re_1, pending\)\./
+      ),
+      action: { text: expect.stringContaining("refund.updated") },
+      context: [
+        `donation ${charge_of.id} · charge ${charge_now().id} · event ${held.id} · refund re_1`,
+      ],
+    });
+    expect(notice.payload.alert.table).toBeUndefined();
   });
 
   it("takes nothing back, and tells ops nothing more, when the pending refund fails", async () => {
@@ -393,7 +506,7 @@ describe("a refund.updated that changes no status", () => {
     const res = await deliver(traced);
 
     expect(res.status).toBe(200);
-    expect(after_refund).toMatch(/Partial Refund Recorded as Owed/);
+    expect(after_refund).toMatch(/^Partial refund recorded as owed · /m);
     expect(notice_text()).toBe(after_refund);
   });
 });
@@ -737,7 +850,7 @@ describe("a bank refund completing the charge", () => {
 
     expect(while_pending).toEqual({ status: "settled", taken: 0 });
     expect(notice_text()).toMatch(
-      /Reversal Held[\s\S]*100\.00 USD \(re_1, pending\)/
+      /^Reversal held until the refund succeeds · [\s\S]*Waiting on: 100\.00 USD \(re_1, pending\)/m
     );
     expect((await gift_of(charge_of.id)).status).toBe("refunded_loss");
     expect(await owed_of(charge_of.id)).toMatchObject([
@@ -783,7 +896,7 @@ describe("a bank refund completing the charge", () => {
     await deliver(completing);
     await deliver(completing); // stripe redelivers
 
-    expect(notice_text()).toMatch(/waiting on: 95\.00 USD \(re_1, pending\)/);
+    expect(notice_text()).toMatch(/Waiting on: 95\.00 USD \(re_1, pending\)/);
     expect(await gift_of(charge_of.id)).toEqual({
       status: "settled",
       taken: 0,
@@ -875,7 +988,11 @@ describe("the notice a partial refund posts", () => {
   const new_line = () =>
     notice_text()
       .split("\n")
-      .filter((l) => l.startsWith("new in this event:"))
+      .filter(
+        (l) =>
+          l.startsWith("New in this event:") ||
+          l.startsWith("Could not tell which refund is new")
+      )
       .at(-1);
 
   it("names the refunds on the charge and the total refunded so far", async () => {
@@ -884,16 +1001,16 @@ describe("the notice a partial refund posts", () => {
     const text = notice_text();
     expect(text).toContain(charge_of.id);
     expect(text).toContain("5.00 USD (re_1, succeeded)");
-    expect(text).toMatch(/total refunded so far: 5\.00 USD of 100\.00 USD/);
+    expect(text).toMatch(/Total refunded so far: 5\.00 USD of 100\.00 USD/);
   });
 
   it("marks only the second refund as new on the second partial's notice", async () => {
     await deliver(refund(500));
     await deliver(refund(1_000));
 
-    expect(new_line()).toBe("new in this event: 10.00 USD (re_2, succeeded)");
+    expect(new_line()).toBe("New in this event: 10.00 USD (re_2, succeeded).");
     expect(notice_text()).toMatch(
-      /total refunded so far: 15\.00 USD of 100\.00 USD/
+      /Total refunded so far: 15\.00 USD of 100\.00 USD/
     );
   });
 
@@ -906,10 +1023,10 @@ describe("the notice a partial refund posts", () => {
     await deliver(first); // stripe redelivers
 
     expect(failed.status).not.toBe(200);
-    expect(new_line()).toBe("new in this event: 5.00 USD (re_1, succeeded)");
+    expect(new_line()).toBe("New in this event: 5.00 USD (re_1, succeeded).");
     expect(notice_text()).toContain("10.00 USD (re_2, succeeded)");
     expect(notice_text()).toMatch(
-      /total refunded so far: 15\.00 USD of 100\.00 USD/
+      /Total refunded so far: 15\.00 USD of 100\.00 USD/
     );
   });
 
@@ -924,7 +1041,7 @@ describe("the notice a partial refund posts", () => {
       .filter((m) => m.id === "fiat-notice" && m.payload.id === second.id);
     expect(posted).toHaveLength(2);
     expect(new Set(posted.map((m) => m.dedupe)).size).toBe(1);
-    expect(new_line()).toBe("new in this event: 10.00 USD (re_2, succeeded)");
+    expect(new_line()).toBe("New in this event: 10.00 USD (re_2, succeeded).");
   });
 
   it("names the latest refund by the event's time when the event carries no previous attributes", async () => {
@@ -935,7 +1052,7 @@ describe("the notice a partial refund posts", () => {
 
     await deliver(second);
 
-    expect(new_line()).toBe("new in this event: 10.00 USD (re_2, succeeded)");
+    expect(new_line()).toBe("New in this event: 10.00 USD (re_2, succeeded).");
   });
 
   it("says it could not tell when two refunds share the latest second and the event carries no previous attributes", async () => {
@@ -947,7 +1064,7 @@ describe("the notice a partial refund posts", () => {
     await deliver(second);
 
     expect(new_line()).toBe(
-      "new in this event: could not tell which refund is new"
+      "Could not tell which refund is new in this event."
     );
   });
 
@@ -958,7 +1075,7 @@ describe("the notice a partial refund posts", () => {
     await deliver(refund(500));
 
     expect(new_line()).toBe(
-      "new in this event: could not tell which refund is new"
+      "Could not tell which refund is new in this event."
     );
   });
 });

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { alert_text } from "#/__tests__/fixtures/alert-text";
 
 const intent_retrieve_mock = vi.hoisted(() => vi.fn());
 const donation_get_mock = vi.hoisted(() => vi.fn());
@@ -91,8 +92,11 @@ const dispute_event = (type: string, status: string, amount = 10_000) =>
   }) as any;
 
 /** the ops notice lines the latest reversal was handed */
-const notice_text = () =>
-  reverse_charge_mock.mock.lastCall![0].notice.lines.join("\n");
+/** what the reversal's notice carries of the dispute: amount, ids, lines */
+const notice_text = () => {
+  const n = reverse_charge_mock.mock.lastCall![0].notice;
+  return [n.amount, ...n.ids, ...n.lines].join("\n");
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -133,12 +137,12 @@ beforeEach(() => {
 
 const HELD = { id: "dist-1", to_id: 7, net: 90, stripe_routed_to: "acct_1" };
 
-/** the fiat notices enqueued, title and body */
+/** the fiat notices enqueued, as ops read them */
 const notices = () =>
   enqueue_mock.mock.calls
     .flat()
     .filter((m) => m.id === "fiat-notice")
-    .map((m) => `${m.payload.alert.title}\n${m.payload.alert.body}`);
+    .map((m) => alert_text(m.payload.alert));
 
 /** the kinds of each enqueue call's messages, in order */
 const enqueued_ids = () =>
@@ -158,11 +162,15 @@ describe("stripe charge.dispute.closed → reversal on a loss", () => {
       dispute_fee_usd: 15,
       source_ref: "dp_1",
       alert_from: "charge-dispute",
-      notice: { id: "evt_charge.dispute.closed", lines: expect.any(Array) },
+      notice: expect.objectContaining({
+        id: "evt_charge.dispute.closed",
+        subject: "Disputed",
+        fields: [{ name: "Reason", value: "Fraudulent", inline: true }],
+      }),
     });
     const text = notice_text();
-    expect(text).toContain(DON_ID);
-    expect(text).toContain("100.00 USD");
+    expect(text).toContain("dispute dp_1");
+    expect(text).toContain("$100.00");
     expect(text).toMatch(/fee.*15\.00 USD/);
   });
 
@@ -186,7 +194,7 @@ describe("stripe charge.dispute.closed → reversal on a loss", () => {
       })
     );
     const text = notice_text();
-    expect(text).toContain(DON_ID);
+    expect(text).toContain("$40.00");
     expect(text).toContain("40.00 USD of 100.00 USD");
     expect(text).toMatch(/fee.*15\.00 USD/);
   });
@@ -357,7 +365,7 @@ describe("stripe charge.dispute.closed → the routed transfers", () => {
       expect(notice).toMatchObject({ dedupe: `fiat.notice_${event.id}` });
       expect(notices()).toEqual([
         expect.stringMatching(
-          /^Dispute Closed: Held Transfers Released\n.*\n.*\ndist dist-1: transfer to npo 7 released/
+          /^Stripe dispute closed, held transfers released · [\s\S]*\nnote: The transfers the dispute held are sent\.\ndist dist-1: transfer to npo 7 released/
         ),
       ]);
     }

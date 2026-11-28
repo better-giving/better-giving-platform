@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inspect } from "node:util";
 import { crc32 } from "node:zlib";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   afterAll,
   beforeAll,
@@ -61,6 +61,7 @@ const paypal_env = vi.hoisted(() => ({
 vi.mock("$/env", () => ({
   paypal: paypal_env,
   stage: "production",
+  base_url: "https://www.better.giving",
 }));
 vi.mock("$/kit/paypal", () => ({
   paypal: {
@@ -1345,7 +1346,7 @@ describe("refunds and reversals", () => {
         source_ref: "REF-1",
       });
       expect(taken_back()).toBe(1);
-      expect(reversal().notice.lines.join("\n")).toContain(CAPTURE_ID);
+      expect(reversal().notice.ids.join("\n")).toContain(CAPTURE_ID);
     }
   );
 
@@ -1437,7 +1438,7 @@ describe("refunds and reversals", () => {
     expect(res.status).toBe(200);
     expect(reversal().source).toBe("dispute");
     expect(taken_back()).toBe(0.4);
-    expect(reversal().notice.lines.join("\n")).toContain("-40.00 USD");
+    expect(reversal().notice.amount).toBe("$40.00");
   });
 
   it("hands over a chargeback after a partial refund by its own part, without the order", async () => {
@@ -1536,7 +1537,7 @@ describe("refunds and reversals", () => {
     expect(res.status).toBe(200);
     expect(reversal().source).toBe("dispute");
     expect(taken_back()).toBe(0.6);
-    expect(reversal().notice.lines.join("\n")).toContain(SALE_ID);
+    expect(reversal().notice.ids.join("\n")).toContain(SALE_ID);
   });
 
   it("asks for redelivery when some dists failed to reverse", async () => {
@@ -1863,16 +1864,44 @@ describe("refunds and reversals", () => {
       expect(notices).toEqual([
         expect.objectContaining({
           payload: expect.objectContaining({
-            alert: expect.objectContaining({ title: "Reversal Not Sized" }),
+            alert: expect.objectContaining({
+              title: expect.stringMatching(/^Reversal not sized · /),
+            }),
           }),
         }),
       ]);
-      const body: string = notices[0].payload.alert.body;
-      expect(body).toContain(SALE_ID);
-      expect(body).toContain("names no amount of its own");
-      expect(body).toContain("by hand");
+      const { alert } = notices[0].payload;
+      expect(alert.context.join(" ")).toContain(SALE_ID);
+      expect(alert.context.join(" ")).toContain(`donation ${ORDER_ID}`);
+      expect(alert.note).toContain("names no amount of its own");
+      expect(alert.action.text).toContain("by hand");
       expect(await owed_rows()).toEqual([]);
       expect((await donation_get(ORDER_ID))?.status).toBe("settled");
+    });
+
+    it("shows no amount for a sale resource it can't size: its amount is the whole sale", async () => {
+      await grant_paid("sale");
+      get_sale_mock.mockResolvedValue({
+        ...sale_copy(),
+        state: "partially_refunded",
+      });
+      enqueue_mock.mockClear();
+
+      await deliver({
+        id: "WH-REV-SALE",
+        event_type: "PAYMENT.SALE.REVERSED",
+        resource_type: "sale",
+        resource: {
+          id: SALE_ID,
+          amount: { total: "100.00", currency: "USD" },
+        },
+      });
+
+      const [notice] = enqueue_mock.mock.calls
+        .flat()
+        .filter((m: any) => m.id === "fiat-notice");
+      expect(notice.payload.alert.title).toMatch(/^Reversal not sized · /);
+      expect(notice.payload.alert.title).not.toContain("100.00");
     });
   });
 });
@@ -2304,6 +2333,7 @@ describe("CUSTOMER.DISPUTE.CREATED", () => {
     resource_type: "dispute",
     resource: {
       dispute_id: "PP-D-1",
+      status: "WAITING_FOR_SELLER_RESPONSE",
       reason: "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
       dispute_amount: { currency_code: "USD", value: "100.00" },
       disputed_transactions: [
@@ -2323,17 +2353,25 @@ describe("CUSTOMER.DISPUTE.CREATED", () => {
     expect(notice).toMatchObject({
       id: "fiat-notice",
       dedupe: "fiat.notice_paypal-dispute_WH-DSP-1",
-      payload: { alert: { title: "PayPal Dispute Opened" } },
     });
-    const { body } = notice.payload.alert;
-    expect(body).toContain("PP-D-1");
-    expect(body).toContain(CAPTURE_ID);
-    expect(body).toContain("100.00 USD");
-    expect(body).not.toContain("buyer@example.com");
-    expect(body).not.toContain("Bea Buyer");
+    const { alert } = notice.payload;
+    expect(alert).toMatchObject({
+      title: "PayPal dispute opened · $100.00 to unknown nonprofit",
+      fields: [
+        { name: "Disputed", value: "100.00 USD" },
+        { name: "Reason", value: "Merchandise or service not received" },
+      ],
+      note: "No donation was settled by this charge, so nothing is recorded as owed.",
+      action: { text: "Respond in the PayPal Resolution Center." },
+      context: [`dispute PP-D-1 · charge ${CAPTURE_ID} · event WH-DSP-1`],
+    });
+    expect(alert).not.toHaveProperty("table");
+    const sent = JSON.stringify(alert);
+    expect(sent).not.toContain("buyer@example.com");
+    expect(sent).not.toContain("Bea Buyer");
   });
 
-  it("names a field paypal left off as unknown", async () => {
+  it("leaves out what paypal left off", async () => {
     const res = await deliver({
       id: "WH-DSP-2",
       event_type: "CUSTOMER.DISPUTE.CREATED",
@@ -2342,24 +2380,53 @@ describe("CUSTOMER.DISPUTE.CREATED", () => {
 
     expect(res.status).toBe(200);
     const [notice] = enqueue_mock.mock.calls.at(-1)!;
-    expect(notice.payload.alert.body).not.toContain("undefined");
-    expect(notice.payload.alert.body).toContain("dispute unknown");
+    const { alert } = notice.payload;
+    expect(JSON.stringify(alert)).not.toContain("undefined");
+    expect(alert).toMatchObject({
+      title: "PayPal dispute opened · unknown amount to unknown nonprofit",
+      fields: [],
+      context: ["event WH-DSP-2"],
+    });
   });
 });
 
 describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
   const DISPUTE_ID = "PP-D000-000-001";
 
-  /** a settled paypal gift: $90 granted and paid out, $3.20 card fee.
-   * `payout` pending leaves the grant in the npo's balances */
+  /** Jane Doe's settled paypal gift to Save the Kids on Sep 15: $90 granted
+   * and paid out, $3.20 card fee. `payout` pending leaves the grant in the
+   * npo's balances */
   const paypal_gift = async (payout: "settled" | "pending" = "settled") => {
     const gift = await seed_card_gift(db(), { ...PAID_GRANT, payout });
+    const npo_id = gift.npo_ids[0]!;
     await db()
       .update(donations)
-      .set({ via: "paypal" })
+      .set({ via: "paypal", created_at: "2026-09-15T10:00:00.000Z" })
       .where(eq(donations.id, gift.id));
-    return { ...gift, npo_id: gift.npo_ids[0]! };
+    await db()
+      .update(npos)
+      .set({ name: "Save the Kids" })
+      .where(eq(npos.id, npo_id));
+    await db()
+      .update(donation_recipients)
+      .set({ name: "Save the Kids" })
+      .where(eq(donation_recipients.donation_id, gift.id));
+    await db().insert(donation_donors).values({
+      donation_id: gift.id,
+      email: "jane@example.com",
+      name: "Jane Doe",
+    });
+    return { ...gift, npo_id };
   };
+
+  /** the alert's parties, named off the gift */
+  const names_parties = (npo_id: number) => [
+    expect.objectContaining({
+      name: "Nonprofit",
+      value: `Save the Kids (#${npo_id})`,
+    }),
+    expect.objectContaining({ name: "Donor", value: "Jane Doe" }),
+  ];
 
   /** the dispute resource as paypal sends it on every dispute event */
   const dispute_resource = (
@@ -2379,7 +2446,7 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
       },
     ],
     reason: "UNAUTHORISED",
-    status: "OPEN",
+    status: "WAITING_FOR_SELLER_RESPONSE",
     dispute_amount: { currency_code: "USD", value: "100.00" },
     dispute_life_cycle_stage: "CHARGEBACK",
     dispute_channel: "EXTERNAL",
@@ -2487,30 +2554,281 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
       .filter((m: any) => m.id === "fiat-notice")
       .map((m: any) => m.payload.alert);
 
-  it("tells ops what is recorded as owed, that paypal reported no fee, and nothing of the payer", async () => {
-    const { id, sttl_id, npo_id } = await paypal_gift();
+  it("tells ops who the gift is from and to, what is recorded as owed, when to respond, and nothing of the payer", async () => {
+    const { sttl_id, npo_id } = await paypal_gift();
+    enqueue_mock.mockClear();
+
+    await deliver(
+      created_ev(sttl_id, { seller_response_due_date: "2026-10-21T07:00:00Z" })
+    );
+
+    expect(notices()).toEqual([
+      expect.objectContaining({
+        title: "PayPal dispute opened · $100.00 to Save the Kids",
+      }),
+    ]);
+    const [alert] = notices();
+    expect(alert.fields).toEqual([
+      ...names_parties(npo_id),
+      expect.objectContaining({
+        name: "Disputed",
+        value: "100.00 of 100.00 USD",
+      }),
+      expect.objectContaining({ name: "Reason", value: "Unauthorised" }),
+      expect.objectContaining({ name: "Donated", value: "Sep 15, 2026" }),
+      expect.objectContaining({
+        name: "Respond by",
+        value: "Oct 21, 2026, 07:00 UTC",
+      }),
+    ]);
+    expect(alert.table.rows).toEqual([
+      [`Save the Kids (#${npo_id})`, "90.00", "3.20", "0.00", "93.20"],
+      ["Total", "—", "—", "—", "93.20"],
+    ]);
+    expect(alert.note).toContain("PayPal reported no chargeback fee.");
+    expect(alert.action.text).toBe(
+      "Respond in the PayPal Resolution Center by Oct 21, 2026, 07:00 UTC."
+    );
+  });
+
+  it.each([
+    "UNDER_REVIEW",
+    "WAITING_FOR_BUYER_RESPONSE",
+    "RESOLVED",
+    undefined,
+  ])(
+    "asks for a response, with the deadline, whenever paypal names one, even while the dispute is %s",
+    async (status) => {
+      const { sttl_id } = await paypal_gift();
+      enqueue_mock.mockClear();
+
+      await deliver(
+        created_ev(sttl_id, {
+          status,
+          seller_response_due_date: "2026-10-21T07:00:00Z",
+        })
+      );
+
+      const [alert] = notices();
+      expect(alert.action.text).toBe(
+        "Respond in the PayPal Resolution Center by Oct 21, 2026, 07:00 UTC."
+      );
+      expect(alert.fields).toContainEqual(
+        expect.objectContaining({
+          name: "Respond by",
+          value: "Oct 21, 2026, 07:00 UTC",
+        })
+      );
+    }
+  );
+
+  it.each([
+    "UNDER_REVIEW",
+    "WAITING_FOR_BUYER_RESPONSE",
+    "RESOLVED",
+    undefined,
+  ])(
+    "asks for no response without a deadline while the dispute is %s",
+    async (status) => {
+      const { sttl_id } = await paypal_gift();
+      enqueue_mock.mockClear();
+
+      await deliver(created_ev(sttl_id, { status }));
+
+      const [alert] = notices();
+      expect(alert).not.toHaveProperty("action");
+      expect(alert.fields.map((f: { name: string }) => f.name)).not.toContain(
+        "Respond by"
+      );
+    }
+  );
+
+  it("asks for a response, with no date, while paypal waits on the seller and names none", async () => {
+    const { sttl_id } = await paypal_gift();
+    enqueue_mock.mockClear();
+
+    await deliver(
+      created_ev(sttl_id, { status: "WAITING_FOR_SELLER_RESPONSE" })
+    );
+
+    const [alert] = notices();
+    expect(alert.action.text).toBe("Respond in the PayPal Resolution Center.");
+  });
+
+  it("links the resolution center, lists the ids, and leaves the payer out", async () => {
+    const { id, sttl_id } = await paypal_gift();
+    enqueue_mock.mockClear();
+    await deliver(created_ev(sttl_id));
+    const [alert] = notices();
+    expect(alert.action.url).toMatch(/resolutioncenter/);
+    expect(alert.context).toEqual([
+      `donation ${id} · dispute ${DISPUTE_ID} · charge ${sttl_id} · event WH-DSP-CREATED`,
+    ]);
+    expect(JSON.stringify(alert)).not.toContain("Bea Buyer");
+  });
+
+  it("names no respond-by date paypal didn't send", async () => {
+    const { sttl_id } = await paypal_gift();
     enqueue_mock.mockClear();
 
     await deliver(created_ev(sttl_id));
 
-    expect(notices()).toEqual([
-      expect.objectContaining({ title: "PayPal Dispute Opened" }),
-    ]);
-    const [{ body }] = notices();
-    expect(body).toContain(`donation ${id}`);
-    expect(body).toContain(DISPUTE_ID);
-    expect(body).toContain(`npo ${npo_id}: 93.20 USD`);
-    expect(body).toContain("none reported by paypal, so recorded as $0");
-    expect(body).not.toContain("Bea Buyer");
+    const [alert] = notices();
+    expect(alert.fields.map((f: { name: string }) => f.name)).not.toContain(
+      "Respond by"
+    );
+    expect(alert.action.text).toBe("Respond in the PayPal Resolution Center.");
+  });
+
+  describe("the opened alert, for a $6 gift to Save the Kids", () => {
+    const DON = "98bc019c-3f2a-4d1e-9b7c-5e0a1f2d3c4b";
+    const CHARGE = "8MC02395TT1228219";
+    const EV = "WH-5GV39823K0583441R-0BC27474SJ0418034";
+
+    /** Jane Doe's $6 gift on Nov 20, settled to npo #4: $4.40 granted and
+     * paid out, $0.51 card fee */
+    const seed_example = async () => {
+      // npos.id is GENERATED ALWAYS: the example's #4 needs the override
+      await db().execute(
+        sql`insert into npos (id, registration_number, name, endow_designation, overview_pt, hq_country, published, active) overriding system value values (4, 'EIN-SAVE-THE-KIDS', 'Save the Kids', 'Charity', '[]', 'United States', true, true)`
+      );
+      await db().insert(donations).values({
+        id: DON,
+        upusd: 1,
+        status: "settled",
+        amount_base: 6,
+        amount_tip: 0,
+        amount_fee_allowance: 0,
+        currency: "USD",
+        frequency: "one-time",
+        source: "bg-marketplace",
+        via: "paypal",
+        created_at: "2026-11-20T15:04:00.000Z",
+      });
+      await db().insert(donation_settlements).values({
+        donation_id: DON,
+        sttl_id: CHARGE,
+        date: "2026-11-20T15:05:00.000Z",
+        currency: "USD",
+        net: 5.49,
+        fee: 0.51,
+      });
+      await db()
+        .insert(dists)
+        .values({
+          id: `dist-${DON}`,
+          donation_id: DON,
+          status: "settled",
+          date_created: "2026-11-20T15:05:00.000Z",
+          to_id: 4,
+          to_name: "Save the Kids",
+          amount: 6,
+          amount_usd: 6,
+          amount_denom: "USD",
+          net: 4.4,
+          fee_base: 1.09,
+          fee_fsa: 0,
+          fee_processing: 0.51,
+          alloc: { liq: 0, lock: 0, cash: 100 },
+        });
+      await db()
+        .insert(payouts)
+        .values({
+          id: `payout-dist-${DON}`,
+          source_id: `dist-${DON}`,
+          npo_id: 4,
+          source: "donation",
+          date: "2026-11-21T00:00:00.000Z",
+          amount: 4.4,
+          type: "settled",
+          settled_date: "2026-11-22T00:00:00.000Z",
+        });
+      await db().insert(donation_recipients).values({
+        donation_id: DON,
+        npo_id: 4,
+        name: "Save the Kids",
+        type: "npo",
+      });
+      await db().insert(donation_donors).values({
+        donation_id: DON,
+        email: "jane@example.com",
+        name: "Jane Doe",
+      });
+    };
+
+    it("is every part of the alert, built from the donation and the dispute", async () => {
+      await seed_example();
+      enqueue_mock.mockClear();
+
+      await deliver({
+        ...created_ev(CHARGE, {
+          dispute_id: "PP-R-YCD-654975725",
+          dispute_amount: { currency_code: "USD", value: "6.00" },
+          seller_response_due_date: "2026-12-10T23:59:59.000Z",
+          disputed_transactions: [
+            {
+              seller_transaction_id: CHARGE,
+              gross_amount: { currency_code: "USD", value: "6.00" },
+              buyer: { name: "Bea Buyer" },
+            },
+          ],
+        }),
+        id: EV,
+      });
+
+      expect(notices()).toEqual([
+        {
+          type: "NOTICE",
+          from: "paypal-webhook-production",
+          title: "PayPal dispute opened · $6.00 to Save the Kids",
+          summary: "PayPal dispute opened: $6.00 to Save the Kids",
+          fields: [
+            {
+              name: "Nonprofit",
+              value: "Save the Kids (#4)",
+              inline: true,
+              url: "https://www.better.giving/admin/4",
+            },
+            { name: "Donor", value: "Jane Doe", inline: true },
+            { name: "Disputed", value: "6.00 of 6.00 USD", inline: true },
+            { name: "Reason", value: "Unauthorised", inline: true },
+            { name: "Donated", value: "Nov 20, 2026", inline: true },
+            {
+              name: "Respond by",
+              value: "Dec 10, 2026, 23:59 UTC",
+              inline: true,
+            },
+          ],
+          table: {
+            columns: [
+              { name: "Party" },
+              { name: "Received (USD)", align: "right" },
+              { name: "Card fee (USD)", align: "right" },
+              { name: "Dispute fee (USD)", align: "right" },
+              { name: "Owed (USD)", align: "right" },
+            ],
+            rows: [
+              ["Save the Kids (#4)", "4.40", "0.51", "0.00", "4.91"],
+              ["Total", "—", "—", "—", "4.91"],
+            ],
+          },
+          note: "PayPal reported no chargeback fee.\nDonation stays settled until a chargeback reverses it; what's owed comes out of next grants and is credited back if we win.",
+          action: {
+            text: "Respond in the PayPal Resolution Center by Dec 10, 2026, 23:59 UTC.",
+            // the mocked api_url is the sandbox's
+            url: "https://www.sandbox.paypal.com/resolutioncenter/",
+          },
+          context: [
+            `donation ${DON} · dispute PP-R-YCD-654975725 · charge ${CHARGE} · event ${EV}`,
+          ],
+        },
+      ]);
+    });
   });
 
   it.each([
-    [
-      "the whole charge",
-      "100.00",
-      "the donation reverses without taking it twice",
-    ],
-    ["$30 of it", "30.00", "it stays owed and the donation is not reversed"],
+    ["the whole charge", "100.00", "settled until a chargeback reverses it"],
+    ["$30 of it", "30.00", "settled even if PayPal charges this part back"],
   ])("tells ops what a reversal of %s will do", async (_, value, says) => {
     const { sttl_id } = await paypal_gift();
     enqueue_mock.mockClear();
@@ -2521,9 +2839,7 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
       })
     );
 
-    expect(notices()[0].body).toContain(
-      `if paypal reverses the charge, ${says}`
-    );
+    expect(notices()[0].note).toContain(`Donation stays ${says};`);
   });
 
   it("changes nothing further on a redelivered filing, and tells ops nothing again", async () => {
@@ -2610,11 +2926,12 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
     await deliver(created_ev(sttl_id));
 
     expect(notices()).toEqual([
-      expect.objectContaining({ title: "PayPal Dispute Opened" }),
+      expect.objectContaining({
+        title: "PayPal dispute opened · $100.00 to Save the Kids",
+        note: "The donation was already refunded_loss, so nothing more is recorded as owed.",
+      }),
     ]);
-    expect(notices()[0].body).toContain(
-      "already refunded_loss, so nothing more recorded as owed"
-    );
+    expect(notices()[0]).not.toHaveProperty("table");
   });
 
   it("filed with the grant still in the npo's balances, then reversed, debits the npo its $93.20 once", async () => {
@@ -2819,6 +3136,22 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
 
     expect(reversed).toMatchObject([{ outstanding_usd: 27.96 }]);
     expect(await owed_rows()).toMatchObject([{ outstanding_usd: 0 }]);
+  });
+
+  it("a second dispute that adds nothing says so without pointing at a table", async () => {
+    const { sttl_id } = await paypal_gift();
+    await deliver(created_ev(sttl_id));
+    enqueue_mock.mockClear();
+
+    await deliver({
+      ...created_ev(sttl_id, { dispute_id: "PP-R-SECOND" }),
+      id: "WH-DSP-SECOND",
+    });
+
+    const [alert] = notices();
+    expect(alert.note).toContain("Nothing more recorded as owed");
+    // the rows may all be settled, and then there is no table to point at
+    expect(alert.note).not.toMatch(/table/i);
   });
 
   it("resolved NONE after a refund and a dispute grew the refund's row, undoes the dispute's take and tells ops nothing", async () => {
@@ -3037,7 +3370,7 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
   });
 
   it("won with no filing on record while a refund's share is owed, tells ops once that nothing was credited", async () => {
-    const { sttl_id } = await paypal_gift();
+    const { sttl_id, npo_id } = await paypal_gift();
     capture_refunded(sttl_id, [["REF-40", "40.00"]]);
     await deliver(refunded_ev(sttl_id, "REF-40", "40.00", "40.00"));
     const owed = await owed_rows();
@@ -3051,10 +3384,18 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
     expect(await owed_rows()).toEqual(owed);
     expect(notices()).toEqual([
       expect.objectContaining({
-        title: "PayPal Dispute Won, Nothing Credited",
+        title:
+          "PayPal dispute won, nothing credited · $100.00 to Save the Kids",
       }),
     ]);
-    expect(notices()[0].body).toContain("37.28 USD");
+    const [alert] = notices();
+    expect(alert.fields).toEqual(expect.arrayContaining(names_parties(npo_id)));
+    expect(alert.table.rows).toEqual([
+      [`Save the Kids (#${npo_id})`, "36.00", "1.28", "0.00", "37.28"],
+      ["Total", "—", "—", "—", "37.28"],
+    ]);
+    expect(alert.note).toContain("credit it by hand on Amounts owed");
+    expect(alert).not.toHaveProperty("action");
   });
 
   it("credits what the filing recorded back to nothing outstanding on a seller win", async () => {
@@ -3074,7 +3415,7 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
   });
 
   it("won after paypal reversed the gift, tells ops once to restore it by hand", async () => {
-    const { id, sttl_id } = await paypal_gift();
+    const { id, sttl_id, npo_id } = await paypal_gift();
     await deliver_in(sttl_id, ["created", "reversed"]);
     const owed = await owed_rows();
     enqueue_mock.mockClear();
@@ -3085,13 +3426,16 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
     expect(res.status).toBe(200);
     expect(notices()).toEqual([
       expect.objectContaining({
-        title: "PayPal Dispute Won on a Reversed Donation",
+        title:
+          "PayPal dispute won on a reversed donation · $100.00 to Save the Kids",
       }),
     ]);
-    const [{ body }] = notices();
-    expect(body).toContain(`donation ${id}`);
-    expect(body).toContain("refunded_loss");
-    expect(body).toContain("by hand");
+    const [alert] = notices();
+    expect(alert.fields).toEqual(expect.arrayContaining(names_parties(npo_id)));
+    expect(alert.context[0]).toContain(`donation ${id}`);
+    expect(alert.note).toContain("already refunded_loss");
+    expect(alert.note).toContain("by hand");
+    expect(alert).not.toHaveProperty("table");
     expect(await owed_rows()).toEqual(owed);
   });
 
@@ -3137,7 +3481,7 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
   ])(
     "resolved with %s, keeps what is owed and tells ops to settle it by hand",
     async (_, dispute_outcome, says) => {
-      const { sttl_id } = await paypal_gift();
+      const { sttl_id, npo_id } = await paypal_gift();
       await deliver(created_ev(sttl_id));
       const owed = await owed_rows();
       enqueue_mock.mockClear();
@@ -3149,13 +3493,41 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
       expect(res.status).toBe(200);
       expect(await owed_rows()).toEqual(owed);
       expect(notices()).toEqual([
-        expect.objectContaining({ title: "PayPal Dispute Resolved" }),
+        expect.objectContaining({
+          title: "PayPal dispute resolved · $100.00 to Save the Kids",
+        }),
       ]);
-      const [{ body }] = notices();
-      expect(body).toContain(`resolved ${says}`);
-      expect(body).toContain("93.20 USD");
+      const [alert] = notices();
+      expect(alert.fields).toEqual(
+        expect.arrayContaining(names_parties(npo_id))
+      );
+      expect(alert.table.rows).toEqual([
+        [`Save the Kids (#${npo_id})`, "90.00", "3.20", "0.00", "93.20"],
+        ["Total", "—", "—", "—", "93.20"],
+      ]);
+      expect(alert.note).toContain(`Resolved ${says}`);
+      expect(alert).not.toHaveProperty("action");
     }
   );
+
+  it("resolved with no outcome tells ops nothing when every row it filed is already settled", async () => {
+    const { sttl_id } = await paypal_gift();
+    await deliver(created_ev(sttl_id));
+    // credited back in full: nothing left to credit or write off by hand
+    await db().update(owed_amounts).set({
+      credited_back_usd: 93.2,
+      credited_back_at: new Date().toISOString(),
+    });
+    enqueue_mock.mockClear();
+
+    const res = await deliver(
+      resolved_ev(sttl_id, "UNUSED", { dispute_outcome: undefined })
+    );
+
+    expect(res.status).toBe(200);
+    expect(await owed_rows()).toMatchObject([{ outstanding_usd: 0 }]);
+    expect(notices()).toEqual([]);
+  });
 
   it("reports a win it can't credit, on a charge settling a gift paid on another rail, and acknowledges it", async () => {
     const { sttl_id } = await seed_card_gift(db(), PAID_GRANT);
@@ -3193,6 +3565,8 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
     const won_ev = (sttl_id: string, at?: string) =>
       resolved_ev(sttl_id, "RESOLVED_SELLER_FAVOUR", {
         ...thirty,
+        // paypal may keep sending the old deadline: only an opened alert shows it
+        seller_response_due_date: "2026-10-21T07:00:00Z",
         ...(at && { update_time: at }),
       });
     const lost_ev = (sttl_id: string, at?: string) =>
@@ -3219,12 +3593,12 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
         .filter(
           (m: any) =>
             m.id === "fiat-notice" &&
-            m.payload.alert.title === "PayPal Dispute Outcome Changed"
+            m.payload.alert.title.startsWith("PayPal dispute outcome changed")
         )
-        .map((m: any) => ({ id: m.payload.id, body: m.payload.alert.body }));
+        .map((m: any) => ({ id: m.payload.id, alert: m.payload.alert }));
 
     it("won after it was lost, credits nothing, keeps its chargeback owed once, and tells ops per event", async () => {
-      const { id, sttl_id } = await paypal_gift();
+      const { id, sttl_id, npo_id } = await paypal_gift();
       await deliver(created_ev(sttl_id, thirty));
       await deliver(lost_ev(sttl_id));
       expect(await owed_rows()).toMatchObject([{ outstanding_usd: 27.96 }]);
@@ -3240,9 +3614,15 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
       ]);
       const alerts = changed();
       expect(new Set(alerts.map((a) => a.id)).size).toBe(1);
-      expect(alerts[0]!.body).toContain(
-        "won after it was recorded lost: the chargeback stays owed; credit by hand"
-      );
+      expect(alerts[0]!.alert).toMatchObject({
+        title: "PayPal dispute outcome changed · $30.00 to Save the Kids",
+        fields: expect.arrayContaining(names_parties(npo_id)),
+        note: "Won after it was recorded lost. The chargeback stays owed; credit it by hand if PayPal returned the money.",
+      });
+      expect(alerts[0]!.alert).not.toHaveProperty("table");
+      expect(
+        alerts[0]!.alert.fields.map((f: { name: string }) => f.name)
+      ).not.toContain("Respond by");
     });
 
     it("lost on appeal after it was won, re-owes nothing, stays won, and tells ops", async () => {
@@ -3260,8 +3640,8 @@ describe("a dispute on a paid-grant $100 gift, on the real entry", () => {
       ]);
       const alerts = changed();
       expect(new Set(alerts.map((a) => a.id)).size).toBe(1);
-      expect(alerts[0]!.body).toContain(
-        "lost on appeal after it was recorded won: nothing re-owed; recover by hand"
+      expect(alerts[0]!.alert.note).toBe(
+        "Lost on appeal after it was recorded won. Nothing is owed again; recover it by hand."
       );
     });
   });

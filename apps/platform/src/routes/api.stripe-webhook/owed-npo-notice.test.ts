@@ -10,7 +10,9 @@ import {
   it,
   vi,
 } from "vitest";
+import { alert_text } from "#/__tests__/fixtures/alert-text";
 import { to_utc_day } from "@/helpers/date";
+import type { Alert } from "@/slack";
 import type { DbOrTx } from "$/pg/queries/helpers";
 import type { TestDb } from "$/pg/test-utils/pglite";
 
@@ -184,7 +186,7 @@ const ops_notices = () =>
   enqueue_mock.mock.calls
     .flat()
     .filter((m) => m.id === "fiat-notice")
-    .map((m) => m.payload.alert as { title: string; body: string });
+    .map((m) => m.payload.alert as Alert);
 
 /** a paid-grant gift the terms cover, with an admin who can be mailed */
 const prepare = async () => {
@@ -342,8 +344,8 @@ describe("owed-npo-notif from mocked stripe events", () => {
     expect(await sent()).toEqual([]);
     expect((await owed_row(gift.id))?.outstanding_usd).toBeCloseTo(108.2, 10);
     expect(opened!.text).toContain("Dispute fee: $15.00");
-    expect(ops_notices().map((n) => n.title)).toContain(
-      "Dispute Lost: Donation Reversed"
+    expect(ops_notices().map((n) => n.title.split(" · ")[0])).toContain(
+      "Dispute lost, donation reversed"
     );
   });
 
@@ -416,9 +418,9 @@ describe("owed-npo-notif from mocked stripe events", () => {
       { subject: mail!.subject, text: mail!.text },
     ]);
     expect(more).toEqual([]);
-    expect(ops!.title).toBe("Dispute Won on a Reversed Donation");
-    expect(ops!.body).toMatch(/credited back, its dispute fee included/);
-    expect(ops!.body).not.toMatch(/by hand/);
+    expect(ops!.title).toMatch(/^Stripe dispute won on a reversed donation · /);
+    expect(alert_text(ops!)).toMatch(/credited back, its dispute fee included/);
+    expect(alert_text(ops!)).not.toMatch(/by hand/);
     expect(transfer_create_mock).not.toHaveBeenCalled();
     expect(transfer_reversal_mock).not.toHaveBeenCalled();
   });

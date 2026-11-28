@@ -20,6 +20,7 @@ import {
 import { paypal_donor_update } from "@/donations/helpers";
 import { PLACEHOLDER_EMAIL } from "@/donations/schema";
 import { msg } from "@/queue";
+import type { Alert, Field } from "@/slack";
 import type { ISub, TInterval, TStatus } from "@/subscriptions";
 import { paypal as paypal_env, stage } from "$/env";
 import { paypal } from "$/kit/paypal";
@@ -34,14 +35,25 @@ import {
   donation_update,
   settlement_exists,
 } from "$/pg/queries/donation";
-import { owed_for_donation } from "$/pg/queries/owed";
+import { type IOwed, owed_for_donation } from "$/pg/queries/owed";
 import {
   sub_cancel_reason_default,
   sub_get,
   sub_put,
   sub_update,
 } from "$/pg/queries/subscription";
-import { dispute_opened, dispute_won, owed_lines } from "$/refund/dispute";
+import {
+  alert_deadline,
+  amount_label,
+  donated_field,
+  donor_field,
+  NOTHING_OUTSTANDING,
+  outstanding,
+  owed_table,
+  recipient_field,
+  recipient_name,
+} from "$/refund/alert";
+import { dispute_opened, dispute_won } from "$/refund/dispute";
 import {
   type ReversalSource,
   reverse_charge,
@@ -517,6 +529,13 @@ const read_order = (
 const money = (value?: string, currency?: string) =>
   value ? `${value} ${currency ?? ""}`.trim() : "unknown";
 
+/** an alert title's "$6.00": what a refund or reversal took, unsigned (paypal
+ * sends a reversal's amount negative); undefined when paypal names none */
+const taken_label = (value?: string, currency?: string) => {
+  const n = Math.abs(Number(value));
+  return value && Number.isFinite(n) ? amount_label(n, currency) : undefined;
+};
+
 interface IMoney {
   value?: string;
   currency?: string;
@@ -562,7 +581,8 @@ interface IReversal {
   /** paypal's refund or reversal id, recorded on what a party owes */
   ref: string | undefined;
   status: string | undefined;
-  refunded: string;
+  /** what this event took back, "$6.00"; absent when paypal names no amount */
+  refunded: string | undefined;
   charged: string;
   /** why `share` is null, for the notice telling ops to settle it by hand */
   caveat?: string;
@@ -600,8 +620,7 @@ const reverse_settled = async (ev: WebhookEvent, c: IReversal) => {
     return new Response(`no donation for ${c.sttl_id}`, { status: 200 });
   }
   const lines = [
-    `donation ${don.id}, charge ${c.sttl_id}, event ${ev.id}`,
-    `refunded in this event: ${c.refunded}, of a charge of ${c.charged} (paypal status ${c.status})`,
+    `Charge was ${c.charged} (PayPal status ${c.status}).`,
     ...(c.caveat ? [c.caveat] : []),
   ];
   const res = await reverse_charge({
@@ -616,7 +635,12 @@ const reverse_settled = async (ev: WebhookEvent, c: IReversal) => {
     source_ref: c.ref,
     alert_from: REFUND_ALERT_FROM,
     // keyed on the event, so a duplicate delivery posts one notice
-    notice: { id: `paypal-reversal_${ev.id}`, lines },
+    notice: {
+      id: `paypal-reversal_${ev.id}`,
+      amount: c.refunded,
+      ids: [`charge ${c.sttl_id}`, `event ${ev.id}`],
+      lines,
+    },
   });
   switch (res.status) {
     case "reversed":
@@ -667,8 +691,11 @@ interface IDispute {
   create_time?: string;
   update_time?: string;
   reason?: string;
+  /** e.g. WAITING_FOR_SELLER_RESPONSE, UNDER_REVIEW, RESOLVED */
+  status?: string;
   dispute_outcome?: { outcome_code?: string };
   dispute_amount?: { value?: string; currency_code?: string };
+  seller_response_due_date?: string;
   disputed_transactions?: {
     seller_transaction_id?: string;
     gross_amount?: { value?: string; currency_code?: string };
@@ -697,16 +724,13 @@ const dispute_fee = (d: IDispute): { usd: number; line: string } => {
       : []
   );
   if (fees.length === 0) {
-    return {
-      usd: 0,
-      line: "chargeback fee: none reported by paypal, so recorded as $0 owed.",
-    };
+    return { usd: 0, line: "PayPal reported no chargeback fee." };
   }
   const listed = fees.map((f) => money(f.value, f.currency)).join(", ");
   if (fees.some((f) => f.currency !== "USD")) {
     return {
       usd: 0,
-      line: `chargeback fee: ${listed}, not all in USD, so recorded as $0 owed: settle it by hand.`,
+      line: `Chargeback fee ${listed} is not all in USD, so none of it is recorded as owed: settle it by hand.`,
     };
   }
   // dec_sub's minor-unit arithmetic, negated: the fees summed
@@ -714,43 +738,121 @@ const dispute_fee = (d: IDispute): { usd: number; line: string } => {
     "0",
     fees.map((f) => f.value)
   );
-  return { usd, line: `chargeback fee: ${listed}` };
+  return { usd, line: `PayPal charged a chargeback fee of ${listed}.` };
 };
 
 /** what becomes of what a filing recorded; `partial`: what the gift has on
  * record as taken back, this dispute included, is part of the charge, which a
  * reversal records as a share, reversing nothing */
 const dispute_explainer = (partial: boolean) =>
-  `the donation stays settled while the dispute is open, and what is owed is recovered from each party's next grants. if paypal reverses the charge, ${partial ? "it stays owed and the donation is not reversed" : "the donation reverses without taking it twice"}; if the dispute resolves leaving us the money (a seller win, the buyer cancelling, the claim denied, or paypal paying the buyer itself), what is owed is credited back.`;
+  partial
+    ? "Donation stays settled even if PayPal charges this part back; what's owed comes out of next grants and is credited back if we win."
+    : "Donation stays settled until a chargeback reverses it; what's owed comes out of next grants and is credited back if we win.";
 
-const RESPOND_BY_DEADLINE =
-  "respond in the paypal resolution center before its deadline.";
+// a sandbox dispute exists only in the sandbox's own resolution center
+const RESOLUTION_CENTER = paypal_env.api_url?.includes("sandbox")
+  ? "https://www.sandbox.paypal.com/resolutioncenter/"
+  : "https://www.paypal.com/resolutioncenter/";
 
-/** an ops notice of a dispute, under `id`: a redelivery collapses into it */
+/** the one thing ops do on an opened dispute: asked whenever paypal names a
+ * seller deadline, whatever the status, since a dispute that opened in another
+ * state can move to waiting on the seller with no event we handle; without a
+ * deadline, only while paypal says it waits on the seller. no "by" without
+ * paypal's date */
+const respond_action = (d: IDispute): Alert["action"] => {
+  const due = alert_deadline(d.seller_response_due_date);
+  if (!due && d.status !== "WAITING_FOR_SELLER_RESPONSE") return undefined;
+  return {
+    text: `Respond in the PayPal Resolution Center${due ? ` by ${due}` : ""}.`,
+    url: RESOLUTION_CENTER,
+  };
+};
+
+/** "UNAUTHORISED" → "Unauthorised" */
+const humanize_code = (code: string) => {
+  const words = code.toLowerCase().replaceAll("_", " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+/** "6.00 of 6.00 USD": the dispute's amount out of the charge's, when both
+ * are known in one currency */
+const disputed_value = (d: IDispute): string | undefined => {
+  const amount = d.dispute_amount;
+  if (!amount?.value) return undefined;
+  const gross = d.disputed_transactions?.[0]?.gross_amount;
+  if (gross?.value && gross.currency_code === amount.currency_code) {
+    return `${amount.value} of ${money(gross.value, gross.currency_code)}`;
+  }
+  return money(amount.value, amount.currency_code);
+};
+
+interface IDisputeNotice {
+  /** dedupe id: a redelivery collapses into it */
+  id: string;
+  /** what happened, e.g. "PayPal dispute opened" */
+  headline: string;
+  owed?: IOwed[];
+  note?: string;
+  action?: Alert["action"];
+}
+
+/** an ops notice of a dispute on `don`, the donation its charge settled */
 const notify_dispute = async (
   ev: WebhookEvent,
   d: IDispute,
-  don_id: string | undefined,
-  n: { id: string; title: string; lines: string[] }
+  don: IDonation | undefined,
+  n: IDisputeNotice
 ) => {
-  const charges = (d.disputed_transactions ?? [])
-    .map((t) => t.seller_transaction_id)
-    .filter(Boolean);
-  await enqueue(
-    msg("fiat-notice", {
-      id: n.id,
-      alert: {
-        type: "NOTICE",
-        from: `paypal-webhook-${stage}`,
-        title: n.title,
-        body: [
-          `${don_id ? `donation ${don_id}, ` : ""}dispute ${d.dispute_id ?? "unknown"}, charge ${charges.join(", ") || "unknown"}, event ${ev.id ?? "unknown"}`,
-          `disputed: ${money(d.dispute_amount?.value, d.dispute_amount?.currency_code)}, reason ${d.reason ?? "unknown"}`,
-          ...n.lines,
-        ].join("\n"),
-      },
-    })
+  const charges = (d.disputed_transactions ?? []).flatMap((t) =>
+    t.seller_transaction_id ? [t.seller_transaction_id] : []
   );
+  const gift = `${amount_label(d.dispute_amount?.value, d.dispute_amount?.currency_code)} to ${recipient_name(don)}`;
+  const disputed = disputed_value(d);
+  // a deadline is news only on the alert that asks for a response
+  const respond_by = n.action && alert_deadline(d.seller_response_due_date);
+  const fields = [
+    don && recipient_field(don),
+    don && donor_field(don),
+    disputed && { name: "Disputed", value: disputed, inline: true as const },
+    d.reason && {
+      name: "Reason",
+      value: humanize_code(d.reason),
+      inline: true as const,
+    },
+    donated_field(don),
+    respond_by && {
+      name: "Respond by",
+      value: respond_by,
+      inline: true as const,
+    },
+  ].filter((f): f is Field => !!f);
+  const ids = [
+    // whole: ops look it up to act by hand
+    don && `donation ${don.id}`,
+    d.dispute_id && `dispute ${d.dispute_id}`,
+    charges.length > 0 && `charge ${charges.join(", ")}`,
+    ev.id && `event ${ev.id}`,
+  ].filter((id): id is string => !!id);
+  const table = n.owed?.length ? await owed_table(n.owed) : undefined;
+  const note = [
+    n.note,
+    // every row settled: said in a line, in place of the table
+    n.owed?.length && !table ? NOTHING_OUTSTANDING : undefined,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const alert: Alert = {
+    type: "NOTICE",
+    from: `paypal-webhook-${stage}`,
+    title: `${n.headline} · ${gift}`,
+    summary: `${n.headline}: ${gift}`,
+    fields,
+    ...(table && { table }),
+    ...(note && { note }),
+    ...(n.action && { action: n.action }),
+    ...(ids.length > 0 && { context: [ids.join(" · ")] }),
+  };
+  await enqueue(msg("fiat-notice", { id: n.id, alert }));
 };
 
 /**
@@ -768,11 +870,9 @@ async function dispute_created(ev: WebhookEvent): Promise<Response> {
     // keyed on the event: nothing is put on record to stop a redelivery
     await notify_dispute(ev, d, undefined, {
       id: `paypal-dispute_${ev.id}`,
-      title: "PayPal Dispute Opened",
-      lines: [
-        "no donation settled by this charge, so nothing recorded as owed.",
-        RESPOND_BY_DEADLINE,
-      ],
+      headline: "PayPal dispute opened",
+      note: "No donation was settled by this charge, so nothing is recorded as owed.",
+      action: respond_action(d),
     });
     return new Response("dispute reported", { status: 200 });
   }
@@ -797,17 +897,19 @@ async function dispute_created(ev: WebhookEvent): Promise<Response> {
       : undefined;
   // told on the first sighting, and again only when what is owed grows: a
   // redelivery tells nothing
-  const news = ((): string[] | null => {
+  const news = ((): Pick<IDisputeNotice, "owed" | "note"> | null => {
     switch (res.status) {
       case "closed":
         return null;
       case "failed":
-        return [`nothing recorded as owed: ${res.reason}. settle it by hand.`];
+        return {
+          note: `Nothing recorded as owed: ${res.reason}. Settle it by hand.`,
+        };
       case "already_reversed":
         return res.inserted
-          ? [
-              `the donation was already ${res.donation_status}, so nothing more recorded as owed.`,
-            ]
+          ? {
+              note: `The donation was already ${res.donation_status}, so nothing more is recorded as owed.`,
+            }
           : null;
       case "recorded": {
         // a dispute closed with no decision, or a chargeback reversed before
@@ -815,36 +917,41 @@ async function dispute_created(ev: WebhookEvent): Promise<Response> {
         const prior =
           res.prior_refs.length > 0
             ? [
-                `what is owed on this payment stands under ${res.prior_refs.join(", ")}, recorded before this dispute; this dispute's share is merged into it, and a win of it credits that share back.`,
+                `What's owed stands under ${res.prior_refs.join(", ")}, recorded before this dispute; its share is merged in and credited back if we win.`,
               ]
             : [];
         if (res.owed_written) {
-          return [
-            ...owed_lines(res.owed),
-            ...prior,
-            fee.line,
-            dispute_explainer((filed?.cumulative_share ?? 1) < 1),
-          ];
+          return {
+            owed: res.owed,
+            note: [
+              ...prior,
+              fee.line,
+              dispute_explainer((filed?.cumulative_share ?? 1) < 1),
+            ].join("\n"),
+          };
         }
         if (!res.inserted) return null;
         if (res.owed.length === 0) {
-          return [
-            "nothing settled to the gift's parties yet, so nothing recorded as owed.",
-          ];
+          return {
+            note: "Nothing settled to the gift's parties yet, so nothing is recorded as owed.",
+          };
         }
-        return [
-          "nothing more recorded as owed for this dispute; the payment's rows stand as:",
-          ...owed_lines(res.owed),
-          ...prior,
-        ];
+        return {
+          owed: res.owed,
+          note: [
+            "Nothing more recorded as owed for this dispute. What the payment already owes stays as it was.",
+            ...prior,
+          ].join("\n"),
+        };
       }
     }
   })();
   if (news) {
-    await notify_dispute(ev, d, don.id, {
+    await notify_dispute(ev, d, don, {
       id: `paypal-dispute_${d.dispute_id}`,
-      title: "PayPal Dispute Opened",
-      lines: [...news, RESPOND_BY_DEADLINE],
+      headline: "PayPal dispute opened",
+      ...news,
+      action: respond_action(d),
     });
   }
   return new Response(`dispute ${res.status}`, { status: 200 });
@@ -873,13 +980,13 @@ const SELLER_KEEPS_OUTCOMES = new Set([
 const notify_outcome_changed = (
   ev: WebhookEvent,
   d: IDispute,
-  don_id: string,
-  line: string
+  don: IDonation,
+  note: string
 ) =>
-  notify_dispute(ev, d, don_id, {
+  notify_dispute(ev, d, don, {
     id: `paypal-dispute-changed_${ev.id}`,
-    title: "PayPal Dispute Outcome Changed",
-    lines: [line],
+    headline: "PayPal dispute outcome changed",
+    note,
   });
 
 /** a dispute resolved. an outcome that leaves us the money credits back what
@@ -927,8 +1034,8 @@ async function dispute_resolved(ev: WebhookEvent): Promise<Response> {
       await notify_outcome_changed(
         ev,
         d,
-        don.id,
-        `dispute ${record.id} closed ${closed_as} after it was recorded ${closed.prior_status}: what it took stays owed; credit by hand if paypal returned the money.`
+        don,
+        `Closed ${closed_as} after it was recorded ${closed.prior_status}. What it took stays owed; credit it by hand if PayPal returned the money.`
       );
     }
     return new Response(`dispute ${outcome}`, { status: 200 });
@@ -940,8 +1047,8 @@ async function dispute_resolved(ev: WebhookEvent): Promise<Response> {
       await notify_outcome_changed(
         ev,
         d,
-        don.id,
-        `dispute ${record.id} lost on appeal after it was recorded ${stands}: nothing re-owed; recover by hand.`
+        don,
+        `Lost on appeal after it was recorded ${stands}. Nothing is owed again; recover it by hand.`
       );
     }
     return new Response(`dispute ${outcome}`, { status: 200 });
@@ -950,18 +1057,18 @@ async function dispute_resolved(ev: WebhookEvent): Promise<Response> {
     // its own share on record: its filing recorded what is owed, into
     // whatever row a refund or an earlier dispute wrote first
     const filed = (await dispute_get(record.id))?.share != null;
-    const owing = filed ? await owed_for_donation(don.id) : [];
+    // only what is still outstanding: ops are told to credit or write off
+    const owing = filed
+      ? (await owed_for_donation(don.id)).filter((o) => outstanding(o) >= 0.01)
+      : [];
     if (owing.length > 0) {
       // keyed on the dispute: a redelivery collapses into it in the queue's
       // dedupe window
-      await notify_dispute(ev, d, don.id, {
+      await notify_dispute(ev, d, don, {
         id: `paypal-dispute-resolved_${d.dispute_id}`,
-        title: "PayPal Dispute Resolved",
-        lines: [
-          `resolved ${outcome ?? "with no outcome"}, which says neither that we kept the money nor that the buyer got it back, so what disputes on this payment recorded stays owed:`,
-          ...owed_lines(owing),
-          "if paypal took no money back for it, credit or write it off by hand on Amounts owed.",
-        ],
+        headline: "PayPal dispute resolved",
+        owed: owing,
+        note: `Resolved ${outcome ?? "with no outcome"}, which doesn't say who kept the money, so what's owed stays owed. If PayPal took no money back, credit or write it off by hand on Amounts owed.`,
       });
     }
     return new Response(`dispute ${outcome ?? "with no outcome"}`, {
@@ -992,18 +1099,16 @@ async function dispute_resolved(ev: WebhookEvent): Promise<Response> {
     await notify_outcome_changed(
       ev,
       d,
-      don.id,
-      `dispute ${record.id} won after it was recorded ${won.prior_status}: the chargeback stays owed; credit by hand if paypal returned the money.`
+      don,
+      `Won after it was recorded ${won.prior_status}. The chargeback stays owed; credit it by hand if PayPal returned the money.`
     );
   }
   // once per dispute: a redelivery finds it on record won already
   if (won.status === "already_reversed" && won.prior_status !== "won") {
-    await notify_dispute(ev, d, don.id, {
+    await notify_dispute(ev, d, don, {
       id: `paypal-dispute-won_${d.dispute_id}`,
-      title: "PayPal Dispute Won on a Reversed Donation",
-      lines: [
-        `paypal resolved the dispute ${outcome}, leaving us the disputed amount, but the donation was already ${won.donation_status} and the refund core can't undo a reversal. if paypal's chargeback reversed it, restore by hand the donation, its dists and what each party was recorded as owing; if a refund did, the donor kept that money and nothing is owed back.`,
-      ],
+      headline: "PayPal dispute won on a reversed donation",
+      note: `Resolved ${outcome}, leaving us the money, but the donation was already ${won.donation_status}. If PayPal's chargeback reversed it, restore the donation, its dists and what's owed by hand; if a refund did, nothing is owed back.`,
     });
   }
   if (won.status === "credited" && won.owed.length === 0 && !was_won) {
@@ -1011,14 +1116,11 @@ async function dispute_resolved(ev: WebhookEvent): Promise<Response> {
       (o) => (o.outstanding_usd ?? 0) >= 0.01
     );
     if (owing.length > 0) {
-      await notify_dispute(ev, d, don.id, {
+      await notify_dispute(ev, d, don, {
         id: `paypal-dispute-won-uncredited_${record.id}`,
-        title: "PayPal Dispute Won, Nothing Credited",
-        lines: [
-          `paypal resolved the dispute ${outcome}, leaving us the disputed amount, but its filing recorded nothing as owed here (never delivered, or handled after the win), so nothing was credited back. the gift still owes:`,
-          ...owed_lines(owing),
-          "if any of it is this dispute's share, credit it by hand on Amounts owed.",
-        ],
+        headline: "PayPal dispute won, nothing credited",
+        owed: owing,
+        note: `Resolved ${outcome}, leaving us the money, but its filing recorded nothing owed, so nothing was credited back. If any of the table is this dispute's share, credit it by hand on Amounts owed.`,
       });
     }
   }
@@ -1441,7 +1543,7 @@ export async function action({ request }: Route.ActionArgs) {
           ref: refund.id,
           refunded_at: is_reversal ? undefined : refund.create_time,
           status: capture.status,
-          refunded: money(part?.value, part?.currency_code),
+          refunded: taken_label(part?.value, part?.currency_code),
           charged: money(gross?.value, gross?.currency_code),
           owner: async () => capture.custom_id,
         });
@@ -1484,7 +1586,11 @@ export async function action({ request }: Route.ActionArgs) {
           ref: r.id,
           refunded_at: is_reversal ? undefined : r.create_time,
           status: state,
-          refunded: money(r.amount?.total, r.amount?.currency),
+          // the sale resource itself names the whole sale, not what was taken
+          refunded:
+            is_sale && !sized.share
+              ? undefined
+              : taken_label(r.amount?.total, r.amount?.currency),
           charged: money(whole?.total, whole?.currency),
           owner: async () => {
             const subs_id = sale.billing_agreement_id;

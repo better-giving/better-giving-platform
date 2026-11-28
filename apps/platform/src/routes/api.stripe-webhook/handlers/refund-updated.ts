@@ -22,7 +22,8 @@ export async function handle_refund_updated(event: Stripe.RefundUpdatedEvent) {
 
   await reverse_refunds(refunded, {
     alert_from: ALERT_FROM,
-    seen_at: `refund ${refund.id}, event ${event.id}`,
+    seen_at: [`refund ${refund.id}`, `event ${event.id}`],
     event_id: event.id,
+    refunds: [refund],
   });
 }

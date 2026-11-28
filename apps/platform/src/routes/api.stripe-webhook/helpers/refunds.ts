@@ -4,7 +4,8 @@ import { is_reversed } from "@/donations";
 import { msg } from "@/queue";
 import { stage } from "$/env";
 import { enqueue } from "$/kit/queue";
-import { money, refund_list } from "$/kit/stripe-money";
+import { money, money_label, refund_list } from "$/kit/stripe-money";
+import { humanize_code, ops_alert } from "$/refund/ops-alert";
 import { reverse_charge } from "$/refund/reverse";
 import { charge_refunds, refund_take } from "$/refund/unsent";
 import { ReversalIncompleteError } from "./reversal-incomplete";
@@ -56,16 +57,31 @@ export async function reverse_refunds(
   { charge, intent_id, don, refunds, latest, live, unsent }: RefundedCharge,
   o: {
     alert_from: string;
-    /** where it was seen, e.g. `charge ch_1, event evt_1` */
-    seen_at: string;
+    /** where it was seen, e.g. [`charge ch_1`, `event evt_1`] */
+    seen_at: string[];
     /** the event: its notices' dedupe id */
     event_id: string;
-    /** the event's own lines for ops, after the donation's */
+    /** the event's own sentences for ops */
     lines?: string[];
+    /** the refunds the event is about, whose amounts the alerts add up; absent,
+     * or when none of them took money back, the alerts show what the charge's
+     * refunds took back so far */
+    refunds?: Stripe.Refund[];
   }
 ) {
   const don_id = don.id;
   const taken = live.reduce((sum, r) => sum + r.amount, 0);
+  // a failed or canceled refund takes nothing back: the alert shows the event's
+  // own refunds that do, or, when they all failed, what the charge's live
+  // refunds take back in all, which is what the reversal then acts on
+  const ids = new Set(live.map((r) => r.id));
+  const own = (o.refunds ?? []).filter((r) => ids.has(r.id));
+  const this_refund = money_label(
+    own.length > 0 ? own.reduce((sum, r) => sum + r.amount, 0) : taken,
+    charge.currency
+  );
+  // the running total is not "this refund": the field says which it shows
+  const subject = own.length > 0 ? "Refunded" : "Refunded so far";
   const result = await reverse_charge({
     donation_id: don_id,
     rail: "stripe",
@@ -78,11 +94,13 @@ export async function reverse_refunds(
     alert_from: o.alert_from,
     notice: {
       id: o.event_id,
+      amount: this_refund,
+      subject,
+      ids: o.seen_at,
       lines: [
-        `donation ${don_id}, ${o.seen_at}`,
         ...(o.lines ?? []),
-        `refunds on this charge: ${refund_list(refunds, charge.currency)}`,
-        `total refunded so far: ${money(taken, charge.currency)} of ${money(charge.amount_captured, charge.currency)}`,
+        `Refunds on this charge: ${refund_list(refunds, charge.currency)}.`,
+        `Total refunded so far: ${money(taken, charge.currency)} of ${money(charge.amount_captured, charge.currency)}.`,
       ],
     },
   });
@@ -94,17 +112,29 @@ export async function reverse_refunds(
       await enqueue(
         msg("fiat-notice", {
           id: `${latest.id}_held`,
-          alert: {
-            type: "NOTICE",
+          alert: await ops_alert({
             from: `${o.alert_from}-${stage}`,
-            title: "Reversal Held: Refund Not Yet Succeeded",
-            body: [
-              `donation ${don_id}, ${o.seen_at}`,
-              `latest refund: ${refund_list([latest], charge.currency)}`,
-              `waiting on: ${refund_list(unsent, charge.currency)}`,
-              "nothing more is taken back until stripe reports every refund here settled (refund.updated), when the refunded share is taken back automatically. if they show succeeded in stripe and nothing was taken back, check that the webhook endpoint subscribes to refund.updated.",
-            ].join("\n"),
-          },
+            headline: "Reversal held until the refund succeeds",
+            don,
+            amount: this_refund,
+            subject,
+            fields: [
+              {
+                name: "Status",
+                // what it waits on, not the latest: that one may have succeeded
+                value: humanize_code(unsent[0]?.status ?? "pending"),
+                inline: true,
+              },
+            ],
+            note: [
+              `Waiting on: ${refund_list(unsent, charge.currency)}.`,
+              "Nothing more is taken back until Stripe reports every refund here succeeded; then it is taken back automatically.",
+            ],
+            action: {
+              text: "If they show succeeded in Stripe and nothing was taken back, check the webhook endpoint subscribes to refund.updated.",
+            },
+            ids: [...new Set([...o.seen_at, `refund ${latest.id}`])],
+          }),
         })
       );
       return;
