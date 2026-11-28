@@ -538,9 +538,9 @@ export async function create_payment(
   // gets a new one, and the old donation is closed, after every check above
   // has passed so a refusal leaves the old payment as it was
   if (voided) {
-    // new one, and the old donation is closed. only if still unpaid, and the
-    // claim goes only when it was: a donation paid meanwhile keeps its answer,
-    // and one a racing repeat just closed leaves the new answer to the claim
+    // the close and the rename happen only if the donation is still unpaid: one
+    // paid meanwhile keeps its answer, and one a racing repeat just closed
+    // leaves the new answer to the claim
     const closed = await db.transaction(async (tx) => {
       const [expired] = await tx
         .update(donations)
