@@ -8,6 +8,7 @@ import {
   beforeEach,
   describe,
   expect,
+  onTestFinished,
   test,
   vi,
 } from "vitest";
@@ -258,6 +259,17 @@ describe("POST /api/partner/v1/payments", () => {
 
     expect(id).not.toBe("chosen-by-the-browser");
     expect(await partner_donation_of_grant(db() as never, "grant_1")).toBe(id);
+  });
+
+  test("a new gift on an authorization whose payment isn't recorded yet is told to wait, not that it is used", async () => {
+    const { key } = await seed();
+    create_grant.mockRejectedValueOnce(new Error("chariot is down"));
+    expect((await post(key.key, daf("g-1", "wf_1"))).status).toBe(500);
+
+    const res = await post(key.key, daf("g-2", "wf_1"));
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get("retry-after")).toBe("30");
   });
 
   test("a second gift on an authorization that already paid is refused before any grant is made", async () => {
@@ -863,6 +875,10 @@ describe("POST /api/partner/v1/payments", () => {
 
   test("a repeat of a made payment spends none of the donor address's limit, and another nonprofit has its own", async () => {
     const { key, other } = await seed();
+    // mid-minute, so the limiter's 60s window can't roll over mid-test
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-25T10:00:20.000Z"));
+    onTestFinished(() => void vi.useRealTimers());
     await post(key.key, body({ donor_ip: "203.0.113.5" }));
     for (let i = 0; i < DONOR_IP_QUOTA.max * 2; i++) {
       expect(
@@ -888,6 +904,10 @@ describe("POST /api/partner/v1/payments", () => {
 
   test("one donor address is limited, answered 429 with retry-after", async () => {
     const { key } = await seed();
+    // mid-minute, so the limiter's 60s window can't roll over mid-test
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-25T10:00:20.000Z"));
+    onTestFinished(() => void vi.useRealTimers());
 
     for (let i = 0; i < DONOR_IP_QUOTA.max; i++) {
       const res = await post(

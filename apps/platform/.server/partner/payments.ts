@@ -229,6 +229,21 @@ async function claim(
     // the same request racing itself also lands here: once more, so its
     // winner's row answers it, before the authorization is called used
     if (!again) return claim(db, npo_id, req, fingerprint, true);
+    // a payment that isn't recorded yet may have made no grant at all (its
+    // request failed or is still running): its own retry settles that, so the
+    // site is told to wait, not that the authorization is used
+    const [holder] = await db
+      .select({ response: partner_payments.response })
+      .from(partner_payments)
+      .where(
+        eq(
+          partner_payments.authorized_session_id,
+          req.authorized_session_id ?? ""
+        )
+      );
+    if (holder && !holder.response) {
+      return { kind: "refused", response: still_being_made() };
+    }
     return {
       kind: "refused",
       response: problem("invalid_request", {
