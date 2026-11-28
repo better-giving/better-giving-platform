@@ -98,7 +98,11 @@ export const stripe_create = async ({
     // no intent exists, so nothing can ever pay this row. left as `created` it
     // would read as a checkout that might still be paid, and keep its campaign
     // from being deleted
-    await donation_update(db, don.id, { status: "failed" }).catch(() => {});
+    // a caller that minted the id closes the row itself, under its claim: a
+    // request that lost the claim must not fail the row its successor is using
+    if (!don_id) {
+      await donation_update(db, don.id, { status: "failed" }).catch(() => {});
+    }
     const refusal = donor_refusal(err);
     if (!refusal) throw err;
     // 4xx is kept off sentry, so this line is the only record of the refusal
@@ -107,7 +111,9 @@ export const stripe_create = async ({
     );
     return refuse(
       refusal.code === "amount_too_small" ? "below_minimum" : "above_maximum",
-      refusal.reason
+      refusal.reason,
+      400,
+      { minimum_usd: MIN_DONATION_USD, upusd }
     );
   }
 

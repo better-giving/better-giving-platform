@@ -96,9 +96,12 @@ export const paypal_create = async ({
     }
   } catch (err) {
     // nothing at paypal for the donor to approve, so the row is not pending
-    await donation_update(db, don.id, { status: "failed" }).catch((e) =>
-      report_error(e, { don_id: don.id })
-    );
+    // a caller that minted the id closes the row itself (see `stripe_create`)
+    if (!don_id) {
+      await donation_update(db, don.id, { status: "failed" }).catch((e) =>
+        report_error(e, { don_id: don.id })
+      );
+    }
     throw err;
   }
 

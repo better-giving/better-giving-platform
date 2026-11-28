@@ -129,6 +129,7 @@ const answer_of = (
 const ORDER_CHECK_AFTER_MS = 60 * 60 * 1000;
 
 async function order_voided(
+  db: Db,
   answer: IPartnerPaymentAnswer,
   created_at: string | Date
 ): Promise<boolean> {
@@ -136,6 +137,12 @@ async function order_voided(
   if (Date.now() - new Date(created_at).getTime() < ORDER_CHECK_AFTER_MS) {
     return false;
   }
+  // paypal is asked only about an order that could still be paid
+  const [don] = await db
+    .select({ status: donations.status })
+    .from(donations)
+    .where(eq(donations.id, answer.id));
+  if (!don || !["created", "intent"].includes(don.status)) return false;
   const order = await paypal
     .get_order(answer.client.token)
     // a 404 is an order paypal no longer has: it expired unapproved
@@ -291,17 +298,37 @@ async function claim(
   };
 }
 
-const release = (db: Db, npo_id: number, gift_id: string, claim_id: string) =>
-  db
-    .delete(partner_payments)
-    .where(
-      and(
-        eq(partner_payments.npo_id, npo_id),
-        eq(partner_payments.gift_id, gift_id),
-        eq(partner_payments.claim_id, claim_id),
-        isNull(partner_payments.response)
+/** gives the gift id back, if this request still holds it. `donation_id` is
+ * the unpaid row its failed session leaves: closed in the same transaction, so
+ * a request that lost its claim never fails the row its successor is using */
+const release = (
+  db: Db,
+  npo_id: number,
+  gift_id: string,
+  claim_id: string,
+  donation_id?: string | null
+) =>
+  db.transaction(async (tx) => {
+    const [gone] = await tx
+      .delete(partner_payments)
+      .where(
+        and(
+          eq(partner_payments.npo_id, npo_id),
+          eq(partner_payments.gift_id, gift_id),
+          eq(partner_payments.claim_id, claim_id),
+          isNull(partner_payments.response)
+        )
       )
-    );
+      .returning({ gift_id: partner_payments.gift_id });
+    if (gone && donation_id) {
+      await tx
+        .update(donations)
+        .set({ status: "failed" })
+        .where(
+          and(eq(donations.id, donation_id), eq(donations.status, "created"))
+        );
+    }
+  });
 
 /** `POST /payments`: the same checks checkout runs, against the key's own
  * nonprofit, then one session on Better Giving's account for the method. a
@@ -336,13 +363,13 @@ export async function create_payment(
       )
     );
   if (held?.response && held.fingerprint === fingerprint) {
-    if (!(await order_voided(held.response, held.created_at))) {
+    if (!(await order_voided(db, held.response, held.created_at))) {
       return send(held.response);
     }
     // the donor can no longer approve the order it names: the gift id gets a
-    // new one, and the old donation is closed
-    // closed only if still unpaid, and the claim goes only when it was: a
-    // donation paid meanwhile keeps its answer
+    // new one, and the old donation is closed. only if still unpaid, and the
+    // claim goes only when it was: a donation paid meanwhile keeps its answer,
+    // and one a racing repeat just closed leaves the new answer to the claim
     const closed = await db.transaction(async (tx) => {
       const [expired] = await tx
         .update(donations)
@@ -354,7 +381,13 @@ export async function create_payment(
           )
         )
         .returning({ id: donations.id });
-      if (!expired) return false;
+      if (!expired) {
+        const [now] = await tx
+          .select({ status: donations.status })
+          .from(donations)
+          .where(eq(donations.id, held.response!.id));
+        return now?.status === "expired" ? "raced" : false;
+      }
       await tx
         .delete(partner_payments)
         .where(
@@ -366,7 +399,14 @@ export async function create_payment(
         );
       return true;
     });
-    if (!closed) return send(held.response);
+    if (closed === false) return send(held.response);
+  }
+
+  // limited per donor address as well as per key, after a repeat is answered
+  // free, and per nonprofit so one site's donors can't lock out another's
+  if (req.donor_ip) {
+    const limited = await charge_donor_ip(db, npo_id, req.donor_ip);
+    if (limited) return limited;
   }
 
   const ready = await readiness(db, npo_id);
@@ -452,7 +492,13 @@ export async function create_payment(
     // same minted id and finds that grant. stripe and paypal mark their row
     // failed before they throw, so theirs is released for a fresh start
     if (via !== "chariot") {
-      await release(db, npo_id, req.gift_id, hold.claim_id).catch(() => {});
+      await release(
+        db,
+        npo_id,
+        req.gift_id,
+        hold.claim_id,
+        hold.donation_id
+      ).catch(() => {});
     }
     // chariot answers 409 while this authorization's grant is still being
     // made: a retry of the same request finds it, so it is a 503, not a 500
@@ -466,7 +512,13 @@ export async function create_payment(
     throw err;
   }
   if (is_refusal(made)) {
-    await release(db, npo_id, req.gift_id, hold.claim_id);
+    await release(
+      db,
+      npo_id,
+      req.gift_id,
+      hold.claim_id,
+      via === "chariot" ? null : hold.donation_id
+    );
     return refusal_response(made);
   }
 
@@ -524,12 +576,13 @@ export async function create_payment(
 }
 
 /** one charge against the donor address's bucket, null when it had room */
-export async function charge_donor_ip(
+async function charge_donor_ip(
   db: Db,
+  npo_id: number,
   donor_ip: string
 ): Promise<Response | null> {
   const r = await limit_shared(
-    `partner:donor_ip:${sha256(donor_ip)}`,
+    `partner:donor_ip:${npo_id}:${sha256(donor_ip)}`,
     DONOR_IP_QUOTA,
     db
   );

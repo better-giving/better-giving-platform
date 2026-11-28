@@ -1,6 +1,7 @@
 import { ChariotError } from "@better-giving/chariot";
 import { PayPalApiError } from "@better-giving/paypal";
 import { eq } from "drizzle-orm";
+import Stripe from "stripe";
 import {
   afterAll,
   beforeAll,
@@ -306,7 +307,7 @@ describe("POST /api/partner/v1/payments", () => {
     expect(await again.json()).toEqual(first);
   });
 
-  test("a grant chariot is still processing is a retryable 503 provider_error, and the gift_id stays free", async () => {
+  test("a grant chariot is still processing is a retryable 503 provider_error, and the claim holds until it goes stale", async () => {
     const { key } = await seed();
     create_grant.mockRejectedValueOnce(new ChariotError(409, "{}", null));
 
@@ -354,6 +355,12 @@ describe("POST /api/partner/v1/payments", () => {
     const [row] = await db().select().from(partner_payments);
     expect(row!.donation_id).toBe(winner.id);
     expect(row!.response).toEqual(winner);
+    // the loser's failure must not close the donation the winner is using
+    const [don] = await db()
+      .select()
+      .from(donations)
+      .where(eq(donations.id, winner.id));
+    expect(don!.status).toBe("created");
   });
 
   test("a daf retry after a request died takes over its claim and keeps its payment id", async () => {
@@ -435,6 +442,26 @@ describe("POST /api/partner/v1/payments", () => {
     ).json();
 
     expect(again.client.token).toBe("ORDER-2");
+  });
+
+  test("a paypal order whose donation is no longer open is replayed without asking paypal", async () => {
+    const { key } = await seed();
+    const first = await (
+      await post(key.key, body({ method: "paypal" }))
+    ).json();
+    await db()
+      .update(donations)
+      .set({ status: "settled" })
+      .where(eq(donations.id, first.id));
+    await db()
+      .update(partner_payments)
+      .set({ created_at: new Date(Date.now() - 2 * 3600_000).toISOString() });
+    get_order.mockResolvedValue({ status: "VOIDED" });
+
+    expect(
+      await (await post(key.key, body({ method: "paypal" }))).json()
+    ).toEqual(first);
+    expect(get_order).not.toHaveBeenCalled();
   });
 
   test("a young paypal order is replayed without asking paypal", async () => {
@@ -537,6 +564,47 @@ describe("POST /api/partner/v1/payments", () => {
       await (await post(key.key, body({ method: "paypal" }))).json()
     ).toEqual(first);
     expect(create_order).toHaveBeenCalledTimes(1);
+  });
+
+  test("a retry after a stripe request died takes over the claim and reuses its donation and keys", async () => {
+    const { key } = await seed();
+    const first = await (await post(key.key, body())).json();
+    // the process died before the answer was recorded
+    await db().update(partner_payments).set({ response: null });
+    await stale();
+
+    const retry = await (await post(key.key, body())).json();
+
+    expect(retry.id).toBe(first.id);
+    expect(await donation_rows()).toHaveLength(1);
+    expect(pi_create).toHaveBeenCalledTimes(2);
+    expect(pi_create.mock.calls[1]![1]).toEqual({
+      idempotencyKey: `partner-pi-${first.id}`,
+    });
+    expect(pi_create.mock.calls[1]![0].metadata).toEqual({
+      order_id: first.id,
+    });
+  });
+
+  test("a stripe refusal closes its unpaid donation and frees the gift_id", async () => {
+    const { key } = await seed();
+    pi_create.mockRejectedValueOnce(
+      Object.assign(
+        new Stripe.errors.StripeInvalidRequestError({
+          type: "invalid_request_error",
+          message: "x",
+          code: "amount_too_large",
+        } as never),
+        {}
+      )
+    );
+
+    const res = await post(key.key, body());
+
+    expect(res.status).toBe(422);
+    expect((await donation_rows())[0]!.status).toBe("failed");
+    expect(await db().select().from(partner_payments)).toHaveLength(0);
+    expect((await post(key.key, body())).status).toBe(200);
   });
 
   test("a stripe retry's customer is keyed by the payment id too", async () => {
@@ -765,6 +833,31 @@ describe("POST /api/partner/v1/payments", () => {
 
     expect((await post(null, body())).status).toBe(401);
     expect((await post("spk_nope", body())).status).toBe(401);
+  });
+
+  test("a repeat of a made payment spends none of the donor address's limit, and another nonprofit has its own", async () => {
+    const { key, other } = await seed();
+    await post(key.key, body({ donor_ip: "203.0.113.5" }));
+    for (let i = 0; i < DONOR_IP_QUOTA.max * 2; i++) {
+      expect(
+        (await post(key.key, body({ donor_ip: "203.0.113.5" }))).status
+      ).toBe(200);
+    }
+    for (let i = 1; i < DONOR_IP_QUOTA.max; i++) {
+      await post(key.key, body({ gift_id: `n-${i}`, donor_ip: "203.0.113.5" }));
+    }
+    expect(
+      (
+        await post(
+          key.key,
+          body({ gift_id: "n-over", donor_ip: "203.0.113.5" })
+        )
+      ).status
+    ).toBe(429);
+    expect(
+      (await post(other.key, body({ gift_id: "o-1", donor_ip: "203.0.113.5" })))
+        .status
+    ).toBe(200);
   });
 
   test("one donor address is limited, answered 429 with retry-after", async () => {

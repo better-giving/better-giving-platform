@@ -329,16 +329,11 @@ export async function action({ request }: Route.ActionArgs) {
         grant.workflowSessionId
       )) ??
       (typeof meta.don_id === "string" && meta.don_id ? meta.don_id : null);
-    // a young grant may be a partner's whose create call has not written its
-    // row yet: a redelivery finds it, so it is asked for rather than lost
-    if (!don_id && is_young(grant)) {
-      console.warn(
-        `[chariot webhook] grant ${grant.id} names no donation yet: asking for redelivery`
-      );
-      return new Response("donation not yet recorded", { status: 409 });
-    }
-    // not from our checkout (another connect instance, a dashboard grant):
-    // no row can ever match, so a 5xx would only buy ten redeliveries
+    // not from our checkout or a partner (another connect instance, a
+    // dashboard grant): no row can ever match, so a 5xx would only buy ten
+    // redeliveries. a partner's payment is claimed, with its authorization,
+    // before its grant is made, so a partner's grant always finds its row;
+    // the donation row may trail it, which `missing_donation` redelivers
     if (!don_id) {
       report_error(new Error("chariot grant without a donation id"), {
         grant_id: grant.id,

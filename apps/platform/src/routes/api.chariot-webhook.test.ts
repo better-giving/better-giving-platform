@@ -294,11 +294,13 @@ describe("chariot webhook partner grant", () => {
     expect(donation_mocks.update).not.toHaveBeenCalled();
   });
 
-  it("asks for redelivery when a young grant has no payment row yet", async () => {
+  it("asks for redelivery when the payment is claimed but its donation row isn't written yet", async () => {
     quiet_console();
     get_grant_mock.mockResolvedValue(
       grant("Completed", { createdAt: minutes_ago(1) })
     );
+    partner_grant_mock.mockResolvedValue("don-pg" as never);
+    donation_mocks.get.mockResolvedValue(undefined);
 
     const res = await deliver(event);
 
@@ -307,10 +309,10 @@ describe("chariot webhook partner grant", () => {
     expect(report_error_mock).not.toHaveBeenCalled();
   });
 
-  it("acks and reports an old grant no payment holds", async () => {
+  it("acks and reports, at once, a grant no payment holds", async () => {
     quiet_console();
     get_grant_mock.mockResolvedValue(
-      grant("Completed", { createdAt: minutes_ago(61) })
+      grant("Completed", { createdAt: minutes_ago(1) })
     );
 
     const res = await deliver(event);

@@ -7,14 +7,13 @@ CREATE TABLE "partner_payments" (
 	"amount" jsonb NOT NULL,
 	"attribution" jsonb NOT NULL,
 	"claim_id" text NOT NULL,
-	"donation_id" text,
+	"donation_id" text NOT NULL,
 	"grant_id" text,
 	"authorized_session_id" text,
 	"response" jsonb,
 	"created_at" timestamptz DEFAULT now() NOT NULL,
 	"claimed_at" timestamptz DEFAULT now() NOT NULL,
-	CONSTRAINT "partner_payments_npo_id_gift_id_pk" PRIMARY KEY("npo_id","gift_id"),
-	CONSTRAINT "partner_payments_response_has_donation" CHECK ("partner_payments"."response" is null or "partner_payments"."donation_id" is not null)
+	CONSTRAINT "partner_payments_npo_id_gift_id_pk" PRIMARY KEY("npo_id","gift_id")
 );
 --> statement-breakpoint
 ALTER TABLE "partner_payments" ADD CONSTRAINT "partner_payments_npo_id_npos_id_fk" FOREIGN KEY ("npo_id") REFERENCES "public"."npos"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

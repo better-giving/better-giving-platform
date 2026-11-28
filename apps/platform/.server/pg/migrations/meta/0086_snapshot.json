@@ -1,5 +1,5 @@
 {
-  "id": "b7476820-7d10-4e29-9a4a-25cb3c13fe3d",
+  "id": "2184c6fa-67b0-4996-844e-344385afd300",
   "prevId": "97f6314a-3121-4c49-8fa2-0f5137bb1a92",
   "version": "7",
   "dialect": "postgresql",
@@ -6036,7 +6036,7 @@
           "name": "donation_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "grant_id": {
           "name": "grant_id",
@@ -6146,12 +6146,7 @@
       },
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "partner_payments_response_has_donation": {
-          "name": "partner_payments_response_has_donation",
-          "value": "\"partner_payments\".\"response\" is null or \"partner_payments\".\"donation_id\" is not null"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.partner_tenants": {

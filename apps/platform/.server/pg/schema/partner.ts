@@ -108,8 +108,9 @@ export const partner_payments = pgTable(
     // names the request holding the gift id; a takeover replaces it, and every
     // write by the holder is made under it
     claim_id: text("claim_id").notNull(),
-    // the donation row the session was made for; null until it exists
-    donation_id: text("donation_id"),
+    // the donation the payment is for, minted with the claim: its row is
+    // written once the session is made
+    donation_id: text("donation_id").notNull(),
     // a DAF payment's Chariot grant: its webhook finds the donation by it
     grant_id: text("grant_id"),
     // the Connect session a DAF payment was authorized by: one payment each,
@@ -125,10 +126,6 @@ export const partner_payments = pgTable(
     uniqueIndex("partner_payments_session_id_idx")
       .on(t.authorized_session_id)
       .where(sql`${t.authorized_session_id} is not null`),
-    check(
-      "partner_payments_response_has_donation",
-      sql`${t.response} is null or ${t.donation_id} is not null`
-    ),
     uniqueIndex("partner_payments_grant_id_idx")
       .on(t.grant_id)
       .where(sql`${t.grant_id} is not null`),

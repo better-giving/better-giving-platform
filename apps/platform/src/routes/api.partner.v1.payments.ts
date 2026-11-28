@@ -1,7 +1,7 @@
 import { getDotPath, safeParse } from "valibot";
 import { open_key, partner_route } from "$/partner/gate";
 import { payment_request } from "$/partner/payment-schema";
-import { charge_donor_ip, create_payment } from "$/partner/payments";
+import { create_payment } from "$/partner/payments";
 import { problem } from "$/partner/problem";
 import { db } from "$/pg/db";
 import type { Route } from "./+types/api.partner.v1.payments";
@@ -26,11 +26,6 @@ export const action = partner_route(async ({ request }: Route.ActionArgs) => {
       })),
     });
   }
-
-  // limited per donor address as well as per key, never per key alone
-  const { donor_ip } = parsed.output;
-  const limited = donor_ip ? await charge_donor_ip(db, donor_ip) : null;
-  if (limited) return limited;
 
   return create_payment(db, live.npo_id, parsed.output);
 });
