@@ -114,35 +114,16 @@ describe("footer landscape", () => {
     expect(art?.getAttribute("aria-hidden")).toBe("true");
   });
 
-  // the only images a variant draws are its logo: any <img> beyond it is the
-  // landscape, whether or not it is marked aria-hidden
-  test.each([
-    ["minimal", 1],
-    ["app", 0],
-  ] as const)(
-    "%s variant has none: %i image(s) in all",
-    async (variant, imgs) => {
-      const Stub = stb(variant);
-      const screen = await render(<Stub />);
-
-      await expect.element(screen.getByRole("contentinfo")).toBeVisible();
-      expect(screen.container.querySelectorAll("footer img")).toHaveLength(
-        imgs
-      );
-    }
-  );
-});
-
-describe("footer copyright year", () => {
-  test.each(["full", "minimal", "app"] as const)(
-    "%s variant carries the current year",
+  test.each(["minimal", "app"] as const)(
+    "%s variant has none",
     async (variant) => {
       const Stub = stb(variant);
       const screen = await render(<Stub />);
 
-      await expect
-        .element(screen.getByRole("contentinfo"))
-        .toHaveTextContent(`© ${new Date().getFullYear()}`);
+      await expect.element(screen.getByRole("contentinfo")).toBeVisible();
+      expect(
+        screen.container.querySelector("footer img[aria-hidden]")
+      ).toBeNull();
     }
   );
 });

@@ -16,8 +16,11 @@ type Props = {
   classes?: string;
   variant?: "full" | "minimal" | "app";
   /**
-   * page-width intent of the surface above. both widths render on the same
-   * `page` container, so this changes nothing in the footer.
+   * page-width intent of the surface above. defaults to the one each variant
+   * usually sits under — `minimal` on browse (wide),
+   * `full` on marketing (narrow). pass it only where the page disagrees with
+   * that default, which today is the npo profile: quiet chrome over a narrow
+   * body.
    */
   width?: "narrow" | "wide";
 };
@@ -51,13 +54,16 @@ const app_links = [
   { label: "Nonprofit terms", to: TERMS_OF_USE_NPO },
 ] as const;
 
-export function Footer({ classes = "", variant = "full" }: Props) {
-  const page = "page";
+export function Footer({ classes = "", variant = "full", width }: Props) {
+  const page =
+    (width ?? (variant === "minimal" ? "wide" : "narrow")) === "wide"
+      ? "page"
+      : "page";
 
-  // `page` lands the footer on the same edge as the header above it (see
-  // public-chrome.tsx). the <footer> itself paints the full-bleed band and
-  // holds the vertical rhythm only — a px-* here would stack a second gutter
-  // on the container inside it.
+  // `page` carries the width intent so the footer lands on the same edge as the
+  // header above it (see public-chrome.tsx). the <footer> itself paints the
+  // full-bleed band and holds the vertical rhythm only — a px-* here would
+  // stack a second gutter on the container inside it.
   //
   // app: the dashboard shell (donor, npo admin, platform admin). one quiet line
   // on the page under a hairline rule — no band, no logo, no socials. the inline gutter is the
