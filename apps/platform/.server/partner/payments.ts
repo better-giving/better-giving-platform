@@ -295,7 +295,7 @@ async function claim(
       kind: "refused",
       response: problem("idempotency_conflict", {
         detail:
-          "This gift_id was already used with another amount, currency or method.",
+          "This gift_id was already used with a different amount, currency, method, donor or authorization.",
       }),
     };
   }

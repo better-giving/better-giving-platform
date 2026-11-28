@@ -105,7 +105,8 @@ export const partner_payments = pgTable(
       .notNull()
       .references(() => npos.id, { onDelete: "cascade" }),
     gift_id: text("gift_id").notNull(),
-    // hash of the method, currency and four parts: what a repeat must match
+    // hash of the method, currency, four parts, donor email and (for a DAF)
+    // authorization: what a repeat must match
     fingerprint: text("fingerprint").notNull(),
     method: text("method").notNull(),
     currency: text("currency").notNull(),
