@@ -12,6 +12,7 @@ import {
   type QueryParam,
 } from "../connector/inputs";
 import { PROBLEM_CODES } from "../connector/problem";
+import { payment_request } from "../partner/payment-schema";
 import { PROBLEM_CODES as PARTNER_PROBLEM_CODES } from "../partner/problem";
 import { RAIL_STATES, RAILS } from "../partner/readiness";
 import { wire_schema } from "./wire-schema";
@@ -922,10 +923,31 @@ const PARTNER_HEADERS: Record<number, Json> = {
   },
   429: {
     "Retry-After": {
-      description: "Seconds until the key's window resets.",
+      description: "Seconds until the key's or donor address's window resets.",
       schema: { type: "integer", minimum: 0 },
     },
   },
+  503: {
+    "Retry-After": {
+      description: "Seconds to wait before retrying the same request.",
+      schema: { type: "integer", minimum: 0 },
+    },
+  },
+};
+
+/** what each status means on the partner surface, where 400 is a request to
+ * fix and 422 one this nonprofit or amount can't take */
+const PARTNER_STATUS_TEXT: Record<number, string> = {
+  400: "The request is invalid; `errors` names each field.",
+  401: "The API key is missing, malformed or revoked.",
+  404: "Nothing matches this request.",
+  409: "The `gift_id` was already used with a different amount, currency, method, donor or authorization.",
+  410: "The DAF authorization has expired.",
+  422: "The nonprofit or amount can't take this: `unsupported`, `below_minimum` (with `minimum_minor`) or `above_maximum`.",
+  429: "Too many requests. Wait for `Retry-After`, then retry.",
+  500: "Better Giving hit an error.",
+  502: "A payment provider (Stripe, PayPal or the DAF provider) refused this request, and Better Giving has been told. The `gift_id` is free. The refusal is usually Better Giving's to fix (its provider credentials or settings), so repeating the same request can succeed once it has, but not before.",
+  503: "Retry the same request after `Retry-After` seconds. The request is still being made (by another attempt of the same `gift_id` or of the same DAF authorization), or a payment provider timed out, dropped the connection or sent a reply that could not be read (the request may have run: send the same one again to find it), was rate limited, answered 5xx or reported the request still running. A Stripe 5xx gives the `gift_id` back and answers `Retry-After: 5`; every other cause holds it, with `Retry-After` of up to 120 seconds.",
 };
 
 const partner_problems = (...statuses: number[]) =>
@@ -934,6 +956,7 @@ const partner_problems = (...statuses: number[]) =>
       s,
       {
         ...error_response(s, "application/problem+json", "PartnerProblem"),
+        description: PARTNER_STATUS_TEXT[s],
         headers: { ...NO_STORE, ...PARTNER_HEADERS[s] },
       },
     ])
@@ -954,6 +977,113 @@ const partner_ops = (): IOperation[] => [
           headers: NO_STORE,
         },
         ...partner_problems(401, 429, 500),
+      },
+    },
+  },
+  {
+    route: "api.partner.v1.payments",
+    path: "/api/partner/v1/payments",
+    method: "post",
+    op: {
+      operationId: "create_payment",
+      summary: "Create a payment for the nonprofit's hosted site",
+      description:
+        "Makes one payment on Better Giving's own processor accounts, payable only by `method`. The four `amount` parts are integer minor units and are charged as sent, never repriced. `gift_id` is the site's own id for the gift and is unique per nonprofit: the same request again answers the same payment and makes no second one, and the same `gift_id` with a different amount, currency, method, donor or authorization is a 409 `idempotency_conflict`. A refused request leaves the `gift_id` free to retry with a corrected body. A request still being made, or one the DAF provider is still processing, answers 503 with `Retry-After`: send the same request again. A DAF payment takes `authorized_session_id`, used once: it is part of what the `gift_id` must repeat. A second gift on an authorization whose payment is recorded is refused; on one whose payment is not recorded yet it answers 503 until that claim is two minutes old, then takes it over. A `tribute` with `notify` sends the honoree notice with the receipt, as at checkout. `crypto` answers `unsupported` for now. `token` is what the method's browser half confirms with: a Stripe client secret, a PayPal order id, or for a DAF the payment id.",
+      security: [{ partnerKey: [] }],
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": { schema: wire_schema(payment_request) },
+        },
+      },
+      responses: {
+        200: {
+          ...ok("The payment, new or replayed.", {
+            type: "object",
+            required: ["id", "client"],
+            properties: {
+              id: { type: "string" },
+              client: {
+                type: "object",
+                required: ["provider", "token"],
+                properties: {
+                  provider: {
+                    type: "string",
+                    enum: ["stripe", "paypal", "chariot"],
+                  },
+                  token: { type: "string" },
+                },
+              },
+            },
+          }),
+          headers: NO_STORE,
+        },
+        ...partner_problems(400, 401, 409, 410, 422, 429, 500, 502, 503),
+      },
+    },
+  },
+  {
+    route: "api.partner.v1.payments_.$id",
+    path: "/api/partner/v1/payments/{id}",
+    method: "get",
+    op: {
+      operationId: "get_payment",
+      summary: "Get a payment as Better Giving holds it",
+      description:
+        "A read of Better Giving's own record: it never contacts a processor and never captures. Another nonprofit's payment is `not_found`.",
+      security: [{ partnerKey: [] }],
+      parameters: [
+        path_param(
+          "id",
+          { type: "string" },
+          "The id `POST /payments` answered."
+        ),
+      ],
+      responses: {
+        200: {
+          ...ok("The payment.", {
+            type: "object",
+            required: [
+              "id",
+              "gift_id",
+              "status",
+              "method",
+              "amount",
+              "currency",
+              "fee",
+              "occurred_at",
+            ],
+            properties: {
+              id: { type: "string" },
+              gift_id: { type: "string" },
+              status: {
+                type: "string",
+                enum: ["pending", "succeeded", "failed", "cancelled"],
+              },
+              method: { type: "string" },
+              amount: {
+                type: "object",
+                required: [
+                  "gift",
+                  "gift_fee_cover",
+                  "contribution",
+                  "contribution_fee_cover",
+                ],
+                properties: {
+                  gift: { type: "integer", minimum: 0 },
+                  gift_fee_cover: { type: "integer", minimum: 0 },
+                  contribution: { type: "integer", minimum: 0 },
+                  contribution_fee_cover: { type: "integer", minimum: 0 },
+                },
+              },
+              currency: { type: "string" },
+              fee: { type: ["integer", "null"] },
+              occurred_at: { type: "string", format: "date-time" },
+            },
+          }),
+          headers: NO_STORE,
+        },
+        ...partner_problems(401, 404, 429, 500),
       },
     },
   },

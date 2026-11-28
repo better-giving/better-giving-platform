@@ -331,21 +331,29 @@ describe("openapi drift", () => {
     );
   });
 
-  test("a partner operation is a keyed GET, and its route refuses every other method as not_found", async () => {
+  test("a partner operation is keyed, and its route refuses the other method as not_found", async () => {
     const partner = of_surface("partner");
     expect(partner.length).toBeGreaterThan(0);
     for (const o of partner) {
       const mod = await route_module(o.route);
-      expect(o.method, o.route).toBe("get");
+      expect(["get", "post"], o.route).toContain(o.method);
       expect(o.op.security, o.route).toEqual([{ partnerKey: [] }]);
       if (!mod.loader || !mod.action) throw new Error(`${o.route} handlers`);
-      const keyless = await call(mod.loader, "get", o.path);
+      const [served, other] =
+        o.method === "get"
+          ? [mod.loader, mod.action]
+          : [mod.action, mod.loader];
+      const keyless = await call(served, o.method, o.path);
       expect([keyless.status, (await keyless.json()).code]).toEqual([
         401,
         "key_invalid",
       ]);
-      const post = await call(mod.action, "post", o.path);
-      expect([post.status, (await post.json()).code]).toEqual([
+      const refused = await call(
+        other,
+        o.method === "get" ? "post" : "get",
+        o.path
+      );
+      expect([refused.status, (await refused.json()).code]).toEqual([
         404,
         "not_found",
       ]);
@@ -433,6 +441,48 @@ describe("openapi drift", () => {
     expect(ConnectorProblem.properties.error.properties.code.enum).toEqual([
       ...PROBLEM_CODES,
     ]);
+  });
+
+  test("every response of every operation has a description", () => {
+    for (const o of operations()) {
+      for (const [status, res] of Object.entries(o.op.responses as Json)) {
+        expect(
+          (res as { description?: string }).description,
+          `${o.op.operationId} ${status}`
+        ).toBeTruthy();
+      }
+    }
+  });
+
+  test("create_payment documents every status its route sends, the provider answers with their headers", () => {
+    const res = op_of("create_payment").responses as Record<
+      string,
+      { description: string; headers?: Record<string, unknown> }
+    >;
+    expect(Object.keys(res)).toEqual(
+      [
+        "200",
+        "400",
+        "401",
+        "409",
+        "410",
+        "422",
+        "429",
+        "500",
+        "502",
+        "503",
+      ].sort()
+    );
+    // a provider's refusal (502) is not retried; a busy one (503) is, after Retry-After
+    expect(res["502"]!.description).toMatch(/refused/);
+    // the 5-second release is Stripe's alone: PayPal and the DAF provider hold
+    // the claim, as their order or grant may exist
+    expect(res["503"]!.description).toMatch(/Stripe 5xx.*Retry-After: 5/);
+    expect(res["503"]!.description).toMatch(/up to 120/);
+    expect(res["503"]!.description).toMatch(/dropped the connection/);
+    expect(res["502"]!.headers).not.toHaveProperty("Retry-After");
+    expect(res["503"]!.description).toMatch(/Retry-After/);
+    expect(res["503"]!.headers).toHaveProperty("Retry-After");
   });
 
   test("every operation documents a 4xx and a 5xx, unless its route refuses nothing", () => {

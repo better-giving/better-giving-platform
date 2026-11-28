@@ -1,5 +1,14 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, pgTable, text } from "drizzle-orm/pg-core";
+import {
+  check,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { timestamptz, timestamptz_now } from "./columns";
 import { npos } from "./npo";
@@ -45,5 +54,93 @@ export const partner_keys = pgTable(
     index("partner_keys_npo_id_live_idx")
       .on(t.npo_id)
       .where(sql`${t.revoked_at} is null`),
+  ]
+);
+
+/** the four parts of a partner payment, in the integer minor units the site
+ * sent them in */
+export interface IPartnerAmount {
+  gift: number;
+  gift_fee_cover: number;
+  contribution: number;
+  contribution_fee_cover: number;
+}
+
+/** what the site names about a payment that checkout never looks up: its ids
+ * are the site's own, so none is read as platform's */
+export interface IPartnerAttribution {
+  form: { id: string; name: string };
+  campaign?: { id: string; name: string };
+  program?: { id: string; name: string };
+  tribute?: {
+    kind: "honor" | "memory";
+    honoree: string;
+    notify?: { name: string; email: string };
+  };
+  contribution_offered: boolean;
+  deployment_origin: string;
+  page_origin?: string;
+}
+
+export interface IPartnerProviderState {
+  customer_id?: string;
+  /** null when the first attempt chose none */
+  descriptor_suffix?: string | null;
+}
+
+/** the answer to `POST /payments`, kept to replay */
+export interface IPartnerPaymentAnswer {
+  id: string;
+  client: { provider: "stripe" | "paypal" | "chariot"; token: string };
+}
+
+/** one payment a partner site asked for. `(npo_id, gift_id)` is the site's
+ * idempotency identity: the row is claimed before any session is made, so two
+ * requests for one gift can't both create one, and `response` is set once the
+ * session exists */
+export const partner_payments = pgTable(
+  "partner_payments",
+  {
+    npo_id: integer("npo_id")
+      .notNull()
+      .references(() => npos.id, { onDelete: "cascade" }),
+    gift_id: text("gift_id").notNull(),
+    // hash of the method, currency, four parts, donor email and (for a DAF)
+    // authorization: what a repeat must match
+    fingerprint: text("fingerprint").notNull(),
+    method: text("method").notNull(),
+    currency: text("currency").notNull(),
+    amount: jsonb("amount").$type<IPartnerAmount>().notNull(),
+    attribution: jsonb("attribution").$type<IPartnerAttribution>().notNull(),
+    // names the request holding the gift id; a takeover replaces it, and every
+    // write by the holder is made under it
+    claim_id: text("claim_id").notNull().default(sql`gen_random_uuid()::text`),
+    // the donation the payment is for, minted with the claim: its row is
+    // written once the session is made
+    donation_id: text("donation_id"),
+    // a DAF payment's Chariot grant: its webhook finds the donation by it
+    grant_id: text("grant_id"),
+    // the Connect session a DAF payment was authorized by: one payment each,
+    // and the webhook's way back when the grant was made but never linked
+    authorized_session_id: text("authorized_session_id"),
+    response: jsonb("response").$type<IPartnerPaymentAnswer>(),
+    created_at: timestamptz_now("created_at"),
+    claimed_at: timestamptz_now("claimed_at"),
+    // what a Stripe payment chose on its first attempt (customer, descriptor
+    // suffix), so a retry under the same idempotency keys sends the same params
+    provider_state: jsonb("provider_state").$type<IPartnerProviderState>(),
+    // set when a voided PayPal order was replaced under its gift id: the row
+    // stays, under a renamed gift id, so the old payment id still reads
+    superseded_at: timestamptz("superseded_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.npo_id, t.gift_id] }),
+    uniqueIndex("partner_payments_donation_id_idx").on(t.donation_id),
+    uniqueIndex("partner_payments_session_id_idx")
+      .on(t.authorized_session_id)
+      .where(sql`${t.authorized_session_id} is not null`),
+    uniqueIndex("partner_payments_grant_id_idx")
+      .on(t.grant_id)
+      .where(sql`${t.grant_id} is not null`),
   ]
 );

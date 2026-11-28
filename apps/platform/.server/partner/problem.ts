@@ -118,7 +118,15 @@ export function rate_limited(retry_after_s: number): Response {
 
 export function provider_error(
   status: 500 | 502 | 503 | 504,
-  detail?: string
+  detail?: string,
+  retry_after_s?: number
 ): Response {
-  return build(status, "provider_error", { detail });
+  return build(
+    status,
+    "provider_error",
+    { detail },
+    retry_after_s === undefined
+      ? undefined
+      : { "retry-after": String(retry_after_s) }
+  );
 }

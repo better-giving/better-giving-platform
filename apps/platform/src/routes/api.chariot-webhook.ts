@@ -14,6 +14,7 @@ import { chariot as chariot_env, stage } from "$/env";
 import { chariot } from "$/kit/chariot";
 import { enqueue } from "$/kit/queue";
 import { aws_monitor } from "$/kit/slack";
+import { partner_donation_of_grant } from "$/partner/grant-donation";
 import { db } from "$/pg/db";
 import { donation_has_dists } from "$/pg/queries/dist";
 import {
@@ -80,6 +81,7 @@ const on_grant_completed: Record<TStatus, "settle" | "duplicate" | "alert"> = {
 interface IGrantRef {
   id: string;
   amount: number;
+  workflowSessionId?: string;
   createdAt?: string;
   statuses?: readonly { createdAt?: string }[];
 }
@@ -207,7 +209,13 @@ async function grant_donation(
   if (!prior) return missing_donation(grant, don_id);
   // `don_id` rides in connect metadata the browser writes, so it can name any
   // row; the intent route records the grant it made as `via_extra`
-  if (prior.via !== "chariot" || prior.via_extra !== grant.id)
+  // a partner's row names the authorization until its create call links the
+  // grant, so a delivery in between finds it under that
+  if (
+    prior.via !== "chariot" ||
+    (prior.via_extra !== grant.id &&
+      prior.via_extra !== grant.workflowSessionId)
+  )
     return ack_unfixable(
       grant,
       prior.id,
@@ -318,10 +326,22 @@ export async function action({ request }: Route.ActionArgs) {
     const grant = await chariot.get_grant(payload.associated_object_id);
     // grant carries donor name, email, phone, address — log ids/status only
     console.info(`[chariot webhook] grant ${grant.id} status ${grant.status}`);
-    const { don_id } = (grant.metadata ?? {}) as Partial<ChariotMetadata>;
-    // not from our checkout (another connect instance, a dashboard grant):
-    // no row can ever match, so a 5xx would only buy ten redeliveries
-    if (typeof don_id !== "string" || !don_id) {
+    const meta = (grant.metadata ?? {}) as Partial<ChariotMetadata>;
+    // a partner's payment holds its grant id, and that wins over connect
+    // metadata, which the partner's page writes and may be absent or junk
+    const don_id =
+      (await partner_donation_of_grant(
+        db,
+        grant.id,
+        grant.workflowSessionId
+      )) ??
+      (typeof meta.don_id === "string" && meta.don_id ? meta.don_id : null);
+    // not from our checkout or a partner (another connect instance, a
+    // dashboard grant): no row can ever match, so a 5xx would only buy ten
+    // redeliveries. a partner's payment is claimed, with its authorization,
+    // before its grant is made, so a partner's grant always finds its row;
+    // the donation row may trail it, which `missing_donation` redelivers
+    if (!don_id) {
       report_error(new Error("chariot grant without a donation id"), {
         grant_id: grant.id,
         status: grant.status,

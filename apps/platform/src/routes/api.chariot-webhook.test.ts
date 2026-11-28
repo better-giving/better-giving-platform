@@ -15,6 +15,7 @@ const report_resp_mock = vi.hoisted(() =>
 );
 const enqueue_mock = vi.hoisted(() => vi.fn());
 const has_dists_mock = vi.hoisted(() => vi.fn());
+const partner_grant_mock = vi.hoisted(() => vi.fn(async () => null));
 
 vi.mock("$/env", () => ({
   chariot: { signing_key: "whsec-test" },
@@ -34,6 +35,9 @@ vi.mock("$/pg/queries/donation", () => ({
   donation_update: donation_mocks.update,
 }));
 vi.mock("$/pg/queries/dist", () => ({ donation_has_dists: has_dists_mock }));
+vi.mock("$/partner/grant-donation", () => ({
+  partner_donation_of_grant: partner_grant_mock,
+}));
 vi.mock("#/errors/report", () => ({
   report_error: report_error_mock,
   report_resp: report_resp_mock,
@@ -70,6 +74,8 @@ afterEach(() => {
   report_resp_mock.mockClear();
   enqueue_mock.mockReset();
   has_dists_mock.mockReset();
+  partner_grant_mock.mockReset();
+  partner_grant_mock.mockResolvedValue(null);
 });
 
 const minutes_ago = (m: number) =>
@@ -211,6 +217,142 @@ describe("chariot webhook grant without our metadata", () => {
       );
     }
   );
+});
+
+describe("chariot webhook partner grant", () => {
+  // a partner's connect element is mounted before any payment exists, so its
+  // grant carries no metadata: the payment holds the grant id instead
+  const event = {
+    id: "ev-pg",
+    category: "grant.updated",
+    associated_object_type: "grant",
+    associated_object_id: "grant-pg",
+  };
+  const grant = (status: string, extra: Record<string, unknown> = {}) => ({
+    id: "grant-pg",
+    workflowSessionId: "wf-pg",
+    status,
+    amount: 10_000,
+    feeDetail: { total: 300 },
+    ...extra,
+  });
+  const held = (status: string) => {
+    partner_grant_mock.mockResolvedValue("don-pg" as never);
+    donation_mocks.get.mockResolvedValue({
+      ...recorded_by("grant-pg"),
+      id: "don-pg",
+      status,
+    });
+    donation_mocks.locked.mockResolvedValue({ status });
+  };
+
+  it("settles the donation its payment holds", async () => {
+    quiet_console();
+    get_grant_mock.mockResolvedValue(grant("Completed"));
+    held("intent");
+
+    const res = await deliver(event);
+
+    expect(res.status).toBe(200);
+    expect(partner_grant_mock).toHaveBeenCalledWith(
+      expect.anything(),
+      "grant-pg",
+      "wf-pg"
+    );
+    expect(donation_mocks.update).toHaveBeenCalledExactlyOnceWith(
+      expect.anything(),
+      "don-pg",
+      expect.objectContaining({
+        status: "settled",
+        settlement: expect.objectContaining({ id: "grant-pg", net: 97 }),
+      })
+    );
+    expect(enqueue_mock).toHaveBeenCalled();
+  });
+
+  it("cancels it", async () => {
+    quiet_console();
+    get_grant_mock.mockResolvedValue(grant("Canceled"));
+    held("intent");
+
+    const res = await deliver(event);
+
+    expect(res.status).toBe(202);
+    expect(donation_mocks.update).toHaveBeenCalledExactlyOnceWith(
+      expect.anything(),
+      "don-pg",
+      { status: "cancelled" }
+    );
+  });
+
+  it("leaves a grant still in progress for the next event", async () => {
+    quiet_console();
+    get_grant_mock.mockResolvedValue(grant("Initiated"));
+    held("intent");
+
+    expect((await deliver(event)).status).toBe(203);
+    expect(donation_mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("asks for redelivery when the payment is claimed but its donation row isn't written yet", async () => {
+    quiet_console();
+    get_grant_mock.mockResolvedValue(
+      grant("Completed", { createdAt: minutes_ago(1) })
+    );
+    partner_grant_mock.mockResolvedValue("don-pg" as never);
+    donation_mocks.get.mockResolvedValue(undefined);
+
+    const res = await deliver(event);
+
+    expect(res.status).toBe(409);
+    expect(donation_mocks.update).not.toHaveBeenCalled();
+    expect(report_error_mock).not.toHaveBeenCalled();
+  });
+
+  it("acks and reports, at once, a grant no payment holds", async () => {
+    quiet_console();
+    get_grant_mock.mockResolvedValue(
+      grant("Completed", { createdAt: minutes_ago(1) })
+    );
+
+    const res = await deliver(event);
+
+    expect(res.status).toBe(200);
+    expect(report_error_mock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ grant_id: "grant-pg" })
+    );
+  });
+
+  it("a checkout grant no payment holds is handled by its metadata, as before", async () => {
+    quiet_console();
+    get_grant_mock.mockResolvedValue(
+      grant("Completed", { metadata: { don_id: "don-1" } })
+    );
+    donation_mocks.get.mockResolvedValue({
+      ...recorded_by("grant-pg"),
+      id: "don-1",
+      status: "intent",
+    });
+    donation_mocks.locked.mockResolvedValue({ status: "intent" });
+
+    expect((await deliver(event)).status).toBe(200);
+    expect(donation_mocks.get).toHaveBeenCalledWith("don-1");
+  });
+
+  it("the payment's donation wins over metadata the partner's page wrote", async () => {
+    quiet_console();
+    get_grant_mock.mockResolvedValue(
+      grant("Completed", { metadata: { don_id: "junk" } })
+    );
+    held("intent");
+
+    const res = await deliver(event);
+
+    expect(res.status).toBe(200);
+    expect(donation_mocks.get).toHaveBeenCalledWith("don-pg");
+    expect(donation_mocks.get).not.toHaveBeenCalledWith("junk");
+  });
 });
 
 describe("chariot webhook signature header", () => {
