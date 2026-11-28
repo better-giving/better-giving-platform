@@ -1101,7 +1101,54 @@ describe("POST /api/partner/v1/payments", () => {
     await stale("g-1");
     const retry = await (await post(key.key, daf("g-1", "wf_1"))).json();
     expect(retry.id).toBe(held!.donation_id);
+    // the retry asks for the same authorization, not a new one
+    expect(create_grant.mock.calls.map((c) => c[0].workflowSessionId)).toEqual([
+      "wf_1",
+      "wf_1",
+    ]);
   });
+
+  test("a lost answer is reported, so a lasting cause does not loop unseen", async () => {
+    const { key } = await seed();
+    create_order.mockRejectedValueOnce(new TypeError("fetch failed"));
+
+    await post(key.key, body({ method: "paypal" }));
+
+    expect(report_error).toHaveBeenCalledWith(
+      expect.any(TypeError),
+      expect.objectContaining({ provider: "lost answer" })
+    );
+  });
+
+  test("an undici socket error with an errno cause is a lost answer too", async () => {
+    const { key } = await seed();
+    create_order.mockRejectedValueOnce(
+      Object.assign(new TypeError("terminated"), {
+        cause: Object.assign(new Error("closed"), { code: "UND_ERR_SOCKET" }),
+      })
+    );
+
+    const res = await post(key.key, body({ method: "paypal" }));
+
+    expect(res.status).toBe(503);
+    expect(await db().select().from(partner_payments)).toHaveLength(1);
+  });
+
+  test.each([
+    ["a TypeError of our own", () => new TypeError("x is undefined")],
+    ["a plain Error", () => new Error("boom")],
+  ])(
+    "%s is not a lost answer: a plain 500, and the gift id is free",
+    async (_, err) => {
+      const { key } = await seed();
+      create_order.mockRejectedValueOnce(err());
+
+      const res = await post(key.key, body({ method: "paypal" }));
+
+      expect(res.status).toBe(500);
+      expect(await db().select().from(partner_payments)).toHaveLength(0);
+    }
+  );
 
   test.each(["card", "apple_pay", "google_pay"])(
     "a partner %s intent is cards only, with no other method and none of the bank options",
@@ -1160,6 +1207,14 @@ describe("POST /api/partner/v1/payments", () => {
       (await post(key.key, { ...daf("g-1", "wf_1"), tribute })).status
     ).toBe(200);
     expect(at_retry.map((t) => t.name)).toEqual(["Rose Alvarez"]);
+    // the notify mapping is the checkout one, from the row the grant settles
+    const [row] = await db().select().from(donation_tributes);
+    expect(row).toMatchObject({
+      name: "Rose Alvarez",
+      notif_email: "mary@example.org",
+      notif_fullname: "Mary Johnson",
+      notif_msg: null,
+    });
   });
 
   test("a mismatched retry of a gift id is a 409 before any current setting is read", async () => {

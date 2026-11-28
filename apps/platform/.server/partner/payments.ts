@@ -757,7 +757,10 @@ async function write_tribute(
 
 function is_unknown_outcome(err: unknown): boolean {
   if (err instanceof SyntaxError) return true;
-  if (err instanceof TypeError && /fetch failed|network/i.test(err.message)) {
+  if (
+    err instanceof TypeError &&
+    /fetch failed|terminated/i.test(err.message)
+  ) {
     return true;
   }
   const cause =
@@ -842,6 +845,9 @@ function provider_failure(
   // a `SyntaxError` from the body): the request may have run, so the claim
   // stays and a retry finds the same order or grant under the same ids
   if (is_unknown_outcome(err)) {
+    // a lasting cause (a wrong api url, a tls failure) would loop here with
+    // every request answered 503, so each is reported
+    report_error(err, { where: "partner", provider: "lost answer" });
     return retry(
       "The payment provider's answer was lost. Retry the same request."
     );
