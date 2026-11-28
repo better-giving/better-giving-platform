@@ -28,6 +28,7 @@ import { npo_get } from "../pg/queries/npo";
 import {
   credit_owed,
   type IOwed,
+  type OwedParty,
   owed_for_party,
   owed_total,
 } from "../pg/queries/owed";
@@ -252,12 +253,27 @@ export async function process_refund(
           now: new Date().toISOString(),
         });
       }
+      // apply and the credit leave the rows stale: the alert reads them as
+      // they stand after the credit
+      const owed = applied.owed.length
+        ? await Promise.all(
+            applied.owed.map(async (o) => {
+              const other = (row: IOwed): OwedParty =>
+                row.referrer_user == null && row.referrer_npo == null
+                  ? { npo_id: row.npo_id! }
+                  : referrer_of(row);
+              const row = await owed_for_party(donation_id, other(o), tx);
+              return row ?? o;
+            })
+          )
+        : applied.owed;
       await dist_refund_update(tx, g.dist.id, {
         refund_status: plan.is_loss ? "loss" : "completed",
       });
       return {
         skipped: false,
         ...applied,
+        owed,
         reasons: plan.loss_reasons,
       } as const;
     });

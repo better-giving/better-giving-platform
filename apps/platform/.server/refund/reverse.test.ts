@@ -1516,13 +1516,15 @@ describe("reverse_charge — the ops notice of a full reversal", () => {
       owed_read.fail = false;
     }
 
-    // the dispute fee the event names is in the fallback, as it is in the rows
+    // the rows the reversal read, with no estimate of the fee: it is written
+    // against the npo after this, at whatever it split to, and guessed here a
+    // fee the open had already recorded would show twice
     const [n] = queued();
     expect(n.alert.table.rows).toEqual([
-      [`Test NPO ${counter} (#${npo_id})`, "90.00", "3.20", "15.00", "108.20"],
-      ["Total", "—", "—", "—", "108.20"],
+      [`Test NPO ${counter} (#${npo_id})`, "90.00", "3.20", "0.00", "93.20"],
+      ["Total", "—", "—", "—", "93.20"],
     ]);
-    expect(n.alert.note).toContain("dispute fee is split across them");
+    expect(n.alert.note).toContain("recorded separately against the nonprofit");
     expect(report_error).toHaveBeenCalledWith(
       expect.objectContaining({ message: "owed read failed" }),
       expect.objectContaining({ donation_id: id })
