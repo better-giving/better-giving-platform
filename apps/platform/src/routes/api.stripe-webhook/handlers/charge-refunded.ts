@@ -52,7 +52,9 @@ export async function handle_charge_refunded(
     // a late or redelivered event is about the refund it added, not the newest
     ...(added && { refunds: added }),
     lines: [
-      `New in this event: ${added ? refund_list(added, refunded.charge.currency) : "could not tell which refund is new"}.`,
+      added
+        ? `New in this event: ${refund_list(added, refunded.charge.currency)}.`
+        : "Could not tell which refund is new in this event.",
     ],
   });
 }

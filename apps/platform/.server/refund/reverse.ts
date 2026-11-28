@@ -285,7 +285,7 @@ const REFUND_PENDING = {
   headline: "Partial refund not reversed",
   action: "Adjust these dists by hand.",
   caveat:
-    "Undo that adjustment if a later refund or dispute reverses the donation or records the whole share as owed, or the dists are debited twice.",
+    "Undo that adjustment if a later refund or dispute reverses the donation or records the whole share as owed; otherwise the dists are debited twice.",
 };
 
 /** the gift's parties and what this event took, for a reversal's alerts */
@@ -614,7 +614,7 @@ async function notify_dispute_lost(
         : []),
       ...(fees_unread
         ? [
-            "The owed rows could not be re-read, so this table may not show the dispute fee yet; it is recorded separately against the nonprofit(s).",
+            "The owed rows could not be re-read, so the table may not show the dispute fee. It is recorded separately against the nonprofits.",
           ]
         : []),
     ],

@@ -988,7 +988,11 @@ describe("the notice a partial refund posts", () => {
   const new_line = () =>
     notice_text()
       .split("\n")
-      .filter((l) => l.startsWith("New in this event:"))
+      .filter(
+        (l) =>
+          l.startsWith("New in this event:") ||
+          l.startsWith("Could not tell which refund is new")
+      )
       .at(-1);
 
   it("names the refunds on the charge and the total refunded so far", async () => {
@@ -1060,7 +1064,7 @@ describe("the notice a partial refund posts", () => {
     await deliver(second);
 
     expect(new_line()).toBe(
-      "New in this event: could not tell which refund is new."
+      "Could not tell which refund is new in this event."
     );
   });
 
@@ -1071,7 +1075,7 @@ describe("the notice a partial refund posts", () => {
     await deliver(refund(500));
 
     expect(new_line()).toBe(
-      "New in this event: could not tell which refund is new."
+      "Could not tell which refund is new in this event."
     );
   });
 });
