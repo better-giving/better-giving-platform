@@ -317,9 +317,21 @@ export async function create_payment(
   }
 
   const answer = answer_of(method, made);
+  // the intent route records the grant it made as the row's `via_extra`
+  const [granted] =
+    via === "chariot"
+      ? await db
+          .select({ via_extra: donations.via_extra })
+          .from(donations)
+          .where(eq(donations.id, answer.id))
+      : [];
   await db
     .update(partner_payments)
-    .set({ donation_id: answer.id, response: answer })
+    .set({
+      donation_id: answer.id,
+      response: answer,
+      ...(granted?.via_extra && { grant_id: granted.via_extra }),
+    })
     .where(
       and(
         eq(partner_payments.npo_id, npo_id),

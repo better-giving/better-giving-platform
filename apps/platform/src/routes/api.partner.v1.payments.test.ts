@@ -56,6 +56,7 @@ const { partner_keys, partner_payments, partner_tenants } = await import(
 const { rate_limit_windows } = await import("$/pg/schema/rate-limit");
 const { mint_key } = await import("$/partner/keys");
 const { DONOR_IP_QUOTA } = await import("$/partner/payments");
+const { partner_donation_of_grant } = await import("$/partner/grant-donation");
 const { action } = await import("./api.partner.v1.payments");
 const { loader: read } = await import("./api.partner.v1.payments_.$id");
 
@@ -184,6 +185,12 @@ describe("POST /api/partner/v1/payments", () => {
       });
       expect(create_order).toHaveBeenCalledTimes(1);
       expect(await donation_rows()).toHaveLength(1);
+      // the donation row is `paypal` for both, as at checkout: the capture
+      // names venmo. the site's own record keeps the method it asked for
+      const [held] = await db()
+        .select({ method: partner_payments.method })
+        .from(partner_payments);
+      expect(held!.method).toBe(m);
     }
   );
 
@@ -211,6 +218,13 @@ describe("POST /api/partner/v1/payments", () => {
       workflowSessionId: "wf_session_1",
       amount: 5000,
     });
+    // the grant is how its webhook finds this payment's donation
+    expect(await partner_donation_of_grant(db() as never, "grant_1")).toBe(
+      answer.id
+    );
+    expect(
+      await partner_donation_of_grant(db() as never, "grant_x")
+    ).toBeNull();
   });
 
   test("a daf payment without an authorized session is invalid_request", async () => {

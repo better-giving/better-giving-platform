@@ -1,5 +1,5 @@
 {
-  "id": "46e6332c-45cc-482b-88ae-84e6330c4fbd",
+  "id": "5b0c6b73-0177-480d-8933-51e9c2dba127",
   "prevId": "97f6314a-3121-4c49-8fa2-0f5137bb1a92",
   "version": "7",
   "dialect": "postgresql",
@@ -6032,6 +6032,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "grant_id": {
+          "name": "grant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "response": {
           "name": "response",
           "type": "jsonb",
@@ -6065,6 +6071,22 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "partner_payments_grant_id_idx": {
+          "name": "partner_payments_grant_id_idx",
+          "columns": [
+            {
+              "expression": "grant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"partner_payments\".\"grant_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
