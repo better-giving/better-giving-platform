@@ -64,7 +64,9 @@ export const chariot_create = async ({
   }
 
   const meta = grant.metadata as Partial<ChariotMetadata> | undefined;
-  const don_id = meta?.don_id ?? minted_id;
+  // a minted id is the server's: connect metadata is the browser's and can't
+  // replace it
+  const don_id = minted_id ?? meta?.don_id;
   if (!don_id) throw new Error(`chariot grant ${grant.id} carries no don_id`);
   const now = new Date().toISOString();
 

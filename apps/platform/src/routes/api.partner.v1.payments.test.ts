@@ -227,6 +227,64 @@ describe("POST /api/partner/v1/payments", () => {
     ).toBeNull();
   });
 
+  const daf = (gift_id: string, session: string) =>
+    body({
+      gift_id,
+      method: "daf",
+      amount: {
+        gift: 5000,
+        gift_fee_cover: 0,
+        contribution: 0,
+        contribution_fee_cover: 0,
+      },
+      authorized_session_id: session,
+    });
+
+  test("the payment id is the server's, whatever the grant's metadata names", async () => {
+    const { key } = await seed();
+    create_grant.mockResolvedValue({
+      id: "grant_1",
+      metadata: { don_id: "chosen-by-the-browser" },
+    });
+
+    const { id } = await (await post(key.key, daf("g-1", "wf_1"))).json();
+
+    expect(id).not.toBe("chosen-by-the-browser");
+    expect(await partner_donation_of_grant(db() as never, "grant_1")).toBe(id);
+  });
+
+  test("a second gift on an authorization that already paid is refused and leaves nothing payable", async () => {
+    const { key } = await seed();
+    const first = await (await post(key.key, daf("g-1", "wf_1"))).json();
+
+    const res = await post(key.key, daf("g-2", "wf_1"));
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("invalid_request");
+    expect(await partner_donation_of_grant(db() as never, "grant_1")).toBe(
+      first.id
+    );
+    const rows = await donation_rows();
+    expect(rows.filter((r) => r.status === "failed")).toHaveLength(1);
+    // the refused gift id stays free
+    create_grant.mockResolvedValue({ id: "grant_2" });
+    expect((await post(key.key, daf("g-2", "wf_2"))).status).toBe(200);
+  });
+
+  test("a repeat is answered from the record after the nonprofit turned the rail off", async () => {
+    const { key } = await seed();
+    const first = await (await post(key.key, body())).json();
+    await db()
+      .update(npos)
+      .set({ donate_methods: ["daf"] })
+      .where(eq(npos.registration_number, "EIN-MINE"));
+
+    const again = await post(key.key, body());
+
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual(first);
+  });
+
   test("a daf payment without an authorized session is invalid_request", async () => {
     const { key } = await seed();
 

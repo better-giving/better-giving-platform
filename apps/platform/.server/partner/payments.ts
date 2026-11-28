@@ -15,6 +15,7 @@ import {
   type Refusal,
 } from "../donation-intents/refusal";
 import type { Db } from "../pg/db";
+import { is_unique_violation } from "../pg/errors";
 import { donations } from "../pg/schema/donation";
 import {
   type IPartnerAmount,
@@ -230,6 +231,25 @@ export async function create_payment(
   }
   const method = req.method;
 
+  // a repeat of a payment already made is answered from the record, ahead of
+  // checks the nonprofit's settings may have changed since
+  const fingerprint = fingerprint_of(req);
+  const [held] = await db
+    .select({
+      fingerprint: partner_payments.fingerprint,
+      response: partner_payments.response,
+    })
+    .from(partner_payments)
+    .where(
+      and(
+        eq(partner_payments.npo_id, npo_id),
+        eq(partner_payments.gift_id, req.gift_id)
+      )
+    );
+  if (held?.response && held.fingerprint === fingerprint) {
+    return send(held.response);
+  }
+
   const ready = await readiness(db, npo_id);
   if (!ready.currencies.includes(req.currency)) {
     return problem("unsupported", {
@@ -274,7 +294,6 @@ export async function create_payment(
     });
   }
 
-  const fingerprint = fingerprint_of(req);
   const claimed = await claim(db, npo_id, req, fingerprint);
   if (claimed.kind === "replay") return send(claimed.answer);
   if (claimed.kind === "refused") return claimed.response;
@@ -325,19 +344,38 @@ export async function create_payment(
           .from(donations)
           .where(eq(donations.id, answer.id))
       : [];
-  await db
-    .update(partner_payments)
-    .set({
-      donation_id: answer.id,
-      response: answer,
-      ...(granted?.via_extra && { grant_id: granted.via_extra }),
-    })
-    .where(
-      and(
-        eq(partner_payments.npo_id, npo_id),
-        eq(partner_payments.gift_id, req.gift_id)
-      )
-    );
+  try {
+    await db
+      .update(partner_payments)
+      .set({
+        donation_id: answer.id,
+        response: answer,
+        ...(granted?.via_extra && { grant_id: granted.via_extra }),
+      })
+      .where(
+        and(
+          eq(partner_payments.npo_id, npo_id),
+          eq(partner_payments.gift_id, req.gift_id)
+        )
+      );
+  } catch (err) {
+    if (!is_unique_violation(err, "partner_payments_grant_id_idx")) throw err;
+    // a second gift on an authorization that already made a payment: its
+    // grant settles the first. the row just made can never be paid
+    await db
+      .update(donations)
+      .set({ status: "failed" })
+      .where(eq(donations.id, answer.id));
+    await release(db, npo_id, req.gift_id);
+    return problem("invalid_request", {
+      errors: [
+        {
+          path: "authorized_session_id",
+          message: "This authorization already made a payment.",
+        },
+      ],
+    });
+  }
   return send(answer);
 }
 
