@@ -7,7 +7,9 @@ import { stripe } from "$/kit/stripe";
  */
 export async function customer_with_currency(
   currency: string,
-  email: string
+  email: string,
+  /** a retry with the same key is answered the customer it first made */
+  idempotency_key?: string
 ): Promise<string> {
   // search for existing Stripe Customer data
   const actives: Stripe.Customer[] = [];
@@ -31,5 +33,8 @@ export async function customer_with_currency(
   if (with_currency) return with_currency.id;
 
   //create new customer for the desired currency
-  return stripe.customers.create({ email }).then((x) => x.id);
+  const created = idempotency_key
+    ? stripe.customers.create({ email }, { idempotencyKey: idempotency_key })
+    : stripe.customers.create({ email });
+  return created.then((x) => x.id);
 }

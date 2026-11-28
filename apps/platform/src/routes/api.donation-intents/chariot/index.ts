@@ -43,8 +43,9 @@ export const chariot_create = async ({
   if (!Number.isInteger(dollars))
     return refuse("invalid", "DAF grants must be a whole dollar amount", 400);
 
+  const cents = dollars * 100;
   const grant = await chariot
-    .create_grant({ workflowSessionId: via_extra, amount: dollars * 100 })
+    .create_grant({ workflowSessionId: via_extra, amount: cents })
     .catch((err) => {
       if (!(err instanceof ChariotError) || !NO_GRANT.has(err.http_status))
         throw err;
@@ -60,6 +61,16 @@ export const chariot_create = async ({
       grant.http_status === 410 ? "authorization_expired" : "invalid",
       NO_GRANT_MSG,
       grant.http_status
+    );
+  }
+
+  // a repeat create for a session answers the grant it first made. a caller
+  // that mints its own ids must not record it at an amount it wasn't made for
+  if (minted_id && grant.amount !== cents) {
+    return refuse(
+      "invalid",
+      "This authorization was made for a different amount.",
+      400
     );
   }
 

@@ -46,10 +46,15 @@ export const stripe_create = async ({
     );
   }
 
-  const customer_id = await customer_with_currency(
-    intent.currency,
-    donor.email
-  );
+  // a caller that minted the id may retry: every object made for it is keyed
+  // by it, so the retry's params match the first attempt's
+  const customer_id = don_id
+    ? await customer_with_currency(
+        intent.currency,
+        donor.email,
+        `partner-cus-${don_id}`
+      )
+    : await customer_with_currency(intent.currency, donor.email);
 
   const r_id = don_id ?? crypto.randomUUID();
   const now = new Date().toISOString();

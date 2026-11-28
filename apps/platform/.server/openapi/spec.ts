@@ -923,7 +923,13 @@ const PARTNER_HEADERS: Record<number, Json> = {
   },
   429: {
     "Retry-After": {
-      description: "Seconds until the key's window resets.",
+      description: "Seconds until the key's or donor address's window resets.",
+      schema: { type: "integer", minimum: 0 },
+    },
+  },
+  503: {
+    "Retry-After": {
+      description: "Seconds to wait before retrying the same request.",
       schema: { type: "integer", minimum: 0 },
     },
   },
@@ -935,12 +941,12 @@ const PARTNER_STATUS_TEXT: Record<number, string> = {
   400: "The request is invalid; `errors` names each field.",
   401: "The API key is missing, malformed or revoked.",
   404: "Nothing matches this request.",
-  409: "The `gift_id` was used with a different request, or is still being created.",
+  409: "The `gift_id` was already used with a different amount, currency, method, donor or authorization.",
   410: "The DAF authorization has expired.",
   422: "The nonprofit or amount can't take this: `unsupported`, `below_minimum` (with `minimum_minor`) or `above_maximum`.",
   429: "Too many requests. Wait for `Retry-After`, then retry.",
   500: "Better Giving hit an error.",
-  503: "A payment provider is still working on this request. Retry the same request shortly.",
+  503: "This request is still being made, or a payment provider is still working on it. Retry the same request after `Retry-After` seconds.",
 };
 
 const partner_problems = (...statuses: number[]) =>
@@ -981,7 +987,7 @@ const partner_ops = (): IOperation[] => [
       operationId: "create_payment",
       summary: "Create a payment for the nonprofit's hosted site",
       description:
-        "Makes one payment on Better Giving's own processor accounts, payable only by `method`. The four `amount` parts are integer minor units and are charged as sent, never repriced. `gift_id` is the site's own id for the gift and is unique per nonprofit: the same request again answers the same payment and makes no second one, and the same `gift_id` with another amount, currency or method is a 409 `idempotency_conflict`. A refused request leaves the `gift_id` free. `crypto` answers `unsupported` for now. `token` is what the method's browser half confirms with: a Stripe client secret, a PayPal order id, or for a DAF the payment id.",
+        "Makes one payment on Better Giving's own processor accounts, payable only by `method`. The four `amount` parts are integer minor units and are charged as sent, never repriced. `gift_id` is the site's own id for the gift and is unique per nonprofit: the same request again answers the same payment and makes no second one, and the same `gift_id` with another amount, currency or method is a 409 `idempotency_conflict`. A refused request leaves the `gift_id` free to retry with a corrected body. A request still being made, or one the DAF provider is still processing, answers 503 with `Retry-After`: send the same request again. A DAF payment takes `authorized_session_id`, used once: it is part of what the `gift_id` must repeat, and a second gift on the same authorization is refused. `crypto` answers `unsupported` for now. `token` is what the method's browser half confirms with: a Stripe client secret, a PayPal order id, or for a DAF the payment id.",
       security: [{ partnerKey: [] }],
       requestBody: {
         required: true,

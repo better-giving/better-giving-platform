@@ -17,6 +17,7 @@ const test_db = vi.hoisted(() => ({ current: null as TestDb | null }));
 const pi_create = vi.hoisted(() => vi.fn());
 const create_order = vi.hoisted(() => vi.fn());
 const get_order = vi.hoisted(() => vi.fn());
+const customer_with_currency = vi.hoisted(() => vi.fn(async () => "cus_1"));
 const create_grant = vi.hoisted(() => vi.fn());
 
 vi.mock("$/pg/db", () => ({
@@ -42,7 +43,7 @@ vi.mock("$/kit/paypal", () => ({ paypal: { create_order, get_order } }));
 vi.mock("$/kit/chariot", () => ({ chariot: { create_grant } }));
 vi.mock("#/.server/unit-per-usd", () => ({ unit_per_usd: async () => 1 }));
 vi.mock("#/routes/api.donation-intents/stripe/customer-with-currency", () => ({
-  customer_with_currency: async () => "cus_1",
+  customer_with_currency,
 }));
 vi.mock("#/routes/api.donation-intents/stripe/descriptor-suffix", () => ({
   npo_descriptor_suffix: async () => undefined,
@@ -80,6 +81,7 @@ beforeEach(async () => {
   create_order.mockResolvedValue({ id: "ORDER-1" });
   create_grant.mockImplementation(async () => ({
     id: "grant_1",
+    amount: 5000,
     // a partner's connect element carries no metadata: no payment exists yet
   }));
   await db().delete(partner_payments);
@@ -247,6 +249,7 @@ describe("POST /api/partner/v1/payments", () => {
     const { key } = await seed();
     create_grant.mockResolvedValue({
       id: "grant_1",
+      amount: 5000,
       metadata: { don_id: "chosen-by-the-browser" },
     });
 
@@ -271,7 +274,7 @@ describe("POST /api/partner/v1/payments", () => {
       first.id
     );
     // the refused gift id stays free
-    create_grant.mockResolvedValue({ id: "grant_2" });
+    create_grant.mockResolvedValue({ id: "grant_2", amount: 5000 });
     expect((await post(key.key, daf("g-2", "wf_2"))).status).toBe(200);
   });
 
@@ -314,7 +317,9 @@ describe("POST /api/partner/v1/payments", () => {
     // the outcome is unknown, so the claim holds until it goes stale; the
     // retry then takes it over under the same payment id
     const [held] = await db().select().from(partner_payments);
-    expect((await post(key.key, daf("g-1", "wf_1"))).status).toBe(409);
+    const waiting = await post(key.key, daf("g-1", "wf_1"));
+    expect(waiting.status).toBe(503);
+    expect(waiting.headers.get("retry-after")).toBe("30");
     await stale("g-1");
     const retry = await post(key.key, daf("g-1", "wf_1"));
     expect(retry.status).toBe(200);
@@ -486,9 +491,64 @@ describe("POST /api/partner/v1/payments", () => {
 
     const res = await post(key.key, payload);
 
+    expect(res.status).toBe(503);
+    expect(res.headers.get("retry-after")).toBe("30");
+    expect((await res.json()).code).toBe("provider_error");
+    expect(pi_create).not.toHaveBeenCalled();
+  });
+
+  test("a retry on another authorization is a conflict, not a second grant", async () => {
+    const { key } = await seed();
+    await post(key.key, daf("g-1", "wf_1"));
+    create_grant.mockClear();
+
+    const res = await post(key.key, daf("g-1", "wf_2"));
+
     expect(res.status).toBe(409);
     expect((await res.json()).code).toBe("idempotency_conflict");
-    expect(pi_create).not.toHaveBeenCalled();
+    expect(create_grant).not.toHaveBeenCalled();
+  });
+
+  test("an authorization made for another amount is refused and records nothing", async () => {
+    const { key } = await seed();
+    create_grant.mockResolvedValue({ id: "grant_9", amount: 1200 });
+
+    const res = await post(key.key, daf("g-1", "wf_1"));
+
+    expect(res.status).toBe(400);
+    expect(await donation_rows()).toHaveLength(0);
+  });
+
+  test("a paypal gift paid meanwhile is replayed, not reissued, whatever paypal now says", async () => {
+    const { key } = await seed();
+    const first = await (
+      await post(key.key, body({ method: "paypal" }))
+    ).json();
+    await db()
+      .update(donations)
+      .set({ status: "settled" })
+      .where(eq(donations.id, first.id));
+    await db()
+      .update(partner_payments)
+      .set({ created_at: new Date(Date.now() - 2 * 3600_000).toISOString() });
+    get_order.mockRejectedValue(new PayPalApiError("get order", 404, "{}"));
+
+    expect(
+      await (await post(key.key, body({ method: "paypal" }))).json()
+    ).toEqual(first);
+    expect(create_order).toHaveBeenCalledTimes(1);
+  });
+
+  test("a stripe retry's customer is keyed by the payment id too", async () => {
+    const { key } = await seed();
+
+    const { id } = await (await post(key.key, body())).json();
+
+    expect(customer_with_currency).toHaveBeenCalledWith(
+      "USD",
+      "donor@example.org",
+      `partner-cus-${id}`
+    );
   });
 
   test("a daf repeat is answered from the record", async () => {
@@ -557,7 +617,7 @@ describe("POST /api/partner/v1/payments", () => {
     expect(pi_create).toHaveBeenCalledTimes(1);
     expect([a.status, b.status].sort()).toEqual([
       200,
-      a.status === 200 && b.status === 200 ? 200 : 409,
+      a.status === 200 && b.status === 200 ? 200 : 503,
     ]);
   });
 

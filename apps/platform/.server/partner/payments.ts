@@ -65,6 +65,9 @@ export const fingerprint_of = (r: PaymentRequest): string =>
       r.amount.gift_fee_cover,
       r.amount.contribution,
       r.amount.contribution_fee_cover,
+      // a repeat names the same donor, and the same authorization on a DAF
+      r.donor.email.toLowerCase(),
+      r.method === "daf" ? r.authorized_session_id : null,
     ])
   );
 
@@ -144,6 +147,16 @@ async function order_voided(
 
 const send = (answer: IPartnerPaymentAnswer) =>
   resp.json(answer, 200, { "cache-control": "no-store" });
+
+/** the same request is being made right now, or lost its claim to a retry: not
+ * a conflict, so a 503 the site retries as it would any provider answer */
+const RETRY_AFTER_S = 30;
+const still_being_made = () =>
+  provider_error(
+    503,
+    "This gift_id is still being created. Retry the same request.",
+    RETRY_AFTER_S
+  );
 
 type Claim =
   | {
@@ -237,9 +250,7 @@ async function claim(
     if (!again) return claim(db, npo_id, req, fingerprint, true);
     return {
       kind: "refused",
-      response: problem("idempotency_conflict", {
-        detail: "This gift_id is being created by another request. Retry.",
-      }),
+      response: still_being_made(),
     };
   }
   if (held.fingerprint !== fingerprint) {
@@ -276,9 +287,7 @@ async function claim(
   if (taken) return { kind: "mine", ...taken };
   return {
     kind: "refused",
-    response: problem("idempotency_conflict", {
-      detail: "This gift_id is still being created. Retry the same request.",
-    }),
+    response: still_being_made(),
   };
 }
 
@@ -332,24 +341,32 @@ export async function create_payment(
     }
     // the donor can no longer approve the order it names: the gift id gets a
     // new one, and the old donation is closed
-    await db
-      .update(donations)
-      .set({ status: "expired" })
-      .where(
-        and(
-          eq(donations.id, held.response.id),
-          inArray(donations.status, ["created", "intent"])
+    // closed only if still unpaid, and the claim goes only when it was: a
+    // donation paid meanwhile keeps its answer
+    const closed = await db.transaction(async (tx) => {
+      const [expired] = await tx
+        .update(donations)
+        .set({ status: "expired" })
+        .where(
+          and(
+            eq(donations.id, held.response!.id),
+            inArray(donations.status, ["created", "intent"])
+          )
         )
-      );
-    await db
-      .delete(partner_payments)
-      .where(
-        and(
-          eq(partner_payments.npo_id, npo_id),
-          eq(partner_payments.gift_id, req.gift_id),
-          eq(partner_payments.donation_id, held.response.id)
-        )
-      );
+        .returning({ id: donations.id });
+      if (!expired) return false;
+      await tx
+        .delete(partner_payments)
+        .where(
+          and(
+            eq(partner_payments.npo_id, npo_id),
+            eq(partner_payments.gift_id, req.gift_id),
+            eq(partner_payments.donation_id, held.response!.id)
+          )
+        );
+      return true;
+    });
+    if (!closed) return send(held.response);
   }
 
   const ready = await readiness(db, npo_id);
@@ -442,7 +459,8 @@ export async function create_payment(
     if (err instanceof ChariotError && err.http_status === 409) {
       return provider_error(
         503,
-        "This authorization is still being processed. Retry the same request shortly."
+        "This authorization is still being processed. Retry the same request shortly.",
+        RETRY_AFTER_S
       );
     }
     throw err;
@@ -500,9 +518,7 @@ export async function create_payment(
   // the claim went to a later request while this one ran: its row is its own,
   // and this session is never recorded
   if (recorded.length === 0) {
-    return problem("idempotency_conflict", {
-      detail: "This gift_id is being created by another request. Retry.",
-    });
+    return still_being_made();
   }
   return send(answer);
 }

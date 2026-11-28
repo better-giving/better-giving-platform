@@ -1,4 +1,4 @@
-import { eq, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Db } from "../pg/db";
 import { partner_payments } from "../pg/schema/partner";
 
@@ -12,16 +12,14 @@ export async function partner_donation_of_grant(
   grant_id: string,
   session_id?: string
 ): Promise<string | null> {
-  const [row] = await db
+  const [linked] = await db
     .select({ donation_id: partner_payments.donation_id })
     .from(partner_payments)
-    .where(
-      session_id
-        ? or(
-            eq(partner_payments.grant_id, grant_id),
-            eq(partner_payments.authorized_session_id, session_id)
-          )
-        : eq(partner_payments.grant_id, grant_id)
-    );
-  return row?.donation_id ?? null;
+    .where(eq(partner_payments.grant_id, grant_id));
+  if (linked || !session_id) return linked?.donation_id ?? null;
+  const [by_session] = await db
+    .select({ donation_id: partner_payments.donation_id })
+    .from(partner_payments)
+    .where(eq(partner_payments.authorized_session_id, session_id));
+  return by_session?.donation_id ?? null;
 }
